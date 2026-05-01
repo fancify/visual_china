@@ -35,6 +35,8 @@
 - [严格地理坐标与体验压缩规则](./geographic-coordinate-and-experience-compression.md)
 - [视觉风格与性能预算原则](./visual-style-and-performance-budget.md)
 - [多尺度地图与历史年代层实现计划](./superpowers/plans/2026-05-01-multiscale-map-era-layers.md)
+- [现代水系数据管线设计](./superpowers/specs/2026-05-01-modern-hydrography-pipeline-design.md)
+- [现代水系数据管线实现计划](./superpowers/plans/2026-05-01-modern-hydrography-pipeline.md)
 
 ## 地图尺度与全国规划
 
