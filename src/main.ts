@@ -59,6 +59,12 @@ import {
   type EnvironmentVisuals
 } from "./game/environment";
 import {
+  clearGameplayInput,
+  isGameplayInputKey,
+  movementAxesFromKeys,
+  normalizeInputKey
+} from "./game/inputState.js";
+import {
   celestialDomeVector,
   skyBodyStyle,
   skyDomePolicy
@@ -144,6 +150,7 @@ import {
   modeColor,
   zoneNameAt
 } from "./game/terrainModel";
+import { textSpriteLayout } from "./game/textLabel.js";
 
 interface FragmentVisual {
   sprite: Sprite;
@@ -597,9 +604,10 @@ function createCloudTexture(size = 512): CanvasTexture {
 }
 
 function createTextSprite(text: string, accent: string): Sprite {
+  const layout = textSpriteLayout(text);
   const canvas = document.createElement("canvas");
-  canvas.width = 420;
-  canvas.height = 120;
+  canvas.width = layout.canvasWidth;
+  canvas.height = layout.canvasHeight;
 
   const context = canvas.getContext("2d");
 
@@ -611,15 +619,21 @@ function createTextSprite(text: string, accent: string): Sprite {
   context.strokeStyle = "rgba(235, 214, 155, 0.28)";
   context.lineWidth = 3;
   context.beginPath();
-  context.roundRect(8, 12, 404, 96, 24);
+  context.roundRect(
+    layout.rect.x,
+    layout.rect.y,
+    layout.rect.width,
+    layout.rect.height,
+    layout.rect.radius
+  );
   context.fill();
   context.stroke();
 
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.font = "600 32px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.font = `600 ${layout.fontSize}px 'Noto Sans SC', 'PingFang SC', sans-serif`;
   context.fillStyle = accent;
-  context.fillText(text, 210, 60);
+  context.fillText(text, layout.text.x, layout.text.y);
 
   const texture = new CanvasTexture(canvas);
   texture.needsUpdate = true;
@@ -627,11 +641,13 @@ function createTextSprite(text: string, accent: string): Sprite {
   const material = new SpriteMaterial({
     map: texture,
     transparent: true,
-    depthWrite: false
+    depthWrite: false,
+    depthTest: false
   });
 
   const sprite = new Sprite(material);
-  sprite.scale.set(10.5, 3, 1);
+  sprite.scale.set(layout.scale.x, layout.scale.y, 1);
+  sprite.renderOrder = 90;
   return sprite;
 }
 
@@ -722,7 +738,7 @@ function rebuildLandmarkVisuals(): void {
         landmark.kind === "pass" ? "#efcf83" : "#f3ebd4"
       );
       if (landmark.kind === "pass") {
-        label.scale.set(15, 4.3, 1);
+        label.scale.multiplyScalar(1.18);
       }
       label.position.set(landmark.position.x, ground + 6.4, landmark.position.y);
       label.userData.chunkId = chunkId;
@@ -1082,7 +1098,7 @@ function rebuildRouteVisuals(): void {
   qinlingRoutes.forEach((route) => {
     if (route.labelPoint && route.label) {
       const routeLabel = createTextSprite(route.label, "#f6d783");
-      routeLabel.scale.set(16.5, 4.7, 1);
+      routeLabel.scale.multiplyScalar(1.16);
       routeLabel.position.set(
         route.labelPoint.x,
         terrainSampler!.sampleHeight(route.labelPoint.x, route.labelPoint.y) + 6.2,
@@ -1957,10 +1973,16 @@ let isAtlasMapDragging = false;
 let atlasMapDragOriginX = 0;
 let atlasMapDragOriginY = 0;
 
+function resetGameplayInput(): void {
+  clearGameplayInput(keys);
+  isDragging = false;
+  isAtlasMapDragging = false;
+}
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && atlasWorkbench.isFullscreen) {
     event.preventDefault();
-    keys.clear();
+    resetGameplayInput();
     atlasWorkbench = setAtlasFullscreen(atlasWorkbench, false);
     refreshAtlasWorkbench();
     return;
@@ -1968,7 +1990,7 @@ document.addEventListener("keydown", (event) => {
 
   if (event.key.toLowerCase() === "m") {
     event.preventDefault();
-    keys.clear();
+    resetGameplayInput();
     atlasWorkbench = setAtlasFullscreen(atlasWorkbench, !atlasWorkbench.isFullscreen);
     refreshAtlasWorkbench();
     return;
@@ -2030,11 +2052,21 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
 
-  keys.add(event.key.toLowerCase());
+  if (isGameplayInputKey(event.key)) {
+    keys.add(normalizeInputKey(event.key));
+  }
 });
 
 document.addEventListener("keyup", (event) => {
-  keys.delete(event.key.toLowerCase());
+  keys.delete(normalizeInputKey(event.key));
+});
+
+window.addEventListener("blur", resetGameplayInput);
+window.addEventListener("pagehide", resetGameplayInput);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    resetGameplayInput();
+  }
 });
 
 function enableAudio(): void {
@@ -2383,21 +2415,7 @@ function update(deltaSeconds: number): void {
     updateTerrainColors(visuals);
   }
 
-  let forwardInput = 0;
-  let rightInput = 0;
-
-  if (keys.has("w") || keys.has("arrowup")) {
-    forwardInput += 1;
-  }
-  if (keys.has("s") || keys.has("arrowdown")) {
-    forwardInput -= 1;
-  }
-  if (keys.has("a") || keys.has("arrowleft")) {
-    rightInput -= 1;
-  }
-  if (keys.has("d") || keys.has("arrowright")) {
-    rightInput += 1;
-  }
+  const { forward: forwardInput, right: rightInput } = movementAxesFromKeys(keys);
 
   if (keys.has("q")) {
     cameraHeading += deltaSeconds * 1.2;
