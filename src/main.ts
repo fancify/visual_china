@@ -65,7 +65,8 @@ import {
 } from "./game/skyDome.js";
 import {
   atlasVisibleFeatures,
-  featureWorldPoints
+  featureWorldPoints,
+  missingDemTileWorldRects
 } from "./game/atlasRender.js";
 import {
   atlasMapCanvasToWorldPoint,
@@ -1234,6 +1235,7 @@ function drawAtlasMapCanvas(
   context.putImageData(image, 0, 0);
   context.fillStyle = "rgba(247, 230, 174, 0.12)";
   context.fillRect(0, 0, width, height);
+  drawDemQualityOverlay(context, asset, canvas, mapView, useWorkbenchView);
 
   const atlasLayers = qinlingAtlasLayers.map((layer) => ({
     ...layer,
@@ -1267,6 +1269,92 @@ function drawAtlasMapCanvas(
   context.lineWidth = 2;
   context.strokeStyle = "rgba(44, 24, 14, 0.8)";
   context.stroke();
+}
+
+function drawDemQualityOverlay(
+  context: CanvasRenderingContext2D,
+  asset: DemAsset,
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number },
+  showLabel: boolean
+): void {
+  const rects = missingDemTileWorldRects(asset);
+
+  if (rects.length === 0) {
+    return;
+  }
+
+  context.save();
+  context.setLineDash([8, 5]);
+  context.lineWidth = 1.5;
+  context.strokeStyle = "rgba(125, 51, 33, 0.78)";
+  context.fillStyle = "rgba(181, 75, 45, 0.2)";
+  let labelBounds: { x: number; y: number; maxX: number; maxY: number } | null = null;
+
+  for (const rect of rects) {
+    const topLeft = atlasMapWorldToCanvasPoint(
+      { x: rect.minX, y: rect.maxY },
+      asset.world,
+      canvas,
+      mapView
+    );
+    const bottomRight = atlasMapWorldToCanvasPoint(
+      { x: rect.maxX, y: rect.minY },
+      asset.world,
+      canvas,
+      mapView
+    );
+    const x = Math.min(topLeft.x, bottomRight.x);
+    const y = Math.min(topLeft.y, bottomRight.y);
+    const w = Math.abs(bottomRight.x - topLeft.x);
+    const h = Math.abs(bottomRight.y - topLeft.y);
+
+    if (w < 2 || h < 2) {
+      continue;
+    }
+
+    labelBounds = labelBounds
+      ? {
+          x: Math.min(labelBounds.x, x),
+          y: Math.min(labelBounds.y, y),
+          maxX: Math.max(labelBounds.maxX, x + w),
+          maxY: Math.max(labelBounds.maxY, y + h)
+        }
+      : { x, y, maxX: x + w, maxY: y + h };
+
+    context.fillRect(x, y, w, h);
+    context.strokeRect(x, y, w, h);
+
+    context.save();
+    context.beginPath();
+    context.rect(x, y, w, h);
+    context.clip();
+    context.setLineDash([]);
+    context.strokeStyle = "rgba(125, 51, 33, 0.24)";
+    for (let hatch = x - h; hatch < x + w + h; hatch += 12) {
+      context.beginPath();
+      context.moveTo(hatch, y + h);
+      context.lineTo(hatch + h, y);
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  if (
+    showLabel &&
+    labelBounds &&
+    labelBounds.maxX - labelBounds.x > 70 &&
+    labelBounds.maxY - labelBounds.y > 28
+  ) {
+    context.setLineDash([]);
+    context.fillStyle = "rgba(55, 30, 22, 0.84)";
+    context.fillRect(labelBounds.x + 8, labelBounds.y + 8, 104, 22);
+    context.fillStyle = "#f6d7a2";
+    context.font = "12px serif";
+    context.fillText("DEM缺瓦片/插值", labelBounds.x + 14, labelBounds.y + 23);
+  }
+
+  context.restore();
 }
 
 function drawOverviewMap(asset: DemAsset, playerPosition: Vector3): void {
