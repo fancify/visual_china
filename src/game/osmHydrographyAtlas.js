@@ -31,11 +31,7 @@ export function importedWaterDisplayPriority(feature) {
     return 5;
   }
 
-  if (feature.kind === "stream") {
-    return 4;
-  }
-
-  return 2;
+  return 0;
 }
 
 export function importedHydrographyFeatureToAtlasFeature(feature) {
@@ -77,5 +73,6 @@ export function importedHydrographyAssetToAtlasFeatures(asset) {
 
   return features
     .map(importedHydrographyFeatureToAtlasFeature)
+    .filter((feature) => feature.displayPriority > 0)
     .toSorted((a, b) => b.displayPriority - a.displayPriority);
 }

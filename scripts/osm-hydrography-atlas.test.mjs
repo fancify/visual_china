@@ -25,11 +25,11 @@ test("promotes known backbone rivers above generic imported waterways", () => {
   assert.equal(importedWaterDisplayPriority({ ...baseFeature, name: "地方河" }), 5);
   assert.equal(
     importedWaterDisplayPriority({ ...baseFeature, name: "地方溪", kind: "stream" }),
-    4
+    0
   );
   assert.equal(
     importedWaterDisplayPriority({ ...baseFeature, name: "灌渠", kind: "canal" }),
-    2
+    0
   );
 });
 
@@ -56,7 +56,17 @@ test("sorts imported hydrography features by atlas display priority", () => {
   });
 
   assert.deepEqual(features.map((feature) => feature.id), [
-    "osm-water-osm-way-3",
-    "osm-water-osm-way-2"
+    "osm-water-osm-way-3"
   ]);
+});
+
+test("omits local streams and canals from atlas evidence features", () => {
+  const features = importedHydrographyAssetToAtlasFeatures({
+    features: [
+      { ...baseFeature, id: "osm-way-4", name: "地方溪", kind: "stream" },
+      { ...baseFeature, id: "osm-way-5", name: "排水沟", kind: "canal" }
+    ]
+  });
+
+  assert.deepEqual(features, []);
 });
