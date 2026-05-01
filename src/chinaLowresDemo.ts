@@ -96,7 +96,8 @@ function createChinaTerrain(asset: DemAsset): Mesh<PlaneGeometry, MeshPhongMater
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index);
     const z = positions.getZ(index);
-    const rawHeight = sampler.sampleHeight(x, z);
+    const mapZ = -z;
+    const rawHeight = sampler.sampleHeight(x, mapZ);
     const normalizedHeight = MathUtils.clamp(
       (rawHeight - asset.minHeight) / (asset.maxHeight - asset.minHeight || 1),
       0,
@@ -104,7 +105,7 @@ function createChinaTerrain(asset: DemAsset): Mesh<PlaneGeometry, MeshPhongMater
     );
 
     positions.setY(index, stylizedHeight(rawHeight, asset));
-    color.copy(terrainColor(rawHeight, normalizedHeight, sampler.sampleRiver(x, z)));
+    color.copy(terrainColor(rawHeight, normalizedHeight, sampler.sampleRiver(x, mapZ)));
     colors.setXYZ(index, color.r, color.g, color.b);
   }
 
