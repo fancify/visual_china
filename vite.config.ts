@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { resolve } from "node:path";
 
 export default defineConfig({
   server: {
@@ -7,6 +8,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, "index.html"),
+        chinaLowres: resolve(__dirname, "china-lowres.html")
+      },
       output: {
         manualChunks: {
           three: ["three"]
