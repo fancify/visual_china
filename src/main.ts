@@ -64,18 +64,21 @@ import {
   skyDomePolicy
 } from "./game/skyDome.js";
 import {
-  atlasCanvasPoint,
-  atlasFeatureCenter,
   atlasVisibleFeatures,
   featureWorldPoints
 } from "./game/atlasRender.js";
 import {
+  atlasMapCanvasToWorldPoint,
+  atlasMapWorldToCanvasPoint,
   createAtlasWorkbenchState,
   findAtlasFeatureAtCanvasPoint,
+  panAtlasMap,
+  resetAtlasMapView,
   selectAtlasFeature,
   setAtlasFullscreen,
   selectedAtlasFeature,
   toggleAtlasLayer,
+  zoomAtlasMapAtPoint,
   type AtlasWorkbenchState
 } from "./game/atlasWorkbench.js";
 import { movementVectorFromInput } from "./game/navigation.js";
@@ -1163,7 +1166,8 @@ function resizeAtlasCanvasToDisplaySize(canvas: HTMLCanvasElement): void {
 function drawAtlasMapCanvas(
   canvas: HTMLCanvasElement,
   asset: DemAsset,
-  playerPosition: Vector3
+  playerPosition: Vector3,
+  useWorkbenchView = false
 ): void {
   const context = canvas.getContext("2d");
 
@@ -1174,23 +1178,51 @@ function drawAtlasMapCanvas(
   const { width, height } = canvas;
   const image = context.createImageData(width, height);
   const heightRange = asset.maxHeight - asset.minHeight || 1;
+  const mapView = useWorkbenchView
+    ? atlasWorkbench.mapView
+    : { scale: 1, offsetX: 0, offsetY: 0 };
 
   for (let y = 0; y < height; y += 1) {
-    const row = Math.min(
-      asset.grid.rows - 1,
-      Math.max(0, Math.floor((y / height) * asset.grid.rows))
-    );
-
     for (let x = 0; x < width; x += 1) {
+      const worldPoint = useWorkbenchView
+        ? atlasMapCanvasToWorldPoint({ x, y }, asset.world, canvas, mapView)
+        : {
+            x: ((x / width) - 0.5) * asset.world.width,
+            y: (0.5 - y / height) * asset.world.depth
+          };
+      const inBounds =
+        worldPoint.x >= -asset.world.width / 2 &&
+        worldPoint.x <= asset.world.width / 2 &&
+        worldPoint.y >= -asset.world.depth / 2 &&
+        worldPoint.y <= asset.world.depth / 2;
+      const offset = (y * width + x) * 4;
+
+      if (!inBounds) {
+        image.data[offset] = 9;
+        image.data[offset + 1] = 17;
+        image.data[offset + 2] = 17;
+        image.data[offset + 3] = 255;
+        continue;
+      }
+
       const column = Math.min(
         asset.grid.columns - 1,
-        Math.max(0, Math.floor((x / width) * asset.grid.columns))
+        Math.max(
+          0,
+          Math.floor(((worldPoint.x / asset.world.width) + 0.5) * asset.grid.columns)
+        )
+      );
+      const row = Math.min(
+        asset.grid.rows - 1,
+        Math.max(
+          0,
+          Math.floor((0.5 - worldPoint.y / asset.world.depth) * asset.grid.rows)
+        )
       );
       const sample = asset.heights[row * asset.grid.columns + column] ?? asset.minHeight;
       const h = MathUtils.clamp((sample - asset.minHeight) / heightRange, 0, 1);
       const lowland = h < 0.28;
       const ridge = h > 0.58;
-      const offset = (y * width + x) * 4;
 
       image.data[offset] = lowland ? 178 : ridge ? 224 : 190 + h * 34;
       image.data[offset + 1] = lowland ? 178 : ridge ? 211 : 170 + h * 40;
@@ -1211,24 +1243,22 @@ function drawAtlasMapCanvas(
 
   atlasVisibleFeatures(qinlingAtlasFeatures, atlasLayers).forEach(
     (feature) => {
-      drawAtlasFeature(context, feature, asset, canvas);
+      drawAtlasFeature(context, feature, asset, canvas, mapView);
     }
   );
 
   if (selectedFeature) {
-    drawAtlasFeatureSelection(context, selectedFeature, asset, canvas);
+    drawAtlasFeatureSelection(context, selectedFeature, asset, canvas, mapView);
   }
 
-  const playerX = MathUtils.clamp(
-    (playerPosition.x / asset.world.width + 0.5) * width,
-    0,
-    width
+  const playerPoint = atlasMapWorldToCanvasPoint(
+    { x: playerPosition.x, y: playerPosition.z },
+    asset.world,
+    canvas,
+    mapView
   );
-  const playerY = MathUtils.clamp(
-    (0.5 - playerPosition.z / asset.world.depth) * height,
-    0,
-    height
-  );
+  const playerX = MathUtils.clamp(playerPoint.x, 0, width);
+  const playerY = MathUtils.clamp(playerPoint.y, 0, height);
 
   context.beginPath();
   context.arc(playerX, playerY, 5.5, 0, Math.PI * 2);
@@ -1244,7 +1274,7 @@ function drawOverviewMap(asset: DemAsset, playerPosition: Vector3): void {
 
   if (atlasWorkbench.isFullscreen) {
     resizeAtlasCanvasToDisplaySize(hud.atlasFullscreenCanvas);
-    drawAtlasMapCanvas(hud.atlasFullscreenCanvas, asset, playerPosition);
+    drawAtlasMapCanvas(hud.atlasFullscreenCanvas, asset, playerPosition, true);
   }
 }
 
@@ -1289,14 +1319,38 @@ function routeStatusText(influence: RouteInfluence): string {
   return `古道：偏离${influence.nearestRoute.name}，山地消耗上升`;
 }
 
+function atlasFeatureCenterInView(
+  feature: QinlingAtlasFeature,
+  asset: DemAsset,
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number }
+): { x: number; y: number } {
+  const points = featureWorldPoints(feature).map((point) =>
+    atlasMapWorldToCanvasPoint(point, asset.world, canvas, mapView)
+  );
+  const sum = points.reduce(
+    (total, point) => ({
+      x: total.x + point.x,
+      y: total.y + point.y
+    }),
+    { x: 0, y: 0 }
+  );
+
+  return {
+    x: sum.x / points.length,
+    y: sum.y / points.length
+  };
+}
+
 function drawAtlasPath(
   context: CanvasRenderingContext2D,
   feature: QinlingAtlasFeature,
   asset: DemAsset,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number }
 ): void {
   const points = featureWorldPoints(feature).map((point) =>
-    atlasCanvasPoint(point, asset.world, canvas)
+    atlasMapWorldToCanvasPoint(point, asset.world, canvas, mapView)
   );
 
   if (points.length === 0) {
@@ -1318,14 +1372,15 @@ function drawAtlasFeature(
   context: CanvasRenderingContext2D,
   feature: QinlingAtlasFeature,
   asset: DemAsset,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number }
 ): void {
   context.save();
   context.lineCap = "round";
   context.lineJoin = "round";
 
   if (feature.layer === "landform") {
-    drawAtlasPath(context, feature, asset, canvas);
+    drawAtlasPath(context, feature, asset, canvas, mapView);
     if (feature.geometry === "area") {
       const isBasin = feature.terrainRole.includes("basin");
       const isGorge = feature.terrainRole.includes("gorge");
@@ -1349,23 +1404,23 @@ function drawAtlasFeature(
   }
 
   if (feature.layer === "water") {
-    drawAtlasPath(context, feature, asset, canvas);
+    drawAtlasPath(context, feature, asset, canvas, mapView);
     context.strokeStyle = "rgba(20, 63, 73, 0.52)";
     context.lineWidth = feature.displayPriority >= 9 ? 4.2 : 3.1;
     context.stroke();
-    drawAtlasPath(context, feature, asset, canvas);
+    drawAtlasPath(context, feature, asset, canvas, mapView);
     context.strokeStyle = "rgba(97, 198, 219, 0.9)";
     context.lineWidth = feature.displayPriority >= 9 ? 2 : 1.35;
     context.stroke();
   }
 
   if (feature.layer === "road") {
-    drawAtlasPath(context, feature, asset, canvas);
+    drawAtlasPath(context, feature, asset, canvas, mapView);
     context.setLineDash([5, 4]);
     context.strokeStyle = "rgba(93, 52, 18, 0.44)";
     context.lineWidth = 2.4;
     context.stroke();
-    drawAtlasPath(context, feature, asset, canvas);
+    drawAtlasPath(context, feature, asset, canvas, mapView);
     context.strokeStyle = "rgba(229, 168, 82, 0.76)";
     context.lineWidth = 1.25;
     context.stroke();
@@ -1373,7 +1428,7 @@ function drawAtlasFeature(
   }
 
   if (feature.geometry === "point") {
-    const center = atlasFeatureCenter(feature, asset.world, canvas);
+    const center = atlasFeatureCenterInView(feature, asset, canvas, mapView);
     const isPass = feature.layer === "pass";
     const radius = isPass ? 4.2 : 3.4;
 
@@ -1391,7 +1446,7 @@ function drawAtlasFeature(
   }
 
   if (feature.displayPriority >= 9) {
-    const center = atlasFeatureCenter(feature, asset.world, canvas);
+    const center = atlasFeatureCenterInView(feature, asset, canvas, mapView);
     context.font = feature.layer === "landform"
       ? "600 12px 'Noto Sans SC', 'PingFang SC', sans-serif"
       : "600 10px 'Noto Sans SC', 'PingFang SC', sans-serif";
@@ -1410,9 +1465,10 @@ function drawAtlasFeatureSelection(
   context: CanvasRenderingContext2D,
   feature: QinlingAtlasFeature,
   asset: DemAsset,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number }
 ): void {
-  const center = atlasFeatureCenter(feature, asset.world, canvas);
+  const center = atlasFeatureCenterInView(feature, asset, canvas, mapView);
 
   context.save();
   context.beginPath();
@@ -1781,6 +1837,9 @@ let cameraViewMode: CameraViewMode = "overview";
 let isDragging = false;
 let dragOriginX = 0;
 let dragOriginY = 0;
+let isAtlasMapDragging = false;
+let atlasMapDragOriginX = 0;
+let atlasMapDragOriginY = 0;
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && atlasWorkbench.isFullscreen) {
@@ -1968,9 +2027,16 @@ function selectAtlasFeatureFromCanvas(
     x: ((event.clientX - rect.left) / rect.width) * canvas.width,
     y: ((event.clientY - rect.top) / rect.height) * canvas.height
   };
+  const hitState =
+    canvas === hud.atlasFullscreenCanvas
+      ? atlasWorkbench
+      : {
+          ...atlasWorkbench,
+          mapView: { scale: 1, offsetX: 0, offsetY: 0 }
+        };
   const feature = findAtlasFeatureAtCanvasPoint(
     qinlingAtlasFeatures,
-    atlasWorkbench,
+    hitState,
     pointer,
     terrainSampler.asset.world,
     canvas
@@ -1998,7 +2064,78 @@ hud.overviewCanvas.addEventListener("click", (event: MouseEvent) => {
 });
 
 hud.atlasFullscreenCanvas.addEventListener("click", (event: MouseEvent) => {
+  if (isAtlasMapDragging) {
+    return;
+  }
+
   selectAtlasFeatureFromCanvas(hud.atlasFullscreenCanvas, event);
+});
+
+hud.atlasFullscreenCanvas.addEventListener("wheel", (event: WheelEvent) => {
+  if (!terrainSampler) {
+    return;
+  }
+
+  event.preventDefault();
+  const rect = hud.atlasFullscreenCanvas.getBoundingClientRect();
+  const pointer = {
+    x: ((event.clientX - rect.left) / rect.width) * hud.atlasFullscreenCanvas.width,
+    y: ((event.clientY - rect.top) / rect.height) * hud.atlasFullscreenCanvas.height
+  };
+  atlasWorkbench = zoomAtlasMapAtPoint(
+    atlasWorkbench,
+    event.deltaY < 0 ? 1.18 : 1 / 1.18,
+    pointer,
+    terrainSampler.asset.world,
+    hud.atlasFullscreenCanvas
+  );
+  refreshAtlasWorkbench();
+});
+
+hud.atlasFullscreenCanvas.addEventListener("pointerdown", (event: PointerEvent) => {
+  isAtlasMapDragging = false;
+  atlasMapDragOriginX = event.clientX;
+  atlasMapDragOriginY = event.clientY;
+  hud.atlasFullscreenCanvas.setPointerCapture(event.pointerId);
+});
+
+hud.atlasFullscreenCanvas.addEventListener("pointermove", (event: PointerEvent) => {
+  if (!hud.atlasFullscreenCanvas.hasPointerCapture(event.pointerId)) {
+    return;
+  }
+
+  const rect = hud.atlasFullscreenCanvas.getBoundingClientRect();
+  const delta = {
+    x: ((event.clientX - atlasMapDragOriginX) / rect.width) *
+      hud.atlasFullscreenCanvas.width,
+    y: ((event.clientY - atlasMapDragOriginY) / rect.height) *
+      hud.atlasFullscreenCanvas.height
+  };
+
+  if (Math.abs(delta.x) + Math.abs(delta.y) < 0.5) {
+    return;
+  }
+
+  isAtlasMapDragging = true;
+  atlasMapDragOriginX = event.clientX;
+  atlasMapDragOriginY = event.clientY;
+  atlasWorkbench = panAtlasMap(atlasWorkbench, delta);
+  refreshAtlasWorkbench();
+});
+
+hud.atlasFullscreenCanvas.addEventListener("pointerup", (event: PointerEvent) => {
+  if (hud.atlasFullscreenCanvas.hasPointerCapture(event.pointerId)) {
+    hud.atlasFullscreenCanvas.releasePointerCapture(event.pointerId);
+  }
+});
+
+hud.atlasFullscreenCanvas.addEventListener("pointerleave", () => {
+  isAtlasMapDragging = false;
+});
+
+hud.atlasFullscreenCanvas.addEventListener("dblclick", () => {
+  atlasWorkbench = resetAtlasMapView(atlasWorkbench);
+  refreshAtlasWorkbench();
 });
 
 renderJournal();

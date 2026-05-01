@@ -8,7 +8,14 @@ import type {
 export interface AtlasWorkbenchState {
   visibleLayerIds: Set<QinlingAtlasLayerId>;
   isFullscreen: boolean;
+  mapView: AtlasMapView;
   selectedFeatureId: string | null;
+}
+
+export interface AtlasMapView {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 export function createAtlasWorkbenchState(
@@ -31,6 +38,37 @@ export function setAtlasFullscreen(
 ): AtlasWorkbenchState;
 
 export function toggleAtlasFullscreen(
+  state: AtlasWorkbenchState
+): AtlasWorkbenchState;
+
+export function atlasMapWorldToCanvasPoint(
+  point: QinlingAtlasPoint,
+  world: { width: number; depth: number },
+  canvas: { width: number; height: number },
+  view: AtlasMapView
+): QinlingAtlasPoint;
+
+export function atlasMapCanvasToWorldPoint(
+  point: QinlingAtlasPoint,
+  world: { width: number; depth: number },
+  canvas: { width: number; height: number },
+  view: AtlasMapView
+): QinlingAtlasPoint;
+
+export function zoomAtlasMapAtPoint(
+  state: AtlasWorkbenchState,
+  zoomFactor: number,
+  pointer: QinlingAtlasPoint,
+  world: { width: number; depth: number },
+  canvas: { width: number; height: number }
+): AtlasWorkbenchState;
+
+export function panAtlasMap(
+  state: AtlasWorkbenchState,
+  delta: QinlingAtlasPoint
+): AtlasWorkbenchState;
+
+export function resetAtlasMapView(
   state: AtlasWorkbenchState
 ): AtlasWorkbenchState;
 

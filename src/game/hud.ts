@@ -128,7 +128,7 @@ export function createHud(
           <div>
             <div class="eyebrow">Atlas Workbench</div>
             <h2>秦岭地貌总览</h2>
-            <p>严格地理坐标底图，用于游玩导航、POI 校对和后续 3D 地貌规则开发。</p>
+            <p>严格地理坐标底图，用于游玩导航、POI 校对和后续 3D 地貌规则开发。滚轮缩放，拖拽平移，双击复位。</p>
           </div>
           <button id="close-atlas-fullscreen" type="button">返回游戏</button>
         </header>
