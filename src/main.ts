@@ -64,9 +64,10 @@ import {
   skyDomePolicy
 } from "./game/skyDome.js";
 import {
+  atlasCanvasPoint,
+  atlasFeatureCenter,
   atlasVisibleFeatures,
-  featureWorldPoints,
-  worldPointToOverviewPixel
+  featureWorldPoints
 } from "./game/atlasRender.js";
 import { movementVectorFromInput } from "./game/navigation.js";
 import {
@@ -78,8 +79,7 @@ import {
   qinlingAtlasFeatures,
   qinlingAtlasLayers,
   qinlingWaterSystem,
-  type QinlingAtlasFeature,
-  type QinlingAtlasPoint
+  type QinlingAtlasFeature
 } from "./game/qinlingAtlas.js";
 import {
   qinlingRoutes,
@@ -1238,43 +1238,6 @@ function routeStatusText(influence: RouteInfluence): string {
   return `古道：偏离${influence.nearestRoute.name}，山地消耗上升`;
 }
 
-function atlasCanvasPoint(
-  point: QinlingAtlasPoint,
-  asset: DemAsset,
-  canvas: HTMLCanvasElement
-): QinlingAtlasPoint {
-  const pixel = worldPointToOverviewPixel(point, asset.world, canvas);
-
-  return {
-    x: MathUtils.clamp(pixel.x, 0, canvas.width),
-    y: MathUtils.clamp(pixel.y, 0, canvas.height)
-  };
-}
-
-function atlasFeatureCenter(
-  feature: QinlingAtlasFeature,
-  asset: DemAsset,
-  canvas: HTMLCanvasElement
-): QinlingAtlasPoint {
-  const points = featureWorldPoints(feature);
-  const sum = points.reduce(
-    (total, point) => ({
-      x: total.x + point.x,
-      y: total.y + point.y
-    }),
-    { x: 0, y: 0 }
-  );
-
-  return atlasCanvasPoint(
-    {
-      x: sum.x / points.length,
-      y: sum.y / points.length
-    },
-    asset,
-    canvas
-  );
-}
-
 function drawAtlasPath(
   context: CanvasRenderingContext2D,
   feature: QinlingAtlasFeature,
@@ -1282,7 +1245,7 @@ function drawAtlasPath(
   canvas: HTMLCanvasElement
 ): void {
   const points = featureWorldPoints(feature).map((point) =>
-    atlasCanvasPoint(point, asset, canvas)
+    atlasCanvasPoint(point, asset.world, canvas)
   );
 
   if (points.length === 0) {
@@ -1359,7 +1322,7 @@ function drawAtlasFeature(
   }
 
   if (feature.geometry === "point") {
-    const center = atlasFeatureCenter(feature, asset, canvas);
+    const center = atlasFeatureCenter(feature, asset.world, canvas);
     const isPass = feature.layer === "pass";
     const radius = isPass ? 4.2 : 3.4;
 
@@ -1377,7 +1340,7 @@ function drawAtlasFeature(
   }
 
   if (feature.displayPriority >= 9) {
-    const center = atlasFeatureCenter(feature, asset, canvas);
+    const center = atlasFeatureCenter(feature, asset.world, canvas);
     context.font = feature.layer === "landform"
       ? "600 12px 'Noto Sans SC', 'PingFang SC', sans-serif"
       : "600 10px 'Noto Sans SC', 'PingFang SC', sans-serif";
