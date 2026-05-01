@@ -5,6 +5,8 @@ import {
   atlasCanvasPoint,
   atlasFeatureCenter,
   atlasLayerDrawOrder,
+  missingDemTileWorldRects,
+  parseMissingDemTileNames,
   atlasVisibleFeatures,
   worldPointToOverviewPixel
 } from "../src/game/atlasRender.js";
@@ -76,4 +78,27 @@ test("atlas feature center uses the average of rendered world points", () => {
   );
 
   assert.deepEqual(center, { x: 110, y: 135 });
+});
+
+test("atlas render policy exposes interpolated DEM tile gaps as map quality areas", () => {
+  const notes = [
+    "Missing required tiles filled by neighbor interpolation: N32E103_FABDEM_V1-2.tif, N32E104_FABDEM_V1-2.tif."
+  ];
+
+  assert.deepEqual(parseMissingDemTileNames(notes), [
+    "N32E103_FABDEM_V1-2.tif",
+    "N32E104_FABDEM_V1-2.tif"
+  ]);
+
+  const rects = missingDemTileWorldRects({
+    bounds: { west: 103.5, east: 109, south: 30.4, north: 35.4 },
+    world,
+    notes
+  });
+
+  assert.equal(rects.length, 2);
+  assert.equal(rects[0].tileName, "N32E103_FABDEM_V1-2.tif");
+  assert.ok(rects[0].minX >= -90, "western missing tile should be clipped to slice bounds");
+  assert.ok(rects[0].maxX < rects[1].maxX, "adjacent missing tiles should preserve geography order");
+  assert.ok(rects[0].minY < rects[0].maxY, "missing tile rect should have visible north-south span");
 });

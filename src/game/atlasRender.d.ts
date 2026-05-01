@@ -19,6 +19,20 @@ export function atlasCanvasPoint(
   canvas: { width: number; height: number }
 ): QinlingAtlasPoint;
 
+export function parseMissingDemTileNames(notes?: string[]): string[];
+
+export function missingDemTileWorldRects(asset: {
+  bounds?: { west: number; east: number; south: number; north: number };
+  world?: { width: number; depth: number };
+  notes?: string[];
+}): Array<{
+  tileName: string;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}>;
+
 export function atlasVisibleFeatures(
   features: QinlingAtlasFeature[],
   layers: QinlingAtlasLayer[]
