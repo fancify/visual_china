@@ -27,7 +27,7 @@
 - 2D Atlas：已建立 `qinlingAtlas` 数据源，包含地貌、水系、城市、关隘、道路、军事、民生、人文图层，并开始升级为可全屏细读的 Atlas Workbench。
 - 多尺度地图：当前秦岭切片定位为 `Overworld Atlas`；未来可通过入口节点进入更细的 `Local Scene`。
 - 历史年代层：近期以现代 DEM 和现代基础地理为主，未来通过 `Era Overlay` 表达河道、湖泽、关隘、城市和道路意义的历史变化。
-- 现代水系：已提升为独立事实层规划，近期优先做准现代河网；历史河道进入未来 `Era Overlay`。
+- 现代水系：已建立第一版独立 hydrography 事实层、秦岭 modern asset、LOD rank 规则和 Atlas 转换器；当前仍是 curated skeleton，下一步接 HydroRIVERS/OSM/MERIT Hydro 校验。
 
 ## 已完成的关键能力
 
@@ -39,7 +39,7 @@
 - 昼夜、天气、季节、月亮、星空、云层的基础环境系统。
 - 关中到汉中的主要古道：陈仓道、褒斜道、傥骆道、子午道。
 - 汉中入蜀路线：金牛道/剑门蜀道。
-- 显式水系骨架：渭河、汉水、嘉陵江、褒水、斜水。
+- 显式水系骨架：渭河、汉水、嘉陵江、褒水、斜水，已从 Atlas 硬编码迁到 hydrography asset 派生。
 - 2D 地貌总览可从 Atlas 绘制核心地貌、水系、古道、城市、关隘。
 - Atlas Workbench 第二轮：支持 `M` 键全屏、滚轮缩放、拖拽平移、双击复位、图层筛选、点击 feature 查看地理/历史/玩法解释。
 
@@ -47,7 +47,7 @@
 
 - 3D 地形仍然不够像“真实关中-秦岭-汉中”的总体关系，局部仍显得过碎、过尖、粒度过一致。
 - 2D Atlas 已有图层开关、点击信息卡和全屏工作台，但还缺少标签避让、专题模式、搜索和更精细的开发校对工具。
-- 水系目前仍是显式线/窄带，还没有独立 hydrography asset、来源等级、DEM 校验和 LOD 管线。
+- 水系已有独立 hydrography asset、来源等级和 LOD rank 第一版；尚未接入真实 HydroRIVERS/OSM 数据导入与 DEM/MERIT Hydro mismatch 报告。
 - 路线在 3D 中已经弱化，但还需要从“提示覆盖层”进化成更自然的道路/河谷/栈道视觉。
 - `src/main.ts` 仍然过大，需要继续拆出渲染、输入、场景对象生命周期等模块。
 - 全国开放世界架构已有原则，但还没有 region registry、world manifest 和多区域切换。

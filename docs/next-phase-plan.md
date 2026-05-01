@@ -39,15 +39,16 @@
 
 ## P2：水系与地貌造型规则
 
-状态：水系已提升为独立现代 hydrography 管线优先级。
+状态：水系已建立第一版独立现代 hydrography 管线骨架，当前数据仍是 curated skeleton，下一步接入真实水文矢量源和 DEM mismatch 报告。
 
 目标：让水系和地貌粒度真正影响视觉，而不是只画几条线。
 
 任务：
 
-- 建立现代水系事实层：名称、等级、流域、来源、可信度、关系字段。
-- 为秦岭区域生成独立 hydrography asset，不再只依赖 `qinlingAtlas.js` 手工折线。
-- 建立 L0/L1/L2 水系显示规则，全国/区域/局部不同密度。
+- 建立现代水系事实层：名称、等级、流域、来源、可信度、关系字段。`已完成第一版`
+- 为秦岭区域生成独立 hydrography asset，不再只依赖 `qinlingAtlas.js` 手工折线。`已完成第一版`
+- 建立 L0/L1/L2 水系显示规则，全国/区域/局部不同密度。`已完成模型第一版`
+- 接入 HydroRIVERS/OSM/MERIT Hydro 的 acquire/clip/normalize/validate 管线。
 - 加入 DEM 校验，报告河流是否贴近低地、谷地、盆地和合理流向。
 - 把渭河、汉水、嘉陵江、褒水、斜水接入 terrain coloring。
 - 为河谷、盆地、平原、主脊、峡谷建立不同造型粒度。
