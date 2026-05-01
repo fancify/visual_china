@@ -27,7 +27,9 @@ test("atlas workbench starts with default-visible layers enabled", () => {
 
   assert.equal(state.visibleLayerIds.has("landform"), true);
   assert.equal(state.visibleLayerIds.has("water"), true);
-  assert.equal(state.visibleLayerIds.has("road"), true);
+  assert.equal(state.visibleLayerIds.has("road"), false);
+  assert.equal(state.visibleLayerIds.has("city"), false);
+  assert.equal(state.visibleLayerIds.has("pass"), false);
   assert.equal(state.visibleLayerIds.has("military"), false);
   assert.equal(state.isFullscreen, false);
   assert.deepEqual(state.mapView, { scale: 1, offsetX: 0, offsetY: 0 });
@@ -106,20 +108,37 @@ test("atlas map reset returns to the full-region view", () => {
   assert.deepEqual(reset.mapView, { scale: 1, offsetX: 0, offsetY: 0 });
 });
 
-test("atlas hit testing selects the nearest visible high-priority feature", () => {
+test("atlas hit testing selects the nearest visible verified feature", () => {
   const state = createAtlasWorkbenchState(qinlingAtlasLayers);
+  const features = [
+    {
+      id: "verified-water-point",
+      name: "核验水系点",
+      layer: "water",
+      geometry: "point",
+      world: { x: 0, y: 0 },
+      displayPriority: 10,
+      source: { verification: "external-vector" }
+    }
+  ];
+  const pointer = atlasMapWorldToCanvasPoint(
+    features[0].world,
+    world,
+    canvas,
+    state.mapView
+  );
   const feature = findAtlasFeatureAtCanvasPoint(
-    qinlingAtlasFeatures,
+    features,
     state,
-    { x: 216, y: 58 },
+    pointer,
     world,
     canvas
   );
 
-  assert.equal(feature?.name, "长安");
+  assert.equal(feature?.name, "核验水系点");
 });
 
-test("atlas hit testing ignores hidden layers", () => {
+test("atlas hit testing ignores unverified hand-drawn features even when their layer is toggled", () => {
   const state = toggleAtlasLayer(createAtlasWorkbenchState(qinlingAtlasLayers), "city");
   const feature = findAtlasFeatureAtCanvasPoint(
     qinlingAtlasFeatures,
@@ -143,20 +162,28 @@ test("atlas hit testing respects zoomed and panned map view", () => {
     ),
     { x: -30, y: 10 }
   );
-  const changan = qinlingAtlasFeatures.find((feature) => feature.name === "长安");
+  const verifiedFeature = {
+    id: "verified-water-point",
+    name: "核验水系点",
+    layer: "water",
+    geometry: "point",
+    world: { x: 88.04, y: 69.12 },
+    displayPriority: 10,
+    source: { verification: "external-vector" }
+  };
   const pointer = atlasMapWorldToCanvasPoint(
-    changan.world,
+    verifiedFeature.world,
     world,
     canvas,
     state.mapView
   );
   const feature = findAtlasFeatureAtCanvasPoint(
-    qinlingAtlasFeatures,
+    [verifiedFeature],
     state,
     pointer,
     world,
     canvas
   );
 
-  assert.equal(feature?.name, "长安");
+  assert.equal(feature?.name, "核验水系点");
 });

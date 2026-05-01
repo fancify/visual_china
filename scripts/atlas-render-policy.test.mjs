@@ -22,14 +22,45 @@ test("atlas render policy keeps the default overview readable", () => {
   const visible = atlasVisibleFeatures(qinlingAtlasFeatures, qinlingAtlasLayers);
   const visibleLayers = new Set(visible.map((feature) => feature.layer));
 
-  assert.ok(visibleLayers.has("landform"));
-  assert.ok(visibleLayers.has("water"));
-  assert.ok(visibleLayers.has("road"));
-  assert.ok(visibleLayers.has("city"));
-  assert.ok(visibleLayers.has("pass"));
+  assert.ok(!visibleLayers.has("landform"));
+  assert.ok(!visibleLayers.has("water"));
+  assert.ok(!visibleLayers.has("road"));
+  assert.ok(!visibleLayers.has("city"));
+  assert.ok(!visibleLayers.has("pass"));
   assert.ok(!visibleLayers.has("culture"));
   assert.ok(!visibleLayers.has("military"));
   assert.ok(!visibleLayers.has("livelihood"));
+});
+
+test("atlas render policy does not expose unverified hand-drawn features as facts", () => {
+  const features = [
+    {
+      id: "draft-landform",
+      layer: "landform",
+      displayPriority: 10,
+      source: { name: "manual-atlas-draft", verification: "unverified" }
+    },
+    {
+      id: "osm-water",
+      layer: "water",
+      displayPriority: 8,
+      source: { name: "openstreetmap-overpass", verification: "external-vector" }
+    }
+  ];
+  const layers = [
+    { id: "landform", defaultVisible: true },
+    { id: "water", defaultVisible: true }
+  ];
+
+  assert.deepEqual(
+    atlasVisibleFeatures(features, layers).map((feature) => feature.id),
+    ["osm-water"]
+  );
+  assert.deepEqual(
+    atlasVisibleFeatures(features, layers, { includeUnverifiedFeatures: true })
+      .map((feature) => feature.id),
+    ["draft-landform", "osm-water"]
+  );
 });
 
 test("atlas render order puts landform under water, road, and point labels", () => {
@@ -111,9 +142,24 @@ test("atlas render policy reveals dense evidence layers only when zoomed in", ()
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 4 }), 4);
 
   const features = [
-    { id: "major", layer: "water", displayPriority: 8 },
-    { id: "tributary", layer: "water", displayPriority: 4 },
-    { id: "local", layer: "water", displayPriority: 0 }
+    {
+      id: "major",
+      layer: "water",
+      displayPriority: 8,
+      source: { verification: "external-vector" }
+    },
+    {
+      id: "tributary",
+      layer: "water",
+      displayPriority: 4,
+      source: { verification: "external-vector" }
+    },
+    {
+      id: "local",
+      layer: "water",
+      displayPriority: 0,
+      source: { verification: "external-vector" }
+    }
   ];
   const layers = [{ id: "water", defaultVisible: true }];
 

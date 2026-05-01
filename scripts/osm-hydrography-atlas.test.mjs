@@ -44,6 +44,8 @@ test("converts imported waterways into atlas evidence features", () => {
   assert.equal(atlasFeature.displayPriority, 8);
   assert.equal(atlasFeature.terrainRole, "main-river-evidence");
   assert.ok(atlasFeature.themes.includes("evidence"));
+  assert.equal(atlasFeature.source.name, "openstreetmap-overpass");
+  assert.equal(atlasFeature.source.verification, "external-vector");
   assert.match(atlasFeature.copy.summary, /OSM/);
 });
 

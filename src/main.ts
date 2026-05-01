@@ -72,6 +72,7 @@ import {
   atlasMinimumDisplayPriority,
   atlasVisibleFeatures,
   featureWorldPoints,
+  isVerifiedAtlasFeature,
   missingDemTileWorldRects
 } from "./game/atlasRender.js";
 import {
@@ -1030,7 +1031,7 @@ function rebuildWaterSystemVisuals(): void {
     return;
   }
 
-  qinlingWaterSystem.forEach((river) => {
+  qinlingWaterSystem.filter(isVerifiedAtlasFeature).forEach((river) => {
     const points = featureWorldPoints(river);
     const ribbonGeometry = new BufferGeometry();
     ribbonGeometry.setAttribute(
@@ -1095,96 +1096,101 @@ function rebuildRouteVisuals(): void {
     return;
   }
 
-  qinlingRoutes.forEach((route) => {
-    if (route.labelPoint && route.label) {
-      const routeLabel = createTextSprite(route.label, "#f6d783");
-      routeLabel.scale.multiplyScalar(1.16);
-      routeLabel.position.set(
-        route.labelPoint.x,
-        terrainSampler!.sampleHeight(route.labelPoint.x, route.labelPoint.y) + 6.2,
-        route.labelPoint.y
-      );
-      routeLabel.renderOrder = 14;
-      routeGroup.add(routeLabel);
-    }
-
-    const ribbonGeometry = new BufferGeometry();
-    ribbonGeometry.setAttribute(
-      "position",
-      new BufferAttribute(
-        buildRouteRibbonVertices(route.points, {
-          width: qinlingRouteRibbonStyle.width,
-          yOffset: qinlingRouteRibbonStyle.yOffset,
-          sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
-        }),
-        3
-      )
-    );
-    ribbonGeometry.computeVertexNormals();
-
-    const ribbon = new Mesh(
-      ribbonGeometry,
-      new MeshBasicMaterial({
-        color: 0xe8c66f,
-        transparent: true,
-        opacity: qinlingRouteRibbonStyle.opacity,
-        side: DoubleSide,
-        depthWrite: false
-      })
-    );
-    ribbon.renderOrder = 11;
-    routeGroup.add(ribbon);
-
-    const positions: number[] = [];
-
-    route.points.forEach((point) => {
-      positions.push(
-        point.x,
-        terrainSampler!.sampleHeight(point.x, point.y) + 0.72,
-        point.y
-      );
-    });
-
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new BufferAttribute(new Float32Array(positions), 3)
-    );
-
-    const line = new Line(
-      geometry,
-      new LineBasicMaterial({
-        color: 0xf0ca72,
-        transparent: true,
-        opacity: 0.82,
-        linewidth: 2
-      })
-    );
-    line.renderOrder = 12;
-    routeGroup.add(line);
-
-    route.points.forEach((point, index) => {
-      if (index !== 0 && index !== route.points.length - 1 && index % 2 !== 0) {
-        return;
+  qinlingRoutes
+    .filter((route) =>
+      route.source?.verification === "external-vector" ||
+      route.source?.verification === "verified"
+    )
+    .forEach((route) => {
+      if (route.labelPoint && route.label) {
+        const routeLabel = createTextSprite(route.label, "#f6d783");
+        routeLabel.scale.multiplyScalar(1.16);
+        routeLabel.position.set(
+          route.labelPoint.x,
+          terrainSampler!.sampleHeight(route.labelPoint.x, route.labelPoint.y) + 6.2,
+          route.labelPoint.y
+        );
+        routeLabel.renderOrder = 14;
+        routeGroup.add(routeLabel);
       }
 
-      const marker = new Mesh(
-        new SphereGeometry(index === route.points.length - 1 ? 0.62 : 0.44, 10, 10),
+      const ribbonGeometry = new BufferGeometry();
+      ribbonGeometry.setAttribute(
+        "position",
+        new BufferAttribute(
+          buildRouteRibbonVertices(route.points, {
+            width: qinlingRouteRibbonStyle.width,
+            yOffset: qinlingRouteRibbonStyle.yOffset,
+            sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
+          }),
+          3
+        )
+      );
+      ribbonGeometry.computeVertexNormals();
+
+      const ribbon = new Mesh(
+        ribbonGeometry,
         new MeshBasicMaterial({
-          color: index === route.points.length - 1 ? 0xf7df8a : 0xd6a852,
+          color: 0xe8c66f,
           transparent: true,
-          opacity: 0.9
+          opacity: qinlingRouteRibbonStyle.opacity,
+          side: DoubleSide,
+          depthWrite: false
         })
       );
-      marker.position.set(
-        point.x,
-        terrainSampler!.sampleHeight(point.x, point.y) + 1.08,
-        point.y
+      ribbon.renderOrder = 11;
+      routeGroup.add(ribbon);
+
+      const positions: number[] = [];
+
+      route.points.forEach((point) => {
+        positions.push(
+          point.x,
+          terrainSampler!.sampleHeight(point.x, point.y) + 0.72,
+          point.y
+        );
+      });
+
+      const geometry = new BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new BufferAttribute(new Float32Array(positions), 3)
       );
-      marker.renderOrder = 13;
-      routeGroup.add(marker);
+
+      const line = new Line(
+        geometry,
+        new LineBasicMaterial({
+          color: 0xf0ca72,
+          transparent: true,
+          opacity: 0.82,
+          linewidth: 2
+        })
+      );
+      line.renderOrder = 12;
+      routeGroup.add(line);
+
+      route.points.forEach((point, index) => {
+        if (index !== 0 && index !== route.points.length - 1 && index % 2 !== 0) {
+          return;
+        }
+
+        const marker = new Mesh(
+          new SphereGeometry(index === route.points.length - 1 ? 0.62 : 0.44, 10, 10),
+          new MeshBasicMaterial({
+            color: index === route.points.length - 1 ? 0xf7df8a : 0xd6a852,
+            transparent: true,
+            opacity: 0.9
+          })
+        );
+        marker.position.set(
+          point.x,
+          terrainSampler!.sampleHeight(point.x, point.y) + 1.08,
+          point.y
+        );
+        marker.renderOrder = 13;
+        routeGroup.add(marker);
+      });
     });
-  });
 }
 
 function resizeAtlasCanvasToDisplaySize(canvas: HTMLCanvasElement): void {

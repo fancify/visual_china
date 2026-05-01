@@ -6,6 +6,10 @@ export interface RoutePoint {
 export interface QinlingRoute {
   id: string;
   name: string;
+  source?: {
+    name?: string;
+    verification?: "unverified" | "external-vector" | "verified";
+  };
   label?: string;
   description: string;
   labelPoint?: RoutePoint;
@@ -22,5 +26,6 @@ export const qinlingRoutes: QinlingRoute[];
 
 export function routeAffinityAt(
   point: RoutePoint,
-  maxDistance?: number
+  maxDistance?: number,
+  options?: { includeUnverifiedRoutes?: boolean }
 ): RouteInfluence;

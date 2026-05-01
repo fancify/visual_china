@@ -2,6 +2,7 @@ export const qinlingRoutes = [
   {
     id: "chencang-road",
     name: "陈仓道",
+    source: { name: "manual-route-draft", verification: "unverified" },
     label: "陈仓道",
     description: "从关中西侧折入秦岭，绕开主脊正面压力的西线通道。",
     labelPoint: { x: 17, y: 44 },
@@ -17,6 +18,7 @@ export const qinlingRoutes = [
   {
     id: "baoxie-road",
     name: "褒斜道",
+    source: { name: "manual-route-draft", verification: "unverified" },
     label: "褒斜道",
     description: "沿褒斜谷穿越秦岭，是关中与汉中之间最直观的谷道意象。",
     labelPoint: { x: 43, y: 39 },
@@ -32,6 +34,7 @@ export const qinlingRoutes = [
   {
     id: "tangluo-road",
     name: "傥骆道",
+    source: { name: "manual-route-draft", verification: "unverified" },
     label: "傥骆道",
     description: "从关中东南侧入山，路线更陡更碎，体现山地机动的代价。",
     labelPoint: { x: 58, y: 36 },
@@ -47,6 +50,7 @@ export const qinlingRoutes = [
   {
     id: "ziwu-road",
     name: "子午道",
+    source: { name: "manual-route-draft", verification: "unverified" },
     label: "子午道",
     description: "从长安方向南入秦岭，直线诱人，但山地风险和补给压力更高。",
     labelPoint: { x: 66, y: 36 },
@@ -62,6 +66,7 @@ export const qinlingRoutes = [
   {
     id: "jianmen-shu-road",
     name: "剑门蜀道",
+    source: { name: "manual-route-draft", verification: "unverified" },
     label: "剑门蜀道",
     description: "从汉中南下，经广元、剑门关进入蜀地，是第二次山地收束的关键通道。",
     labelPoint: { x: -18, y: -31 },
@@ -122,10 +127,21 @@ function routeDistance(point, route) {
 }
 
 export function routeAffinityAt(point, maxDistance = 11) {
+  const options =
+    typeof maxDistance === "object"
+      ? maxDistance
+      : arguments[2] ?? {};
+  const searchDistance = typeof maxDistance === "number" ? maxDistance : 11;
+  const routes = options.includeUnverifiedRoutes
+    ? qinlingRoutes
+    : qinlingRoutes.filter((route) =>
+      route.source?.verification === "external-vector" ||
+      route.source?.verification === "verified"
+    );
   let nearestRoute = null;
   let nearestDistance = Number.POSITIVE_INFINITY;
 
-  for (const route of qinlingRoutes) {
+  for (const route of routes) {
     const distance = routeDistance(point, route);
 
     if (distance < nearestDistance) {
@@ -134,10 +150,10 @@ export function routeAffinityAt(point, maxDistance = 11) {
     }
   }
 
-  const falloff = smoothstep(nearestDistance, 2, maxDistance);
+  const falloff = smoothstep(nearestDistance, 2, searchDistance);
 
   return {
-    affinity: clamp(1 - falloff, 0, 1),
+    affinity: nearestRoute ? clamp(1 - falloff, 0, 1) : 0,
     distance: nearestDistance,
     nearestRoute
   };

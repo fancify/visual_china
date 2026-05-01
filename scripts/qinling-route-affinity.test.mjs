@@ -3,8 +3,17 @@ import test from "node:test";
 
 import { qinlingRoutes, routeAffinityAt } from "../src/game/qinlingRoutes.js";
 
-test("Qinling route affinity is high near a named crossing route", () => {
+test("Qinling route affinity does not use unverified hand-drawn routes by default", () => {
   const influence = routeAffinityAt({ x: 34, y: 28 });
+
+  assert.equal(influence.affinity, 0);
+  assert.equal(influence.nearestRoute, null);
+});
+
+test("Qinling draft route affinity remains available for QA when explicitly requested", () => {
+  const influence = routeAffinityAt({ x: 34, y: 28 }, 11, {
+    includeUnverifiedRoutes: true
+  });
 
   assert.ok(influence.affinity > 0.7);
   assert.equal(influence.nearestRoute?.id, "baoxie-road");

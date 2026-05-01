@@ -12,6 +12,10 @@ export function hydrographyFeatureToAtlasFeature(feature) {
     displayPriority: mainRiver ? 10 : 7,
     terrainRole: mainRiver ? "main-river" : "tributary-river",
     themes: ["terrain", "livelihood"],
+    source: {
+      ...(feature.source ?? {}),
+      verification: feature.source?.verification ?? "unverified"
+    },
     copy: {
       summary: `${feature.name}是${feature.basin}的${mainRiver ? "主干水系" : "支流水系"}，用于解释地貌、聚落和道路关系。`
     },
