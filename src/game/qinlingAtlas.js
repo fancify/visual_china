@@ -1,3 +1,6 @@
+import { hydrographyFeatureToAtlasFeature } from "./hydrographyAtlas.js";
+import { qinlingModernHydrography } from "./qinlingHydrography.js";
+
 export const qinlingAtlasPolicy = {
   sourceOfTruth: "2d-atlas-first",
   coordinatePolicy: "strict-geographic",
@@ -128,12 +131,6 @@ const landformSymbol = {
   emphasis: "broad-shape"
 };
 
-const waterSymbol = {
-  symbol: "river-line",
-  color: "#5eb8c9",
-  emphasis: "valley-thread"
-};
-
 const citySymbol = {
   symbol: "settlement-dot",
   color: "#e9c46a",
@@ -151,6 +148,10 @@ const roadSymbol = {
   color: "#d49a4a",
   emphasis: "walkable-route"
 };
+
+const qinlingModernWaterFeatures = qinlingModernHydrography.features.map(
+  hydrographyFeatureToAtlasFeature
+);
 
 export const qinlingAtlasFeatures = [
   feature({
@@ -261,66 +262,7 @@ export const qinlingAtlasFeatures = [
     visualRule: { ...landformSymbol, color: "#769d68" },
     themes: ["terrain", "livelihood"]
   }),
-  feature({
-    id: "water-weihe",
-    name: "渭河",
-    layer: "water",
-    geometry: "polyline",
-    world: { points: [point(26, 72), point(48, 70), point(70, 69), point(88, 68)] },
-    displayPriority: 10,
-    terrainRole: "north-river",
-    summary: "关中平原的水系主轴，解释城市、农田与东西向交通。",
-    visualRule: waterSymbol,
-    themes: ["terrain", "livelihood"]
-  }),
-  feature({
-    id: "water-hanshui",
-    name: "汉水",
-    layer: "water",
-    geometry: "polyline",
-    world: { points: [point(-8, 3), point(14, 8), point(26, 9), point(42, 7), point(62, 0)] },
-    displayPriority: 10,
-    terrainRole: "basin-river",
-    summary: "汉中盆地的水系主轴，让盆地可居住、可补给、可转运。",
-    visualRule: waterSymbol,
-    themes: ["terrain", "livelihood", "military"]
-  }),
-  feature({
-    id: "water-jialing",
-    name: "嘉陵江",
-    layer: "water",
-    geometry: "polyline",
-    world: { points: [point(-8, 3), point(-12, -20), point(-10, -28), point(-8, -64)] },
-    displayPriority: 9,
-    terrainRole: "shu-river",
-    summary: "广元一带的南北水路骨架，和剑门入蜀路线彼此缠绕。",
-    visualRule: waterSymbol,
-    themes: ["terrain", "livelihood", "military"]
-  }),
-  feature({
-    id: "water-baoshui",
-    name: "褒水",
-    layer: "water",
-    geometry: "polyline",
-    world: { points: [point(24, 11), point(30, 18), point(34, 28), point(38, 39)] },
-    displayPriority: 8,
-    terrainRole: "valley-river",
-    summary: "褒斜谷南段的河谷线，解释为什么道路会沿谷而行。",
-    visualRule: waterSymbol,
-    themes: ["terrain", "road"]
-  }),
-  feature({
-    id: "water-xieshui",
-    name: "斜水",
-    layer: "water",
-    geometry: "polyline",
-    world: { points: [point(58, 70), point(51, 58), point(44, 48), point(38, 39)] },
-    displayPriority: 8,
-    terrainRole: "valley-river",
-    summary: "褒斜谷北段的河谷线，把关中侧入口和山中谷地连起来。",
-    visualRule: waterSymbol,
-    themes: ["terrain", "road"]
-  }),
+  ...qinlingModernWaterFeatures,
   feature({
     id: "city-changan",
     name: "长安",
