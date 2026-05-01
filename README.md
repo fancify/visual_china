@@ -44,6 +44,10 @@
   - 抵达汉中
   - 再向入蜀
   - 进入盆地
+- 2D Atlas-first 信息底图：
+  - 地貌、水系、城市、关隘、古道、军事、民生、人文图层
+  - 渭河、汉水、嘉陵江、褒水、斜水显式建模
+  - 地貌总览从 Atlas 数据绘制，而不是在 3D 中临时堆调试标记
 
 ## 启动
 
@@ -69,7 +73,7 @@ npm run dev
 - [qinling-slice-dem.json](/Users/chen/Documents/GitHub/visual_china/public/data/qinling-slice-dem.json)
 - [qinling region manifest](/Users/chen/Documents/GitHub/visual_china/public/data/regions/qinling/manifest.json)
 
-这份资产目前是由脚本从程序化地形生成的占位版，后面会被真实 DEM 处理结果替换。
+这份资产当前已经是从真实 FABDEM 处理出的秦岭切片派生资产，`sourceType` 为 `processed-real-dem`。
 
 如果要生成真实秦岭 DEM 切片，可使用单区域脚本链：
 
@@ -123,23 +127,12 @@ npm run china:dem:build -- --allow-partial
 
 ## 文档
 
-- [首版技术方案](./docs/technical-plan.md)
-- [秦岭切片设计](./docs/qinling-slice-design.md)
-- [全国中国 DEM 母版方案](./docs/china-national-dem.md)
-- [需求对齐与共识草案](./docs/requirements-alignment.md)
-- [第一阶段产品需求定稿](./docs/product-requirements.md)
-- [下一阶段执行方案](./docs/next-phase-execution-plan.md)
-- [切片地图尺寸设计规则](./docs/slice-map-sizing-rules.md)
-- [全国地图与重点切片比例设计规则](./docs/world-to-slice-scaling-rules.md)
-- [全国区域密度与压缩分级规则](./docs/national-density-and-compression-rules.md)
-- [视觉风格与性能预算原则](./docs/visual-style-and-performance-budget.md)
-- [开放世界地理资产流式加载方案](./docs/open-world-geographic-streaming-plan.md)
-- [DEM 资产格式与地理边界规范](./docs/dem-asset-format-and-boundary-spec.md)
+- [文档入口](./docs/README.md)
+- [上下文压缩摘要](./docs/context-summary.md)
 - [开发任务看板](./docs/development-task-list.md)
+- [下一阶段计划](./docs/next-phase-plan.md)
 
 ## 说明
-
-当前地形仍是“为真实 DEM 接入预留接口的程序化母版”。
 
 当前 DEM 管线已经拆成两层：
 

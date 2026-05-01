@@ -13,6 +13,12 @@ export function worldPointToOverviewPixel(
   canvas: { width: number; height: number }
 ): QinlingAtlasPoint;
 
+export function atlasCanvasPoint(
+  point: QinlingAtlasPoint,
+  world: { width: number; depth: number },
+  canvas: { width: number; height: number }
+): QinlingAtlasPoint;
+
 export function atlasVisibleFeatures(
   features: QinlingAtlasFeature[],
   layers: QinlingAtlasLayer[]
@@ -21,3 +27,9 @@ export function atlasVisibleFeatures(
 export function featureWorldPoints(
   feature: QinlingAtlasFeature
 ): QinlingAtlasPoint[];
+
+export function atlasFeatureCenter(
+  feature: Pick<QinlingAtlasFeature, "world">,
+  world: { width: number; depth: number },
+  canvas: { width: number; height: number }
+): QinlingAtlasPoint;

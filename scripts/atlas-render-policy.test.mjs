@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  atlasCanvasPoint,
+  atlasFeatureCenter,
   atlasLayerDrawOrder,
   atlasVisibleFeatures,
   worldPointToOverviewPixel
@@ -46,4 +48,32 @@ test("world points convert to overview pixels without changing geographic propor
     worldPointToOverviewPixel({ x: 90, y: -120 }, world, { width: 220, height: 270 }),
     { x: 220, y: 270 }
   );
+});
+
+test("atlas canvas points clamp out-of-bounds features to the overview frame", () => {
+  assert.deepEqual(
+    atlasCanvasPoint(
+      { x: 120, y: -160 },
+      world,
+      { width: 220, height: 270 }
+    ),
+    { x: 220, y: 270 }
+  );
+});
+
+test("atlas feature center uses the average of rendered world points", () => {
+  const center = atlasFeatureCenter(
+    {
+      world: {
+        points: [
+          { x: -90, y: 120 },
+          { x: 90, y: -120 }
+        ]
+      }
+    },
+    world,
+    { width: 220, height: 270 }
+  );
+
+  assert.deepEqual(center, { x: 110, y: 135 });
 });
