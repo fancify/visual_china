@@ -108,12 +108,12 @@ test("atlas render policy reveals dense evidence layers only when zoomed in", ()
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: false, scale: 1 }), 7);
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 1 }), 7);
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 2 }), 4);
-  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 4 }), 2);
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 4 }), 4);
 
   const features = [
     { id: "major", layer: "water", displayPriority: 8 },
     { id: "tributary", layer: "water", displayPriority: 4 },
-    { id: "local", layer: "water", displayPriority: 2 }
+    { id: "local", layer: "water", displayPriority: 0 }
   ];
   const layers = [{ id: "water", defaultVisible: true }];
 

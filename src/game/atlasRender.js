@@ -99,10 +99,6 @@ export function atlasMinimumDisplayPriority({ fullscreen = false, scale = 1 } = 
     return 7;
   }
 
-  if (scale >= 4) {
-    return 2;
-  }
-
   if (scale >= 2) {
     return 4;
   }
