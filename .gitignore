@@ -4,8 +4,10 @@ dist/
 # Raw DEM downloads and extracted source tiles are too large for Git.
 data/fabdem/
 
+# Raw third-party hydrography downloads are reproducible source data.
+data/hydrography/raw/
+
 .DS_Store
 *.log
 .env
 .env.*
-

@@ -90,7 +90,9 @@
 | P2.6-3 | 水系 LOD 规则 | 已完成模型第一轮 | L0/L1/L2 能按 rank 控制显示密度 |
 | P2.6-4 | 水系 DEM 校验 | 已完成第一轮 | `npm run verify:hydrography` 生成 DEM mismatch report；当前报告显示 21/21 点低 riverMask 亲和度 |
 | P2.6-5 | 水系与道路/POI 关系 | 已完成数据第一轮 | 褒斜道、陈仓道、汉中盆地、关中平原能通过水系关系解释 |
-| P2.6-6 | 真实水系源导入 | 待执行 | HydroRIVERS/OSM/MERIT Hydro 数据进入 acquire/clip/validate 管线 |
+| P2.6-6 | OSM 命名水系源导入 | 已完成第一轮 | `npm run fetch:hydrography:osm` 分块抓取 Overpass，`npm run build:hydrography:osm` 生成 4639 条命名水系片段 |
+| P2.6-7 | 真实水系等级校准 | 进行中 | 主干、一级支流、地方支流、渠道分级稳定，缺失的重点河流能被报告 |
+| P2.6-8 | HydroRIVERS/MERIT/国内水系源评估 | 待执行 | 用第二数据源校验 OSM 缺失、分段和等级问题 |
 
 ## P3 开放世界架构继续推进
 

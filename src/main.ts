@@ -64,6 +64,7 @@ import {
   skyDomePolicy
 } from "./game/skyDome.js";
 import {
+  atlasMinimumDisplayPriority,
   atlasVisibleFeatures,
   featureWorldPoints,
   missingDemTileWorldRects
@@ -95,6 +96,10 @@ import {
   type QinlingAtlasFeature,
   type QinlingAtlasLayerId
 } from "./game/qinlingAtlas.js";
+import {
+  importedHydrographyAssetToAtlasFeatures,
+  type ImportedHydrographyAsset
+} from "./game/osmHydrographyAtlas.js";
 import {
   qinlingRoutes,
   routeAffinityAt,
@@ -181,6 +186,25 @@ let storyLine = "主线：从关中出发，去看山河如何一步步把道路
 let storyGuideInitialized = false;
 let atlasWorkbench: AtlasWorkbenchState =
   createAtlasWorkbenchState(qinlingAtlasLayers);
+let atlasFeatures: QinlingAtlasFeature[] = [...qinlingAtlasFeatures];
+
+async function loadImportedHydrographyAtlas(): Promise<void> {
+  try {
+    const response = await fetch("/data/regions/qinling/hydrography/osm-modern.json");
+
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+
+    const asset = (await response.json()) as ImportedHydrographyAsset;
+    const importedFeatures = importedHydrographyAssetToAtlasFeatures(asset);
+    atlasFeatures = [...qinlingAtlasFeatures, ...importedFeatures];
+  } catch (error) {
+    console.warn("Failed to load imported OSM hydrography atlas layer", error);
+  }
+}
+
+void loadImportedHydrographyAtlas();
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -1241,9 +1265,13 @@ function drawAtlasMapCanvas(
     ...layer,
     defaultVisible: atlasWorkbench.visibleLayerIds.has(layer.id)
   }));
-  const selectedFeature = selectedAtlasFeature(atlasWorkbench, qinlingAtlasFeatures);
+  const selectedFeature = selectedAtlasFeature(atlasWorkbench, atlasFeatures);
+  const minDisplayPriority = atlasMinimumDisplayPriority({
+    fullscreen: useWorkbenchView,
+    scale: mapView.scale
+  });
 
-  atlasVisibleFeatures(qinlingAtlasFeatures, atlasLayers).forEach(
+  atlasVisibleFeatures(atlasFeatures, atlasLayers, { minDisplayPriority }).forEach(
     (feature) => {
       drawAtlasFeature(context, feature, asset, canvas, mapView);
     }
@@ -1575,7 +1603,7 @@ function drawAtlasFeatureSelection(
 function refreshAtlasWorkbench(): void {
   hud.renderAtlasLayers(qinlingAtlasLayers, atlasWorkbench.visibleLayerIds);
   hud.renderAtlasFeature(
-    selectedAtlasFeature(atlasWorkbench, qinlingAtlasFeatures)
+    selectedAtlasFeature(atlasWorkbench, atlasFeatures)
   );
   hud.setAtlasFullscreenOpen(atlasWorkbench.isFullscreen);
   hudDirty = true;
@@ -2093,7 +2121,7 @@ function handleAtlasLayerClick(event: MouseEvent): void {
   }
 
   atlasWorkbench = toggleAtlasLayer(atlasWorkbench, layerId);
-  const selectedFeature = selectedAtlasFeature(atlasWorkbench, qinlingAtlasFeatures);
+  const selectedFeature = selectedAtlasFeature(atlasWorkbench, atlasFeatures);
 
   if (selectedFeature && !atlasWorkbench.visibleLayerIds.has(selectedFeature.layer)) {
     atlasWorkbench = selectAtlasFeature(atlasWorkbench, null);
@@ -2123,7 +2151,7 @@ function selectAtlasFeatureFromCanvas(
           mapView: { scale: 1, offsetX: 0, offsetY: 0 }
         };
   const feature = findAtlasFeatureAtCanvasPoint(
-    qinlingAtlasFeatures,
+    atlasFeatures,
     hitState,
     pointer,
     terrainSampler.asset.world,
