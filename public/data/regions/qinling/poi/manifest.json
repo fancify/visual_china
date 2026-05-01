@@ -1,0 +1,7 @@
+{
+  "id": "qinling-poi",
+  "type": "region-poi-manifest",
+  "version": 1,
+  "regionId": "qinling",
+  "file": "content.json"
+}

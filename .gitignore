@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Raw DEM downloads and extracted source tiles are too large for Git.
+data/fabdem/
+
+.DS_Store
+*.log
+.env
+.env.*
+
