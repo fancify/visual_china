@@ -42,7 +42,6 @@ import {
   landmarks as defaultLandmarks,
   modeMeta,
   routeStart as defaultRouteStart,
-  viewModes,
   type Landmark,
   type ViewMode
 } from "./data/qinlingSlice";
@@ -1999,21 +1998,6 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (atlasWorkbench.isFullscreen) {
-    return;
-  }
-
-  if (event.key >= "1" && event.key <= "4") {
-    currentMode = viewModes[Number(event.key) - 1]!;
-    if (lastVisuals) {
-      updateTerrainColors(lastVisuals);
-    }
-    hudDirty = true;
-    return;
-  }
-
-  if (event.key.toLowerCase() === "j") {
-    journalOpen = !journalOpen;
-    renderJournal();
     return;
   }
 
