@@ -17,6 +17,11 @@
 - `npm run china:fabdem:extract`
 - `npm run china:dem:build`
 
+另有一条更轻的全国低分辨率试验管线：
+
+- `npm run china:lowres:download`
+- `npm run china:lowres:build`
+
 以及公共配置：
 
 - `scripts/china-dem-common.mjs`
@@ -34,6 +39,21 @@
 
 - 其许可证为 `CC BY-NC-SA 4.0`
 - 更适合原型与研究，不应默认视作商业最终源
+
+## 低分辨率全国母版试验
+
+为了避免一开始就下载完整 FABDEM 全国包，当前新增了 `ETOPO 2022 60 arc-second` 试验管线。
+
+这条管线不会下载 456MB 全球 GeoTIFF，也不会下载 56GB+ 的 FABDEM 全国包。它通过 NOAA THREDDS / OPeNDAP 只抽取中国 bbox，并按 stride 采样成一个小缓存：
+
+- 源缓存：`data/etopo/china-etopo-2022-60s-stride7.ascii`
+- 运行资产：`public/data/china-lowres-dem.json`
+- 资产网格：`532 x 309`
+- 用途：全国总览、LOD 规划、宏观地势验证
+- 非用途：重点区域的真实游览地形
+- 海底高程：构建时按海平面 `0` 夹平，避免海沟深度压扁陆地 relief；真实海底可未来作为独立水域/海图层处理。
+
+这条路线的意义是先验证“全国低清 + 重点区域高清”的架构。秦岭、关中、汉中等重点区域仍应继续使用 FABDEM 或更高质量区域 DEM。
 
 后续若要商业化，应优先切换到：
 
