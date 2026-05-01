@@ -1,0 +1,320 @@
+{
+  "schema": "visual-china.hydrography-dem-validation.v1",
+  "summary": {
+    "featureCount": 5,
+    "totalPoints": 21,
+    "problemPoints": 21,
+    "issueCounts": {
+      "low-river-affinity": 21
+    }
+  },
+  "features": [
+    {
+      "featureId": "river-weihe",
+      "name": "渭河",
+      "rank": 1,
+      "pointCount": 4,
+      "problemPoints": 4,
+      "points": [
+        {
+          "pointIndex": 0,
+          "x": 24,
+          "y": 72,
+          "height": -0.456,
+          "riverAffinity": 0.0244,
+          "slope": 0.0925,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 1,
+          "x": 48,
+          "y": 70,
+          "height": -1.18,
+          "riverAffinity": 0,
+          "slope": 0.0136,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 2,
+          "x": 70,
+          "y": 69,
+          "height": -1.88,
+          "riverAffinity": 0,
+          "slope": 0.0411,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 3,
+          "x": 90,
+          "y": 68,
+          "height": -2.62,
+          "riverAffinity": 0,
+          "slope": 0.0196,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        }
+      ]
+    },
+    {
+      "featureId": "river-hanjiang",
+      "name": "汉江/汉水",
+      "rank": 1,
+      "pointCount": 5,
+      "problemPoints": 5,
+      "points": [
+        {
+          "pointIndex": 0,
+          "x": -8,
+          "y": 3,
+          "height": -0.909,
+          "riverAffinity": 0.0548,
+          "slope": 0.0832,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 1,
+          "x": 14,
+          "y": 8,
+          "height": -1.289,
+          "riverAffinity": 0.0205,
+          "slope": 0.107,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 2,
+          "x": 26,
+          "y": 9,
+          "height": -1.898,
+          "riverAffinity": 0.0005,
+          "slope": 0.0233,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 3,
+          "x": 42,
+          "y": 7,
+          "height": -0.937,
+          "riverAffinity": 0.0011,
+          "slope": 0.1316,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 4,
+          "x": 62,
+          "y": 0,
+          "height": 0.122,
+          "riverAffinity": 0.0095,
+          "slope": 0.2123,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        }
+      ]
+    },
+    {
+      "featureId": "river-jialingjiang",
+      "name": "嘉陵江",
+      "rank": 1,
+      "pointCount": 4,
+      "problemPoints": 4,
+      "points": [
+        {
+          "pointIndex": 0,
+          "x": -8,
+          "y": 3,
+          "height": -0.909,
+          "riverAffinity": 0.0548,
+          "slope": 0.0832,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 1,
+          "x": -12,
+          "y": -20,
+          "height": -0.707,
+          "riverAffinity": 0.0381,
+          "slope": 0.2697,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 2,
+          "x": -10,
+          "y": -28,
+          "height": -0.738,
+          "riverAffinity": 0.0241,
+          "slope": 0.2274,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 3,
+          "x": -8,
+          "y": -64,
+          "height": -2.414,
+          "riverAffinity": 0.0138,
+          "slope": 0.0894,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        }
+      ]
+    },
+    {
+      "featureId": "stream-baohe",
+      "name": "褒河",
+      "rank": 3,
+      "pointCount": 4,
+      "problemPoints": 4,
+      "points": [
+        {
+          "pointIndex": 0,
+          "x": 24,
+          "y": 11,
+          "height": -1.853,
+          "riverAffinity": 0.0038,
+          "slope": 0.0248,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 1,
+          "x": 30,
+          "y": 18,
+          "height": 0.743,
+          "riverAffinity": 0,
+          "slope": 0.513,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 2,
+          "x": 34,
+          "y": 28,
+          "height": 3.754,
+          "riverAffinity": 0,
+          "slope": 0.3831,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 3,
+          "x": 38,
+          "y": 39,
+          "height": 2.111,
+          "riverAffinity": 0.0706,
+          "slope": 0.3588,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        }
+      ]
+    },
+    {
+      "featureId": "stream-xieshui",
+      "name": "斜水",
+      "rank": 3,
+      "pointCount": 4,
+      "problemPoints": 4,
+      "points": [
+        {
+          "pointIndex": 0,
+          "x": 58,
+          "y": 70,
+          "height": -1.708,
+          "riverAffinity": 0,
+          "slope": 0.0167,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 1,
+          "x": 51,
+          "y": 58,
+          "height": 0.882,
+          "riverAffinity": 0.0197,
+          "slope": 0.5766,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 2,
+          "x": 44,
+          "y": 48,
+          "height": 8.927,
+          "riverAffinity": 0.0001,
+          "slope": 0.6623,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        },
+        {
+          "pointIndex": 3,
+          "x": 38,
+          "y": 39,
+          "height": 2.111,
+          "riverAffinity": 0.0706,
+          "slope": 0.3588,
+          "missingTileNames": [],
+          "issues": [
+            "low-river-affinity"
+          ]
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-05-01T08:54:21.815Z",
+  "sourceAsset": {
+    "hydrography": "public/data/regions/qinling/hydrography/modern.json",
+    "dem": "public/data/qinling-slice-dem.json"
+  },
+  "interpretation": [
+    "This report checks whether curated hydrography points agree with the current DEM-derived river affinity and slope fields.",
+    "Current hydrography is still a curated skeleton; low affinity points are QA signals, not automatic errors.",
+    "Points inside interpolated DEM tiles should not be used as strong evidence until DEM source gaps are repaired."
+  ]
+}
