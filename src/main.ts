@@ -69,6 +69,15 @@ import {
   atlasVisibleFeatures,
   featureWorldPoints
 } from "./game/atlasRender.js";
+import {
+  createAtlasWorkbenchState,
+  findAtlasFeatureAtCanvasPoint,
+  selectAtlasFeature,
+  setAtlasFullscreen,
+  selectedAtlasFeature,
+  toggleAtlasLayer,
+  type AtlasWorkbenchState
+} from "./game/atlasWorkbench.js";
 import { movementVectorFromInput } from "./game/navigation.js";
 import {
   avatarHeadingForMovement,
@@ -79,7 +88,8 @@ import {
   qinlingAtlasFeatures,
   qinlingAtlasLayers,
   qinlingWaterSystem,
-  type QinlingAtlasFeature
+  type QinlingAtlasFeature,
+  type QinlingAtlasLayerId
 } from "./game/qinlingAtlas.js";
 import {
   qinlingRoutes,
@@ -165,6 +175,8 @@ let storyBeats: StoryBeat[] = getQinlingStoryBeats();
 const completedStoryBeatIds = new Set<string>();
 let storyLine = "主线：从关中出发，去看山河如何一步步把道路收紧。";
 let storyGuideInitialized = false;
+let atlasWorkbench: AtlasWorkbenchState =
+  createAtlasWorkbenchState(qinlingAtlasLayers);
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -1131,8 +1143,28 @@ function rebuildRouteVisuals(): void {
   });
 }
 
-function drawOverviewMap(asset: DemAsset, playerPosition: Vector3): void {
-  const canvas = hud.overviewCanvas;
+function resizeAtlasCanvasToDisplaySize(canvas: HTMLCanvasElement): void {
+  const rect = canvas.getBoundingClientRect();
+
+  if (rect.width <= 0 || rect.height <= 0) {
+    return;
+  }
+
+  const pixelRatio = Math.min(window.devicePixelRatio, 2);
+  const nextWidth = Math.max(1, Math.floor(rect.width * pixelRatio));
+  const nextHeight = Math.max(1, Math.floor(rect.height * pixelRatio));
+
+  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+  }
+}
+
+function drawAtlasMapCanvas(
+  canvas: HTMLCanvasElement,
+  asset: DemAsset,
+  playerPosition: Vector3
+): void {
   const context = canvas.getContext("2d");
 
   if (!context) {
@@ -1171,11 +1203,21 @@ function drawOverviewMap(asset: DemAsset, playerPosition: Vector3): void {
   context.fillStyle = "rgba(247, 230, 174, 0.12)";
   context.fillRect(0, 0, width, height);
 
-  atlasVisibleFeatures(qinlingAtlasFeatures, qinlingAtlasLayers).forEach(
+  const atlasLayers = qinlingAtlasLayers.map((layer) => ({
+    ...layer,
+    defaultVisible: atlasWorkbench.visibleLayerIds.has(layer.id)
+  }));
+  const selectedFeature = selectedAtlasFeature(atlasWorkbench, qinlingAtlasFeatures);
+
+  atlasVisibleFeatures(qinlingAtlasFeatures, atlasLayers).forEach(
     (feature) => {
       drawAtlasFeature(context, feature, asset, canvas);
     }
   );
+
+  if (selectedFeature) {
+    drawAtlasFeatureSelection(context, selectedFeature, asset, canvas);
+  }
 
   const playerX = MathUtils.clamp(
     (playerPosition.x / asset.world.width + 0.5) * width,
@@ -1195,6 +1237,15 @@ function drawOverviewMap(asset: DemAsset, playerPosition: Vector3): void {
   context.lineWidth = 2;
   context.strokeStyle = "rgba(44, 24, 14, 0.8)";
   context.stroke();
+}
+
+function drawOverviewMap(asset: DemAsset, playerPosition: Vector3): void {
+  drawAtlasMapCanvas(hud.overviewCanvas, asset, playerPosition);
+
+  if (atlasWorkbench.isFullscreen) {
+    resizeAtlasCanvasToDisplaySize(hud.atlasFullscreenCanvas);
+    drawAtlasMapCanvas(hud.atlasFullscreenCanvas, asset, playerPosition);
+  }
 }
 
 function nearestLandmarkText(): string {
@@ -1353,6 +1404,37 @@ function drawAtlasFeature(
   }
 
   context.restore();
+}
+
+function drawAtlasFeatureSelection(
+  context: CanvasRenderingContext2D,
+  feature: QinlingAtlasFeature,
+  asset: DemAsset,
+  canvas: HTMLCanvasElement
+): void {
+  const center = atlasFeatureCenter(feature, asset.world, canvas);
+
+  context.save();
+  context.beginPath();
+  context.arc(center.x, center.y, 7.2, 0, Math.PI * 2);
+  context.strokeStyle = "rgba(255, 246, 190, 0.95)";
+  context.lineWidth = 2.4;
+  context.stroke();
+  context.beginPath();
+  context.arc(center.x, center.y, 10.5, 0, Math.PI * 2);
+  context.strokeStyle = "rgba(112, 52, 22, 0.55)";
+  context.lineWidth = 1.4;
+  context.stroke();
+  context.restore();
+}
+
+function refreshAtlasWorkbench(): void {
+  hud.renderAtlasLayers(qinlingAtlasLayers, atlasWorkbench.visibleLayerIds);
+  hud.renderAtlasFeature(
+    selectedAtlasFeature(atlasWorkbench, qinlingAtlasFeatures)
+  );
+  hud.setAtlasFullscreenOpen(atlasWorkbench.isFullscreen);
+  hudDirty = true;
 }
 
 function nearestUncollectedFragment():
@@ -1701,6 +1783,26 @@ let dragOriginX = 0;
 let dragOriginY = 0;
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && atlasWorkbench.isFullscreen) {
+    event.preventDefault();
+    keys.clear();
+    atlasWorkbench = setAtlasFullscreen(atlasWorkbench, false);
+    refreshAtlasWorkbench();
+    return;
+  }
+
+  if (event.key.toLowerCase() === "m") {
+    event.preventDefault();
+    keys.clear();
+    atlasWorkbench = setAtlasFullscreen(atlasWorkbench, !atlasWorkbench.isFullscreen);
+    refreshAtlasWorkbench();
+    return;
+  }
+
+  if (atlasWorkbench.isFullscreen) {
+    return;
+  }
+
   if (event.key >= "1" && event.key <= "4") {
     currentMode = viewModes[Number(event.key) - 1]!;
     if (lastVisuals) {
@@ -1824,7 +1926,83 @@ hud.closeJournalButton.addEventListener("click", () => {
   renderJournal();
 });
 
+function handleAtlasLayerClick(event: MouseEvent): void {
+  const target = event.target;
+
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const button = target.closest<HTMLButtonElement>("[data-atlas-layer]");
+
+  if (!button) {
+    return;
+  }
+
+  const layerId = button.dataset.atlasLayer as QinlingAtlasLayerId | undefined;
+
+  if (!layerId) {
+    return;
+  }
+
+  atlasWorkbench = toggleAtlasLayer(atlasWorkbench, layerId);
+  const selectedFeature = selectedAtlasFeature(atlasWorkbench, qinlingAtlasFeatures);
+
+  if (selectedFeature && !atlasWorkbench.visibleLayerIds.has(selectedFeature.layer)) {
+    atlasWorkbench = selectAtlasFeature(atlasWorkbench, null);
+  }
+
+  refreshAtlasWorkbench();
+}
+
+function selectAtlasFeatureFromCanvas(
+  canvas: HTMLCanvasElement,
+  event: MouseEvent
+): void {
+  if (!terrainSampler) {
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const pointer = {
+    x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+    y: ((event.clientY - rect.top) / rect.height) * canvas.height
+  };
+  const feature = findAtlasFeatureAtCanvasPoint(
+    qinlingAtlasFeatures,
+    atlasWorkbench,
+    pointer,
+    terrainSampler.asset.world,
+    canvas
+  );
+
+  atlasWorkbench = selectAtlasFeature(atlasWorkbench, feature?.id ?? null);
+  refreshAtlasWorkbench();
+}
+
+hud.openAtlasFullscreenButton.addEventListener("click", () => {
+  atlasWorkbench = setAtlasFullscreen(atlasWorkbench, true);
+  refreshAtlasWorkbench();
+});
+
+hud.closeAtlasFullscreenButton.addEventListener("click", () => {
+  atlasWorkbench = setAtlasFullscreen(atlasWorkbench, false);
+  refreshAtlasWorkbench();
+});
+
+hud.atlasLayerList.addEventListener("click", handleAtlasLayerClick);
+hud.atlasFullscreenLayerList.addEventListener("click", handleAtlasLayerClick);
+
+hud.overviewCanvas.addEventListener("click", (event: MouseEvent) => {
+  selectAtlasFeatureFromCanvas(hud.overviewCanvas, event);
+});
+
+hud.atlasFullscreenCanvas.addEventListener("click", (event: MouseEvent) => {
+  selectAtlasFeatureFromCanvas(hud.atlasFullscreenCanvas, event);
+});
+
 renderJournal();
+refreshAtlasWorkbench();
 
 const targetCameraPosition = new Vector3();
 const lookTarget = new Vector3();

@@ -1,6 +1,11 @@
 import type { ViewMode } from "../data/qinlingSlice";
 import { modeMeta, viewModes } from "../data/qinlingSlice";
 import { compactHudPanelConfig } from "./hudChrome.js";
+import type {
+  QinlingAtlasFeature,
+  QinlingAtlasLayer,
+  QinlingAtlasLayerId
+} from "./qinlingAtlas.js";
 
 export interface HudStatusSnapshot {
   zone: string;
@@ -13,6 +18,14 @@ export interface HudStatusSnapshot {
 
 export interface HudController {
   overviewCanvas: HTMLCanvasElement;
+  atlasFullscreen: HTMLElement;
+  atlasFullscreenCanvas: HTMLCanvasElement;
+  atlasLayerList: HTMLElement;
+  atlasFullscreenLayerList: HTMLElement;
+  atlasFeatureCard: HTMLElement;
+  atlasFullscreenFeatureCard: HTMLElement;
+  openAtlasFullscreenButton: HTMLButtonElement;
+  closeAtlasFullscreenButton: HTMLButtonElement;
   closeJournalButton: HTMLButtonElement;
   journal: HTMLElement;
   journalEmpty: HTMLElement;
@@ -20,6 +33,12 @@ export interface HudController {
   journalDetail: HTMLElement;
   setLoadingState(message: string, tone?: "info" | "success" | "error"): void;
   setActiveMode(mode: ViewMode): void;
+  renderAtlasLayers(
+    layers: QinlingAtlasLayer[],
+    visibleLayerIds: Set<QinlingAtlasLayerId>
+  ): void;
+  renderAtlasFeature(feature: QinlingAtlasFeature | null): void;
+  setAtlasFullscreenOpen(isOpen: boolean): void;
   updateStatus(snapshot: HudStatusSnapshot): void;
   showToast(text: string): void;
   hideToast(): void;
@@ -86,14 +105,58 @@ export function createHud(
       </details>
     </div>
     <details class="overview-block hud-drawer" ${compactHudPanelConfig.overview.openByDefault ? "open" : ""}>
-      <summary>地貌总览</summary>
+      <summary>地貌总览 · M 全屏</summary>
       <canvas id="overview-map" width="220" height="270"></canvas>
+      <button class="atlas-open-button" id="open-atlas-fullscreen" type="button">
+        全屏细读地图
+      </button>
+      <div class="atlas-layer-list" id="atlas-layer-list"></div>
+      <div class="atlas-feature-card" id="atlas-feature-card">
+        <div class="atlas-card-kicker">点击地图</div>
+        <strong>选择一个地理要素</strong>
+        <p>可以查看河流、古道、城市、关隘和地貌的解释。</p>
+      </div>
       <div class="overview-legend">
         <span>北：关中</span>
         <span>中：秦岭</span>
         <span>南：汉中 / 巴蜀</span>
       </div>
     </details>
+    <aside class="atlas-fullscreen" id="atlas-fullscreen" aria-hidden="true">
+      <div class="atlas-fullscreen-shell">
+        <header class="atlas-fullscreen-head">
+          <div>
+            <div class="eyebrow">Atlas Workbench</div>
+            <h2>秦岭地貌总览</h2>
+            <p>严格地理坐标底图，用于游玩导航、POI 校对和后续 3D 地貌规则开发。</p>
+          </div>
+          <button id="close-atlas-fullscreen" type="button">返回游戏</button>
+        </header>
+        <div class="atlas-fullscreen-body">
+          <div class="atlas-map-stage">
+            <canvas id="atlas-fullscreen-map" width="840" height="1120"></canvas>
+          </div>
+          <aside class="atlas-side-panel">
+            <div class="atlas-panel-section">
+              <div class="atlas-panel-title">图层</div>
+              <div class="atlas-layer-list atlas-layer-list-full" id="atlas-fullscreen-layer-list"></div>
+            </div>
+            <div class="atlas-panel-section">
+              <div class="atlas-panel-title">要素说明</div>
+              <div class="atlas-feature-card atlas-feature-card-full" id="atlas-fullscreen-feature-card">
+                <div class="atlas-card-kicker">点击地图</div>
+                <strong>选择一个地理要素</strong>
+                <p>可以查看河流、古道、城市、关隘和地貌的解释。</p>
+              </div>
+            </div>
+            <div class="atlas-panel-section atlas-dev-note">
+              <div class="atlas-panel-title">开发用途</div>
+              <p>先在 2D 中确认地貌、POI、路线和文案，再把规则同步到 3D 游戏体验。</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </aside>
     <details class="controls-block hud-drawer" ${compactHudPanelConfig.controls.openByDefault ? "open" : ""}>
       <summary>操作提示</summary>
       <div class="control-grid">
@@ -101,6 +164,7 @@ export function createHud(
         <span>拖动 / Q E 转向</span>
         <span>滚轮缩放</span>
         <span>O 总览 / F 近身</span>
+        <span>M 全屏地图</span>
         <span>1-4 切换视图</span>
         <span>T 快进时辰</span>
         <span>K 切天气</span>
@@ -137,6 +201,29 @@ export function createHud(
   const storyLine = requireElement<HTMLElement>(hud, "#story-line");
   const modeSummary = requireElement<HTMLElement>(hud, "#mode-summary");
   const overviewCanvas = requireElement<HTMLCanvasElement>(hud, "#overview-map");
+  const openAtlasFullscreenButton = requireElement<HTMLButtonElement>(
+    hud,
+    "#open-atlas-fullscreen"
+  );
+  const atlasFullscreen = requireElement<HTMLElement>(hud, "#atlas-fullscreen");
+  const atlasFullscreenCanvas = requireElement<HTMLCanvasElement>(
+    hud,
+    "#atlas-fullscreen-map"
+  );
+  const atlasLayerList = requireElement<HTMLElement>(hud, "#atlas-layer-list");
+  const atlasFullscreenLayerList = requireElement<HTMLElement>(
+    hud,
+    "#atlas-fullscreen-layer-list"
+  );
+  const atlasFeatureCard = requireElement<HTMLElement>(hud, "#atlas-feature-card");
+  const atlasFullscreenFeatureCard = requireElement<HTMLElement>(
+    hud,
+    "#atlas-fullscreen-feature-card"
+  );
+  const closeAtlasFullscreenButton = requireElement<HTMLButtonElement>(
+    hud,
+    "#close-atlas-fullscreen"
+  );
   const journal = requireElement<HTMLElement>(hud, "#journal");
   const journalEmpty = requireElement<HTMLElement>(hud, "#journal-empty");
   const journalList = requireElement<HTMLElement>(hud, "#journal-list");
@@ -155,8 +242,58 @@ export function createHud(
 
   let lastStatus: HudStatusSnapshot | null = null;
 
+  const renderLayerList = (
+    container: HTMLElement,
+    layers: QinlingAtlasLayer[],
+    visibleLayerIds: Set<QinlingAtlasLayerId>
+  ): void => {
+    container.innerHTML = layers
+      .map(
+        (layer) => `
+          <button
+            class="atlas-layer-chip ${visibleLayerIds.has(layer.id) ? "active" : ""}"
+            data-atlas-layer="${layer.id}"
+            type="button"
+            title="${layer.description}"
+          >
+            ${layer.name}
+          </button>
+        `
+      )
+      .join("");
+  };
+
+  const renderFeatureCard = (
+    container: HTMLElement,
+    feature: QinlingAtlasFeature | null
+  ): void => {
+    if (!feature) {
+      container.innerHTML = `
+        <div class="atlas-card-kicker">点击地图</div>
+        <strong>选择一个地理要素</strong>
+        <p>可以查看河流、古道、城市、关隘和地貌的解释。</p>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="atlas-card-kicker">${feature.layer} · ${feature.terrainRole}</div>
+      <strong>${feature.name}</strong>
+      <p>${feature.copy.summary}</p>
+      <span>视觉规则：${feature.visualRule.symbol} / ${feature.visualRule.emphasis}</span>
+    `;
+  };
+
   const controller: HudController = {
     overviewCanvas,
+    atlasFullscreen,
+    atlasFullscreenCanvas,
+    atlasLayerList,
+    atlasFullscreenLayerList,
+    atlasFeatureCard,
+    atlasFullscreenFeatureCard,
+    openAtlasFullscreenButton,
+    closeAtlasFullscreenButton,
     closeJournalButton,
     journal,
     journalEmpty,
@@ -175,6 +312,18 @@ export function createHud(
       modeChips.forEach((chip, chipMode) => {
         chip.classList.toggle("active", chipMode === mode);
       });
+    },
+    renderAtlasLayers(layers, visibleLayerIds) {
+      renderLayerList(atlasLayerList, layers, visibleLayerIds);
+      renderLayerList(atlasFullscreenLayerList, layers, visibleLayerIds);
+    },
+    renderAtlasFeature(feature) {
+      renderFeatureCard(atlasFeatureCard, feature);
+      renderFeatureCard(atlasFullscreenFeatureCard, feature);
+    },
+    setAtlasFullscreenOpen(isOpen) {
+      atlasFullscreen.classList.toggle("open", isOpen);
+      atlasFullscreen.setAttribute("aria-hidden", String(!isOpen));
     },
     updateStatus(snapshot) {
       if (lastStatus?.zone !== snapshot.zone) {
