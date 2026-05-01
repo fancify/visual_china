@@ -1,0 +1,31 @@
+{
+  "name": "visual-china",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:dem": "node scripts/generate-qinling-dem.mjs && node scripts/build-qinling-region-assets.mjs",
+    "build:qinling:region": "node scripts/build-qinling-region-assets.mjs",
+    "qinling:fabdem:download": "node scripts/download-qinling-fabdem.mjs",
+    "qinling:fabdem:extract": "node scripts/extract-qinling-fabdem.mjs",
+    "qinling:dem:status": "node scripts/qinling-dem-status.mjs",
+    "qinling:dem:build-real": "node scripts/build-qinling-real-dem.mjs && node scripts/build-qinling-region-assets.mjs",
+    "verify:dem": "node scripts/verify-dem-assets.mjs public/data/qinling-slice-dem.json public/data/regions/qinling/manifest.json",
+    "test": "node --test scripts/qinling-dem-status.test.mjs scripts/qinling-landform-visual.test.mjs scripts/navigation-controls.test.mjs scripts/camera-view.test.mjs scripts/environment-celestial.test.mjs scripts/sky-disc-position.test.mjs scripts/sky-dome-runtime.test.mjs scripts/hud-chrome.test.mjs scripts/qinling-poi-geography.test.mjs scripts/qinling-route-affinity.test.mjs scripts/route-ribbon.test.mjs scripts/player-avatar.test.mjs scripts/world-coordinate-contract.test.mjs scripts/qinling-atlas-coverage.test.mjs scripts/atlas-render-policy.test.mjs",
+    "china:fabdem:download": "node scripts/download-china-fabdem.mjs",
+    "china:fabdem:extract": "node scripts/extract-china-fabdem.mjs",
+    "china:dem:build": "node scripts/build-china-national-dem.mjs",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "geotiff": "^3.0.5",
+    "three": "^0.178.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.178.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.0"
+  }
+}

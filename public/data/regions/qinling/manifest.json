@@ -1,0 +1,50 @@
+{
+  "id": "qinling",
+  "type": "region-manifest",
+  "version": 1,
+  "displayName": "秦岭 - 关中 - 汉中 - 四川盆地",
+  "densityClass": "high-focus",
+  "coordinatePolicy": "strict-geographic",
+  "parentWorldId": "china-mainland",
+  "sourceType": "processed-real-dem",
+  "generatedAt": "2026-05-01T03:15:32.157Z",
+  "bounds": {
+    "west": 103.5,
+    "east": 109,
+    "south": 30.4,
+    "north": 35.4
+  },
+  "world": {
+    "width": 180,
+    "depth": 240
+  },
+  "geographicFootprintKm": {
+    "width": 420,
+    "depth": 560
+  },
+  "experienceScaleMultiplier": 2.3,
+  "experienceProfile": {
+    "coordinatePolicy": "strict-geographic",
+    "travelSpeedMultiplier": 1,
+    "cameraScaleMultiplier": 1,
+    "detailDensityMultiplier": 1,
+    "eventDensityMultiplier": 1
+  },
+  "lods": [
+    {
+      "id": "L1",
+      "file": "slice-l1.json",
+      "grid": {
+        "columns": 193,
+        "rows": 241
+      }
+    }
+  ],
+  "chunking": {
+    "enabled": true,
+    "chunkColumns": 4,
+    "chunkRows": 5,
+    "chunkManifest": "chunks/manifest.json"
+  },
+  "poiManifest": "poi/manifest.json"
+}
