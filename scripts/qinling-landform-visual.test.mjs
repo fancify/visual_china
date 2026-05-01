@@ -82,6 +82,13 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
   );
 });
 
+test("Qinling real DEM uses all required FABDEM source tiles", () => {
+  assert.ok(
+    !asset.notes.some((note) => note.includes("Missing required tiles")),
+    "Qinling DEM should not contain neighbor-interpolated FABDEM tile gaps"
+  );
+});
+
 test("Qinling visual relief avoids needle-like mountain noise", () => {
   const relief = localReliefStats();
 
