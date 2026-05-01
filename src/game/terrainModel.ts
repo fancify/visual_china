@@ -3,10 +3,22 @@ import { Color, MathUtils } from "three";
 import { TerrainSampler } from "./demSampler";
 import type { EnvironmentState, EnvironmentVisuals } from "./environment";
 
-function normalizedHeight(height: number, sampler: TerrainSampler): number {
+export function terrainHeightRange(sampler: TerrainSampler): {
+  minHeight: number;
+  maxHeight: number;
+} {
+  return {
+    minHeight: sampler.asset.presentation?.globalMinHeight ?? sampler.asset.minHeight,
+    maxHeight: sampler.asset.presentation?.globalMaxHeight ?? sampler.asset.maxHeight
+  };
+}
+
+export function terrainNormalizedHeight(height: number, sampler: TerrainSampler): number {
+  const { minHeight, maxHeight } = terrainHeightRange(sampler);
+
   return MathUtils.clamp(
-    (height - sampler.asset.minHeight) /
-      (sampler.asset.maxHeight - sampler.asset.minHeight || 1),
+    (height - minHeight) /
+      (maxHeight - minHeight || 1),
     0,
     1
   );
@@ -51,7 +63,7 @@ export function modeColor(
   environmentState: EnvironmentState,
   environmentVisuals: EnvironmentVisuals
 ): Color {
-  const h = normalizedHeight(height, sampler);
+  const h = terrainNormalizedHeight(height, sampler);
   const slope = sampler.sampleSlope(x, z);
   const river = sampler.sampleRiver(x, z);
   const pass = sampler.samplePass(x, z);
@@ -109,7 +121,9 @@ export function modeColor(
 
   color.setHSL(hsl.h, hsl.s, hsl.l);
 
-  if (mode === "terrain" && environmentState.season === "winter" && height > sampler.asset.minHeight + (sampler.asset.maxHeight - sampler.asset.minHeight) * 0.52) {
+  const { minHeight, maxHeight } = terrainHeightRange(sampler);
+
+  if (mode === "terrain" && environmentState.season === "winter" && height > minHeight + (maxHeight - minHeight) * 0.52) {
     color.lerp(new Color("#f5f7fb"), 0.22 + h * 0.25);
   }
 

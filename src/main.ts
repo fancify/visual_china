@@ -142,6 +142,7 @@ import {
 import {
   createTerrainMesh,
   disposeTerrainMesh,
+  setTerrainMeshSurfaceVisible,
   setTerrainMeshWorldPosition,
   updateTerrainMeshColors,
   type TerrainMeshHandle
@@ -1819,6 +1820,7 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         const loadedChunk = await loadDemAsset(chunkAssetUrl);
         const chunkSampler = new TerrainSampler(loadedChunk.asset);
         const terrainChunk = createTerrainMesh(chunkSampler);
+        setTerrainMeshSurfaceVisible(terrainChunk, false);
         const scenery = createChunkScenery(
           chunkSampler,
           runtimeBudget.scenery

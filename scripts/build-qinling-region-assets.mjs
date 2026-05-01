@@ -77,10 +77,11 @@ const chunkManifest = {
 
 for (let chunkRow = 0; chunkRow < chunkRows; chunkRow += 1) {
   for (let chunkColumn = 0; chunkColumn < chunkColumns; chunkColumn += 1) {
-    const startColumn = Math.floor((chunkColumn / chunkColumns) * asset.grid.columns);
-    const endColumn = Math.floor(((chunkColumn + 1) / chunkColumns) * asset.grid.columns);
-    const startRow = Math.floor((chunkRow / chunkRows) * asset.grid.rows);
-    const endRow = Math.floor(((chunkRow + 1) / chunkRows) * asset.grid.rows);
+    const startColumn = Math.round((chunkColumn / chunkColumns) * (asset.grid.columns - 1));
+    const endColumn =
+      Math.round(((chunkColumn + 1) / chunkColumns) * (asset.grid.columns - 1)) + 1;
+    const startRow = Math.round((chunkRow / chunkRows) * (asset.grid.rows - 1));
+    const endRow = Math.round(((chunkRow + 1) / chunkRows) * (asset.grid.rows - 1)) + 1;
 
     const columns = endColumn - startColumn;
     const rows = endRow - startRow;

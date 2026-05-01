@@ -73,6 +73,20 @@ export function setTerrainMeshWorldPosition(
   terrainMesh.mesh.position.set(centerX, yOffset, centerZ);
 }
 
+export function setTerrainMeshSurfaceVisible(
+  terrainMesh: TerrainMeshHandle,
+  visible: boolean
+): void {
+  if (Array.isArray(terrainMesh.mesh.material)) {
+    terrainMesh.mesh.material.forEach((material) => {
+      material.visible = visible;
+    });
+    return;
+  }
+
+  terrainMesh.mesh.material.visible = visible;
+}
+
 export function updateTerrainMeshColors(
   terrainMesh: TerrainMeshHandle,
   mode: ViewMode,
