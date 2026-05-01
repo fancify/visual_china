@@ -128,6 +128,44 @@ body {
   cursor: pointer;
 }
 
+.china-lowres-compass {
+  position: absolute;
+  right: 28px;
+  top: 22px;
+  display: grid;
+  grid-template-columns: 32px 32px 32px;
+  grid-template-rows: 28px 28px 28px;
+  place-items: center;
+  border: 1px solid rgba(241, 210, 137, 0.18);
+  border-radius: 18px;
+  padding: 8px;
+  background: rgba(10, 18, 18, 0.56);
+  color: rgba(245, 236, 211, 0.78);
+  font-size: 13px;
+  font-weight: 700;
+  backdrop-filter: blur(16px);
+}
+
+.china-lowres-compass .north {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.china-lowres-compass .west {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.china-lowres-compass .east {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.china-lowres-compass .south {
+  grid-column: 2;
+  grid-row: 3;
+}
+
 .china-lowres-error {
   display: grid;
   min-height: 100%;
@@ -151,5 +189,11 @@ body {
     bottom: 12px;
     left: 12px;
     max-width: none;
+  }
+
+  .china-lowres-compass {
+    right: 12px;
+    top: auto;
+    bottom: 92px;
   }
 }

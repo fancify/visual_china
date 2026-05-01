@@ -142,6 +142,12 @@ function mountShell(asset: DemAsset): {
         拖拽旋转视角，滚轮缩放，WASD 平移观察中心。
         <button id="china-lowres-reset" type="button">复位视角</button>
       </aside>
+      <aside class="china-lowres-compass" aria-label="地图方位">
+        <span class="north">北</span>
+        <span class="west">西</span>
+        <span class="east">东</span>
+        <span class="south">南</span>
+      </aside>
     </main>
   `;
 
@@ -175,9 +181,9 @@ function installControls(
   const keys = new Set<string>();
 
   function reset(): void {
-    state.yaw = -36;
-    state.pitch = 48;
-    state.distance = 430;
+    state.yaw = 0;
+    state.pitch = 58;
+    state.distance = 460;
     state.target.set(0, 8, 0);
   }
 
@@ -283,9 +289,9 @@ async function start(): Promise<void> {
   scene.add(fillLight);
 
   const state: ViewerState = {
-    yaw: -36,
-    pitch: 48,
-    distance: 430,
+    yaw: 0,
+    pitch: 58,
+    distance: 460,
     target: new Vector3(0, 8, 0),
     dragging: false,
     pointerX: 0,

@@ -9,5 +9,6 @@ test("standalone China lowres game demo page loads the lowres DEM module", () =>
   assert.match(html, /chinaLowresDemo\.ts/);
   assert.match(entry, /\/data\/china-lowres-dem\.json/);
   assert.match(entry, /heightScale/);
+  assert.match(entry, /state\.yaw = 0/);
   assert.match(entry, /requestAnimationFrame/);
 });
