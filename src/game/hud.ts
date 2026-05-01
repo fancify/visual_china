@@ -69,15 +69,15 @@ export function createHud(
   fragmentCount: number
 ): HudController {
   const hud = document.createElement("div");
+  const hiddenClass = "hud-hidden";
   hud.className = "hud";
   hud.innerHTML = `
     <div class="title-block">
-      <div class="eyebrow">山河中国 · 垂直切片原型</div>
+      <div class="eyebrow">山河中国</div>
       <h1>秦岭 - 关中 - 四川盆地</h1>
-      <p>风景先出现，理解随后被拾起。</p>
       <div class="loading-line" id="loading-line"></div>
     </div>
-    <details class="mode-block hud-drawer" ${compactHudPanelConfig.mode.openByDefault ? "open" : ""}>
+    <details class="mode-block hud-drawer ${compactHudPanelConfig.mode.visible ? "" : hiddenClass}" ${compactHudPanelConfig.mode.openByDefault ? "open" : ""}>
       <summary>视图 · <strong id="mode-summary">${modeMeta.terrain.title}</strong></summary>
       <div class="mode-options">
         ${viewModes
@@ -92,7 +92,7 @@ export function createHud(
           .join("")}
       </div>
     </details>
-    <div class="status-block ${compactHudPanelConfig.status.openByDefault ? "visible" : ""}">
+    <div class="status-block ${compactHudPanelConfig.status.visible ? "" : hiddenClass} ${compactHudPanelConfig.status.openByDefault ? "visible" : ""}">
       <div class="status-title">当前旅程</div>
       <div class="status-line" id="zone-line">${defaultStatusSnapshot.zone}</div>
       <div class="status-line story-line" id="story-line">${defaultStatusSnapshot.story}</div>
@@ -104,11 +104,11 @@ export function createHud(
         <div class="status-line" id="nearby-line">${defaultStatusSnapshot.nearby}</div>
       </details>
     </div>
-    <details class="overview-block hud-drawer" ${compactHudPanelConfig.overview.openByDefault ? "open" : ""}>
-      <summary>地貌总览 · M 全屏</summary>
+    <details class="overview-block hud-drawer ${compactHudPanelConfig.overview.visible ? "" : hiddenClass}" ${compactHudPanelConfig.overview.openByDefault ? "open" : ""}>
+      <summary>地图 · M</summary>
       <canvas id="overview-map" width="220" height="270"></canvas>
       <button class="atlas-open-button" id="open-atlas-fullscreen" type="button">
-        全屏细读地图
+        全屏地图
       </button>
       <div class="atlas-layer-list" id="atlas-layer-list"></div>
       <div class="atlas-feature-card" id="atlas-feature-card">
@@ -126,9 +126,9 @@ export function createHud(
       <div class="atlas-fullscreen-shell">
         <header class="atlas-fullscreen-head">
           <div>
-            <div class="eyebrow">Atlas Workbench</div>
+            <div class="eyebrow">地貌总览</div>
             <h2>秦岭地貌总览</h2>
-            <p>严格地理坐标底图，用于游玩导航、POI 校对和后续 3D 地貌规则开发。滚轮缩放，拖拽平移，双击复位。</p>
+            <p>滚轮缩放，拖拽平移，双击复位。先看山、水、盆地和通行关系。</p>
           </div>
           <button id="close-atlas-fullscreen" type="button">返回游戏</button>
         </header>
@@ -149,15 +149,11 @@ export function createHud(
                 <p>可以查看河流、古道、城市、关隘和地貌的解释。</p>
               </div>
             </div>
-            <div class="atlas-panel-section atlas-dev-note">
-              <div class="atlas-panel-title">开发用途</div>
-              <p>先在 2D 中确认地貌、POI、路线和文案，再把规则同步到 3D 游戏体验。</p>
-            </div>
           </aside>
         </div>
       </div>
     </aside>
-    <details class="controls-block hud-drawer" ${compactHudPanelConfig.controls.openByDefault ? "open" : ""}>
+    <details class="controls-block hud-drawer ${compactHudPanelConfig.controls.visible ? "" : hiddenClass}" ${compactHudPanelConfig.controls.openByDefault ? "open" : ""}>
       <summary>操作提示</summary>
       <div class="control-grid">
         <span>WASD 移动</span>
@@ -165,16 +161,14 @@ export function createHud(
         <span>滚轮缩放</span>
         <span>O 总览 / F 近身</span>
         <span>M 全屏地图</span>
-        <span>1-4 切换视图</span>
         <span>T 快进时辰</span>
         <span>K 切天气</span>
         <span>L 切季节</span>
-        <span>J 打开札记</span>
         <span>点击画面启用声音</span>
       </div>
     </details>
     <div class="toast" id="pickup-toast"></div>
-    <aside class="journal" id="journal">
+    <aside class="journal ${compactHudPanelConfig.journal.visible ? "" : hiddenClass}" id="journal">
       <div class="journal-head">
         <div>
           <div class="eyebrow">山河札记</div>

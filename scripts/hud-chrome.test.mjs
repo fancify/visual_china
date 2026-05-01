@@ -7,12 +7,15 @@ import {
 } from "../src/game/hudChrome.js";
 
 test("compact HUD keeps only essential panels open by default", () => {
-  assert.equal(compactHudPanelConfig.mode.openByDefault, false);
+  assert.equal(compactHudPanelConfig.mode.visible, false);
+  assert.equal(compactHudPanelConfig.status.visible, false);
+  assert.equal(compactHudPanelConfig.journal.visible, false);
+  assert.equal(compactHudPanelConfig.overview.visible, true);
+  assert.equal(compactHudPanelConfig.controls.visible, true);
   assert.equal(compactHudPanelConfig.overview.openByDefault, false);
   assert.equal(compactHudPanelConfig.controls.openByDefault, false);
-  assert.equal(compactHudPanelConfig.status.openByDefault, true);
 });
 
-test("compact HUD status hides secondary telemetry until expanded", () => {
-  assert.deepEqual(visibleStatusLineIds, ["zone-line", "story-line"]);
+test("natural exploration HUD does not pin journey or story lines", () => {
+  assert.deepEqual(visibleStatusLineIds, []);
 });

@@ -1,16 +1,24 @@
 export const compactHudPanelConfig = {
   mode: {
+    visible: false,
     openByDefault: false
   },
   overview: {
+    visible: true,
     openByDefault: false
   },
   controls: {
+    visible: true,
     openByDefault: false
   },
   status: {
-    openByDefault: true
+    visible: false,
+    openByDefault: false
+  },
+  journal: {
+    visible: false,
+    openByDefault: false
   }
 };
 
-export const visibleStatusLineIds = ["zone-line", "story-line"];
+export const visibleStatusLineIds = [];
