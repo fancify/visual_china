@@ -24,6 +24,9 @@
 6. [下一阶段计划](./next-phase-plan.md)  
    下一轮应该集中推进的开发路线。
 
+7. [多尺度地图与历史年代层架构设计](./superpowers/specs/2026-05-01-multiscale-map-era-layers-design.md)
+   说明当前秦岭地图如何作为总览层，未来如何通过入口进入局部场景，并预留历史年代 overlay。
+
 ## 架构与工程文档
 
 - [首版技术方案](./technical-plan.md)
@@ -31,6 +34,7 @@
 - [开放世界地理资产流式加载方案](./open-world-geographic-streaming-plan.md)
 - [严格地理坐标与体验压缩规则](./geographic-coordinate-and-experience-compression.md)
 - [视觉风格与性能预算原则](./visual-style-and-performance-budget.md)
+- [多尺度地图与历史年代层实现计划](./superpowers/plans/2026-05-01-multiscale-map-era-layers.md)
 
 ## 地图尺度与全国规划
 
