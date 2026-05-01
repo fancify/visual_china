@@ -39,7 +39,7 @@
 
 ## P2：水系与地貌造型规则
 
-状态：水系已建立第一版独立现代 hydrography 管线骨架和 DEM mismatch report。当前数据仍是 curated skeleton，下一步接入真实水文矢量源。
+状态：水系已建立第一版独立现代 hydrography 管线骨架、DEM mismatch report 和 OSM/Overpass 命名水系导入链路。当前 Atlas Workbench 已能按缩放加载主要河流、命名支流和渠道证据层。
 
 目标：让水系和地貌粒度真正影响视觉，而不是只画几条线。
 
@@ -49,7 +49,9 @@
 - 为秦岭区域生成独立 hydrography asset，不再只依赖 `qinlingAtlas.js` 手工折线。`已完成第一版`
 - 建立 L0/L1/L2 水系显示规则，全国/区域/局部不同密度。`已完成模型第一版`
 - 加入 DEM 校验，报告河流是否贴近低地、谷地、盆地和合理流向。`已完成第一版`
-- 接入 HydroRIVERS/OSM/MERIT Hydro 的 acquire/clip/normalize/validate 管线。
+- 接入 OSM/Overpass acquire/clip/normalize/export 管线。`已完成第一轮`
+- 继续评估 HydroRIVERS/MERIT Hydro 或国内基础地理水系数据，用于补强 OSM 缺失与等级校准。
+- 合并 OSM 分段、核验中文名称、为主干/一级支流/地方支流建立更可靠的 rank 规则。
 - 把渭河、汉水、嘉陵江、褒水、斜水接入 terrain coloring。
 - 为河谷、盆地、平原、主脊、峡谷建立不同造型粒度。
 - 平原和盆地做低频平滑，山脊保留中高频，关隘/峡谷局部强化。

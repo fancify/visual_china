@@ -5,6 +5,7 @@ import {
   atlasCanvasPoint,
   atlasFeatureCenter,
   atlasLayerDrawOrder,
+  atlasMinimumDisplayPriority,
   missingDemTileWorldRects,
   parseMissingDemTileNames,
   atlasVisibleFeatures,
@@ -101,4 +102,27 @@ test("atlas render policy exposes interpolated DEM tile gaps as map quality area
   assert.ok(rects[0].minX >= -90, "western missing tile should be clipped to slice bounds");
   assert.ok(rects[0].maxX < rects[1].maxX, "adjacent missing tiles should preserve geography order");
   assert.ok(rects[0].minY < rects[0].maxY, "missing tile rect should have visible north-south span");
+});
+
+test("atlas render policy reveals dense evidence layers only when zoomed in", () => {
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: false, scale: 1 }), 7);
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 1 }), 7);
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 2 }), 4);
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 4 }), 2);
+
+  const features = [
+    { id: "major", layer: "water", displayPriority: 8 },
+    { id: "tributary", layer: "water", displayPriority: 4 },
+    { id: "local", layer: "water", displayPriority: 2 }
+  ];
+  const layers = [{ id: "water", defaultVisible: true }];
+
+  assert.deepEqual(
+    atlasVisibleFeatures(features, layers, { minDisplayPriority: 7 }).map((feature) => feature.id),
+    ["major"]
+  );
+  assert.deepEqual(
+    atlasVisibleFeatures(features, layers, { minDisplayPriority: 4 }).map((feature) => feature.id),
+    ["major", "tributary"]
+  );
 });

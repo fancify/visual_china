@@ -94,16 +94,34 @@ export function missingDemTileWorldRects(asset) {
   });
 }
 
-export function atlasVisibleFeatures(features, layers) {
+export function atlasMinimumDisplayPriority({ fullscreen = false, scale = 1 } = {}) {
+  if (!fullscreen) {
+    return 7;
+  }
+
+  if (scale >= 4) {
+    return 2;
+  }
+
+  if (scale >= 2) {
+    return 4;
+  }
+
+  return 7;
+}
+
+export function atlasVisibleFeatures(features, layers, options = {}) {
   const visibleLayerIds = new Set(
     layers.filter((layer) => layer.defaultVisible).map((layer) => layer.id)
   );
+  const minDisplayPriority = options.minDisplayPriority ?? Number.NEGATIVE_INFINITY;
   const order = new Map(
     atlasLayerDrawOrder.map((layerId, index) => [layerId, index])
   );
 
   return features
     .filter((feature) => visibleLayerIds.has(feature.layer))
+    .filter((feature) => feature.displayPriority >= minDisplayPriority)
     .toSorted((a, b) => {
       const layerDelta = (order.get(a.layer) ?? 99) - (order.get(b.layer) ?? 99);
 

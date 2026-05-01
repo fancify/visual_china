@@ -33,9 +33,15 @@ export function missingDemTileWorldRects(asset: {
   maxY: number;
 }>;
 
+export function atlasMinimumDisplayPriority(options?: {
+  fullscreen?: boolean;
+  scale?: number;
+}): number;
+
 export function atlasVisibleFeatures(
   features: QinlingAtlasFeature[],
-  layers: QinlingAtlasLayer[]
+  layers: QinlingAtlasLayer[],
+  options?: { minDisplayPriority?: number }
 ): QinlingAtlasFeature[];
 
 export function featureWorldPoints(
