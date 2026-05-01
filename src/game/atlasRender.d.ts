@@ -38,10 +38,14 @@ export function atlasMinimumDisplayPriority(options?: {
   scale?: number;
 }): number;
 
+export function isVerifiedAtlasFeature(
+  feature: QinlingAtlasFeature
+): boolean;
+
 export function atlasVisibleFeatures(
   features: QinlingAtlasFeature[],
   layers: QinlingAtlasLayer[],
-  options?: { minDisplayPriority?: number }
+  options?: { minDisplayPriority?: number; includeUnverifiedFeatures?: boolean }
 ): QinlingAtlasFeature[];
 
 export function featureWorldPoints(

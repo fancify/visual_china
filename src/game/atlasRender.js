@@ -106,11 +106,19 @@ export function atlasMinimumDisplayPriority({ fullscreen = false, scale = 1 } = 
   return 7;
 }
 
+export function isVerifiedAtlasFeature(feature) {
+  return (
+    feature.source?.verification === "external-vector" ||
+    feature.source?.verification === "verified"
+  );
+}
+
 export function atlasVisibleFeatures(features, layers, options = {}) {
   const visibleLayerIds = new Set(
     layers.filter((layer) => layer.defaultVisible).map((layer) => layer.id)
   );
   const minDisplayPriority = options.minDisplayPriority ?? Number.NEGATIVE_INFINITY;
+  const includeUnverifiedFeatures = options.includeUnverifiedFeatures === true;
   const order = new Map(
     atlasLayerDrawOrder.map((layerId, index) => [layerId, index])
   );
@@ -118,6 +126,10 @@ export function atlasVisibleFeatures(features, layers, options = {}) {
   return features
     .filter((feature) => visibleLayerIds.has(feature.layer))
     .filter((feature) => feature.displayPriority >= minDisplayPriority)
+    .filter((feature) =>
+      includeUnverifiedFeatures ||
+      isVerifiedAtlasFeature(feature)
+    )
     .toSorted((a, b) => {
       const layerDelta = (order.get(a.layer) ?? 99) - (order.get(b.layer) ?? 99);
 

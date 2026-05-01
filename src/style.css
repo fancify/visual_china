@@ -338,6 +338,11 @@ canvas {
   color: rgba(241, 210, 137, 0.62);
 }
 
+.atlas-feature-card span {
+  display: block;
+  margin-top: 4px;
+}
+
 .atlas-fullscreen {
   position: absolute;
   inset: 0;

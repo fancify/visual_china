@@ -37,6 +37,12 @@ export interface QinlingAtlasFeature {
   displayPriority: number;
   terrainRole: string;
   themes: string[];
+  source?: {
+    name?: string;
+    confidence?: string;
+    verification?: "unverified" | "external-vector" | "verified";
+    license?: string;
+  };
   copy: {
     summary: string;
   };

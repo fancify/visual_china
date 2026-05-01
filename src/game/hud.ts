@@ -270,10 +270,15 @@ export function createHud(
       return;
     }
 
+    const sourceLabel = feature.source?.name
+      ? `来源：${feature.source.name}${feature.source.verification ? ` / ${feature.source.verification}` : ""}`
+      : "来源：未标注";
+
     container.innerHTML = `
       <div class="atlas-card-kicker">${feature.layer} · ${feature.terrainRole}</div>
       <strong>${feature.name}</strong>
       <p>${feature.copy.summary}</p>
+      <span>${sourceLabel}</span>
       <span>视觉规则：${feature.visualRule.symbol} / ${feature.visualRule.emphasis}</span>
     `;
   };

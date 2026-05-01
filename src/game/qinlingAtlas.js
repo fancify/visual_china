@@ -25,20 +25,20 @@ export const qinlingAtlasLayers = [
   {
     id: "city",
     name: "城市",
-    defaultVisible: true,
-    description: "只保留组织空间的核心城市和枢纽。"
+    defaultVisible: false,
+    description: "城市点位需要外部地名数据校准后再作为事实层显示。"
   },
   {
     id: "pass",
     name: "关隘",
-    defaultVisible: true,
-    description: "山地把宽阔行动面压缩成少数锁口。"
+    defaultVisible: false,
+    description: "关隘点位需要史料或现代地名矢量校准后再显示。"
   },
   {
     id: "road",
     name: "古道",
-    defaultVisible: true,
-    description: "道路是玩家行动、叙事和补给压力的主线。"
+    defaultVisible: false,
+    description: "古道线位先作为待核验草稿，不默认展示为事实。"
   },
   {
     id: "military",
@@ -109,7 +109,12 @@ function feature({
   terrainRole,
   summary,
   visualRule,
-  themes = []
+  themes = [],
+  source = {
+    name: "manual-atlas-draft",
+    confidence: "draft",
+    verification: "unverified"
+  }
 }) {
   return {
     id,
@@ -120,6 +125,7 @@ function feature({
     displayPriority,
     terrainRole,
     themes,
+    source,
     copy: { summary },
     visualRule
   };

@@ -52,6 +52,13 @@ export function importedHydrographyFeatureToAtlasFeature(feature) {
           ? "main-river-evidence"
           : "named-tributary-evidence",
     themes: [...new Set([...atlasFeature.themes, "evidence"])],
+    source: {
+      ...(atlasFeature.source ?? {}),
+      name: feature.source?.name ?? "openstreetmap-overpass",
+      confidence: feature.source?.confidence ?? "medium",
+      verification: "external-vector",
+      license: "ODbL-1.0"
+    },
     copy: {
       summary: `${feature.name}来自 OSM 现代水系导入层，用于校准真实河网、支流关系和地图细部。`
     },
