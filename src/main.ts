@@ -3123,9 +3123,11 @@ function update(deltaSeconds: number): void {
       const i3 = index * 3;
       precipitationPositions[i3 + 1] -= fallSpeed * deltaSeconds;
 
-      if (snowiness > 0.5) {
-        precipitationPositions[i3] += Math.sin(clock.elapsedTime + precipitationOffsets[index]!) * 0.15;
-        precipitationPositions[i3 + 2] += Math.cos(clock.elapsedTime * 0.8 + precipitationOffsets[index]!) * 0.08;
+      // 雪的横向飘动按 snowiness 连续叠加，避开 0.5 阈值跳变（codex
+      // adb9879 抓到的 P3：横向运动从 0.51 → 0.49 时直接断掉）。
+      if (snowiness > 0) {
+        precipitationPositions[i3] += Math.sin(clock.elapsedTime + precipitationOffsets[index]!) * 0.15 * snowiness;
+        precipitationPositions[i3 + 2] += Math.cos(clock.elapsedTime * 0.8 + precipitationOffsets[index]!) * 0.08 * snowiness;
       }
 
       if (precipitationPositions[i3 + 1] < 0) {

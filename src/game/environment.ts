@@ -205,18 +205,28 @@ function copyWeatherConfig(w: WeatherConfig): EffectiveWeather {
   };
 }
 
+// Linear bounded approach：每帧最多走 step（= dt / 过渡总秒数 × 满程 1.0），
+// 这样从 1 → 0 的过渡严格在 transitionSeconds 秒内结束，而不是 lerp 的
+// 指数衰减会拖到 60+ 秒尾巴（codex adb9879 review 抓到雨切晴后粒子能
+// 残留 75s 才 fade 完）。
+function approachBounded(current: number, target: number, maxStep: number): number {
+  const delta = target - current;
+  if (Math.abs(delta) <= maxStep) return target;
+  return current + Math.sign(delta) * maxStep;
+}
+
 function lerpEffectiveWeather(
   current: EffectiveWeather,
   target: EffectiveWeather,
-  rate: number
+  step: number
 ): void {
-  const blend = MathUtils.clamp(rate, 0, 1);
-  current.wind += (target.wind - current.wind) * blend;
-  current.rain += (target.rain - current.rain) * blend;
-  current.snow += (target.snow - current.snow) * blend;
-  current.fogBoost += (target.fogBoost - current.fogBoost) * blend;
-  current.sunCut += (target.sunCut - current.sunCut) * blend;
-  current.shimmer += (target.shimmer - current.shimmer) * blend;
+  current.wind = approachBounded(current.wind, target.wind, step);
+  current.rain = approachBounded(current.rain, target.rain, step);
+  current.snow = approachBounded(current.snow, target.snow, step);
+  // fogBoost 量级很小（~0.002），用相对单位的 step 让它也在同周期内完成。
+  current.fogBoost = approachBounded(current.fogBoost, target.fogBoost, step * 0.0021);
+  current.sunCut = approachBounded(current.sunCut, target.sunCut, step);
+  current.shimmer = approachBounded(current.shimmer, target.shimmer, step);
 }
 
 export class EnvironmentController {
@@ -264,10 +274,10 @@ export class EnvironmentController {
       this.advanceSeason();
     }
 
-    // 平滑过渡：每帧把 effectiveWeather 朝 weatherConfig[state.weather] 拉。
+    // 平滑过渡：linear bounded，确保 12 秒内严格走完 0→1 / 1→0。
     const target = weatherConfig[this.state.weather];
-    const rate = deltaSeconds / EnvironmentController.WEATHER_TRANSITION_SECONDS;
-    lerpEffectiveWeather(this.effectiveWeather, copyWeatherConfig(target), rate);
+    const step = deltaSeconds / EnvironmentController.WEATHER_TRANSITION_SECONDS;
+    lerpEffectiveWeather(this.effectiveWeather, copyWeatherConfig(target), step);
 
     return this.state;
   }
