@@ -1088,9 +1088,16 @@ function rebuildWaterSystemVisuals(): void {
       opacity: waterStyle.ribbonOpacity,
       renderOrder: 4
     });
-    // 加强 polygonOffset：用户反馈"俯视时河流看不见"是因为低 yOffset
-    // 时 ribbon 和地形深度挤在一起，弱 polygonOffset (-1, -2) 没把
-    // ribbon 推到地形之前，渲染时被地形赢了 depth test。-2/-4 更稳。
+    // 高视角河流可见性：第二轮调（用户在 polygonOffset -2/-4 的版本仍
+    // 反馈"俯视看不见"）。根因：terrain mesh 在 vertex 间做线性插值，
+    // ribbon 截面在不同 sample 点取 max 后做不同插值——像素级两种插值
+    // 路径下，terrain 跑赢 depth test 把 ribbon 盖住。彻底修：关掉
+    // ribbon 的 depthTest，让它无视 depth buffer 始终画在 terrain 上面。
+    // 副作用：相机如果隔山看远处的河，ribbon 会"穿透"山体显示——但
+    // (a) 河水在低洼处，山在两侧，正常机位很少出现这种相对几何；
+    // (b) 即使出现一点点也比"俯视看不见"好。配合 renderOrder 4，确保
+    // ribbon 在 terrain 之后画。
+    ribbon.material.depthTest = false;
     ribbon.material.polygonOffset = true;
     ribbon.material.polygonOffsetFactor = -2;
     ribbon.material.polygonOffsetUnits = -4;
