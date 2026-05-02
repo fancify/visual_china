@@ -2713,7 +2713,14 @@ function selectAtlasFeatureFromCanvas(
     hitState,
     pointer,
     terrainSampler.asset.world,
-    canvas
+    canvas,
+    14,
+    {
+      minDisplayPriority: atlasMinimumDisplayPriority({
+        fullscreen: canvas === hud.atlasFullscreenCanvas,
+        scale: hitState.mapView.scale
+      })
+    }
   );
 
   atlasWorkbench = selectAtlasFeature(atlasWorkbench, feature?.id ?? null);

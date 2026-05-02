@@ -338,11 +338,20 @@ export function findAtlasFeatureAtCanvasPoint(
   pointer,
   world,
   canvas,
-  maxDistance = 14
+  maxDistance = 14,
+  options = {}
 ) {
-  const visible = atlasVisibleFeatures(features, [
-    ...state.visibleLayerIds
-  ].map((id) => ({ id, defaultVisible: true })));
+  // 跟 atlasVisibleFeatures 在 drawOverviewMap 那边的过滤参数对齐：
+  // 默认按 atlasMinimumDisplayPriority(scale) 过滤，避免渲染上看不见
+  // 的低优先级 feature 仍然 clickable（codex 8c58368 P2 抓到 county 城
+  // 市 priority 6 在 default scale 不画但点空白处仍弹出 card）。
+  const visible = atlasVisibleFeatures(
+    features,
+    [...state.visibleLayerIds].map((id) => ({ id, defaultVisible: true })),
+    {
+      minDisplayPriority: options.minDisplayPriority ?? Number.NEGATIVE_INFINITY
+    }
+  );
   let best = null;
   let bestDistance = maxDistance;
   let bestRank = Number.POSITIVE_INFINITY;
