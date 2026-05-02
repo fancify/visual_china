@@ -12,12 +12,15 @@ import { TerrainSampler } from "./demSampler";
 import type { RuntimePerformanceBudget } from "./performanceBudget";
 
 // 共享 geometry / material：scenery 在每个 chunk 加载时被频繁创建/卸载，
-// 共享资源避免重复 GPU 上传和材质实例数膨胀。
+// 共享资源避免重复 GPU 上传和材质实例数膨胀。transparent + 默认 opacity:1
+// 让外部能按距离 fade 树（保持 LOD 渐进淡入的统一手感）。
 const sharedTreeGeometry = new ConeGeometry(0.38, 1.75, 5);
-const sharedTreeMaterial = new MeshPhongMaterial({
+export const sharedTreeMaterial = new MeshPhongMaterial({
   color: 0x4f7f58,
   flatShading: true,
-  shininess: 5
+  shininess: 5,
+  transparent: true,
+  opacity: 1
 });
 
 // settlement markers（5 棱柱褐色块）已移除：用户反馈"看不出含义"，
