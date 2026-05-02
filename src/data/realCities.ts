@@ -121,7 +121,9 @@ export const realQinlingCities: RealCity[] = [
   { id: "lixian", name: "礼县", lat: 34.19, lon: 105.18, tier: "county", hint: "祁山堡所在，六出祁山主战场" },
   { id: "zhaohua", name: "昭化", lat: 32.32, lon: 105.65, tier: "county", hint: "金牛道剑门关后" },
   { id: "jiange", name: "剑阁", lat: 32.30, lon: 105.55, tier: "county", hint: "剑门关所在" },
+  { id: "wulian", name: "武连", lat: 31.83, lon: 105.30, tier: "county", hint: "金牛道蜀地段，剑阁与梓潼之间" },
   { id: "zitong", name: "梓潼", lat: 31.65, lon: 105.18, tier: "county", hint: "金牛道蜀地段" },
+  { id: "chenggu", name: "城固", lat: 33.16, lon: 107.34, tier: "county", hint: "汉中盆地东部，子午道汉中端" },
   { id: "nanjiang", name: "南江", lat: 32.36, lon: 106.84, tier: "county", hint: "米仓道腹心" },
   { id: "zhenba", name: "镇巴", lat: 32.55, lon: 107.90, tier: "county", hint: "荔枝道汉中端" },
   { id: "xixiang", name: "西乡", lat: 32.99, lon: 107.77, tier: "county", hint: "汉中盆地东段，子午道汉中端" }
