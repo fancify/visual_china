@@ -114,6 +114,28 @@ function waterRibbonCrossSection(point, normal, halfWidth, y) {
   };
 }
 
+// 把折线密化：每段切到不超过 maxSegmentLength 长度。这样每个 cross-
+// section 都能 sample 到自己当地的地形高度，避免长段在中段凹陷处低于
+// 地形。地形 grid 大概 2 单元一格，maxSegmentLength=2 让 ribbon 跟
+// 着 grid 走（codex 之前抓不到的根因——ribbon 段中间 linear interp
+// 不跟 terrain bilinear interp 走，于是俯视角度被 terrain 覆盖看不见）。
+function densifyPolyline(points, maxSegmentLength) {
+  if (points.length < 2) return points.slice();
+  const result = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+    const subdivisions = Math.max(1, Math.ceil(segLen / maxSegmentLength));
+    for (let j = 0; j < subdivisions; j += 1) {
+      const t = j / subdivisions;
+      result.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    }
+  }
+  result.push(points[points.length - 1]);
+  return result;
+}
+
 export function buildWaterRibbonVertices(points, options) {
   if (points.length < 2) {
     return new Float32Array();
@@ -121,6 +143,9 @@ export function buildWaterRibbonVertices(points, options) {
 
   const halfWidth = options.width * 0.5;
   const yOffset = options.yOffset ?? 0;
+  // 折线密化：把任何 > 2 单元的段拆成 ≤ 2 单元的子段，使每个 cross-
+  // section 都贴着真实地形采样。
+  points = densifyPolyline(points, 2);
   // Slope-aware Y（capped lift, never below center）：每个截面在中心、
   // 左、右三点采样地形。
   // - cross-slope（一边比中心高）：抬到 upslope 上方，最多比中心高
