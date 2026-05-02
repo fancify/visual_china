@@ -1,9 +1,11 @@
 import {
-  BoxGeometry,
+  ExtrudeGeometry,
   Group,
   InstancedMesh,
   MeshPhongMaterial,
-  Object3D
+  Object3D,
+  Path,
+  Shape
 } from "three";
 
 import type { CityTier, RealCity } from "../data/realCities";
@@ -12,59 +14,87 @@ import type { DemBounds, DemWorld } from "./demSampler";
 import { projectGeoToWorld } from "./mapOrientation.js";
 
 /**
- * 在 3D 场景里把真实城市坐标摆出来。三档建筑：
- *   capital（京城）= 高 4 单元、底 3.6×3.6，叠一个红屋顶
- *   prefecture（州府）= 高 2.8 单元、底 2.8×2.8，叠红屋顶
- *   county（县城）= 高 1.6 单元、底 2.0×2.0，叠红屋顶
+ * 在 3D 场景里把真实城市坐标摆出来。
  *
- * 用 InstancedMesh：每档（base + roof）= 2 mesh，共 6 个 instanced mesh。
- * 28 个 instance 总，draw call 增 6，性能可忽略。
+ * 造型 = "口"字型城墙 (extrude 一个带洞的方形 shape)：矮、贴地、no roof
+ * prism。三档用尺寸差区分：
+ *   capital（京城）= 外 4.4 内 3.0、墙厚 0.7、高 1.4（最大）
+ *   prefecture（州府）= 外 3.4 内 2.4、墙厚 0.5、高 1.1
+ *   county（县城）= 外 2.4 内 1.6、墙厚 0.4、高 0.8（最矮）
  *
- * 渲染高度直接 sample 地形（不再像之前 settlementMask 那样靠合成 mask
- * 决定有无建筑）。位置用 mapOrientation 的 projectGeoToWorld，跟 atlas
- * / hydrography 同一个投影（不会 mismatch）。
+ * 用 InstancedMesh：每档 1 个 mesh，共 3 个 instanced mesh（之前 base+
+ * roof 6 个减半）。28 个 instance，draw call 3。
+ *
+ * 用户反馈："base + roof 太丑、太高，应该矮一点 + 像小城的样子，
+ * 口字型或类似造型"——所以删掉 prism roof，让墙体本身代表城。
  */
 
-interface TierGeometry {
-  base: BoxGeometry;
-  roof: BoxGeometry;
-  baseHeight: number;
-  roofHeight: number;
+function makeWalledCompoundGeometry(
+  outerSide: number,
+  innerSide: number,
+  height: number
+): ExtrudeGeometry {
+  const half = outerSide * 0.5;
+  const innerHalf = innerSide * 0.5;
+
+  // ExtrudeGeometry 默认在 XY plane 画 shape，沿 +Z 方向 extrude；
+  // 我们要让 "口" 平放在地面（XZ plane）、向上长高。所以画在 XY 平面，
+  // extrude 0..height，最后旋转 -PI/2 让 Z 轴变 Y 轴。
+  const shape = new Shape();
+  shape.moveTo(-half, -half);
+  shape.lineTo(half, -half);
+  shape.lineTo(half, half);
+  shape.lineTo(-half, half);
+  shape.lineTo(-half, -half);
+
+  const hole = new Path();
+  hole.moveTo(-innerHalf, -innerHalf);
+  hole.lineTo(innerHalf, -innerHalf);
+  hole.lineTo(innerHalf, innerHalf);
+  hole.lineTo(-innerHalf, innerHalf);
+  hole.lineTo(-innerHalf, -innerHalf);
+  shape.holes.push(hole);
+
+  const geom = new ExtrudeGeometry(shape, {
+    depth: height,
+    bevelEnabled: false,
+    curveSegments: 1
+  });
+  geom.rotateX(-Math.PI / 2);
+  // 经过 rotateX(-PI/2)，原本 (x, y, z) 变成 (x, z, -y)。
+  // shape 原本 z=0..height 朝 +Z extrude，rotate 后变成 y=0..-height（向下）。
+  // 所以再 translate +height 让墙站在 y=0 之上。
+  geom.translate(0, height, 0);
+  return geom;
 }
 
-function makeTierGeometry(
-  baseW: number,
-  baseH: number,
-  roofExtra: number,
-  roofH: number
-): TierGeometry {
-  return {
-    base: new BoxGeometry(baseW, baseH, baseW),
-    roof: new BoxGeometry(baseW + roofExtra, roofH, baseW + roofExtra),
-    baseHeight: baseH,
-    roofHeight: roofH
-  };
+interface TierGeometry {
+  geom: ExtrudeGeometry;
+  height: number;
 }
 
 const TIER_GEOMETRY: Record<CityTier, TierGeometry> = {
-  county: makeTierGeometry(2.0, 1.6, 0.4, 0.4),
-  prefecture: makeTierGeometry(2.8, 2.4, 0.6, 0.5),
-  capital: makeTierGeometry(3.6, 3.2, 0.8, 0.7)
+  county: {
+    geom: makeWalledCompoundGeometry(2.4, 1.6, 0.8),
+    height: 0.8
+  },
+  prefecture: {
+    geom: makeWalledCompoundGeometry(3.4, 2.4, 1.1),
+    height: 1.1
+  },
+  capital: {
+    geom: makeWalledCompoundGeometry(4.4, 3.0, 1.4),
+    height: 1.4
+  }
 };
 
-// 城墙灰偏暖（夯土 / 砖石），屋顶用古建筑暗红（瓦色）。
+// 城墙灰偏暖（夯土 / 砖石）。
 const WALL_COLOR = 0x8b8276;
-const ROOF_COLOR = 0x6b3a2c;
 
 const wallMaterial = new MeshPhongMaterial({
   color: WALL_COLOR,
   flatShading: true,
   shininess: 6
-});
-const roofMaterial = new MeshPhongMaterial({
-  color: ROOF_COLOR,
-  flatShading: true,
-  shininess: 4
 });
 
 export interface CityMarkersHandle {
@@ -96,11 +126,9 @@ export function createCityMarkers(
     const tierCities = byTier[tier];
     if (tierCities.length === 0) return;
 
-    const geom = TIER_GEOMETRY[tier];
-    const baseMesh = new InstancedMesh(geom.base, wallMaterial, tierCities.length);
-    const roofMesh = new InstancedMesh(geom.roof, roofMaterial, tierCities.length);
-    baseMesh.name = `city-base-${tier}`;
-    roofMesh.name = `city-roof-${tier}`;
+    const tierGeom = TIER_GEOMETRY[tier];
+    const wallMesh = new InstancedMesh(tierGeom.geom, wallMaterial, tierCities.length);
+    wallMesh.name = `city-walls-${tier}`;
 
     tierCities.forEach((city, index) => {
       const worldPoint = projectGeoToWorld(
@@ -110,27 +138,16 @@ export function createCityMarkers(
       );
       const terrainY = sampler.sampleHeight(worldPoint.x, worldPoint.z);
 
-      // base：站在地形上，中心抬高 baseHeight/2
-      dummy.position.set(worldPoint.x, terrainY + geom.baseHeight / 2, worldPoint.z);
+      // geom 已经从 base y=0 长到 y=height，所以放到 (x, terrainY, z) 即可。
+      dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
-      baseMesh.setMatrixAt(index, dummy.matrix);
-
-      // roof：贴在 base 顶端，中心 = base 顶 + roof 半高
-      dummy.position.set(
-        worldPoint.x,
-        terrainY + geom.baseHeight + geom.roofHeight / 2,
-        worldPoint.z
-      );
-      dummy.updateMatrix();
-      roofMesh.setMatrixAt(index, dummy.matrix);
+      wallMesh.setMatrixAt(index, dummy.matrix);
     });
 
-    baseMesh.instanceMatrix.needsUpdate = true;
-    roofMesh.instanceMatrix.needsUpdate = true;
-    group.add(baseMesh);
-    group.add(roofMesh);
+    wallMesh.instanceMatrix.needsUpdate = true;
+    group.add(wallMesh);
   });
 
   return { group, cities };
