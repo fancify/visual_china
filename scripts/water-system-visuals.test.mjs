@@ -113,31 +113,22 @@ test("water label point chooses a stable interior point on the river", () => {
   assert.deepEqual(waterLabelPoint(feature), { x: 30, y: 0 });
 });
 
-test("3D water visuals stay visible without becoming broad map ribbons", () => {
+test("3D water visuals stay visible as a simple narrow ribbon glued to terrain", () => {
   const majorStyle = waterVisualStyle({ ...baseWaterFeature, displayPriority: 10 });
   const minorStyle = waterVisualStyle({ ...baseWaterFeature, displayPriority: 7 });
 
-  // bounds 跟着用户反馈"水流再窄一点 + 高视角能看到"调整：
-  // ribbonWidth 收窄、ribbonYOffset 抬高，让顶视角不被相邻地形遮挡。
+  // 简化后：单层 ribbon、贴地、窄。用户反馈"反光奇怪 + 太宽 + 飘空"。
   assert.ok(majorStyle.bankWidth > majorStyle.ribbonWidth);
   assert.ok(majorStyle.bankOpacity > 0.1);
   assert.ok(majorStyle.bankOpacity < majorStyle.ribbonOpacity);
-  assert.ok(majorStyle.ribbonWidth >= 1.4);
-  assert.ok(majorStyle.ribbonWidth <= 2.0);
-  assert.ok(majorStyle.ribbonYOffset >= 1.2);
-  assert.ok(majorStyle.ribbonYOffset <= 1.8);
-  assert.ok(majorStyle.lineYOffset > majorStyle.ribbonYOffset);
-  assert.ok(majorStyle.lineYOffset >= 1.4);
-  assert.ok(majorStyle.highlightWidth >= 0.35);
-  assert.ok(majorStyle.highlightWidth <= 0.55);
-  assert.ok(majorStyle.ribbonOpacity >= 0.68);
-  assert.ok(majorStyle.ribbonOpacity <= 0.82);
-  assert.ok(majorStyle.lineOpacity >= 0.9);
+  assert.ok(majorStyle.ribbonWidth >= 0.8);
+  assert.ok(majorStyle.ribbonWidth <= 1.2);
+  assert.ok(majorStyle.ribbonYOffset >= 0.2);
+  assert.ok(majorStyle.ribbonYOffset <= 0.5);
+  assert.ok(majorStyle.ribbonOpacity >= 0.85);
   assert.equal(majorStyle.depthTest, true);
-  assert.equal(majorStyle.lineDepthTest, true);
-  assert.equal(majorStyle.highlightDepthTest, true);
-  assert.ok(minorStyle.ribbonWidth >= 0.7);
-  assert.ok(minorStyle.ribbonWidth <= 1.05);
+  assert.ok(minorStyle.ribbonWidth >= 0.4);
+  assert.ok(minorStyle.ribbonWidth <= 0.7);
 });
 
 test("water environment style keeps clear daylight rivers readable", () => {
@@ -154,12 +145,10 @@ test("water environment style keeps clear daylight rivers readable", () => {
   });
 
   assert.ok(daylight.ribbonOpacity >= baseStyle.ribbonOpacity * 0.9);
-  assert.ok(daylight.lineOpacity >= baseStyle.lineOpacity * 0.88);
   assert.ok(daylight.colorMultiplier >= 0.92);
-  assert.ok(daylight.highlightMultiplier >= daylight.colorMultiplier);
 });
 
-test("water environment style dims bright river highlights at night and in weather", () => {
+test("water environment style dims river opacity and color at night and in weather", () => {
   const baseStyle = waterVisualStyle({ ...baseWaterFeature, displayPriority: 10 });
   const daylight = waterEnvironmentVisualStyle(baseStyle, {
     daylight: 1,
@@ -183,9 +172,7 @@ test("water environment style dims bright river highlights at night and in weath
   });
 
   assert.ok(rainyNight.ribbonOpacity < daylight.ribbonOpacity * 0.65);
-  assert.ok(rainyNight.lineOpacity < daylight.lineOpacity * 0.58);
   assert.ok(rainyNight.colorMultiplier < daylight.colorMultiplier * 0.62);
-  assert.ok(rainyNight.highlightMultiplier < daylight.highlightMultiplier * 0.55);
   assert.ok(rainyNight.ribbonOpacity >= baseStyle.ribbonOpacity * 0.28);
 });
 

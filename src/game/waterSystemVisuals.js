@@ -280,23 +280,19 @@ export function buildRiverVegetationSamples(
 export function waterVisualStyle(feature) {
   const major = feature.displayPriority >= 9;
 
-  // ribbonWidth 缩窄（2.8/1.32 → 1.6/0.85）：用户反馈河面太宽不像河；
-  // ribbonYOffset 抬高（0.82/0.48 → 1.5/1.0）：原本几乎贴着地表，从顶
-  // 视角度容易被相邻地形像素遮挡，调高后高视角也能看清河流走向；不会
-  // 过于"飘"——线条本身就是窄带，悬空 1.5m 在地图比例下基本不可察觉。
+  // 简化为单层 ribbon：用户反馈"中间反光白条很奇怪"——之前 ribbon /
+  // highlight / line 三层叠出"内白外蓝"是反方向的（参考图是内白外蓝
+  // 描边），干脆删掉 highlight 和 line 两层不再要反光，只留主带。
+  // ribbonWidth 1.6/0.85 → 1.0/0.55（再窄 ~38%），
+  // ribbonYOffset 1.5/1.0 → 0.3/0.2（贴地，配合 polygonOffset 防 z-fight）。
   return {
     bankWidth: major ? 4.4 : 3.2,
     bankYOffset: major ? 0.12 : 0.1,
     bankOpacity: major ? 0.24 : 0.18,
-    ribbonWidth: major ? 1.6 : 0.85,
-    ribbonYOffset: major ? 1.5 : 1.0,
-    lineYOffset: major ? 1.7 : 1.2,
-    ribbonOpacity: major ? 0.78 : 0.56,
-    highlightWidth: major ? 0.42 : 0.3,
-    lineOpacity: major ? 0.95 : 0.72,
-    depthTest: true,
-    lineDepthTest: true,
-    highlightDepthTest: true
+    ribbonWidth: major ? 1.0 : 0.55,
+    ribbonYOffset: major ? 0.3 : 0.2,
+    ribbonOpacity: major ? 0.92 : 0.78,
+    depthTest: true
   };
 }
 
@@ -319,21 +315,14 @@ export function waterEnvironmentVisualStyle(style, visuals = {}) {
     0.08
   );
   const ribbonMultiplier = clamp01(0.3 + light * 0.62 + shimmer * 0.12 - weatherDim * 0.22);
-  const lineMultiplier = clamp01(0.26 + light * 0.55 + shimmer * 0.15 - weatherDim * 0.36);
   const colorMultiplier = Math.max(
     0.28,
     Math.min(1, 0.26 + light * 0.72 + moon * 0.08 - weatherDim * 0.24)
-  );
-  const highlightMultiplier = Math.max(
-    0.18,
-    Math.min(1.08, colorMultiplier * 0.92 + shimmer * 0.18 - weatherDim * 0.18)
   );
 
   return {
     bankOpacity: style.bankOpacity * Math.max(0.35, ribbonMultiplier * 0.82),
     ribbonOpacity: style.ribbonOpacity * Math.max(0.28, ribbonMultiplier),
-    lineOpacity: style.lineOpacity * Math.max(0.18, lineMultiplier),
-    colorMultiplier,
-    highlightMultiplier
+    colorMultiplier
   };
 }
