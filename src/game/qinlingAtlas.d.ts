@@ -6,7 +6,24 @@ export type QinlingAtlasLayerId =
   | "road"
   | "military"
   | "livelihood"
-  | "culture";
+  | "culture"
+  | "scenic";
+
+export type QinlingScenicRole =
+  | "alpine-peak"
+  | "religious-mountain"
+  | "karst-lake-system"
+  | "buddhist-relic"
+  | "imperial-mausoleum";
+
+export interface QinlingScenicLandmark {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  summary: string;
+  role: QinlingScenicRole;
+}
 
 export interface QinlingAtlasPoint {
   x: number;
@@ -60,6 +77,7 @@ export const qinlingAtlasLayers: QinlingAtlasLayer[];
 export const qinlingAtlasRequiredNames: string[];
 export const qinlingAtlasFeatures: QinlingAtlasFeature[];
 export const qinlingWaterSystem: QinlingAtlasFeature[];
+export const qinlingScenicLandmarks: QinlingScenicLandmark[];
 
 export function atlasFeaturesByLayer(
   layerId: QinlingAtlasLayerId
