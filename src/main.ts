@@ -981,7 +981,7 @@ function updateNearbyRealCity(): void {
   if (closest?.id !== nearbyRealCity?.id) {
     nearbyRealCity = closest;
     if (closest) {
-      showToast(`[T] 了解 ${closest.name}`);
+      showToast(`[I] 了解 ${closest.name}`);
     }
   }
 }
@@ -2570,10 +2570,10 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  // T: 走到城市跟前按 T 弹出详情。E 是相机旋转，F 是切回 follow 视
-  // 角，都已被占；T（"talk"）在原先映射里没用，改用它就不会冲突
-  // （codex 995d07b P1+P2 抓到 F 跟 follow 切换的冲突）。
-  if (normalized === "t" && nearbyRealCity) {
+  // I（info）: 走到城市跟前按 I 弹出详情。E/F/T/O 都已绑定（rotate /
+  // follow / time / overview），I 是空键。codex 995d07b/fd28316 review
+  // 一连抓到 F、T 都已占用——用 I 终于不冲突。
+  if (normalized === "i" && nearbyRealCity) {
     event.preventDefault();
     const city = nearbyRealCity;
     const tier =
