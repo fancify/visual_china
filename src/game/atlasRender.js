@@ -1,12 +1,13 @@
 import { projectWorldToAtlasPixel } from "./mapOrientation.js";
 
-// 跟 qinlingAtlasLayers 对齐：水系 → 城市 → 关隘 → 名胜 → 民生。底色（水系）
-// 先画，点状叙事节点（关隘 / 名胜 / 民生）后画压在城市之上。
+// 跟 qinlingAtlasLayers 对齐：水系 → 城市 → 关隘 → 名胜 → 考古 → 民生。
+// 底色（水系）先画，点状叙事节点（关隘 / 名胜 / 考古 / 民生）后画压在城市之上。
 export const atlasLayerDrawOrder = [
   "water",
   "city",
   "pass",
   "scenic",
+  "ancient",
   "livelihood"
 ];
 

@@ -108,6 +108,7 @@ import {
   qinlingAtlasFeatures,
   qinlingAtlasLayers,
   qinlingScenicLandmarks,
+  qinlingAncientSites,
   type QinlingAtlasFeature,
   type QinlingAtlasLayerId
 } from "./game/qinlingAtlas.js";
@@ -556,11 +557,17 @@ const cityMarkersGroup = new Group();
 scene.add(cityMarkersGroup);
 let cityMarkersHandle: CityMarkersHandle | null = null;
 
-// 名胜（scenic）单独一个 group——5 个 POI 的 mesh 跟 landmarks/cities
-// 不一致（每个 POI 都是组合体），独立路径方便管理 dispose 和 LOD。
+// 名胜（scenic）单独一个 group——POI 的 mesh 跟 landmarks/cities 不一致
+// （每个 POI 都是组合体），独立路径方便管理 dispose 和 LOD。
 const scenicGroup = new Group();
 scene.add(scenicGroup);
 const scenicLabelSprites: Sprite[] = [];
+
+// 考古（ancient）跟 scenic 同思路独立一个 group：3D mesh 跟其它景点风格
+// 不一样（夯土台 + 文物缩影），分组也方便 atlas 层切换 toggle 整层。
+const ancientGroup = new Group();
+scene.add(ancientGroup);
+const ancientLabelSprites: Sprite[] = [];
 // 城市名签 sprites 按档分组 track，方便：
 // 1) 重建 region 时显式 dispose 它们的 SpriteMaterial + CanvasTexture
 //    （cityMarkersGroup.clear() 只 detach 不 dispose——codex b50e5c6 抓到）
@@ -676,6 +683,33 @@ function updateCityLodFade(): void {
     sprite.material.opacity = prefectureAlpha;
     sprite.visible = prefectureAlpha > 0.01;
   }
+  // 考古（三星堆/金沙/大地湾）跟 scenic 同档 LOD。
+  for (const sprite of ancientLabelSprites) {
+    sprite.material.opacity = prefectureAlpha;
+    sprite.visible = prefectureAlpha > 0.01;
+  }
+  // ── 远距 mesh 一并隐去（用户："离得太远的话，这些东西都不要显示"）──
+  // 用 farMeshAlpha = 1 - smoothstep(distance, 250, 330)：默认 26..170 全亮，
+  // overview 170 接近 1，250+ 才开始淡出。3D 主网格（树/河/山）这套距离
+  // 上根本看不见，这 fade 是给 fly mode 或未来 zoom-out 提前做的防御。
+  const farMeshAlpha = 1 - MathUtils.smoothstep(distance, 250, 330);
+  const farMeshVisible = farMeshAlpha > 0.01;
+  // 名胜 / 考古 group 整组 visibility 用 alpha 硬切（材料已在 scenicMaterials
+  // 上 transparent: true，可读 opacity）。Three.js Material 上设 opacity 一次
+  // 就改所有共享 material 实例。
+  Object.values(scenicMaterials).forEach((mat) => {
+    mat.opacity = farMeshAlpha * (mat === scenicMaterials.karstWater ? 0.92 : 1);
+    mat.visible = farMeshVisible;
+  });
+  Object.values(ancientMaterials).forEach((mat) => {
+    mat.opacity = farMeshAlpha;
+    mat.visible = farMeshVisible;
+  });
+  // capital 城墙 mesh：之前 capitalAlpha=1 永亮；现在远距也跟着隐。
+  if (cityMarkersHandle) {
+    cityMarkersHandle.tierMaterials.capital.opacity = farMeshAlpha;
+    cityMarkersHandle.tierMaterials.capital.visible = farMeshVisible;
+  }
   // 山体遮挡（occlusion）：用 terrainSampler 沿 camera→label 线段做软光线
   // 步进，碰到任何采样点高度 > 当前线段高度，就把 sprite.visible 设为 false。
   // 比 GPU depthTest 可靠（Three.js Sprite + transparent + depthTest 实测整体
@@ -714,6 +748,7 @@ function updateCityLodFade(): void {
     riverLabelSpritesByTier.tributary.forEach(occlude);
     routeLabelSprites.forEach(occlude);
     scenicLabelSprites.forEach(occlude);
+    ancientLabelSprites.forEach(occlude);
   }
 }
 
@@ -833,7 +868,7 @@ const passSteleCapMaterial = new MeshPhongMaterial({
   opacity: 1
 });
 
-// 名胜（scenic）共用几何 + 材质——5 个 POI 共 4 类 mesh 形态。
+// 名胜（scenic）共用几何 + 材质——7 个 POI 共 6 类 mesh 形态。
 const scenicGeometries = {
   // 太白山：8m 高的 sharp cone（peak base radius 5.5）；雪冠是顶端小白锥。
   alpinePeakBody: new ConeGeometry(5.5, 8, 8),
@@ -855,7 +890,19 @@ const scenicGeometries = {
   pagodaSpire: new ConeGeometry(0.5, 1.4, 6),
   // 乾陵：黄土封土圆丘（hemisphere）+ 两通石碑（无字碑/述圣纪碑）立在前方。
   mausoleumMound: new SphereGeometry(4.6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-  mausoleumStele: new BoxGeometry(0.45, 2.4, 0.18)
+  mausoleumStele: new BoxGeometry(0.45, 2.4, 0.18),
+  // 黄龙：钙华梯田金水池——6 层降幅圆盘叠瀑（半径 0.9..2.6），水位略错开。
+  travertineDisk1: new CylinderGeometry(2.6, 2.6, 0.22, 22),
+  travertineDisk2: new CylinderGeometry(2.2, 2.2, 0.22, 20),
+  travertineDisk3: new CylinderGeometry(1.85, 1.85, 0.22, 18),
+  travertineDisk4: new CylinderGeometry(1.5, 1.5, 0.22, 16),
+  travertineDisk5: new CylinderGeometry(1.15, 1.15, 0.22, 14),
+  travertineDisk6: new CylinderGeometry(0.9, 0.9, 0.22, 12),
+  // 汉中天坑：暗深井圆柱（向下 4m）+ 灰岩环形沿口（外径 3.4 内径 2.6）。
+  // 三维里没法真正"挖洞"，所以用深色 cylinder 立在地面上，外加一圈石灰岩沿。
+  tiankengWell: new CylinderGeometry(2.4, 2.6, 0.3, 24),
+  tiankengRimOuter: new CylinderGeometry(3.4, 3.4, 0.5, 20),
+  tiankengRimInner: new CylinderGeometry(2.5, 2.5, 0.55, 20)
 };
 
 const scenicMaterials = {
@@ -901,6 +948,57 @@ const scenicMaterials = {
   }),
   mausoleumStele: new MeshPhongMaterial({
     color: 0xb0a896, emissive: 0x201c14, flatShading: true, shininess: 8,
+    transparent: true, opacity: 1
+  }),
+  // 黄龙：金黄色钙华水池（高反光仿水面 + 鎏金色调）。
+  travertineGold: new MeshPhongMaterial({
+    color: 0xe5b86b, emissive: 0x4a3110, flatShading: true, shininess: 65,
+    transparent: true, opacity: 0.94
+  }),
+  // 汉中天坑：井底色（极暗）和井沿色（青灰）。
+  tiankengWell: new MeshPhongMaterial({
+    color: 0x1c1f24, emissive: 0x06070a, flatShading: true, shininess: 1,
+    transparent: true, opacity: 1
+  }),
+  tiankengRim: new MeshPhongMaterial({
+    color: 0x8a8a82, emissive: 0x121212, flatShading: true, shininess: 6,
+    transparent: true, opacity: 1
+  })
+};
+
+// 考古（ancient）层独立 geometry / material 集合。
+const ancientGeometries = {
+  // 三星堆：方形夯土基座 (3.0 x 3.0 x 0.6) + 青铜立人柱（细圆柱顶端有横梁）。
+  bronzePodium: new BoxGeometry(3.0, 0.6, 3.0),
+  bronzePillar: new CylinderGeometry(0.18, 0.22, 2.6, 6),
+  bronzeCrossbar: new BoxGeometry(0.95, 0.18, 0.18),
+  // 金沙：方形低台 + 太阳神鸟金箔（薄金色圆盘，立在台上）。
+  jinshaPodium: new BoxGeometry(2.6, 0.45, 2.6),
+  sunBirdDisk: new CylinderGeometry(0.95, 0.95, 0.06, 24),
+  // 大地湾：F901 仰韶大房址——圆形夯土平台 + 4 根复原柱础。
+  yangshaoPlatform: new CylinderGeometry(2.8, 3.0, 0.32, 18),
+  yangshaoPost: new CylinderGeometry(0.16, 0.18, 1.4, 6)
+};
+
+const ancientMaterials = {
+  earthFoundation: new MeshPhongMaterial({
+    color: 0x8e6f4a, emissive: 0x1a120a, flatShading: true, shininess: 4,
+    transparent: true, opacity: 1
+  }),
+  bronzeRelic: new MeshPhongMaterial({
+    color: 0x6d6034, emissive: 0x141008, flatShading: true, shininess: 38,
+    transparent: true, opacity: 1
+  }),
+  goldRelic: new MeshPhongMaterial({
+    color: 0xdcb45a, emissive: 0x3a2a08, flatShading: true, shininess: 88,
+    transparent: true, opacity: 1
+  }),
+  rammedEarth: new MeshPhongMaterial({
+    color: 0xb59872, emissive: 0x1a120a, flatShading: true, shininess: 3,
+    transparent: true, opacity: 1
+  }),
+  woodPost: new MeshPhongMaterial({
+    color: 0x6f4f30, emissive: 0x140a06, flatShading: true, shininess: 4,
     transparent: true, opacity: 1
   })
 };
@@ -1125,6 +1223,28 @@ function rebuildScenicVisuals(): void {
       recordChunkId(stele2, position);
       scenicGroup.add(stele2);
       labelHeight = 5.4;
+    } else if (spot.role === "travertine-terraces") {
+      // 黄龙：6 层钙华梯田金水池，半径递减、Y 错位 0.18 模拟叠瀑。
+      const disks: Array<[keyof typeof scenicGeometries, number]> = [
+        ["travertineDisk1", 0.11],
+        ["travertineDisk2", 0.34],
+        ["travertineDisk3", 0.57],
+        ["travertineDisk4", 0.80],
+        ["travertineDisk5", 1.03],
+        ["travertineDisk6", 1.26]
+      ];
+      disks.forEach(([key, y]) => {
+        addPiece(new Mesh(scenicGeometries[key], scenicMaterials.travertineGold), y);
+      });
+      labelHeight = 3.0;
+    } else if (spot.role === "karst-sinkhole") {
+      // 汉中天坑：暗深井 + 灰岩沿口（双圈造出环形沿）。
+      // 井底用大半径低色 cylinder 地表下沉感（用 -0.15 让其顶面略低于地面）。
+      addPiece(new Mesh(scenicGeometries.tiankengWell, scenicMaterials.tiankengWell), -0.15);
+      // 外圈大、内圈小一点，叠出"中空"看感。
+      addPiece(new Mesh(scenicGeometries.tiankengRimOuter, scenicMaterials.tiankengRim), 0.25);
+      addPiece(new Mesh(scenicGeometries.tiankengRimInner, scenicMaterials.tiankengWell), 0.27);
+      labelHeight = 2.6;
     }
 
     // 名胜 label 用青金色——区别于 pass 的 #efcf83，更靠近"名山古迹"
@@ -1136,6 +1256,84 @@ function rebuildScenicVisuals(): void {
     recordChunkId(label, position);
     scenicGroup.add(label);
     scenicLabelSprites.push(label);
+  });
+}
+
+// 考古 POI 渲染：3 个遗址，独立 group 跟 ancient atlas 层对齐。
+function rebuildAncientVisuals(): void {
+  clearGroup(ancientGroup);
+  ancientLabelSprites.length = 0;
+
+  if (!terrainSampler?.asset.bounds) {
+    return;
+  }
+  const bounds = terrainSampler.asset.bounds;
+  const world = terrainSampler.asset.world;
+
+  qinlingAncientSites.forEach((site) => {
+    if (
+      site.lat < bounds.south ||
+      site.lat > bounds.north ||
+      site.lon < bounds.west ||
+      site.lon > bounds.east
+    ) {
+      return;
+    }
+    const wp = projectGeoToWorld(
+      { lat: site.lat, lon: site.lon },
+      bounds,
+      world
+    );
+    const groundY = terrainSampler!.sampleHeight(wp.x, wp.z);
+    const position = new Vector2(wp.x, wp.z);
+
+    const addPiece = (mesh: Mesh, yOffset: number, dx = 0, dz = 0): void => {
+      mesh.position.set(wp.x + dx, groundY + yOffset, wp.z + dz);
+      mesh.userData.terrainYOffset = yOffset;
+      mesh.userData.sharedResources = true;
+      mesh.userData.chunkId = regionChunkManifest
+        ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
+        : null;
+      ancientGroup.add(mesh);
+    };
+
+    let labelHeight = 4.4;
+
+    if (site.role === "shu-bronze-altar") {
+      // 三星堆：方形夯土基座 + 青铜立人柱（圆柱 + 顶端横梁意象纵目面具）。
+      addPiece(new Mesh(ancientGeometries.bronzePodium, ancientMaterials.earthFoundation), 0.30);
+      addPiece(new Mesh(ancientGeometries.bronzePillar, ancientMaterials.bronzeRelic), 1.90);
+      addPiece(new Mesh(ancientGeometries.bronzeCrossbar, ancientMaterials.bronzeRelic), 3.10);
+      labelHeight = 4.5;
+    } else if (site.role === "shu-sun-bird") {
+      // 金沙：低台 + 太阳神鸟金箔（薄圆盘竖立摆放）。
+      addPiece(new Mesh(ancientGeometries.jinshaPodium, ancientMaterials.earthFoundation), 0.225);
+      const disk = new Mesh(ancientGeometries.sunBirdDisk, ancientMaterials.goldRelic);
+      disk.rotation.x = Math.PI / 2; // 竖起来
+      addPiece(disk, 1.45);
+      labelHeight = 3.2;
+    } else if (site.role === "yangshao-dwelling") {
+      // 大地湾：圆形夯土平台 + 4 根复原柱础呈方阵。
+      addPiece(new Mesh(ancientGeometries.yangshaoPlatform, ancientMaterials.rammedEarth), 0.16);
+      const postOffsets: Array<[number, number]> = [
+        [-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]
+      ];
+      postOffsets.forEach(([dx, dz]) => {
+        addPiece(new Mesh(ancientGeometries.yangshaoPost, ancientMaterials.woodPost), 1.02, dx, dz);
+      });
+      labelHeight = 2.6;
+    }
+
+    // 考古 label 用米白色，跟 scenic 的青金色稍区分；走 prefecture LOD。
+    const label = createTextSprite(site.name, "#e7d8b3");
+    label.scale.multiplyScalar(1.02);
+    label.position.set(wp.x, groundY + labelHeight, wp.z);
+    label.userData.terrainYOffset = labelHeight;
+    label.userData.chunkId = regionChunkManifest
+      ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
+      : null;
+    ancientGroup.add(label);
+    ancientLabelSprites.push(label);
   });
 }
 
@@ -1186,6 +1384,7 @@ function rebuildFragmentVisuals(): void {
 
 rebuildLandmarkVisuals();
 rebuildScenicVisuals();
+rebuildAncientVisuals();
 rebuildFragmentVisuals();
 
 // Atmosphere（sky dome + 云层 + 雨雪粒子）从 main.ts 抽出，便于独立演进 shader。
@@ -2969,6 +3168,11 @@ function updateVisibleChunkState(nextChunkId: string | null): void {
       typeof child.userData?.chunkId === "string" ? child.userData.chunkId : null;
     child.visible = !chunkId || visibleChunkIds.has(chunkId);
   });
+  ancientGroup.children.forEach((child) => {
+    const chunkId =
+      typeof child.userData?.chunkId === "string" ? child.userData.chunkId : null;
+    child.visible = !chunkId || visibleChunkIds.has(chunkId);
+  });
   void syncChunkTerrainWindow(visibleChunkIds);
   hudDirty = true;
 }
@@ -3944,6 +4148,13 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
       child.position.y = sampler.sampleHeight(child.position.x, child.position.z) + yOffset;
     }
   });
+  // 考古 group 同上。
+  ancientGroup.children.forEach((child) => {
+    if (child instanceof Sprite || child instanceof Mesh) {
+      const yOffset = (child.userData.terrainYOffset as number | undefined) ?? 1.8;
+      child.position.y = sampler.sampleHeight(child.position.x, child.position.z) + yOffset;
+    }
+  });
 
   knowledgeFragments.forEach((fragment) => {
     const visual = fragmentVisuals.get(fragment.id);
@@ -4016,6 +4227,7 @@ async function init(): Promise<void> {
     resetStoryGuide();
     rebuildLandmarkVisuals();
     rebuildScenicVisuals();
+    rebuildAncientVisuals();
     rebuildFragmentVisuals();
     renderJournal();
     hudDirty = true;
