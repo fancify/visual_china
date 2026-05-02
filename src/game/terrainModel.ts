@@ -100,21 +100,63 @@ export function modeColor(
   let color: Color;
 
   if (mode === "terrain") {
-    color = new Color().setHSL(
-      MathUtils.lerp(0.15, 0.1, h),
-      MathUtils.lerp(0.3, 0.42, h),
-      MathUtils.lerp(0.24, 0.86, Math.pow(h, 1.15))
-    );
+    // Biome zonation by normalized elevation + slope，参照秦岭/中国
+    // 实际植被分布（不是臆想）：
+    //   < 0.18 = 盆地 / 农田带（黄绿）
+    //   0.18-0.45 = 暖温带阔叶混交林（中绿）
+    //   0.45-0.75 = 温带针叶林（深绿）
+    //   0.75-0.92 = 亚高山针叶 / 灌丛（灰绿偏蓝）
+    //   > 0.92 = 高山草甸 / 裸岩（灰白）
+    // 陡坡推向裸岩色（灰），沿河推向湿润亮绿。
+    // 旧版 hue 0.15→0.10（黄色调）+ 弱植被 overlay 只能盖住 20-32%，
+    // 出来整体土黄沙漠感，是用户反馈的根因。
+    let hue, sat, lum;
+    if (h < 0.18) {
+      hue = 0.22;
+      sat = 0.40;
+      lum = MathUtils.lerp(0.46, 0.52, h / 0.18);
+    } else if (h < 0.45) {
+      const t = (h - 0.18) / 0.27;
+      hue = MathUtils.lerp(0.24, 0.30, t);
+      sat = MathUtils.lerp(0.46, 0.42, t);
+      lum = MathUtils.lerp(0.42, 0.34, t);
+    } else if (h < 0.75) {
+      const t = (h - 0.45) / 0.30;
+      hue = MathUtils.lerp(0.30, 0.32, t);
+      sat = MathUtils.lerp(0.42, 0.36, t);
+      lum = MathUtils.lerp(0.34, 0.40, t);
+    } else if (h < 0.92) {
+      const t = (h - 0.75) / 0.17;
+      hue = 0.32;
+      sat = MathUtils.lerp(0.36, 0.20, t);
+      lum = MathUtils.lerp(0.40, 0.62, t);
+    } else {
+      const t = (h - 0.92) / 0.08;
+      hue = MathUtils.lerp(0.10, 0.08, t);
+      sat = MathUtils.lerp(0.18, 0.06, t);
+      lum = MathUtils.lerp(0.62, 0.84, t);
+    }
 
-    const vegetation = terrainVegetationCover({
-      normalizedHeight: h,
-      slope,
-      river,
-      settlement: settle
-    });
-    color.lerp(new Color("#778d52"), vegetation.agriculture * 0.2);
-    color.lerp(new Color("#5f8052"), vegetation.riparian * 0.24);
-    color.lerp(new Color("#496840"), vegetation.forest * 0.32);
+    // 陡坡（slope > 0.45）向裸岩灰色推：暴露岩面在阴影面看是冷灰，
+    // 阳面偏暖灰。简单起见取一个折中 hue。
+    const rockiness = MathUtils.clamp((slope - 0.45) / 0.4, 0, 1);
+    hue = MathUtils.lerp(hue, 0.07, rockiness * 0.55);
+    sat = MathUtils.lerp(sat, 0.10, rockiness * 0.5);
+    lum = MathUtils.lerp(lum, lum * 0.92, rockiness * 0.25);
+
+    color = new Color().setHSL(hue, sat, lum);
+
+    // 河流近邻 / 湿润带向亮绿推（"河边林木"语义）。
+    if (river > 0.1) {
+      const riparianTint = new Color().setHSL(0.30, 0.55, 0.42);
+      color.lerp(riparianTint, river * 0.36);
+    }
+
+    // 聚落附近向耕地黄绿推（农田 + 灌丛 mix）。
+    if (settle > 0.5 && h < 0.35) {
+      const agricultureTint = new Color().setHSL(0.20, 0.42, 0.50);
+      color.lerp(agricultureTint, (settle - 0.5) * 0.4);
+    }
   } else if (mode === "livelihood") {
     color = new Color().setHSL(
       MathUtils.lerp(0.09, 0.24, settle),
