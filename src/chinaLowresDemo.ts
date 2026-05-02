@@ -130,7 +130,7 @@ function mountShell(asset: DemAsset): {
       <canvas class="china-lowres-canvas" aria-label="中国低分辨率游戏地形预览"></canvas>
       <section class="china-lowres-panel">
         <div class="china-lowres-kicker">低分辨率全国母版 · Game Terrain Preview</div>
-        <h1>山河中国</h1>
+        <h1>千里江山图</h1>
         <p>这是一张单独的游戏式全国低清地形原型：只看宏观高原、盆地、平原和海岸关系，不加载秦岭剧情、人物或 POI。</p>
         <div class="china-lowres-stats">
           <div class="china-lowres-stat"><strong>${asset.grid.columns}×${asset.grid.rows}</strong><span>DEM 网格</span></div>
