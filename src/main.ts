@@ -562,17 +562,19 @@ const cityLabelSpritesByTier: { capital: Sprite[]; prefecture: Sprite[] } = {
  *   capital       : 始终 1
  */
 function updateCityLodFade(): void {
-  if (!cityMarkersHandle) return;
   // 用渲染相机的实际位置算距离，而不是 target 的 cameraDistance——
   // cameraDistance 改变时（按 o/f 或滚轮）相机用 lerp 缓动跟过去，立即
   // 用 target 算 LOD 会让 city 在画面相机还没到位时就 fade 到 0，跳变
   // 仍然存在。codex eec2f37 P1 抓到。
   const distance = camera.position.distanceTo(lookTarget);
-  // 同口径 fade 一下树木：相机拉远（distance > 110）开始 fade，
-  // distance > 165 完全消失。复用共享 material，不动 instance 数。
+  // 树 fade 不依赖 cityMarkers——standalone DEM（没有 bounds、不建城市）
+  // 也要享受 LOD（codex c039a4b P2 抓到）。所以放在 cityMarkersHandle
+  // gate 之前。相机拉远（distance > 110）开始 fade，distance > 165 完全
+  // 消失。复用共享 material，不动 instance 数。
   const treeAlpha = 1 - MathUtils.smoothstep(distance, 110, 165);
   sharedTreeMaterial.opacity = treeAlpha;
   sharedTreeMaterial.visible = treeAlpha > 0.01;
+  if (!cityMarkersHandle) return;
   const countyAlpha = 1 - MathUtils.smoothstep(distance, 50, 100);
   const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 100, 160);
   const capitalAlpha = 1.0;
