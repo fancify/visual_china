@@ -66,10 +66,7 @@ import {
   formatTimeOfDay,
   type EnvironmentVisuals
 } from "./game/environment";
-import {
-  northNeedleAngleRadians,
-  screenRightDirectionLabel
-} from "./game/compass.js";
+import { northNeedleAngleRadians } from "./game/compass.js";
 import {
   clearGameplayInput,
   isGameplayInputKey,
@@ -3142,8 +3139,7 @@ function update(deltaSeconds: number): void {
     heading: cameraHeading
   });
   hud.updateCompass({
-    northAngleRadians: northNeedleAngleRadians(compassHeading),
-    screenRightDirection: screenRightDirectionLabel(compassHeading)
+    northAngleRadians: northNeedleAngleRadians(compassHeading)
   });
 
   underpaint.position.x = player.position.x * 0.04;
