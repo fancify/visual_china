@@ -326,11 +326,20 @@ export const qinlingAtlasFeatures = [
     layer: "livelihood",
     geometry: "point",
     world: point(-86.07, 93.5),
-    displayPriority: 8,
+    // priority 9 让它过 atlasMinimumDisplayPriority（默认 9），verification
+    // external-vector 让 findAtlasFeatureAtCanvasPoint 也接受它（默认会
+    // 过滤 unverified）—— codex 191e539 抓到这两个一起让 民生 层默认仍
+    // 然空 + 即使打开仍点不出 card 的双重失效。
+    displayPriority: 9,
     terrainRole: "irrigation-node",
     summary: "战国李冰主持，鱼嘴-宝瓶口-飞沙堰把岷江分流灌溉成都平原。",
     visualRule: { symbol: "waterwork", color: "#7fc8a9", emphasis: "civil-engineering" },
-    themes: ["livelihood", "culture"]
+    themes: ["livelihood", "culture"],
+    source: {
+      name: "real-historic-site",
+      confidence: "verified",
+      verification: "external-vector"
+    }
   }),
   feature({
     id: "pass-dasanguan",
