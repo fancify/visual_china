@@ -3224,9 +3224,10 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
         const groundY = sampler.sampleHeight(wp.x, wp.z);
         // tierTop 抬到 sprite center 应该在的高度——createTextSprite
         // 默认 ~3.8 单元高，乘 scale 后 capital ~4.5、prefecture ~3.6，
-        // sprite 用中心定位，所以 y 偏移要等于"屋顶 + sprite 半高"才
-        // 不会撞到 building（codex b50e5c6 review）。
-        const tierTop = city.tier === "capital" ? 7.0 : 6.0;
+        // sprite 用中心定位，所以 y 偏移要等于"墙顶 + sprite 半高"才
+        // 不会撞到城墙。新口字型墙更矮（capital 1.4、prefecture 1.1），
+        // label 偏移跟着降。
+        const tierTop = city.tier === "capital" ? 4.0 : 3.2;
         const accent = city.tier === "capital" ? "#fbe0a8" : "#f3d692";
         const label = createTextSprite(city.name, accent);
         label.scale.multiplyScalar(city.tier === "capital" ? 1.18 : 0.96);
