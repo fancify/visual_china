@@ -916,17 +916,17 @@ function applyWaterEnvironmentVisuals(visuals: EnvironmentVisuals): void {
   });
 }
 
-const ambientWaterBaseColor = new Color(0x6aa7b0);
+// 0x3d7d8c：把水的色相往真实河流的"深绿青"上推。原来的 0x6aa7b0 太接近
+// 灰白，叠在地形上几乎看不出色。现在饱和度足够，远眺时能立刻识别出河道。
+const ambientWaterBaseColor = new Color(0x3d7d8c);
 function applyAmbientWaterSurfaceVisuals(visuals: EnvironmentVisuals): void {
   const environmentStyle = waterEnvironmentVisualStyle(ambientWaterStyle, visuals);
-  // 把 environment-coupled 强度喂给水面 shader 的 uniform。
-  // base color 按 colorMultiplier 缩放（夜晚更暗、晴天更亮），
-  // opacity 按 environmentStyle.ribbonOpacity 控制（雨天更淡）。
   const tintedBase = ambientWaterBaseColor
     .clone()
     .multiplyScalar(environmentStyle.colorMultiplier);
   waterSurface.setBaseColor(tintedBase);
-  waterSurface.setOpacity(Math.max(0.06, environmentStyle.ribbonOpacity * 1.4));
+  // opacity 倍率从 1.4 → 1.9：水面更不透明，叠在地形上不再"洗白"。
+  waterSurface.setOpacity(Math.max(0.12, environmentStyle.ribbonOpacity * 1.9));
   waterSurface.setSunDirection(visuals.sunDirection);
 }
 
@@ -2824,7 +2824,10 @@ function update(deltaSeconds: number): void {
   });
   sunSkyDisc.position.set(sunDomeVector.x, sunDomeVector.y, sunDomeVector.z);
   sunSkyDisc.scale.setScalar(46 + Math.max(0, sunDomeVector.altitude) * 24);
-  sunSkyDisc.material.opacity = visuals.sunDiscOpacity;
+  // 太阳/月亮地平线遮挡：altitude < 0 时已经"沉到地面下"，硬剪掉容易跳变，
+  // 用 [-0.05, 0.04] 的窗口做平滑 fade，看起来像真的从地平线沉下去。
+  const sunHorizonFade = MathUtils.smoothstep(sunDomeVector.altitude, -0.05, 0.04);
+  sunSkyDisc.material.opacity = visuals.sunDiscOpacity * sunHorizonFade;
   moonSkyDisc.position.set(moonDomeVector.x, moonDomeVector.y, moonDomeVector.z);
   moonSkyDisc.scale.setScalar(
     MathUtils.lerp(
@@ -2833,7 +2836,8 @@ function update(deltaSeconds: number): void {
       Math.max(0, moonDomeVector.altitude)
     )
   );
-  moonSkyDisc.material.opacity = visuals.moonOpacity;
+  const moonHorizonFade = MathUtils.smoothstep(moonDomeVector.altitude, -0.05, 0.04);
+  moonSkyDisc.material.opacity = visuals.moonOpacity * moonHorizonFade;
   mistPlane.material.opacity = visuals.mistOpacity;
   applyAmbientWaterSurfaceVisuals(visuals);
   applyWaterEnvironmentVisuals(visuals);
