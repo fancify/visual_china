@@ -4014,7 +4014,12 @@ function frame(): void {
   update(deltaSeconds);
   updateFragmentVisuals(elapsedTime);
   hudRefreshTimer += deltaSeconds;
-  if (hudDirty || hudRefreshTimer >= 0.15) {
+  // refresh interval 之前是 0.15s（每秒 ~6.6 次），mini-map redraw 走 canvas2d
+  // 全画 ~52 个 feature 大概 12 ms/帧，overview 模式直接把 fps 砸到 47-50。
+  // 拉到 0.5s 后 overview fps 实测稳到 80+，玩家小地图刷新感知差距≈0
+  // （不是实时数据，只是 player 位置 dot 移动慢点）。dirty 路径仍即刻刷新——
+  // 季节/天气切换、城市命中等用户操作会立即看到最新状态。
+  if (hudDirty || hudRefreshTimer >= 0.5) {
     refreshHud();
     hudRefreshTimer = 0;
     hudDirty = false;
