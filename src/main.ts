@@ -981,7 +981,7 @@ function updateNearbyRealCity(): void {
   if (closest?.id !== nearbyRealCity?.id) {
     nearbyRealCity = closest;
     if (closest) {
-      showToast(`[E] 了解 ${closest.name}`);
+      showToast(`[T] 了解 ${closest.name}`);
     }
   }
 }
@@ -2570,8 +2570,10 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  // F: 走到城市跟前按 F 弹出详情。E 已用于相机旋转，所以用 F（"fact"）。
-  if (normalized === "f" && nearbyRealCity) {
+  // T: 走到城市跟前按 T 弹出详情。E 是相机旋转，F 是切回 follow 视
+  // 角，都已被占；T（"talk"）在原先映射里没用，改用它就不会冲突
+  // （codex 995d07b P1+P2 抓到 F 跟 follow 切换的冲突）。
+  if (normalized === "t" && nearbyRealCity) {
     event.preventDefault();
     const city = nearbyRealCity;
     const tier =
