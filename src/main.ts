@@ -480,9 +480,10 @@ function createTextSprite(text: string, accent: string): Sprite {
     throw new Error("Failed to create label context");
   }
 
-  context.fillStyle = "rgba(9, 18, 19, 0.52)";
-  context.strokeStyle = "rgba(235, 214, 155, 0.28)";
-  context.lineWidth = 3;
+  // 紧凑 pill：背板透明度更低（rgba 0.36），细金边，让山河地形透出来不抢戏。
+  context.fillStyle = "rgba(7, 13, 14, 0.42)";
+  context.strokeStyle = "rgba(235, 214, 155, 0.32)";
+  context.lineWidth = 1.4;
   context.beginPath();
   context.roundRect(
     layout.rect.x,
@@ -497,6 +498,11 @@ function createTextSprite(text: string, accent: string): Sprite {
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.font = `600 ${layout.fontSize}px 'Noto Sans SC', 'PingFang SC', sans-serif`;
+  // 文本先描一圈深色 stroke，再叠 accent 实色——保证亮地貌（沙土黄）上
+  // 也读得清，不依赖背板厚度。
+  context.lineWidth = 4;
+  context.strokeStyle = "rgba(7, 13, 14, 0.85)";
+  context.strokeText(text, layout.text.x, layout.text.y);
   context.fillStyle = accent;
   context.fillText(text, layout.text.x, layout.text.y);
 
@@ -507,6 +513,11 @@ function createTextSprite(text: string, accent: string): Sprite {
     map: texture,
     transparent: true,
     depthWrite: false,
+    // depthTest: false 是 Sprite + transparent 通常要的组合（开 depthTest 后
+    // 画面里 sprite 整体看不到——Three.js Sprite 在 transparent pass 的深度处理
+    // 跟普通 Mesh 不一致，会被 opaque pass 留下的深度全部刷掉）。
+    // 山体遮挡改用 software raycast 在主循环里 hide—— updateLabelOcclusion()
+    // 沿 camera→label 线段采样 terrainSampler，比 GPU 深度测试可靠。
     depthTest: false
   });
 
@@ -557,6 +568,16 @@ const cityLabelSpritesByTier: { capital: Sprite[]; prefecture: Sprite[] } = {
 const countyLabelSpriteByCityId = new Map<string, Sprite>();
 // 关隘石碑名签 sprites，跟 prefecture tier 同档 fade（170-240）。
 const passLandmarkLabelSprites: Sprite[] = [];
+// 河流 / 古道 名签——之前没接 LOD，远距离仍漂浮；用户反馈"标签离得太远
+// 就不要显示了"，按 priority 分两档：
+//   river major (priority>=9, e.g. 渭河/汉水/嘉陵江)：跟 prefecture 同档 170-240
+//   river tributary (priority<9，褒水/斜水等支流)：跟 county 同档 70-140
+//   route：跟 prefecture 同档 170-240
+const riverLabelSpritesByTier: { major: Sprite[]; tributary: Sprite[] } = {
+  major: [],
+  tributary: []
+};
+const routeLabelSprites: Sprite[] = [];
 
 /**
  * 距离视角分档 fade：camera 远了 county 先消失、再 prefecture 消失，
@@ -618,8 +639,66 @@ function updateCityLodFade(): void {
     sprite.material.opacity = prefectureAlpha;
     sprite.visible = prefectureAlpha > 0.01;
   }
+  // capital 名签（西安/成都）：本来 opacity 恒 1，但用户要求"标签离得太远
+  // 就不要显示了"——给一档软 fade 250..330，覆盖飞镜头到 region 边缘的
+  // 极端情况。默认相机 26..170 全程 1.0 不变。
+  const capitalLabelAlpha = 1 - MathUtils.smoothstep(distance, 250, 330);
   for (const sprite of cityLabelSpritesByTier.capital) {
-    sprite.material.opacity = capitalAlpha;
+    sprite.material.opacity = capitalLabelAlpha;
+    sprite.visible = capitalLabelAlpha > 0.01;
+  }
+  // 河流名签：major（渭河/汉水/嘉陵江）跟 prefecture 同档；tributary
+  // （褒水/斜水等）跟 county 同档，远了就先隐去支流标签减少视觉噪声。
+  for (const sprite of riverLabelSpritesByTier.major) {
+    sprite.material.opacity = prefectureAlpha;
+    sprite.visible = prefectureAlpha > 0.01;
+  }
+  for (const sprite of riverLabelSpritesByTier.tributary) {
+    sprite.material.opacity = countyAlpha;
+    sprite.visible = countyAlpha > 0.01;
+  }
+  // 古道名签跟 prefecture 同档（陈仓道/剑门蜀道这种主轴线索）。
+  for (const sprite of routeLabelSprites) {
+    sprite.material.opacity = prefectureAlpha;
+    sprite.visible = prefectureAlpha > 0.01;
+  }
+  // 山体遮挡（occlusion）：用 terrainSampler 沿 camera→label 线段做软光线
+  // 步进，碰到任何采样点高度 > 当前线段高度，就把 sprite.visible 设为 false。
+  // 比 GPU depthTest 可靠（Three.js Sprite + transparent + depthTest 实测整体
+  // 不渲染，疑似 transparent pass 不读 opaque pass 写的深度）。每帧 ~30 个
+  // sprite × 8 步 = 240 次 sampleHeight 调用，sampler 走 bilinear 查表，开销
+  // 可忽略。
+  if (terrainSampler) {
+    const cameraWorld = camera.position;
+    const occlude = (sprite: Sprite): void => {
+      if (!sprite.visible) return; // 已经被距离 fade 隐去就不必再算
+      const target = sprite.position;
+      const dx = target.x - cameraWorld.x;
+      const dy = target.y - cameraWorld.y;
+      const dz = target.z - cameraWorld.z;
+      // 8 步线性插值采样（不含端点 t=0 和 t=1，端点本身没意义：
+      // 0 在相机内、1 是 label 自身位置）。
+      for (let i = 1; i <= 8; i += 1) {
+        const t = i / 9;
+        const sx = cameraWorld.x + dx * t;
+        const sy = cameraWorld.y + dy * t;
+        const sz = cameraWorld.z + dz * t;
+        const groundY = terrainSampler!.sampleHeight(sx, sz);
+        // groundY > sy 表示这一段地形比视线高 → 山挡住了 label。
+        // 给 0.6 单元容差，避免 label 自己脚下小起伏触发误判。
+        if (groundY > sy + 0.6) {
+          sprite.visible = false;
+          return;
+        }
+      }
+    };
+    cityLabelSpritesByTier.capital.forEach(occlude);
+    cityLabelSpritesByTier.prefecture.forEach(occlude);
+    countyLabelSpriteByCityId.forEach(occlude);
+    passLandmarkLabelSprites.forEach(occlude);
+    riverLabelSpritesByTier.major.forEach(occlude);
+    riverLabelSpritesByTier.tributary.forEach(occlude);
+    routeLabelSprites.forEach(occlude);
   }
 }
 
@@ -1244,6 +1323,10 @@ function rebuildWaterSystemVisuals(): void {
   clearGroup(riverVegetationGroup);
   waterEnvironmentMaterials.length = 0;
   visibleWaterFeatures = [];
+  // 复用同一个 sprites 数组对象（updateCityLodFade 闭包了它的引用），所以
+  // 用 length=0 清空，而不是重新赋值。
+  riverLabelSpritesByTier.major.length = 0;
+  riverLabelSpritesByTier.tributary.length = 0;
 
   if (!terrainSampler) {
     return;
@@ -1298,8 +1381,9 @@ function rebuildWaterSystemVisuals(): void {
     const labelPoint = waterLabelPoint(river);
 
     if (labelPoint) {
+      const isMajor = river.displayPriority >= 9;
       const label = createTextSprite(river.name, "#bdeff0");
-      label.scale.multiplyScalar(river.displayPriority >= 9 ? 1.08 : 0.82);
+      label.scale.multiplyScalar(isMajor ? 1.08 : 0.82);
       label.position.set(
         labelPoint.x,
         terrainSampler!.sampleHeight(labelPoint.x, labelPoint.y) + 4.8,
@@ -1307,6 +1391,10 @@ function rebuildWaterSystemVisuals(): void {
       );
       label.renderOrder = 13;
       waterSystemGroup.add(label);
+      (isMajor
+        ? riverLabelSpritesByTier.major
+        : riverLabelSpritesByTier.tributary
+      ).push(label);
     }
   });
 
@@ -1317,6 +1405,7 @@ function rebuildWaterSystemVisuals(): void {
 
 function rebuildRouteVisuals(): void {
   clearGroup(routeGroup);
+  routeLabelSprites.length = 0;
 
   if (!terrainSampler) {
     return;
@@ -1338,6 +1427,7 @@ function rebuildRouteVisuals(): void {
         );
         routeLabel.renderOrder = 14;
         routeGroup.add(routeLabel);
+        routeLabelSprites.push(routeLabel);
       }
 
       const ribbonGeometry = new BufferGeometry();
