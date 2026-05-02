@@ -2976,19 +2976,28 @@ function update(deltaSeconds: number): void {
   });
 
   // 地形碰撞 clamp：minElevation 现在允许相机降到与玩家齐平（看天空），
-  // 但代价是后方上坡时相机会嵌进山里、屏幕被山体填满。在相机所在 (x,z)
-  // 采样地形高度，确保 camera.y 始终高出地表至少 clearance（4 米）。
+  // 但代价是后方上坡时相机会嵌进山里、屏幕被山体填满。
+  // 实现要点（codex review e2ab87a 之后修正）：
+  //   - 出界保护：只在 (x,z) 落在 DEM 世界范围内时采样；否则 sampleHeight
+  //     会把坐标 clamp 到边界格子的高度，反而把已经飘到地图外的相机抬起来。
+  //   - 既 clamp target 也 clamp post-lerp position：lerp 0.12 每帧只补 12%，
+  //     如果上一帧 camera 已经在山里，光改 target 还要好几帧才出来；所以
+  //     lerp 之后立即再 clamp 一次实际相机位置。
   const cameraTerrainClearance = 4.0;
-  if (terrainSampler) {
-    const terrainAtCamera = terrainSampler.sampleHeight(
-      nextCameraPosition.x,
-      nextCameraPosition.z
-    );
-    nextCameraPosition.y = Math.max(
-      nextCameraPosition.y,
-      terrainAtCamera + cameraTerrainClearance
-    );
+  function clampAboveTerrain(x: number, z: number, y: number): number {
+    if (!terrainSampler) return y;
+    const halfWidth = terrainSampler.asset.world.width * 0.5;
+    const halfDepth = terrainSampler.asset.world.depth * 0.5;
+    if (Math.abs(x) > halfWidth || Math.abs(z) > halfDepth) return y;
+    const terrainAt = terrainSampler.sampleHeight(x, z);
+    return Math.max(y, terrainAt + cameraTerrainClearance);
   }
+
+  nextCameraPosition.y = clampAboveTerrain(
+    nextCameraPosition.x,
+    nextCameraPosition.z,
+    nextCameraPosition.y
+  );
 
   targetCameraPosition.set(
     nextCameraPosition.x,
@@ -2997,6 +3006,11 @@ function update(deltaSeconds: number): void {
   );
 
   camera.position.lerp(targetCameraPosition, qinlingCameraRig.followLerp);
+  camera.position.y = clampAboveTerrain(
+    camera.position.x,
+    camera.position.z,
+    camera.position.y
+  );
   // 始终用 +Y 作为 up：overview 模式现在改成"从南方斜俯视北"而不是纯顶视，
   // 不需要再用 -Z 翻转 up。
   camera.up.set(0, 1, 0);
