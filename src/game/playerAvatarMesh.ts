@@ -72,7 +72,10 @@ export function createPlayerAvatar(): PlayerAvatarHandle {
     shininess: 80
   });
 
-  const horseBody = new Mesh(new BoxGeometry(2.7, 0.86, 1.12), woodMaterial);
+  // 用户要求"躯体稍微窄小一点"：长 2.7→2.55（-5.5%）、高 0.86→0.78（-9%）、
+  // 宽 1.12→0.88（-21%，最明显的窄）。腿在 z=±0.38（仍在新宽度 ±0.44 内）、
+  // 鞍 0.88 宽（贴合新躯体），均无需联动。
+  const horseBody = new Mesh(new BoxGeometry(2.55, 0.78, 0.88), woodMaterial);
   horseBody.name = "wooden-horse-body";
   horseBody.position.y = 1.35;
 
