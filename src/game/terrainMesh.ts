@@ -58,7 +58,10 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
     opacity: 0
   });
   attachTerrainShaderEnhancements(material, {
-    heightFogColor: new Color(0xb6c4be)
+    heightFogColor: new Color(0xb6c4be),
+    // 跟主 terrainMaterial 同款远山初始色（千里江山图 石青）。每帧 main loop
+    // 会 updateTerrainShaderAtmosphericFar 把它跟天色 mix 后写回。
+    atmosphericFarColor: new Color(0x5f8ba6)
   });
   const mesh = new Mesh(geometry, material);
 

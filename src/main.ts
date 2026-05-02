@@ -196,6 +196,7 @@ import {
 import { createCircleTexture } from "./game/proceduralTextures";
 import {
   attachTerrainShaderEnhancements,
+  updateTerrainShaderAtmosphericFar,
   updateTerrainShaderHeightFog
 } from "./game/terrainShaderEnhancer";
 import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
@@ -435,7 +436,10 @@ const terrainMaterial = new MeshPhongMaterial({
   shininess: 8
 });
 attachTerrainShaderEnhancements(terrainMaterial, {
-  heightFogColor: new Color(0xb6c4be)
+  heightFogColor: new Color(0xb6c4be),
+  // 远山初始色：千里江山图 石青调（#5f8ba6 偏冷）。runtime 每帧根据
+  // environmentVisuals.skyZenithColor 改写它，让远山色随时间/天气一致。
+  atmosphericFarColor: new Color(0x5f8ba6)
 });
 const terrain = new Mesh(terrainGeometry, terrainMaterial);
 scene.add(terrain);
@@ -3746,11 +3750,24 @@ function update(deltaSeconds: number): void {
     terrainMaterial,
     visuals.skyHorizonColor
   );
+  // 远山逐青：用 skyZenithColor（深邃天色）跟一个石青基调 mix。zenithColor
+  // 已经反映了 dawn/dusk/夜晚 的色温，这样远山在落日时也会暖一点、凌晨偏紫。
+  const atmosphericFarRuntimeColor = visuals.skyZenithColor
+    .clone()
+    .lerp(new Color(0x5f8ba6), 0.55);
+  updateTerrainShaderAtmosphericFar(
+    terrainMaterial,
+    atmosphericFarRuntimeColor
+  );
   terrainChunkMeshes.forEach((chunk) => {
     if (!Array.isArray(chunk.mesh.material)) {
       updateTerrainShaderHeightFog(
         chunk.mesh.material as MeshPhongMaterial,
         visuals.skyHorizonColor
+      );
+      updateTerrainShaderAtmosphericFar(
+        chunk.mesh.material as MeshPhongMaterial,
+        atmosphericFarRuntimeColor
       );
     }
   });
