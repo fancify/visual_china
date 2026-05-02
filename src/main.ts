@@ -539,20 +539,57 @@ scene.add(routeGroup);
 const cityMarkersGroup = new Group();
 scene.add(cityMarkersGroup);
 let cityMarkersHandle: CityMarkersHandle | null = null;
-// 城市名签 sprites 单独 track，方便重建 region 时显式 dispose 它们的
-// SpriteMaterial + CanvasTexture（cityMarkersGroup.clear() 只 detach 不
-// dispose，会泄 GPU 资源——codex b50e5c6 review 抓到）。
-const cityLabelSprites: Sprite[] = [];
+// 城市名签 sprites 按档分组 track，方便：
+// 1) 重建 region 时显式 dispose 它们的 SpriteMaterial + CanvasTexture
+//    （cityMarkersGroup.clear() 只 detach 不 dispose——codex b50e5c6 抓到）
+// 2) LOD fade 时按档分别调整 opacity（capital 始终亮、prefecture 中距
+//    fade out、county 近距才显）
+const cityLabelSpritesByTier: { capital: Sprite[]; prefecture: Sprite[] } = {
+  capital: [],
+  prefecture: []
+};
+
+/**
+ * 距离视角分档 fade：camera 远了 county 先消失、再 prefecture 消失，
+ * capital 始终保持。让相机拉远时画面信息密度自动降级，符合用户"分层
+ * 加载、远的不展示"的诉求。淡入淡出用 smoothstep，避免 snap 跳变。
+ *
+ * cameraDistance 在 26 (近) 到 170 (远) 之间。fade 阈值：
+ *   county        : 0..50 全亮，50..100 fade 到 0
+ *   prefecture    : 0..100 全亮，100..160 fade 到 0
+ *   capital       : 始终 1
+ */
+function updateCityLodFade(): void {
+  if (!cityMarkersHandle) return;
+  const distance = cameraDistance;
+  const countyAlpha = 1 - MathUtils.smoothstep(distance, 50, 100);
+  const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 100, 160);
+  const capitalAlpha = 1.0;
+  cityMarkersHandle.tierMaterials.county.opacity = countyAlpha;
+  cityMarkersHandle.tierMaterials.county.visible = countyAlpha > 0.01;
+  cityMarkersHandle.tierMaterials.prefecture.opacity = prefectureAlpha;
+  cityMarkersHandle.tierMaterials.prefecture.visible = prefectureAlpha > 0.01;
+  cityMarkersHandle.tierMaterials.capital.opacity = capitalAlpha;
+  for (const sprite of cityLabelSpritesByTier.prefecture) {
+    sprite.material.opacity = prefectureAlpha;
+    sprite.visible = prefectureAlpha > 0.01;
+  }
+  for (const sprite of cityLabelSpritesByTier.capital) {
+    sprite.material.opacity = capitalAlpha;
+  }
+}
 
 function disposeCityLabelSprites(): void {
-  for (const sprite of cityLabelSprites) {
-    const material = sprite.material;
-    if (material instanceof SpriteMaterial) {
-      material.map?.dispose();
-      material.dispose();
+  (["capital", "prefecture"] as const).forEach((tier) => {
+    for (const sprite of cityLabelSpritesByTier[tier]) {
+      const material = sprite.material;
+      if (material instanceof SpriteMaterial) {
+        material.map?.dispose();
+        material.dispose();
+      }
     }
-  }
-  cityLabelSprites.length = 0;
+    cityLabelSpritesByTier[tier].length = 0;
+  });
 }
 
 const fragmentVisuals = new Map<string, FragmentVisual>();
@@ -2894,6 +2931,7 @@ function update(deltaSeconds: number): void {
   applyAmbientWaterSurfaceVisuals(visuals);
   applyWaterEnvironmentVisuals(visuals);
   waterSurface.setTime(clock.elapsedTime);
+  updateCityLodFade();
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 60;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
   cloudSprites.forEach((cloud, index) => {
@@ -3239,7 +3277,9 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
         label.position.set(wp.x, groundY + tierTop, wp.z);
         label.renderOrder = 13;
         cityMarkersGroup.add(label);
-        cityLabelSprites.push(label);
+        if (city.tier === "capital" || city.tier === "prefecture") {
+          cityLabelSpritesByTier[city.tier].push(label);
+        }
       });
   }
 
