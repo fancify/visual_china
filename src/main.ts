@@ -243,11 +243,7 @@ function eventDensityMultiplier(): number {
 function scaledSceneryBudget(): typeof runtimeBudget.scenery {
   const m = detailDensityMultiplier();
   return {
-    maxTreesPerChunk: Math.max(1, Math.floor(runtimeBudget.scenery.maxTreesPerChunk * m)),
-    maxSettlementMarkersPerChunk: Math.max(
-      1,
-      Math.floor(runtimeBudget.scenery.maxSettlementMarkersPerChunk * m)
-    )
+    maxTreesPerChunk: Math.max(1, Math.floor(runtimeBudget.scenery.maxTreesPerChunk * m))
   };
 }
 let storyBeats: StoryBeat[] = getQinlingStoryBeats();

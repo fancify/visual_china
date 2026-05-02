@@ -8,7 +8,6 @@ export interface RuntimePerformanceBudget {
   streaming: StreamingBudget;
   scenery: {
     maxTreesPerChunk: number;
-    maxSettlementMarkersPerChunk: number;
   };
 }
 
@@ -19,7 +18,6 @@ export const qinlingRuntimeBudget: RuntimePerformanceBudget = {
     maxLoadedTerrainChunks: 25
   },
   scenery: {
-    maxTreesPerChunk: 46,
-    maxSettlementMarkersPerChunk: 4
+    maxTreesPerChunk: 46
   }
 };
