@@ -181,12 +181,58 @@ export function formatTimeOfDay(timeOfDay: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+interface EffectiveWeather {
+  wind: number;
+  rain: number;
+  snow: number;
+  fogBoost: number;
+  sunCut: number;
+  shimmer: number;
+}
+
+function emptyEffectiveWeather(): EffectiveWeather {
+  return { wind: 0, rain: 0, snow: 0, fogBoost: 0, sunCut: 0, shimmer: 0 };
+}
+
+function copyWeatherConfig(w: WeatherConfig): EffectiveWeather {
+  return {
+    wind: w.wind,
+    rain: w.rain,
+    snow: w.snow,
+    fogBoost: w.fogBoost,
+    sunCut: w.sunCut,
+    shimmer: w.shimmer
+  };
+}
+
+function lerpEffectiveWeather(
+  current: EffectiveWeather,
+  target: EffectiveWeather,
+  rate: number
+): void {
+  const blend = MathUtils.clamp(rate, 0, 1);
+  current.wind += (target.wind - current.wind) * blend;
+  current.rain += (target.rain - current.rain) * blend;
+  current.snow += (target.snow - current.snow) * blend;
+  current.fogBoost += (target.fogBoost - current.fogBoost) * blend;
+  current.sunCut += (target.sunCut - current.sunCut) * blend;
+  current.shimmer += (target.shimmer - current.shimmer) * blend;
+}
+
 export class EnvironmentController {
   private seasonIndex = 0;
   private weatherIndex = 0;
   private weatherTimer = 0;
   private seasonTimer = 0;
   private nextWeatherDelay = 45;
+  // 平滑天气切换：每帧把 effectiveWeather 朝 target 配置插值，过渡 ~12 秒。
+  // 之前 weather 切换是硬跳，computeVisuals 里 sunCut/rain/snow 等数值瞬变
+  // 让 fog/雨粒子/水面 shimmer 都跳一帧，用户反馈"过渡生硬"。改成连续值后
+  // 雨从无到有需要 ~12s 慢慢起来，云慢慢压低 sunIntensity。
+  private effectiveWeather: EffectiveWeather = copyWeatherConfig(
+    weatherConfig[weathers[0]]
+  );
+  private static readonly WEATHER_TRANSITION_SECONDS = 12;
 
   state: EnvironmentState = {
     timeOfDay: 7.5,
@@ -218,6 +264,11 @@ export class EnvironmentController {
       this.advanceSeason();
     }
 
+    // 平滑过渡：每帧把 effectiveWeather 朝 weatherConfig[state.weather] 拉。
+    const target = weatherConfig[this.state.weather];
+    const rate = deltaSeconds / EnvironmentController.WEATHER_TRANSITION_SECONDS;
+    lerpEffectiveWeather(this.effectiveWeather, copyWeatherConfig(target), rate);
+
     return this.state;
   }
 
@@ -247,7 +298,10 @@ export class EnvironmentController {
 
   computeVisuals(): EnvironmentVisuals {
     const season = seasonConfig[this.state.season];
-    const weather = weatherConfig[this.state.weather];
+    // 用 effectiveWeather 而不是 weatherConfig[state.weather]：保证天气
+    // 切换时 sunCut/rain/snow/fogBoost/shimmer 都是平滑过渡的，雨/雾/云
+    // 不会一帧跳变。
+    const weather = this.effectiveWeather;
     const celestial = celestialCycle({
       timeOfDay: this.state.timeOfDay,
       weatherSunCut: weather.sunCut,
@@ -294,9 +348,14 @@ export class EnvironmentController {
       rimIntensity: MathUtils.lerp(0.25, 0.82, daylight),
       fogDensity: MathUtils.lerp(0.0075, 0.0032, daylight) + weather.fogBoost * 0.55,
       mistOpacity: MathUtils.lerp(0.012, 0.055, 1 - daylight) + weather.fogBoost * 9,
-      precipitationOpacity: weather.rain > 0 ? 0.6 : weather.snow > 0 ? 0.42 : 0,
-      precipitationColor: new Color(weather.snow > 0 ? "#f7fbff" : "#9fc7d8"),
-      precipitationSize: weather.snow > 0 ? 0.42 : 0.18,
+      // 粒子透明度 / 颜色 / 尺寸 现在按 rain / snow 的连续混合算，
+      // 让"晴 → 雨"过渡里粒子能从无到有平滑显现，而不是瞬间满。
+      precipitationOpacity: weather.rain * 0.6 + weather.snow * 0.42,
+      precipitationColor: new Color("#9fc7d8").lerp(
+        new Color("#f7fbff"),
+        MathUtils.clamp(weather.snow, 0, 1)
+      ),
+      precipitationSize: 0.18 + (0.42 - 0.18) * MathUtils.clamp(weather.snow, 0, 1),
       windStrength: weather.wind,
       waterShimmer: weather.shimmer * MathUtils.lerp(0.35, 1, daylight),
       daylight,
@@ -313,26 +372,30 @@ export class EnvironmentController {
             : this.state.season === "autumn"
               ? -0.018
               : -0.01,
-      terrainSaturationMul:
-        this.state.weather === "mist"
-          ? 0.8
-          : this.state.weather === "snow"
-            ? 0.72
-            : this.state.weather === "rain"
-              ? 0.88
-              : this.state.season === "summer"
-                ? 1.08
-                : this.state.season === "winter"
-                  ? 0.82
-                  : 1,
-      terrainLightnessMul:
-        this.state.weather === "snow"
-          ? 1.14
-        : this.state.weather === "rain"
-            ? 0.92
-            : this.state.weather === "mist"
-              ? 0.96
-              : MathUtils.lerp(celestial.terrainLightnessFloor, 1.06, daylight)
+      // terrain mult 改成基于 effectiveWeather 的连续混合，让天气过渡也
+      // 平滑——硬开关会让山色一帧跳一次。
+      // 基线 = season-based。雨/雪/雾按各自强度往各自的目标拉。
+      terrainSaturationMul: (() => {
+        const seasonBase =
+          this.state.season === "summer"
+            ? 1.08
+            : this.state.season === "winter"
+              ? 0.82
+              : 1;
+        const mistFactor = MathUtils.clamp(weather.fogBoost / 0.0021, 0, 1);
+        let mul = MathUtils.lerp(seasonBase, 0.8, mistFactor * 0.6);
+        mul = MathUtils.lerp(mul, 0.72, MathUtils.clamp(weather.snow, 0, 1) * 0.7);
+        mul = MathUtils.lerp(mul, 0.88, MathUtils.clamp(weather.rain, 0, 1) * 0.6);
+        return mul;
+      })(),
+      terrainLightnessMul: (() => {
+        const dayBase = MathUtils.lerp(celestial.terrainLightnessFloor, 1.06, daylight);
+        const mistFactor = MathUtils.clamp(weather.fogBoost / 0.0021, 0, 1);
+        let mul = MathUtils.lerp(dayBase, 0.96, mistFactor * 0.5);
+        mul = MathUtils.lerp(mul, 0.92, MathUtils.clamp(weather.rain, 0, 1) * 0.5);
+        mul = MathUtils.lerp(mul, 1.14, MathUtils.clamp(weather.snow, 0, 1) * 0.6);
+        return mul;
+      })()
     };
   }
 }
