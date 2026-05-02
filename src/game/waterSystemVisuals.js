@@ -176,11 +176,16 @@ function segmentDistance(point, start, end) {
   return Math.hypot(point.x - closestX, point.z - closestZ);
 }
 
+// waterRadius / bankRadius 跟新的 ribbonWidth（major 1.6 / minor 0.85）
+// 同步收窄。原来的 1.6 / 6.2 是按 ribbonWidth 2.8 校的，留着会出现"窄
+// 河旁边外扩一圈宽水边色"的不一致——codex c54e89c review 抓到的。
+// 新值参考：waterRadius ≈ 0.6 × ribbonWidth_major、bankRadius 比例略宽
+// 一些（保留湿润植被带，比 ribbon 宽 ~3 倍），但比原来收紧 20%。
 export function riverCorridorInfluenceAtPoint(
   x,
   z,
   features,
-  { waterRadius = 1.6, bankRadius = 6.2 } = {}
+  { waterRadius = 1.0, bankRadius = 5.0 } = {}
 ) {
   let distance = Infinity;
 
