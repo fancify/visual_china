@@ -274,6 +274,10 @@ export const qinlingAncientSites = [
     summary: "甘肃秦安，仰韶文化早期大型聚落（约前 5800 年），F901 大房址。",
     role: "yangshao-dwelling"
   }
+  // 半坡(109.07°E) / 兵马俑(109.27°E) / 秦始皇陵(109.25°E) 都在切片东界
+  // (109°E) 之外几公里。直接添加会触发 atlas-coverage 测试 x ∈ [-90, 90]
+  // 检查失败。等做正经东扩（backlog #54）把所有 hardcoded river/POI 坐标
+  // 重新从 lat/lon 投影后，再连同 华山 一起补进来。
 ];
 
 const ancientSymbol = {
