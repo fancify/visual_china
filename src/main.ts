@@ -566,6 +566,7 @@ const countyLabelSpriteByCityId = new Map<string, Sprite>();
  *   capital       : 始终 1
  * 用户反馈"城市在摄像头变化时容易消失"——之前 prefecture fade 100-160
  * 让默认 118 距离已经在 fade 中段（69% opacity），按 O 直接消失。
+ */
 function updateCityLodFade(): void {
   // 用渲染相机的实际位置算距离，而不是 target 的 cameraDistance——
   // cameraDistance 改变时（按 o/f 或滚轮）相机用 lerp 缓动跟过去，立即
