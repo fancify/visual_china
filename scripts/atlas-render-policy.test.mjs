@@ -22,19 +22,17 @@ test("atlas render policy keeps the default overview readable", () => {
   const visible = atlasVisibleFeatures(qinlingAtlasFeatures, qinlingAtlasLayers);
   const visibleLayers = new Set(visible.map((feature) => feature.layer));
 
-  // 城市层现在 by-default 可见——真实城市表全部 verification:
-  // external-vector，跟 3D 共用同一个 source-of-truth。其他 layer 还是
-  // unverified curated draft（landform / road / pass 都 manual-atlas-
-  // draft，curated 水系 confidence:medium 但没 verification 标记）所以
-  // 仍不出现在默认渲染里。
+  // 城市层用真实坐标 verification: external-vector，跟 3D 共用同一份
+  // source-of-truth，所以默认就显示。water（curated-modern-qinling）
+  // 还没 external-vector 标记、pass 是 manual-atlas-draft，按"默认视图
+  // 只展示已核验事实"的策略仍被过滤掉。livelihood 整层 defaultVisible:
+  // false，专题视图单独打开。
+  // landform / road / military / culture 整层已经删除（codex review 后
+  // 跟 3D 对齐），所以这里不再断言它们"不可见"——assertion 写出来反而误导。
   assert.ok(visibleLayers.has("city"), "verified real cities should render by default");
-  assert.ok(!visibleLayers.has("landform"));
-  assert.ok(!visibleLayers.has("water"));
-  assert.ok(!visibleLayers.has("road"));
-  assert.ok(!visibleLayers.has("pass"));
-  assert.ok(!visibleLayers.has("culture"));
-  assert.ok(!visibleLayers.has("military"));
-  assert.ok(!visibleLayers.has("livelihood"));
+  assert.ok(!visibleLayers.has("water"), "unverified curated water stays out of the default overview");
+  assert.ok(!visibleLayers.has("pass"), "manual-draft passes stay hidden until evidence layer toggled");
+  assert.ok(!visibleLayers.has("livelihood"), "livelihood is opt-in subject layer");
 });
 
 test("atlas render policy does not expose unverified or raw evidence features as facts", () => {
@@ -70,7 +68,10 @@ test("atlas render policy does not expose unverified or raw evidence features as
   assert.deepEqual(
     atlasVisibleFeatures(features, layers, { includeUnverifiedFeatures: true })
       .map((feature) => feature.id),
-    ["draft-landform", "primary-water"]
+    // landform 已不在 atlasLayerDrawOrder 里，sort 时拿到 fallback index 99，
+    // 排在 water 后面。这里只是验证 includeUnverifiedFeatures 让 unverified
+    // 特征也通过 filter，顺序差异是 draw order 收缩的副作用。
+    ["primary-water", "draft-landform"]
   );
   assert.deepEqual(
     atlasVisibleFeatures(features, layers, { includeEvidenceFeatures: true })
@@ -79,13 +80,15 @@ test("atlas render policy does not expose unverified or raw evidence features as
   );
 });
 
-test("atlas render order puts landform under water, road, and point labels", () => {
-  assert.deepEqual(atlasLayerDrawOrder.slice(0, 5), [
-    "landform",
+test("atlas render order puts water under city/pass/livelihood point labels", () => {
+  // landform / road / military / culture 整层删除后，draw order 跟着收缩
+  // 到 4 层。水系作为底色先画，pass / livelihood 作为叙事节点后画压在
+  // 城市之上。
+  assert.deepEqual(atlasLayerDrawOrder, [
     "water",
-    "road",
     "city",
-    "pass"
+    "pass",
+    "livelihood"
   ]);
 });
 

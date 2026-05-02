@@ -14,18 +14,12 @@ const featuresByName = new Map(
 );
 
 test("Qinling 2D atlas has the required independent map layers", () => {
+  // 用户要求 atlas 跟 3D 主游戏对齐——3D 没有 landform / road / culture /
+  // military 这些手画"意象"层，所以 atlas 也只留 4 层：水系 / 城市 /
+  // 关隘 / 民生（都江堰水利工程）。
   assert.deepEqual(
     qinlingAtlasLayers.map((layer) => layer.id),
-    [
-      "landform",
-      "water",
-      "city",
-      "pass",
-      "road",
-      "military",
-      "livelihood",
-      "culture"
-    ]
+    ["water", "city", "pass", "livelihood"]
   );
   assert.equal(qinlingAtlasPolicy.coordinatePolicy, "strict-geographic");
   assert.equal(qinlingAtlasPolicy.sourceOfTruth, "2d-atlas-first");

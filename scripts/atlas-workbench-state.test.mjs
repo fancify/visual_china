@@ -25,34 +25,35 @@ const canvas = { width: 220, height: 270 };
 test("atlas workbench starts with default-visible layers enabled", () => {
   const state = createAtlasWorkbenchState(qinlingAtlasLayers);
 
-  // 地貌 / 水系 / 城市 / 关隘 / 古道 默认开，让用户打开 atlas 第一眼就能
-  // 看到秦岭叙事网络（长安、剑门关、陈仓道），而不是空白底图。
-  // 军事 / 民生 / 人文 是专题图层，按需打开。
-  assert.equal(state.visibleLayerIds.has("landform"), true);
+  // 跟 3D 主游戏对齐后，atlas 只剩 水系 / 城市 / 关隘 / 民生 4 层。
+  // 前 3 个 defaultVisible: true，让用户打开 atlas 一眼看到秦岭网络
+  // （西安、剑门关、汉水）。民生（都江堰水利）是专题图层，按需打开。
   assert.equal(state.visibleLayerIds.has("water"), true);
-  assert.equal(state.visibleLayerIds.has("road"), true);
   assert.equal(state.visibleLayerIds.has("city"), true);
   assert.equal(state.visibleLayerIds.has("pass"), true);
-  assert.equal(state.visibleLayerIds.has("military"), false);
   assert.equal(state.visibleLayerIds.has("livelihood"), false);
-  assert.equal(state.visibleLayerIds.has("culture"), false);
   assert.equal(state.isFullscreen, false);
   assert.deepEqual(state.mapView, { scale: 1, offsetX: 0, offsetY: 0 });
 });
 
 test("atlas workbench toggles optional layers without mutating prior state", () => {
   const state = createAtlasWorkbenchState(qinlingAtlasLayers);
-  const next = toggleAtlasLayer(state, "military");
+  const next = toggleAtlasLayer(state, "livelihood");
 
-  assert.equal(state.visibleLayerIds.has("military"), false);
-  assert.equal(next.visibleLayerIds.has("military"), true);
+  assert.equal(state.visibleLayerIds.has("livelihood"), false);
+  assert.equal(next.visibleLayerIds.has("livelihood"), true);
 });
 
-test("atlas workbench keeps landform visible as the base reading layer", () => {
+test("atlas workbench keeps water visible as the base reading layer", () => {
+  // 水系是 atlas 现在的"底色"——河流决定盆地、谷道、城市落点。
+  // 默认开，toggle 一次再 toggle 回来仍应回到默认 visible 状态。
   const state = createAtlasWorkbenchState(qinlingAtlasLayers);
-  const next = toggleAtlasLayer(state, "landform");
+  const closed = toggleAtlasLayer(state, "water");
+  const reopened = toggleAtlasLayer(closed, "water");
 
-  assert.equal(next.visibleLayerIds.has("landform"), true);
+  assert.equal(state.visibleLayerIds.has("water"), true);
+  assert.equal(closed.visibleLayerIds.has("water"), false);
+  assert.equal(reopened.visibleLayerIds.has("water"), true);
 });
 
 test("atlas selected feature resolves from stable feature id", () => {
