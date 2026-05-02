@@ -121,14 +121,23 @@ export function buildWaterRibbonVertices(points, options) {
 
   const halfWidth = options.width * 0.5;
   const yOffset = options.yOffset ?? 0;
-  const sections = points.map((point, index) =>
-    waterRibbonCrossSection(
-      point,
-      pointNormal(points, index),
-      halfWidth,
-      options.sampleHeight(point.x, point.y) + yOffset
-    )
-  );
+  // Slope-aware Y：每个截面对中心、左、右三点采样，取最大地形高度。
+  // 这样在 cross-slope 上 ribbon 也始终高出 upslope 一侧地表，避免低
+  // yOffset（贴地）时被山坡淹掉（codex a75386c review 抓到 66/1278 顶
+  // 点扎进地形的问题）。
+  const sections = points.map((point, index) => {
+    const normal = pointNormal(points, index);
+    const leftX = point.x + normal.x * halfWidth;
+    const leftZ = point.y + normal.y * halfWidth;
+    const rightX = point.x - normal.x * halfWidth;
+    const rightZ = point.y - normal.y * halfWidth;
+    const maxTerrain = Math.max(
+      options.sampleHeight(point.x, point.y),
+      options.sampleHeight(leftX, leftZ),
+      options.sampleHeight(rightX, rightZ)
+    );
+    return waterRibbonCrossSection(point, normal, halfWidth, maxTerrain + yOffset);
+  });
   const vertices = [];
   const pushVertex = (point) => {
     vertices.push(point.x, point.y, point.z);
@@ -176,16 +185,18 @@ function segmentDistance(point, start, end) {
   return Math.hypot(point.x - closestX, point.z - closestZ);
 }
 
-// waterRadius / bankRadius 跟新的 ribbonWidth（major 1.6 / minor 0.85）
-// 同步收窄。原来的 1.6 / 6.2 是按 ribbonWidth 2.8 校的，留着会出现"窄
-// 河旁边外扩一圈宽水边色"的不一致——codex c54e89c review 抓到的。
-// 新值参考：waterRadius ≈ 0.6 × ribbonWidth_major、bankRadius 比例略宽
-// 一些（保留湿润植被带，比 ribbon 宽 ~3 倍），但比原来收紧 20%。
+// waterRadius / bankRadius 跟着 ribbonWidth 一路收窄：
+//   原始 ribbon 2.8m → waterRadius 1.6 / bankRadius 6.2
+//   收窄 ribbon 1.6m → waterRadius 1.0 / bankRadius 5.0
+//   再收窄到 ribbon 1.0m，waterRadius 也得跟到 ~0.55，否则水色会渲染到
+//   ribbon footprint 外两倍宽（codex a75386c review 抓到 593/1166 顶
+//   点超出 ribbon footprint）。bankRadius 不必跟着等比例缩小——它代表
+//   "湿润植被带"，本来就比可见 ribbon 宽 5-10 倍。
 export function riverCorridorInfluenceAtPoint(
   x,
   z,
   features,
-  { waterRadius = 1.0, bankRadius = 5.0 } = {}
+  { waterRadius = 0.55, bankRadius = 5.0 } = {}
 ) {
   let distance = Infinity;
 
