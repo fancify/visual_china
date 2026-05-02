@@ -107,6 +107,7 @@ import { createPlayerAvatar } from "./game/playerAvatarMesh";
 import {
   qinlingAtlasFeatures,
   qinlingAtlasLayers,
+  qinlingScenicLandmarks,
   type QinlingAtlasFeature,
   type QinlingAtlasLayerId
 } from "./game/qinlingAtlas.js";
@@ -554,6 +555,12 @@ scene.add(routeGroup);
 const cityMarkersGroup = new Group();
 scene.add(cityMarkersGroup);
 let cityMarkersHandle: CityMarkersHandle | null = null;
+
+// 名胜（scenic）单独一个 group——5 个 POI 的 mesh 跟 landmarks/cities
+// 不一致（每个 POI 都是组合体），独立路径方便管理 dispose 和 LOD。
+const scenicGroup = new Group();
+scene.add(scenicGroup);
+const scenicLabelSprites: Sprite[] = [];
 // 城市名签 sprites 按档分组 track，方便：
 // 1) 重建 region 时显式 dispose 它们的 SpriteMaterial + CanvasTexture
 //    （cityMarkersGroup.clear() 只 detach 不 dispose——codex b50e5c6 抓到）
@@ -662,6 +669,13 @@ function updateCityLodFade(): void {
     sprite.material.opacity = prefectureAlpha;
     sprite.visible = prefectureAlpha > 0.01;
   }
+  // 名胜（太白山/青城山/法门寺...）也走 prefecture LOD：日常视距全亮，
+  // overview 拉远才淡出。比 county 优先级高（地标性强），但不至于挂到
+  // capital 那么硬。
+  for (const sprite of scenicLabelSprites) {
+    sprite.material.opacity = prefectureAlpha;
+    sprite.visible = prefectureAlpha > 0.01;
+  }
   // 山体遮挡（occlusion）：用 terrainSampler 沿 camera→label 线段做软光线
   // 步进，碰到任何采样点高度 > 当前线段高度，就把 sprite.visible 设为 false。
   // 比 GPU depthTest 可靠（Three.js Sprite + transparent + depthTest 实测整体
@@ -699,6 +713,7 @@ function updateCityLodFade(): void {
     riverLabelSpritesByTier.major.forEach(occlude);
     riverLabelSpritesByTier.tributary.forEach(occlude);
     routeLabelSprites.forEach(occlude);
+    scenicLabelSprites.forEach(occlude);
   }
 }
 
@@ -818,6 +833,78 @@ const passSteleCapMaterial = new MeshPhongMaterial({
   opacity: 1
 });
 
+// 名胜（scenic）共用几何 + 材质——5 个 POI 共 4 类 mesh 形态。
+const scenicGeometries = {
+  // 太白山：8m 高的 sharp cone（peak base radius 5.5）；雪冠是顶端小白锥。
+  alpinePeakBody: new ConeGeometry(5.5, 8, 8),
+  alpineSnowCap: new ConeGeometry(2.2, 2.8, 8),
+  // 青城山：圆顶，3m 高 + 顶上一个迷你方亭暗示道观（青城天下幽）。
+  forestPeakDome: new SphereGeometry(4.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+  forestPavilion: new BoxGeometry(1.2, 0.6, 1.2),
+  forestPavilionRoof: new ConeGeometry(0.95, 0.6, 4),
+  // 九寨沟：海子（cyan disk）+ 两个低锥代表周围森林。disk 半径 2.4。
+  karstPool: new CylinderGeometry(2.4, 2.4, 0.18, 24),
+  karstPoolSmall: new CylinderGeometry(1.4, 1.4, 0.16, 18),
+  karstFringeTree: new ConeGeometry(0.55, 1.6, 5),
+  // 法门寺：5 层方塔，每层缩进 0.18，最高 4.5m。基座 box，塔身 cylinder*5。
+  pagodaBase: new BoxGeometry(2.4, 0.5, 2.4),
+  pagodaTier1: new BoxGeometry(2.0, 0.85, 2.0),
+  pagodaTier2: new BoxGeometry(1.7, 0.85, 1.7),
+  pagodaTier3: new BoxGeometry(1.45, 0.85, 1.45),
+  pagodaTier4: new BoxGeometry(1.2, 0.85, 1.2),
+  pagodaSpire: new ConeGeometry(0.5, 1.4, 6),
+  // 乾陵：黄土封土圆丘（hemisphere）+ 两通石碑（无字碑/述圣纪碑）立在前方。
+  mausoleumMound: new SphereGeometry(4.6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+  mausoleumStele: new BoxGeometry(0.45, 2.4, 0.18)
+};
+
+const scenicMaterials = {
+  alpineRock: new MeshPhongMaterial({
+    color: 0x9a8e7c, emissive: 0x16100a, flatShading: true, shininess: 6,
+    transparent: true, opacity: 1
+  }),
+  alpineSnow: new MeshPhongMaterial({
+    color: 0xeef2f5, emissive: 0x1a1d20, flatShading: true, shininess: 28,
+    transparent: true, opacity: 1
+  }),
+  forestGreen: new MeshPhongMaterial({
+    color: 0x416b3c, emissive: 0x0e1a0c, flatShading: true, shininess: 3,
+    transparent: true, opacity: 1
+  }),
+  pavilionWall: new MeshPhongMaterial({
+    color: 0xc89866, emissive: 0x1f120a, flatShading: true, shininess: 8,
+    transparent: true, opacity: 1
+  }),
+  pavilionRoof: new MeshPhongMaterial({
+    color: 0x6c2f1f, emissive: 0x180a06, flatShading: true, shininess: 12,
+    transparent: true, opacity: 1
+  }),
+  karstWater: new MeshPhongMaterial({
+    color: 0x4cb6c4, emissive: 0x1c4a52, flatShading: true, shininess: 60,
+    transparent: true, opacity: 0.92
+  }),
+  karstTree: new MeshPhongMaterial({
+    color: 0x2e5a3c, emissive: 0x0a1808, flatShading: true, shininess: 2,
+    transparent: true, opacity: 1
+  }),
+  pagodaWall: new MeshPhongMaterial({
+    color: 0xc25b3b, emissive: 0x32140c, flatShading: true, shininess: 14,
+    transparent: true, opacity: 1
+  }),
+  pagodaBaseStone: new MeshPhongMaterial({
+    color: 0x8c7b65, emissive: 0x18120c, flatShading: true, shininess: 4,
+    transparent: true, opacity: 1
+  }),
+  mausoleumEarth: new MeshPhongMaterial({
+    color: 0x8c7444, emissive: 0x1c1408, flatShading: true, shininess: 3,
+    transparent: true, opacity: 1
+  }),
+  mausoleumStele: new MeshPhongMaterial({
+    color: 0xb0a896, emissive: 0x201c14, flatShading: true, shininess: 8,
+    transparent: true, opacity: 1
+  })
+};
+
 // 真实 instanced city marker 已经覆盖的"意象"地标位置——这些 legacy
 // kind=city POI 留着会和真实城市 mesh 重叠，需要从渲染 + HUD 一起过滤。
 // 注意：成都平原 的坐标 (-44,104) 跟真实 成都 (~-71,107) 不重合，是
@@ -925,6 +1012,133 @@ function rebuildLandmarkVisuals(): void {
   });
 }
 
+// 名胜 POI 渲染：5 个独立组合体，每个都带 1 个 label + 多个 mesh。
+// 调用时机跟 rebuildLandmarkVisuals 同步——rebuild 时 clear group + reset
+// 标签数组（updateCityLodFade 闭包了 scenicLabelSprites 的引用）。
+function rebuildScenicVisuals(): void {
+  clearGroup(scenicGroup);
+  scenicLabelSprites.length = 0;
+
+  if (!terrainSampler?.asset.bounds) {
+    return;
+  }
+  const bounds = terrainSampler.asset.bounds;
+  const world = terrainSampler.asset.world;
+
+  const recordChunkId = (
+    object: { userData: { chunkId?: string | null } },
+    position: Vector2
+  ): void => {
+    object.userData.chunkId = regionChunkManifest
+      ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
+      : null;
+  };
+
+  qinlingScenicLandmarks.forEach((spot) => {
+    if (
+      spot.lat < bounds.south ||
+      spot.lat > bounds.north ||
+      spot.lon < bounds.west ||
+      spot.lon > bounds.east
+    ) {
+      return;
+    }
+    const wp = projectGeoToWorld(
+      { lat: spot.lat, lon: spot.lon },
+      bounds,
+      world
+    );
+    const groundY = terrainSampler!.sampleHeight(wp.x, wp.z);
+    const position = new Vector2(wp.x, wp.z);
+
+    const addPiece = (mesh: Mesh, yOffset: number): void => {
+      mesh.position.set(wp.x, groundY + yOffset, wp.z);
+      mesh.userData.terrainYOffset = yOffset;
+      mesh.userData.sharedResources = true;
+      recordChunkId(mesh, position);
+      scenicGroup.add(mesh);
+    };
+
+    let labelHeight = 6.4;
+
+    if (spot.role === "alpine-peak") {
+      // 太白山：8m 锥山身 + 2.8m 雪冠（顶在 ~10m）。label 抬到 13m 高。
+      addPiece(new Mesh(scenicGeometries.alpinePeakBody, scenicMaterials.alpineRock), 4.0);
+      addPiece(new Mesh(scenicGeometries.alpineSnowCap, scenicMaterials.alpineSnow), 8.4);
+      labelHeight = 12.4;
+    } else if (spot.role === "religious-mountain") {
+      // 青城山：圆顶 + 顶上小道观（亭 + 锥顶）。
+      addPiece(new Mesh(scenicGeometries.forestPeakDome, scenicMaterials.forestGreen), 0);
+      addPiece(new Mesh(scenicGeometries.forestPavilion, scenicMaterials.pavilionWall), 4.55);
+      addPiece(new Mesh(scenicGeometries.forestPavilionRoof, scenicMaterials.pavilionRoof), 5.15);
+      labelHeight = 7.0;
+    } else if (spot.role === "karst-lake-system") {
+      // 九寨沟：3 个海子 + 4 株冷杉 cluster，沿东北 / 西南错位。
+      const pools: Array<[number, number, number]> = [
+        [0, 0.09, 0],
+        [3.4, 0.08, 1.6],
+        [-2.6, 0.08, -1.8]
+      ];
+      pools.forEach(([dx, dy, dz], index) => {
+        const geom = index === 0 ? scenicGeometries.karstPool : scenicGeometries.karstPoolSmall;
+        const mesh = new Mesh(geom, scenicMaterials.karstWater);
+        mesh.position.set(wp.x + dx, groundY + dy, wp.z + dz);
+        mesh.userData.terrainYOffset = dy;
+        mesh.userData.sharedResources = true;
+        recordChunkId(mesh, position);
+        scenicGroup.add(mesh);
+      });
+      const trees: Array<[number, number]> = [
+        [-1.6, 1.4], [1.8, 1.2], [-3.4, -0.4], [2.6, -2.6]
+      ];
+      trees.forEach(([dx, dz]) => {
+        const tree = new Mesh(scenicGeometries.karstFringeTree, scenicMaterials.karstTree);
+        tree.position.set(wp.x + dx, groundY + 0.8, wp.z + dz);
+        tree.userData.terrainYOffset = 0.8;
+        tree.userData.sharedResources = true;
+        recordChunkId(tree, position);
+        scenicGroup.add(tree);
+      });
+      labelHeight = 4.2;
+    } else if (spot.role === "buddhist-relic") {
+      // 法门寺：5 层方塔 + 顶尖 spire。基座 0.25m 起。
+      addPiece(new Mesh(scenicGeometries.pagodaBase, scenicMaterials.pagodaBaseStone), 0.25);
+      addPiece(new Mesh(scenicGeometries.pagodaTier1, scenicMaterials.pagodaWall), 0.92);
+      addPiece(new Mesh(scenicGeometries.pagodaTier2, scenicMaterials.pagodaWall), 1.85);
+      addPiece(new Mesh(scenicGeometries.pagodaTier3, scenicMaterials.pagodaWall), 2.78);
+      addPiece(new Mesh(scenicGeometries.pagodaTier4, scenicMaterials.pagodaWall), 3.71);
+      addPiece(new Mesh(scenicGeometries.pagodaSpire, scenicMaterials.pagodaWall), 4.84);
+      labelHeight = 6.5;
+    } else if (spot.role === "imperial-mausoleum") {
+      // 乾陵：黄土圆丘 + 前方两通石碑（无字碑左、述圣纪碑右）。
+      addPiece(new Mesh(scenicGeometries.mausoleumMound, scenicMaterials.mausoleumEarth), 0);
+      const stele1 = new Mesh(scenicGeometries.mausoleumStele, scenicMaterials.mausoleumStele);
+      stele1.position.set(wp.x - 1.6, groundY + 1.2, wp.z + 5.0);
+      stele1.userData.terrainYOffset = 1.2;
+      stele1.userData.sharedResources = true;
+      recordChunkId(stele1, position);
+      scenicGroup.add(stele1);
+      const stele2 = new Mesh(scenicGeometries.mausoleumStele, scenicMaterials.mausoleumStele);
+      stele2.position.set(wp.x + 1.6, groundY + 1.2, wp.z + 5.0);
+      stele2.userData.terrainYOffset = 1.2;
+      stele2.userData.sharedResources = true;
+      recordChunkId(stele2, position);
+      scenicGroup.add(stele2);
+      labelHeight = 5.4;
+    }
+
+    // 名胜 label 用青金色——区别于 pass 的 #efcf83，更靠近"名山古迹"
+    // 调性。LOD fade 跟 prefecture 同档（updateCityLodFade 走遍数组）。
+    const label = createTextSprite(spot.name, "#dde7c2");
+    label.scale.multiplyScalar(1.05);
+    label.position.set(wp.x, groundY + labelHeight, wp.z);
+    label.userData.terrainYOffset = labelHeight;
+    recordChunkId(label, position);
+    scenicGroup.add(label);
+    scenicLabelSprites.push(label);
+  });
+}
+
 // 共享 sprite material：所有 knowledge fragment 用同色 glow + halo。
 const fragmentGlowMaterial = new SpriteMaterial({
   map: fragmentGlowTexture,
@@ -971,6 +1185,7 @@ function rebuildFragmentVisuals(): void {
 }
 
 rebuildLandmarkVisuals();
+rebuildScenicVisuals();
 rebuildFragmentVisuals();
 
 // Atmosphere（sky dome + 云层 + 雨雪粒子）从 main.ts 抽出，便于独立演进 shader。
@@ -2749,6 +2964,11 @@ function updateVisibleChunkState(nextChunkId: string | null): void {
       typeof child.userData?.chunkId === "string" ? child.userData.chunkId : null;
     child.visible = !chunkId || visibleChunkIds.has(chunkId);
   });
+  scenicGroup.children.forEach((child) => {
+    const chunkId =
+      typeof child.userData?.chunkId === "string" ? child.userData.chunkId : null;
+    child.visible = !chunkId || visibleChunkIds.has(chunkId);
+  });
   void syncChunkTerrainWindow(visibleChunkIds);
   hudDirty = true;
 }
@@ -3717,6 +3937,13 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
       child.position.y = sampler.sampleHeight(x, z) + yOffset;
     }
   });
+  // 名胜 group 跟 landmark 同样把每件子物体重新贴到当前 sampler 的高度。
+  scenicGroup.children.forEach((child) => {
+    if (child instanceof Sprite || child instanceof Mesh) {
+      const yOffset = (child.userData.terrainYOffset as number | undefined) ?? 1.8;
+      child.position.y = sampler.sampleHeight(child.position.x, child.position.z) + yOffset;
+    }
+  });
 
   knowledgeFragments.forEach((fragment) => {
     const visual = fragmentVisuals.get(fragment.id);
@@ -3788,6 +4015,7 @@ async function init(): Promise<void> {
     storyBeats = regionBundle.content.storyBeats ?? getQinlingStoryBeats();
     resetStoryGuide();
     rebuildLandmarkVisuals();
+    rebuildScenicVisuals();
     rebuildFragmentVisuals();
     renderJournal();
     hudDirty = true;

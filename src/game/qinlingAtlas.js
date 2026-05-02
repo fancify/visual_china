@@ -175,7 +175,7 @@ function scenicWorldPoint(lon, lat) {
   };
 }
 
-const scenicLandmarks = [
+export const qinlingScenicLandmarks = [
   {
     id: "scenic-taibai-shan",
     name: "太白山",
@@ -302,7 +302,7 @@ export const qinlingAtlasFeatures = [
   ...realQinlingCities.map(realCityToAtlasFeature),
   // 著名景点：太白山 / 青城山 / 九寨沟 / 法门寺 / 乾陵——全部用真实坐标，
   // verification: external-vector，跟 3D 一致地展示。
-  ...scenicLandmarks.map((spot) => ({
+  ...qinlingScenicLandmarks.map((spot) => ({
     id: spot.id,
     name: spot.name,
     layer: "scenic",
