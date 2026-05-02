@@ -1613,13 +1613,16 @@ interface RegionPlacemark {
 // 宏观地带标签：与 feature 系统并行，作为打开 atlas 时的"地理骨架"。
 // feature 标签是细节（渭河、长安），这些是脊柱（关中平原、秦岭主脊、蜀道走廊）。
 const qinlingRegionPlacemarks: RegionPlacemark[] = [
-  { name: "关中平原", world: { x: 26, z: 80 }, fontSize: 18 },
-  { name: "渭河谷地", world: { x: -22, z: 76 }, fontSize: 14 },
-  { name: "秦岭主脊", world: { x: 6, z: 28 }, fontSize: 17 },
-  { name: "汉中盆地", world: { x: 26, z: 8 }, fontSize: 16 },
-  { name: "蜀道走廊", world: { x: -10, z: -28 }, fontSize: 14 },
-  { name: "四川盆地北缘", world: { x: -30, z: -64 }, fontSize: 14 },
-  { name: "成都平原", world: { x: -44, z: -104 }, fontSize: 16 }
+  // mapOrientation 北 = -Z；当时 worldAxis 重构跑 flip-z-axis-source.mjs 时
+  // 这组 landform label 用 `world: { x, z }`，没匹配脚本的 `{ x, y }` /
+  // `point(x,y)` / `Vector2(x,y)` pattern，被漏了。手工把 z 全部翻号。
+  { name: "关中平原", world: { x: 26, z: -80 }, fontSize: 18 },
+  { name: "渭河谷地", world: { x: -22, z: -76 }, fontSize: 14 },
+  { name: "秦岭主脊", world: { x: 6, z: -28 }, fontSize: 17 },
+  { name: "汉中盆地", world: { x: 26, z: -8 }, fontSize: 16 },
+  { name: "蜀道走廊", world: { x: -10, z: 28 }, fontSize: 14 },
+  { name: "四川盆地北缘", world: { x: -30, z: 64 }, fontSize: 14 },
+  { name: "成都平原", world: { x: -44, z: 104 }, fontSize: 16 }
 ];
 
 function drawRegionPlacemarks(
