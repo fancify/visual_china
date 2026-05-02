@@ -18,7 +18,6 @@ export interface HudStatusSnapshot {
 
 export interface HudCompassSnapshot {
   northAngleRadians: number;
-  screenRightDirection: string;
 }
 
 export interface AtlasLayerCount {
@@ -98,13 +97,13 @@ export function createHud(
     </div>
     <div class="compass-block" aria-label="游戏方位">
       <div class="compass-dial">
-        <span class="compass-cardinal compass-north">北</span>
-        <span class="compass-cardinal compass-east">东</span>
+        <div class="compass-rosette" id="compass-rosette">
+          <span class="compass-cardinal compass-north">北</span>
+          <span class="compass-cardinal compass-east">东</span>
+          <span class="compass-cardinal compass-south">南</span>
+          <span class="compass-cardinal compass-west">西</span>
+        </div>
         <span class="compass-needle" id="compass-needle"></span>
-      </div>
-      <div class="compass-copy">
-        <span>屏幕右侧</span>
-        <strong id="compass-direction">东</strong>
       </div>
     </div>
     <details class="mode-block hud-drawer ${compactHudPanelConfig.mode.visible ? "" : hiddenClass}" ${compactHudPanelConfig.mode.openByDefault ? "open" : ""}>
@@ -217,7 +216,7 @@ export function createHud(
 
   const loadingLine = requireElement<HTMLElement>(hud, "#loading-line");
   const compassNeedle = requireElement<HTMLElement>(hud, "#compass-needle");
-  const compassDirection = requireElement<HTMLElement>(hud, "#compass-direction");
+  const compassRosette = requireElement<HTMLElement>(hud, "#compass-rosette");
   const pickupToast = requireElement<HTMLElement>(hud, "#pickup-toast");
   const zoneLine = requireElement<HTMLElement>(hud, "#zone-line");
   const modeLine = requireElement<HTMLElement>(hud, "#mode-line");
@@ -420,12 +419,13 @@ export function createHud(
       atlasFullscreen.setAttribute("aria-hidden", String(!isOpen));
     },
     updateCompass(snapshot) {
+      // 新罗盘：箭头永远向上（指向当前视角的前方），罗盘玫瑰（北东南西
+      // 标签）按相机朝向旋转。northAngleRadians 是"在屏幕坐标里、从向上
+      // 方向到真实北的顺时针夹角"——直接用它转 rosette 让 北 标签落
+      // 到真实北的方向，箭头维持向上不变。
       if (lastCompass?.northAngleRadians !== snapshot.northAngleRadians) {
-        compassNeedle.style.transform =
-          `translate(-50%, -100%) rotate(${snapshot.northAngleRadians}rad)`;
-      }
-      if (lastCompass?.screenRightDirection !== snapshot.screenRightDirection) {
-        compassDirection.textContent = snapshot.screenRightDirection;
+        compassRosette.style.transform =
+          `translate(-50%, -50%) rotate(${snapshot.northAngleRadians}rad)`;
       }
 
       lastCompass = snapshot;
@@ -464,8 +464,7 @@ export function createHud(
   controller.setLoadingState(`正在载入母版：${initialLoadingLabel}`);
   controller.setActiveMode("terrain");
   controller.updateCompass({
-    northAngleRadians: 0,
-    screenRightDirection: "东"
+    northAngleRadians: 0
   });
   controller.updateStatus({
     ...defaultStatusSnapshot,
