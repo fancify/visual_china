@@ -2822,11 +2822,19 @@ function update(deltaSeconds: number): void {
     body: "moon",
     radius: skyDomePolicy.radius * skyBodyStyle.moon.radiusMultiplier
   });
+  // sun/moon 地平线 fade：fade 窗口必须覆盖"日轮的半径"才不会让太阳还有
+  // 大半个露在天上时就消失。日轮在天穹上的视半角 ≈ atan(spriteRadius /
+  // skyRadius)。skyRadius 360、sun scale 46-70、moon scale 走 minScale/
+  // maxScale（约 36-58）。取保守 ±0.10 rad 窗口，覆盖 sun 半径并留余量。
+  const skyBodyHorizonFadeWindow = 0.10;
+  const sunScaleAtCurrent = 46 + Math.max(0, sunDomeVector.altitude) * 24;
   sunSkyDisc.position.set(sunDomeVector.x, sunDomeVector.y, sunDomeVector.z);
-  sunSkyDisc.scale.setScalar(46 + Math.max(0, sunDomeVector.altitude) * 24);
-  // 太阳/月亮地平线遮挡：altitude < 0 时已经"沉到地面下"，硬剪掉容易跳变，
-  // 用 [-0.05, 0.04] 的窗口做平滑 fade，看起来像真的从地平线沉下去。
-  const sunHorizonFade = MathUtils.smoothstep(sunDomeVector.altitude, -0.05, 0.04);
+  sunSkyDisc.scale.setScalar(sunScaleAtCurrent);
+  const sunHorizonFade = MathUtils.smoothstep(
+    sunDomeVector.altitude,
+    -skyBodyHorizonFadeWindow,
+    skyBodyHorizonFadeWindow
+  );
   sunSkyDisc.material.opacity = visuals.sunDiscOpacity * sunHorizonFade;
   moonSkyDisc.position.set(moonDomeVector.x, moonDomeVector.y, moonDomeVector.z);
   moonSkyDisc.scale.setScalar(
@@ -2836,7 +2844,11 @@ function update(deltaSeconds: number): void {
       Math.max(0, moonDomeVector.altitude)
     )
   );
-  const moonHorizonFade = MathUtils.smoothstep(moonDomeVector.altitude, -0.05, 0.04);
+  const moonHorizonFade = MathUtils.smoothstep(
+    moonDomeVector.altitude,
+    -skyBodyHorizonFadeWindow,
+    skyBodyHorizonFadeWindow
+  );
   moonSkyDisc.material.opacity = visuals.moonOpacity * moonHorizonFade;
   mistPlane.material.opacity = visuals.mistOpacity;
   applyAmbientWaterSurfaceVisuals(visuals);
@@ -2962,6 +2974,21 @@ function update(deltaSeconds: number): void {
     elevation: cameraElevation,
     distance: cameraDistance
   });
+
+  // 地形碰撞 clamp：minElevation 现在允许相机降到与玩家齐平（看天空），
+  // 但代价是后方上坡时相机会嵌进山里、屏幕被山体填满。在相机所在 (x,z)
+  // 采样地形高度，确保 camera.y 始终高出地表至少 clearance（4 米）。
+  const cameraTerrainClearance = 4.0;
+  if (terrainSampler) {
+    const terrainAtCamera = terrainSampler.sampleHeight(
+      nextCameraPosition.x,
+      nextCameraPosition.z
+    );
+    nextCameraPosition.y = Math.max(
+      nextCameraPosition.y,
+      terrainAtCamera + cameraTerrainClearance
+    );
+  }
 
   targetCameraPosition.set(
     nextCameraPosition.x,
