@@ -622,15 +622,20 @@ function rebuildLandmarkVisuals(): void {
   landmarkChunkIds.clear();
 
   landmarks.forEach((landmark) => {
+    // P4 真实城市 instanced markers 现在覆盖 长安意象 / 汉中盆地 /
+    // 成都平原 这几个 kind=city 的"意象"地标，留着会和 city marker
+    // 的 instanced building 重叠。整体跳过 kind=city，passes/plain 仍然
+    // 渲染（关隘 + 普通地标不冲突）。
+    if (landmark.kind === "city") {
+      return;
+    }
     const chunkId = regionChunkManifest
       ? findChunkForPosition(regionChunkManifest, landmark.position)?.id ?? null
       : null;
     landmarkChunkIds.set(landmark.name, chunkId);
     const ground = 0;
-    const geometry =
-      landmark.kind === "city"
-        ? landmarkGeometries.city
-        : landmarkGeometries.generic;
+    // city 已在上面 return，这里只剩 pass / river / mountain / plain。
+    const geometry = landmarkGeometries.generic;
     const material = landmarkMaterials[landmark.kind] ?? landmarkMaterials.plain;
     const marker = new Mesh(geometry, material);
     marker.position.set(landmark.position.x, ground + 1.8, landmark.position.y);
