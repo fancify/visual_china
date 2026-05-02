@@ -275,10 +275,17 @@ export class EnvironmentController {
 
     // 同步过渡：t 在 12 秒内走完 0→1，所有 channel 同步 lerp。
     if (this.weatherTransitionTarget !== this.state.weather) {
-      // 新 target：把当前 effective 锁为 from，新 target 设进 transitionTarget。
+      // 新 target：把当前 effective 锁为 from。
       this.weatherTransitionFrom = { ...this.effectiveWeather };
       this.weatherTransitionTarget = this.state.weather;
-      this.weatherTransitionT = 0;
+      // mid-flight 切换时初始化 t 为"已走过的比例"，这样剩余距离用剩余
+      // 时间收完，不会因为打断累计成 18s+（codex 4f5a0b6 P2 抓到）。
+      // 用 rain / snow 做距离 proxy（量级最大、视觉影响最大）。
+      const targetCfg = weatherConfig[this.state.weather];
+      const distRain = Math.abs(this.effectiveWeather.rain - targetCfg.rain);
+      const distSnow = Math.abs(this.effectiveWeather.snow - targetCfg.snow);
+      const remaining = Math.max(distRain, distSnow);
+      this.weatherTransitionT = MathUtils.clamp(1 - remaining, 0, 1);
     }
     if (this.weatherTransitionT < 1) {
       this.weatherTransitionT = Math.min(
