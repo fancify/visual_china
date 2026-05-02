@@ -1,6 +1,5 @@
 import {
   ConeGeometry,
-  CylinderGeometry,
   Group,
   InstancedMesh,
   Matrix4,
@@ -20,12 +19,10 @@ const sharedTreeMaterial = new MeshPhongMaterial({
   flatShading: true,
   shininess: 5
 });
-const sharedSettlementGeometry = new CylinderGeometry(0.42, 0.58, 1.4, 5);
-const sharedSettlementMaterial = new MeshPhongMaterial({
-  color: 0xb89b63,
-  flatShading: true,
-  shininess: 7
-});
+
+// settlement markers（5 棱柱褐色块）已移除：用户反馈"看不出含义"，
+// 而且位置是 chunk 内伪随机，并不对应真实城镇。P4 城市存在感会换成
+// 真实坐标的 instanced 建筑簇，这里先把误导性的几何体清掉。
 
 function pseudoRandom(seed: number): number {
   const value = Math.sin(seed * 12.9898) * 43758.5453;
@@ -50,7 +47,6 @@ export function createChunkScenery(
   const dummy = new Object3D();
 
   const treeMatrices: Matrix4[] = [];
-  const settlementMatrices: Matrix4[] = [];
   const { width, depth } = sampler.asset.world;
   const columns = 12;
   const rows = 12;
@@ -66,6 +62,8 @@ export function createChunkScenery(
       const h = normalizedHeight(height, sampler);
       const slope = sampler.sampleSlope(x, z);
       const river = sampler.sampleRiver(x, z);
+      // sampleSettlement 仍然用来"避开城镇区域不长树"——这是正确的语义，
+      // 即使我们不再渲染城镇本身的视觉 marker。
       const settlement = sampler.sampleSettlement(x, z);
       const forestBand = Math.max(0, 1 - Math.abs(h - 0.46) / 0.34);
       const lowlandGreen = Math.max(0, 1 - h / 0.44) * Math.max(0, 1 - slope / 0.72);
@@ -86,21 +84,6 @@ export function createChunkScenery(
         dummy.updateMatrix();
         treeMatrices.push(dummy.matrix.clone());
       }
-
-      if (
-        settlementMatrices.length < budget.maxSettlementMarkersPerChunk &&
-        settlement > 0.76 &&
-        slope < 0.42 &&
-        h < 0.58 &&
-        pseudoRandom(seed + 71) < 0.32
-      ) {
-        const scale = 0.9 + pseudoRandom(seed + 83) * 0.65;
-        dummy.position.set(x, height + 0.72 * scale, z);
-        dummy.rotation.set(0, pseudoRandom(seed + 97) * Math.PI * 2, 0);
-        dummy.scale.set(scale, scale, scale);
-        dummy.updateMatrix();
-        settlementMatrices.push(dummy.matrix.clone());
-      }
     }
   }
 
@@ -114,19 +97,6 @@ export function createChunkScenery(
   trees.instanceMatrix.needsUpdate = true;
   trees.userData.sharedResources = true;
   group.add(trees);
-
-  const settlements = new InstancedMesh(
-    sharedSettlementGeometry,
-    sharedSettlementMaterial,
-    Math.max(1, settlementMatrices.length)
-  );
-  settlements.count = settlementMatrices.length;
-  settlementMatrices.forEach((matrix, index) =>
-    settlements.setMatrixAt(index, matrix)
-  );
-  settlements.instanceMatrix.needsUpdate = true;
-  settlements.userData.sharedResources = true;
-  group.add(settlements);
 
   return group;
 }
