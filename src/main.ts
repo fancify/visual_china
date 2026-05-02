@@ -3178,6 +3178,29 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
       sampler
     );
     cityMarkersGroup.add(cityMarkersHandle.group);
+
+    // 城市名签：只给京城 + 州府（9 个）渲染 text sprite。
+    // 28 个全做 sprite 实测把 fps 从 120 砸到 24（每个 sprite 一张
+    // CanvasTexture + 透明 sort，量上来扛不住）。县城建筑物 mesh 已经
+    // 在 cityMarkersHandle 渲染，玩家走近能看到形状档级，名字可以等之
+    // 后做 hover/proximity 弹出标签的交互再补，先把性能保住。
+    visibleCities
+      .filter((city) => city.tier !== "county")
+      .forEach((city) => {
+        const wp = projectGeoToWorld(
+          { lat: city.lat, lon: city.lon },
+          sampler.asset.bounds!,
+          sampler.asset.world
+        );
+        const groundY = sampler.sampleHeight(wp.x, wp.z);
+        const tierTop = city.tier === "capital" ? 5.0 : 4.4;
+        const accent = city.tier === "capital" ? "#fbe0a8" : "#f3d692";
+        const label = createTextSprite(city.name, accent);
+        label.scale.multiplyScalar(city.tier === "capital" ? 1.18 : 0.96);
+        label.position.set(wp.x, groundY + tierTop, wp.z);
+        label.renderOrder = 13;
+        cityMarkersGroup.add(label);
+      });
   }
 
   const waterLevel = sampler.asset.presentation?.waterLevel ?? sampler.asset.minHeight - 2.5;
