@@ -273,27 +273,16 @@ export class EnvironmentController {
       this.advanceSeason();
     }
 
-    // 同步过渡：t 在 12 秒内走完 0→1，所有 channel 同步 lerp。
+    // 同步过渡：t 在 12 秒内走完 0→1，所有 channel 用同一个 t lerp。
+    // 每次 weather 切换 t reset 为 0：每段 blend 严格 12s 走完。
+    // 中途被打断（rare，~36-70s 才自动切一次，K 键手动也罕见）会让
+    // 总时间超过 12s（worst case 24s 来回），但每段 blend 时长可预期
+    // —— 这比 mid-flight 距离 proxy 既要保证 12s blend 又要避免 dry-to-
+    // dry 跳过的两难简单可控。
     if (this.weatherTransitionTarget !== this.state.weather) {
-      // 新 target：把当前 effective 锁为 from。
       this.weatherTransitionFrom = { ...this.effectiveWeather };
       this.weatherTransitionTarget = this.state.weather;
-      // mid-flight 切换时初始化 t 为"已走过的比例"，这样剩余距离用剩余
-      // 时间收完，不会因为打断累计成 18s+（codex 4f5a0b6 P2 抓到）。
-      // 距离 proxy 用全部 channel 的归一化最大值——只看 rain/snow 在
-      // dry → dry（如 clear → windy）转换时距离会算成 0、blend 直接跳完，
-      // 视觉上 wind/fog/sunCut/shimmer 都卡住不动（codex 4f96fc6 P1）。
-      const targetCfg = weatherConfig[this.state.weather];
-      const eff = this.effectiveWeather;
-      const remaining = Math.max(
-        Math.abs(eff.rain - targetCfg.rain),
-        Math.abs(eff.snow - targetCfg.snow),
-        Math.abs(eff.wind - targetCfg.wind),
-        Math.abs(eff.shimmer - targetCfg.shimmer),
-        Math.abs(eff.sunCut - targetCfg.sunCut) / 0.42,
-        Math.abs(eff.fogBoost - targetCfg.fogBoost) / 0.0021
-      );
-      this.weatherTransitionT = MathUtils.clamp(1 - remaining, 0, 1);
+      this.weatherTransitionT = 0;
     }
     if (this.weatherTransitionT < 1) {
       this.weatherTransitionT = Math.min(
