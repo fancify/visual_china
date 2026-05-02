@@ -104,7 +104,7 @@ export function createHud(
   hud.className = "hud";
   hud.innerHTML = `
     <div class="title-block">
-      <div class="eyebrow">山河中国</div>
+      <div class="eyebrow">千里江山图</div>
       <h1>秦岭 - 关中 - 四川盆地</h1>
       <div class="loading-line" id="loading-line"></div>
     </div>
