@@ -280,11 +280,19 @@ export class EnvironmentController {
       this.weatherTransitionTarget = this.state.weather;
       // mid-flight 切换时初始化 t 为"已走过的比例"，这样剩余距离用剩余
       // 时间收完，不会因为打断累计成 18s+（codex 4f5a0b6 P2 抓到）。
-      // 用 rain / snow 做距离 proxy（量级最大、视觉影响最大）。
+      // 距离 proxy 用全部 channel 的归一化最大值——只看 rain/snow 在
+      // dry → dry（如 clear → windy）转换时距离会算成 0、blend 直接跳完，
+      // 视觉上 wind/fog/sunCut/shimmer 都卡住不动（codex 4f96fc6 P1）。
       const targetCfg = weatherConfig[this.state.weather];
-      const distRain = Math.abs(this.effectiveWeather.rain - targetCfg.rain);
-      const distSnow = Math.abs(this.effectiveWeather.snow - targetCfg.snow);
-      const remaining = Math.max(distRain, distSnow);
+      const eff = this.effectiveWeather;
+      const remaining = Math.max(
+        Math.abs(eff.rain - targetCfg.rain),
+        Math.abs(eff.snow - targetCfg.snow),
+        Math.abs(eff.wind - targetCfg.wind),
+        Math.abs(eff.shimmer - targetCfg.shimmer),
+        Math.abs(eff.sunCut - targetCfg.sunCut) / 0.42,
+        Math.abs(eff.fogBoost - targetCfg.fogBoost) / 0.0021
+      );
       this.weatherTransitionT = MathUtils.clamp(1 - remaining, 0, 1);
     }
     if (this.weatherTransitionT < 1) {
