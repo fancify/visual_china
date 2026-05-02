@@ -561,7 +561,11 @@ const cityLabelSpritesByTier: { capital: Sprite[]; prefecture: Sprite[] } = {
  */
 function updateCityLodFade(): void {
   if (!cityMarkersHandle) return;
-  const distance = cameraDistance;
+  // 用渲染相机的实际位置算距离，而不是 target 的 cameraDistance——
+  // cameraDistance 改变时（按 o/f 或滚轮）相机用 lerp 缓动跟过去，立即
+  // 用 target 算 LOD 会让 city 在画面相机还没到位时就 fade 到 0，跳变
+  // 仍然存在。codex eec2f37 P1 抓到。
+  const distance = camera.position.distanceTo(lookTarget);
   const countyAlpha = 1 - MathUtils.smoothstep(distance, 50, 100);
   const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 100, 160);
   const capitalAlpha = 1.0;
