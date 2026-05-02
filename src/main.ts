@@ -46,6 +46,7 @@ import {
   modeMeta,
   routeStart as defaultRouteStart,
   type Landmark,
+  type LandmarkKind,
   type ViewMode
 } from "./data/qinlingSlice";
 import {
@@ -161,6 +162,7 @@ import {
   type CityMarkersHandle
 } from "./game/cityMarkers";
 import { realQinlingCities } from "./data/realCities";
+import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
   evaluateStoryGuide,
   formatStoryGuideLine,
@@ -625,6 +627,33 @@ const LEGACY_OVERLAPPING_CITY_NAMES = new Set(["长安意象", "汉中盆地"]);
 
 function isLegacyOverlappingCityLandmark(landmark: Landmark): boolean {
   return landmark.kind === "city" && LEGACY_OVERLAPPING_CITY_NAMES.has(landmark.name);
+}
+
+// 把真实城市投影到当前 region 的世界坐标，用作 HUD nearest 候选（不进
+// landmarkGroup 渲染——visual marker 是 cityMarkers 那条独立路径）。
+function realCityLandmarksForHud(): Landmark[] {
+  const bounds = terrainSampler?.asset.bounds;
+  const world = terrainSampler?.asset.world;
+  if (!bounds || !world) return [];
+  return realQinlingCities
+    .filter(
+      (city) =>
+        city.lat >= bounds.south &&
+        city.lat <= bounds.north &&
+        city.lon >= bounds.west &&
+        city.lon <= bounds.east
+    )
+    .map((city) => {
+      const wp = projectGeoToWorld({ lat: city.lat, lon: city.lon }, bounds, world);
+      const tierLabel =
+        city.tier === "capital" ? "京城" : city.tier === "prefecture" ? "州府" : "县城";
+      return {
+        name: city.name,
+        kind: "city" as LandmarkKind,
+        position: new Vector2(wp.x, wp.z),
+        description: city.hint ?? `${tierLabel}`
+      };
+    });
 }
 
 function rebuildLandmarkVisuals(): void {
@@ -1732,7 +1761,10 @@ function nearestLandmarkText(): string {
 
   const currentPosition = new Vector2(player.position.x, player.position.z);
   // 跟 rebuildLandmarkVisuals 保持一致：legacy 重叠的"意象"城市地标不
-  // 进 HUD nearest，否则玩家站在 西安 city 旁还是被告知"附近：长安意象"。
+  // 进 HUD nearest（否则站在 西安 旁还是被告知"附近：长安意象"）。
+  // 同时把 P4 真实城市 instanced markers 也变成 nearest 候选，否则 HUD
+  // 会指向更远的 渭河平原 / 褒斜谷意象 之类，而玩家其实就站在西安/汉中
+  // 旁边——codex d99d587 review 抓到。
   const renderableLandmarks = landmarks.filter(
     (landmark) => !isLegacyOverlappingCityLandmark(landmark)
   );
@@ -1744,7 +1776,8 @@ function nearestLandmarkText(): string {
         })
       : renderableLandmarks;
 
-  const landmarksToUse = visibleLandmarks.length > 0 ? visibleLandmarks : renderableLandmarks;
+  const baseLandmarks = visibleLandmarks.length > 0 ? visibleLandmarks : renderableLandmarks;
+  const landmarksToUse = [...baseLandmarks, ...realCityLandmarksForHud()];
 
   const nearest = landmarksToUse.reduce((best, landmark) => {
     const bestDistance = best.position.distanceTo(currentPosition);
