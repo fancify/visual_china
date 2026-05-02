@@ -1249,11 +1249,13 @@ function rebuildWaterSystemVisuals(): void {
     return;
   }
 
-  // 用户反馈"风扇响"——回到默认 9 阈值，只渲染主干河（priority 10）。
-  // 之前为了让 tributary 进入而降到 8 是 codex 建议的 LOD 启用，但
-  // tributary 数量多、虽然每条粗粒化省顶点，整体渲染压力还是上去了。
-  // 用户更看重静音，水系只画主干即可（汉江、渭河、嘉陵江 等）。
-  const rivers = selectRenderableWaterFeatures(atlasFeatures);
+  // 3D 游戏里保留一级支流（rank=2，priority 8），用户反馈"游戏里还是
+  // 要有支流信息"。tributary 用 1.5 单元密化（major 是 0.9）省 ~40%
+  // 顶点；其它 perf 节流（pixelRatio 1.25 / 白天隐星 / 节流 proximity）
+  // 已分摊掉部分开销。
+  const rivers = selectRenderableWaterFeatures(atlasFeatures, {
+    minDisplayPriority: 8
+  });
   visibleWaterFeatures = rivers;
 
   rebuildRiverVegetationVisuals(rivers);
