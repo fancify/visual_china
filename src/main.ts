@@ -1021,9 +1021,12 @@ function rebuildWaterSystemVisuals(): void {
       opacity: waterStyle.ribbonOpacity,
       renderOrder: 4
     });
+    // 加强 polygonOffset：用户反馈"俯视时河流看不见"是因为低 yOffset
+    // 时 ribbon 和地形深度挤在一起，弱 polygonOffset (-1, -2) 没把
+    // ribbon 推到地形之前，渲染时被地形赢了 depth test。-2/-4 更稳。
     ribbon.material.polygonOffset = true;
-    ribbon.material.polygonOffsetFactor = -1;
-    ribbon.material.polygonOffsetUnits = -2;
+    ribbon.material.polygonOffsetFactor = -2;
+    ribbon.material.polygonOffsetUnits = -4;
     registerWaterEnvironmentMaterial(ribbon.material, ribbonColor, waterStyle, "ribbon");
     waterSystemGroup.add(ribbon);
 
