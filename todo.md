@@ -21,8 +21,10 @@
 - ❌ 彩虹（已砍）
 
 ## P4：城市存在感（~2 天）
-- ⏳ 4.1 instanced building prefab（京城 / 州府 / 县城 三档）
-- ⏳ 4.2 长安 / 汉中 / 广元 等真实坐标摆放
+- ✅ 4.1 instanced building prefab（京城 / 州府 / 县城 三档）
+- ✅ 4.2 长安 / 汉中 / 广元 等真实坐标摆放（28 个真实城市）
+- ✅ 4.3 京城 / 州府 文字名签（9 个 sprite，性能保住）
+- ⏳ 4.4 县城名签：proximity-trigger 或 DOM overlay（避开 28 sprite 撞 fps）
 
 ## P5：信息分层 UI + POI 内容容器（~2 天）
 - ⏳ 5.1 progressive disclosure panel 框架
