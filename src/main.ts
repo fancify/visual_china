@@ -3751,10 +3751,13 @@ function update(deltaSeconds: number): void {
     visuals.skyHorizonColor
   );
   // 远山逐青：用 skyZenithColor（深邃天色）跟一个石青基调 mix。zenithColor
-  // 已经反映了 dawn/dusk/夜晚 的色温，这样远山在落日时也会暖一点、凌晨偏紫。
+  // 已经反映了 dawn/dusk/夜晚 的色温。codex review d30759b 抓到夜里 zenith
+  // ≈ #000 跟 #5f8ba6 mix 0.55 = mid-teal，远山反而变亮。改成按 daylight
+  // 加权：白天 0.55 mix（远山饱和石青），夜里 0.05 mix（基本跟天色齐黑）。
+  const atmosphericMixT = 0.05 + visuals.daylight * 0.50;
   const atmosphericFarRuntimeColor = visuals.skyZenithColor
     .clone()
-    .lerp(new Color(0x5f8ba6), 0.55);
+    .lerp(new Color(0x5f8ba6), atmosphericMixT);
   updateTerrainShaderAtmosphericFar(
     terrainMaterial,
     atmosphericFarRuntimeColor
@@ -4078,12 +4081,12 @@ function frame(): void {
   update(deltaSeconds);
   updateFragmentVisuals(elapsedTime);
   hudRefreshTimer += deltaSeconds;
-  // refresh interval 之前是 0.15s（每秒 ~6.6 次），mini-map redraw 走 canvas2d
-  // 全画 ~52 个 feature 大概 12 ms/帧，overview 模式直接把 fps 砸到 47-50。
-  // 拉到 0.5s 后 overview fps 实测稳到 80+，玩家小地图刷新感知差距≈0
-  // （不是实时数据，只是 player 位置 dot 移动慢点）。dirty 路径仍即刻刷新——
-  // 季节/天气切换、城市命中等用户操作会立即看到最新状态。
-  if (hudDirty || hudRefreshTimer >= 0.5) {
+  // refresh interval：atlas 全屏打开时玩家 dot/heading 三角是导航主要参考，
+  // 必须保持 0.15s 平滑；普通游戏视图下 mini-map 是辅助，0.5s 即可，避免
+  // overview 模式 fps 被 12ms canvas2d 重绘砸到 50。codex review of d30759b
+  // 抓到全屏 atlas 0.5s 间隔会让导航 dot 明显卡顿。
+  const hudRefreshInterval = atlasWorkbench.isFullscreen ? 0.15 : 0.5;
+  if (hudDirty || hudRefreshTimer >= hudRefreshInterval) {
     refreshHud();
     hudRefreshTimer = 0;
     hudDirty = false;
