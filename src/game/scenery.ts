@@ -50,10 +50,23 @@ export function createChunkScenery(
   const { width, depth } = sampler.asset.world;
   const columns = 12;
   const rows = 12;
+  // 每个 chunk 用自己的 worldBounds 偏移作为 seed 基量，确保相邻 chunk
+  // 的 12x12 候选树位不会完全重合（codex d180823 review 抓到的"相邻盆
+  // 地 chunk 树位 45/46 一致"问题）。整张 region asset（无 chunk 划分）
+  // 走默认 0 偏移。
+  const chunkBounds = sampler.asset.worldBounds;
+  const chunkSeedOffsetX = chunkBounds ? Math.floor(chunkBounds.minX) : 0;
+  const chunkSeedOffsetZ = chunkBounds ? Math.floor(chunkBounds.minZ) : 0;
 
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
-      const seed = row * columns + column + width * 13 + depth * 7;
+      const seed =
+        row * columns +
+        column +
+        width * 13 +
+        depth * 7 +
+        chunkSeedOffsetX * 31 +
+        chunkSeedOffsetZ * 53;
       const jitterX = (pseudoRandom(seed) - 0.5) * (width / columns) * 0.8;
       const jitterZ = (pseudoRandom(seed + 17) - 0.5) * (depth / rows) * 0.8;
       const x = -width * 0.5 + ((column + 0.5) / columns) * width + jitterX;
