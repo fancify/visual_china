@@ -62,9 +62,10 @@ export function createChunkScenery(
       const h = normalizedHeight(height, sampler);
       const slope = sampler.sampleSlope(x, z);
       const river = sampler.sampleRiver(x, z);
-      // sampleSettlement 仍然用来"避开城镇区域不长树"——这是正确的语义，
-      // 即使我们不再渲染城镇本身的视觉 marker。
-      const settlement = sampler.sampleSettlement(x, z);
+      // sampleSettlement 也是合成出来的（高程 + 坡度 + 湿度），不对应真实
+      // 城镇。一并不再用作"空树"过滤——否则盆地会出现大片明显空地暗示
+      // 子虚乌有的聚落（codex 1af1fe7 review 抓到）。基本盆地实际历史上
+      // 是农田 + 村落，长树合理。
       const forestBand = Math.max(0, 1 - Math.abs(h - 0.46) / 0.34);
       const lowlandGreen = Math.max(0, 1 - h / 0.44) * Math.max(0, 1 - slope / 0.72);
       const vegetationChance = 0.12 + river * 0.22 + forestBand * 0.24 + lowlandGreen * 0.16;
@@ -74,7 +75,6 @@ export function createChunkScenery(
         h > 0.18 &&
         h < 0.78 &&
         slope < 0.62 &&
-        settlement < 0.74 &&
         pseudoRandom(seed + 31) < vegetationChance
       ) {
         const scale = 0.62 + pseudoRandom(seed + 43) * 0.55;
