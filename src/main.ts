@@ -2377,6 +2377,11 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         if (existing) {
           if (!existing.mesh.visible) {
             existing.mesh.userData.fadeStart = clock.elapsedTime;
+            // 立刻把 opacity 清零，避免 cached chunk 第一帧用旧的 1 渲
+            // 染（codex fb57c87 P1 抓到 updateChunkFadeIn 跑在 visibility
+            // 翻转之前导致一帧 pop）。
+            (existing.mesh.material as MeshPhongMaterial).opacity = 0;
+            if (existing.scenery) existing.scenery.visible = false;
           }
           existing.mesh.visible = true;
         }
@@ -2393,6 +2398,11 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         if (existing) {
           if (!existing.mesh.visible) {
             existing.mesh.userData.fadeStart = clock.elapsedTime;
+            // 立刻把 opacity 清零，避免 cached chunk 第一帧用旧的 1 渲
+            // 染（codex fb57c87 P1 抓到 updateChunkFadeIn 跑在 visibility
+            // 翻转之前导致一帧 pop）。
+            (existing.mesh.material as MeshPhongMaterial).opacity = 0;
+            if (existing.scenery) existing.scenery.visible = false;
           }
           existing.mesh.visible = true;
         }
@@ -2446,29 +2456,39 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
     const willBeVisible = chunkIds.has(chunkId);
     if (willBeVisible && !wasVisible) {
       terrainChunk.mesh.userData.fadeStart = clock.elapsedTime;
+      (terrainChunk.mesh.material as MeshPhongMaterial).opacity = 0;
+      if (terrainChunk.scenery) terrainChunk.scenery.visible = false;
     }
     terrainChunk.mesh.visible = willBeVisible;
   });
 }
 
 // Chunk fade-in：每帧把刚切到 visible 的 chunk 从 opacity 0 涨到 1，
-// 1.2 秒走完。复用 mesh.userData.fadeStart 时间戳做差。
+// 1.2 秒走完。scenery（树）等 chunk fade 结束后再亮起来，避免地形还在
+// 半透明时树已经满 opacity 漂在空气里（codex fb57c87 P2）。
 function updateChunkFadeIn(): void {
   const fadeDuration = 1.2;
   terrainChunkMeshes.forEach((terrainChunk) => {
+    if (!terrainChunk.mesh.visible) return;
     const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
     const material = terrainChunk.mesh.material as MeshPhongMaterial;
     if (fadeStart === undefined) {
       material.opacity = 1;
+      if (terrainChunk.scenery) terrainChunk.scenery.visible = true;
       return;
     }
     const elapsed = clock.elapsedTime - fadeStart;
     if (elapsed >= fadeDuration) {
       material.opacity = 1;
       delete terrainChunk.mesh.userData.fadeStart;
+      if (terrainChunk.scenery) terrainChunk.scenery.visible = true;
       return;
     }
     material.opacity = MathUtils.clamp(elapsed / fadeDuration, 0, 1);
+    // scenery 在 fade 80% 之后再开始 visible，让树跟在 terrain 后面"长出来"。
+    if (terrainChunk.scenery) {
+      terrainChunk.scenery.visible = elapsed >= fadeDuration * 0.8;
+    }
   });
 }
 
