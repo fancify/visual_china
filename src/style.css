@@ -610,11 +610,18 @@ canvas {
   transform-origin: 50% 50%;
 }
 
-.compass-cardinal {
+/* anchor 跟着 rosette 转，把字摆到对应方位；inner label 用
+   --label-counter-rotation 反向旋转保持文字竖直可读。 */
+.compass-cardinal-anchor {
   position: absolute;
   font-size: 10px;
   line-height: 1;
   color: rgba(241, 210, 137, 0.78);
+}
+
+.compass-cardinal-label {
+  display: inline-block;
+  transform: rotate(var(--label-counter-rotation, 0rad));
 }
 
 .compass-north {
