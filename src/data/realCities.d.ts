@@ -12,6 +12,8 @@ export interface RealCity {
   tier: CityTier;
   /** 简短背景说明，一行（用于 panel hint，可空） */
   hint?: string;
+  /** 详细介绍，可多段（纯文本，用 `\n\n` 分段；用于城市详情面板） */
+  description?: string;
 }
 
 export const realQinlingCities: RealCity[];

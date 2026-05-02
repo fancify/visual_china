@@ -60,6 +60,19 @@ export interface HudController {
   updateStatus(snapshot: HudStatusSnapshot): void;
   showToast(text: string): void;
   hideToast(): void;
+  cityDetailPanel: HTMLElement;
+  closeCityDetailButton: HTMLButtonElement;
+  setCityDetailPanelOpen(snapshot: CityDetailSnapshot | null): void;
+}
+
+export interface CityDetailSnapshot {
+  id: string;
+  name: string;
+  tier: "capital" | "prefecture" | "county";
+  lat: number;
+  lon: number;
+  hint?: string;
+  description?: string;
 }
 
 const defaultStatusSnapshot: HudStatusSnapshot = {
@@ -197,6 +210,19 @@ export function createHud(
       </div>
     </details>
     <div class="toast" id="pickup-toast"></div>
+    <aside class="city-detail-panel" id="city-detail-panel" aria-hidden="true">
+      <div class="city-detail-inner">
+        <header class="city-detail-head">
+          <div class="eyebrow" id="city-detail-tier"></div>
+          <h2 id="city-detail-name"></h2>
+        </header>
+        <div class="city-detail-hint" id="city-detail-hint"></div>
+        <div class="city-detail-description" id="city-detail-description"></div>
+        <footer class="city-detail-foot">
+          <button id="close-city-detail" type="button">返回游戏</button>
+        </footer>
+      </div>
+    </aside>
     <aside class="journal ${compactHudPanelConfig.journal.visible ? "" : hiddenClass}" id="journal">
       <div class="journal-head">
         <div>
@@ -260,6 +286,19 @@ export function createHud(
   const closeJournalButton = requireElement<HTMLButtonElement>(
     hud,
     "#close-journal"
+  );
+
+  const cityDetailPanel = requireElement<HTMLElement>(hud, "#city-detail-panel");
+  const cityDetailTier = requireElement<HTMLElement>(hud, "#city-detail-tier");
+  const cityDetailName = requireElement<HTMLElement>(hud, "#city-detail-name");
+  const cityDetailHint = requireElement<HTMLElement>(hud, "#city-detail-hint");
+  const cityDetailDescription = requireElement<HTMLElement>(
+    hud,
+    "#city-detail-description"
+  );
+  const closeCityDetailButton = requireElement<HTMLButtonElement>(
+    hud,
+    "#close-city-detail"
   );
 
   const modeChips = new Map<ViewMode, HTMLElement>();
@@ -462,6 +501,42 @@ export function createHud(
     },
     hideToast() {
       pickupToast.classList.remove("visible");
+    },
+    cityDetailPanel,
+    closeCityDetailButton,
+    setCityDetailPanelOpen(snapshot) {
+      if (snapshot === null) {
+        cityDetailPanel.classList.remove("open");
+        cityDetailPanel.setAttribute("aria-hidden", "true");
+        return;
+      }
+      const tierLabel =
+        snapshot.tier === "capital"
+          ? "京城"
+          : snapshot.tier === "prefecture"
+            ? "州府"
+            : "县城";
+      cityDetailTier.textContent =
+        `${tierLabel}  ·  ${snapshot.lat.toFixed(2)}°N  ${snapshot.lon.toFixed(2)}°E`;
+      cityDetailName.textContent = snapshot.name;
+      if (snapshot.hint) {
+        cityDetailHint.textContent = snapshot.hint;
+        cityDetailHint.hidden = false;
+      } else {
+        cityDetailHint.textContent = "";
+        cityDetailHint.hidden = true;
+      }
+      if (snapshot.description) {
+        // 把 \n\n 拆成段落；段内 \n 转 <br>
+        cityDetailDescription.innerHTML = snapshot.description
+          .split(/\n\n+/)
+          .map((para) => `<p>${para.replace(/\n/g, "<br>")}</p>`)
+          .join("");
+      } else {
+        cityDetailDescription.innerHTML = "<p>更多详情待补。</p>";
+      }
+      cityDetailPanel.classList.add("open");
+      cityDetailPanel.setAttribute("aria-hidden", "false");
     }
   };
 

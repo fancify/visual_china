@@ -16,6 +16,8 @@ export function buildWaterRibbonVertices(
   options: {
     width: number;
     yOffset?: number;
+    /** 折线密化最大段长（默认 0.9，支流可传 1.5 节省顶点） */
+    maxSegmentLength?: number;
     sampleHeight(x: number, z: number): number;
   }
 ): Float32Array;
