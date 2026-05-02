@@ -1,4 +1,4 @@
-import { Color, ShaderMaterial, Vector3 } from "three";
+import { Color, DoubleSide, ShaderMaterial, Vector3 } from "three";
 
 /**
  * 整区水面 shader：菲涅尔 + 时间相位涟漪 + 太阳高光。
@@ -115,4 +115,39 @@ export function createWaterSurfaceMaterial(): WaterSurfaceShaderHandle {
       material.uniforms.uOpacity.value = opacity;
     }
   };
+}
+
+/**
+ * 给河流 ribbon 用的独立 ShaderMaterial 实例。每条河单独 clone 一份，
+ * 这样 uBaseColor / uOpacity 可以按"主河 vs 一级支流"差异化设置；uTime
+ * / uSunDirection 由主循环按帧统一刷给所有实例。
+ *
+ * 用法：调用方持有返回的 material，render frame 里：
+ *   material.uniforms.uTime.value = elapsedSeconds;
+ *   material.uniforms.uSunDirection.value.copy(sunDir).normalize();
+ *   material.uniforms.uOpacity.value = environmentStyle.ribbonOpacity;
+ *   material.uniforms.uBaseColor.value.copy(baseColor).multiplyScalar(...);
+ */
+export function createRiverRibbonShaderMaterial(options: {
+  baseColor: Color | number;
+  highlightColor?: Color | number;
+  opacity: number;
+  depthTest?: boolean;
+}): ShaderMaterial {
+  return new ShaderMaterial({
+    vertexShader: VERTEX,
+    fragmentShader: FRAGMENT,
+    uniforms: {
+      uBaseColor: { value: new Color(options.baseColor) },
+      uHighlightColor: { value: new Color(options.highlightColor ?? 0xd9efef) },
+      uSunDirection: { value: new Vector3(110, 160, 24).normalize() },
+      uTime: { value: 0 },
+      uOpacity: { value: options.opacity }
+    },
+    transparent: true,
+    depthWrite: false,
+    depthTest: options.depthTest ?? true,
+    side: DoubleSide,
+    fog: false
+  });
 }
