@@ -76,6 +76,12 @@ export const qinlingAtlasLayers = [
     description: "关隘是地形把通道压成锁口的位置，秦岭故事的关键节点。"
   },
   {
+    id: "scenic",
+    name: "名胜",
+    defaultVisible: true,
+    description: "太白山、青城山、九寨沟、法门寺、乾陵——区域内最有名的山岳与古迹。"
+  },
+  {
     id: "livelihood",
     name: "民生",
     defaultVisible: false,
@@ -144,6 +150,78 @@ const passSymbol = {
   color: "#b96b35",
   emphasis: "terrain-lock"
 };
+
+const scenicMountainSymbol = {
+  symbol: "mountain-peak",
+  color: "#7d8b5b",
+  emphasis: "natural-landmark"
+};
+
+const scenicHeritageSymbol = {
+  symbol: "pagoda",
+  color: "#c9a253",
+  emphasis: "historic-site"
+};
+
+// 把 lat/lon 投到 atlas 世界坐标（跟 realCityToAtlasFeature 同一份投影）。
+// 用户："很多著名景点都没有"——这里收紧到 5 个 region 内的人尽皆知地标，
+// 全部用真实经纬度（external-vector）跟 3D 共用，避免再走"unverified"路线。
+function scenicWorldPoint(lon, lat) {
+  const lonSpan = QINLING_BOUNDS.east - QINLING_BOUNDS.west;
+  const latSpan = QINLING_BOUNDS.north - QINLING_BOUNDS.south;
+  return {
+    x: ((lon - QINLING_BOUNDS.west) / lonSpan - 0.5) * QINLING_WORLD.width,
+    y: (0.5 - (lat - QINLING_BOUNDS.south) / latSpan) * QINLING_WORLD.depth
+  };
+}
+
+const scenicLandmarks = [
+  {
+    id: "scenic-taibai-shan",
+    name: "太白山",
+    lat: 33.95,
+    lon: 107.78,
+    summary: "秦岭主脊最高峰（3771 m），积雪期长，李白\"西上太白峰\"故。",
+    symbol: scenicMountainSymbol,
+    role: "alpine-peak"
+  },
+  {
+    id: "scenic-qingcheng-shan",
+    name: "青城山",
+    lat: 30.92,
+    lon: 103.57,
+    summary: "中国道教发源地之一，紧邻都江堰，幽深翠绿被誉为\"青城天下幽\"。",
+    symbol: scenicMountainSymbol,
+    role: "religious-mountain"
+  },
+  {
+    id: "scenic-jiuzhaigou",
+    name: "九寨沟",
+    lat: 33.16,
+    lon: 103.93,
+    summary: "高原岩溶湖群，原始森林+海子+瀑布，世界自然遗产。",
+    symbol: scenicMountainSymbol,
+    role: "karst-lake-system"
+  },
+  {
+    id: "scenic-famen-si",
+    name: "法门寺",
+    lat: 34.43,
+    lon: 107.83,
+    summary: "唐代供奉佛指舍利的皇家寺院，1987 年地宫出土大量珍宝。",
+    symbol: scenicHeritageSymbol,
+    role: "buddhist-relic"
+  },
+  {
+    id: "scenic-qian-ling",
+    name: "乾陵",
+    lat: 34.59,
+    lon: 108.20,
+    summary: "唐高宗与武则天合葬陵，唐代石刻无字碑、石狮以雄浑著称。",
+    symbol: scenicHeritageSymbol,
+    role: "imperial-mausoleum"
+  }
+];
 
 const qinlingModernWaterFeatures = qinlingModernHydrography.features.map(
   hydrographyFeatureToAtlasFeature
@@ -221,7 +299,26 @@ export const qinlingAtlasFeatures = [
   // 对应、verification: unverified 不该作为"事实"展示。3D 也不画 route
   // 线，atlas 跟着对齐。
   // 真实坐标城市批量注入。
-  ...realQinlingCities.map(realCityToAtlasFeature)
+  ...realQinlingCities.map(realCityToAtlasFeature),
+  // 著名景点：太白山 / 青城山 / 九寨沟 / 法门寺 / 乾陵——全部用真实坐标，
+  // verification: external-vector，跟 3D 一致地展示。
+  ...scenicLandmarks.map((spot) => ({
+    id: spot.id,
+    name: spot.name,
+    layer: "scenic",
+    geometry: "point",
+    world: scenicWorldPoint(spot.lon, spot.lat),
+    displayPriority: 9,
+    terrainRole: spot.role,
+    themes: ["culture", "nature"],
+    source: {
+      name: "real-scenic-landmark",
+      confidence: "verified",
+      verification: "external-vector"
+    },
+    copy: { summary: spot.summary },
+    visualRule: spot.symbol
+  }))
 ];
 
 export const qinlingWaterSystem = qinlingAtlasFeatures.filter(

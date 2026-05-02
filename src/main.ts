@@ -1570,14 +1570,39 @@ function demSampleColor(
   );
   const sample = asset.heights[row * asset.grid.columns + column] ?? asset.minHeight;
   const h = MathUtils.clamp((sample - asset.minHeight) / heightRange, 0, 1);
-  const lowland = h < 0.28;
-  const ridge = h > 0.58;
 
-  return [
-    lowland ? 178 : ridge ? 224 : 190 + h * 34,
-    lowland ? 178 : ridge ? 211 : 170 + h * 40,
-    lowland ? 126 : ridge ? 160 : 108 + h * 36
-  ];
+  // 跟 3D 主游戏的色板对齐（用户："视觉风格跟主游戏很不一样"）：
+  //   h < 0.30 平原盆地 → 草绿（≈ #6f8a4d）
+  //   0.30..0.55 中山植被 → 黄绿过渡 → 黄褐（≈ #aa9a5e）
+  //   0.55..0.80 山脊裸岩 → 暖灰褐（≈ #b59874）
+  //   h > 0.80 雪线 → 灰白（≈ #d6d6cf）
+  // 不再是 desert / parchment 配色——盆地直接给绿色，跟玩家在 3D 里看到的
+  // 关中盆地 / 四川盆地一致。
+  let r: number;
+  let g: number;
+  let b: number;
+  if (h < 0.30) {
+    const t = h / 0.30;
+    r = 90 + t * 30;
+    g = 120 + t * 18;
+    b = 76 + t * 22;
+  } else if (h < 0.55) {
+    const t = (h - 0.30) / 0.25;
+    r = 120 + t * 50;
+    g = 138 + t * 16;
+    b = 98 - t * 4;
+  } else if (h < 0.80) {
+    const t = (h - 0.55) / 0.25;
+    r = 170 + t * 26;
+    g = 154 - t * 4;
+    b = 94 + t * 26;
+  } else {
+    const t = MathUtils.clamp((h - 0.80) / 0.20, 0, 1);
+    r = 196 + t * 18;
+    g = 150 + t * 60;
+    b = 120 + t * 90;
+  }
+  return [r, g, b];
 }
 
 function computeHillshade(
@@ -1927,16 +1952,15 @@ interface RegionPlacemark {
 // 宏观地带标签：与 feature 系统并行，作为打开 atlas 时的"地理骨架"。
 // feature 标签是细节（渭河、长安），这些是脊柱（关中平原、秦岭主脊、蜀道走廊）。
 const qinlingRegionPlacemarks: RegionPlacemark[] = [
-  // mapOrientation 北 = -Z；当时 worldAxis 重构跑 flip-z-axis-source.mjs 时
-  // 这组 landform label 用 `world: { x, z }`，没匹配脚本的 `{ x, y }` /
-  // `point(x,y)` / `Vector2(x,y)` pattern，被漏了。手工把 z 全部翻号。
-  { name: "关中平原", world: { x: 26, z: -80 }, fontSize: 18 },
-  { name: "渭河谷地", world: { x: -22, z: -76 }, fontSize: 14 },
-  { name: "秦岭主脊", world: { x: 6, z: -28 }, fontSize: 17 },
-  { name: "汉中盆地", world: { x: 26, z: -8 }, fontSize: 16 },
-  { name: "蜀道走廊", world: { x: -10, z: 28 }, fontSize: 14 },
-  { name: "四川盆地北缘", world: { x: -30, z: 64 }, fontSize: 14 },
-  { name: "成都平原", world: { x: -44, z: 104 }, fontSize: 16 }
+  // 字号按用户反馈"字体很小"统一 +8。fullscreen 模式 atlas 一眼看清。
+  // mapOrientation 北 = -Z（z 取负）。
+  { name: "关中平原", world: { x: 26, z: -80 }, fontSize: 26 },
+  { name: "渭河谷地", world: { x: -22, z: -76 }, fontSize: 22 },
+  { name: "秦岭主脊", world: { x: 6, z: -28 }, fontSize: 25 },
+  { name: "汉中盆地", world: { x: 26, z: -8 }, fontSize: 24 },
+  { name: "蜀道走廊", world: { x: -10, z: 28 }, fontSize: 22 },
+  { name: "四川盆地北缘", world: { x: -30, z: 64 }, fontSize: 22 },
+  { name: "成都平原", world: { x: -44, z: 104 }, fontSize: 24 }
 ];
 
 function drawRegionPlacemarks(
