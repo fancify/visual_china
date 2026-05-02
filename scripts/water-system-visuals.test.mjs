@@ -117,25 +117,27 @@ test("3D water visuals stay visible without becoming broad map ribbons", () => {
   const majorStyle = waterVisualStyle({ ...baseWaterFeature, displayPriority: 10 });
   const minorStyle = waterVisualStyle({ ...baseWaterFeature, displayPriority: 7 });
 
+  // bounds 跟着用户反馈"水流再窄一点 + 高视角能看到"调整：
+  // ribbonWidth 收窄、ribbonYOffset 抬高，让顶视角不被相邻地形遮挡。
   assert.ok(majorStyle.bankWidth > majorStyle.ribbonWidth);
   assert.ok(majorStyle.bankOpacity > 0.1);
   assert.ok(majorStyle.bankOpacity < majorStyle.ribbonOpacity);
-  assert.ok(majorStyle.ribbonWidth >= 2.4);
-  assert.ok(majorStyle.ribbonWidth <= 3.2);
-  assert.ok(majorStyle.ribbonYOffset >= 0.7);
-  assert.ok(majorStyle.ribbonYOffset <= 1.0);
+  assert.ok(majorStyle.ribbonWidth >= 1.4);
+  assert.ok(majorStyle.ribbonWidth <= 2.0);
+  assert.ok(majorStyle.ribbonYOffset >= 1.2);
+  assert.ok(majorStyle.ribbonYOffset <= 1.8);
   assert.ok(majorStyle.lineYOffset > majorStyle.ribbonYOffset);
-  assert.ok(majorStyle.lineYOffset >= 1);
-  assert.ok(majorStyle.highlightWidth >= 0.48);
-  assert.ok(majorStyle.highlightWidth <= 0.72);
+  assert.ok(majorStyle.lineYOffset >= 1.4);
+  assert.ok(majorStyle.highlightWidth >= 0.35);
+  assert.ok(majorStyle.highlightWidth <= 0.55);
   assert.ok(majorStyle.ribbonOpacity >= 0.68);
   assert.ok(majorStyle.ribbonOpacity <= 0.82);
   assert.ok(majorStyle.lineOpacity >= 0.9);
   assert.equal(majorStyle.depthTest, true);
   assert.equal(majorStyle.lineDepthTest, true);
   assert.equal(majorStyle.highlightDepthTest, true);
-  assert.ok(minorStyle.ribbonWidth >= 1);
-  assert.ok(minorStyle.ribbonWidth <= 1.45);
+  assert.ok(minorStyle.ribbonWidth >= 0.7);
+  assert.ok(minorStyle.ribbonWidth <= 1.05);
 });
 
 test("water environment style keeps clear daylight rivers readable", () => {

@@ -275,15 +275,19 @@ export function buildRiverVegetationSamples(
 export function waterVisualStyle(feature) {
   const major = feature.displayPriority >= 9;
 
+  // ribbonWidth 缩窄（2.8/1.32 → 1.6/0.85）：用户反馈河面太宽不像河；
+  // ribbonYOffset 抬高（0.82/0.48 → 1.5/1.0）：原本几乎贴着地表，从顶
+  // 视角度容易被相邻地形像素遮挡，调高后高视角也能看清河流走向；不会
+  // 过于"飘"——线条本身就是窄带，悬空 1.5m 在地图比例下基本不可察觉。
   return {
-    bankWidth: major ? 5.6 : 4.1,
+    bankWidth: major ? 4.4 : 3.2,
     bankYOffset: major ? 0.12 : 0.1,
     bankOpacity: major ? 0.24 : 0.18,
-    ribbonWidth: major ? 2.8 : 1.32,
-    ribbonYOffset: major ? 0.82 : 0.48,
-    lineYOffset: major ? 1.12 : 0.72,
-    ribbonOpacity: major ? 0.74 : 0.52,
-    highlightWidth: major ? 0.6 : 0.42,
+    ribbonWidth: major ? 1.6 : 0.85,
+    ribbonYOffset: major ? 1.5 : 1.0,
+    lineYOffset: major ? 1.7 : 1.2,
+    ribbonOpacity: major ? 0.78 : 0.56,
+    highlightWidth: major ? 0.42 : 0.3,
     lineOpacity: major ? 0.95 : 0.72,
     depthTest: true,
     lineDepthTest: true,

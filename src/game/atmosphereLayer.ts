@@ -20,7 +20,7 @@ import {
   createCircleTexture,
   createCloudTexture,
   createMoonTexture,
-  createStarDomePositions
+  createStarDome
 } from "./proceduralTextures";
 
 export interface SkyDomeHandle {
@@ -100,19 +100,24 @@ export function createSkyDome(): SkyDomeHandle {
   shell.renderOrder = -1000;
   group.add(shell);
 
+  // 5000 颗星，用银河带偏置的非均匀分布 + 每星亮度/色温差异。
+  // vertexColors=true 让 PointsMaterial 直接采用 BufferAttribute 里的
+  // 单星 RGB（已经把"亮度"乘进 RGB），所以不需要单独的 size attribute——
+  // 暗星本身 RGB 接近黑色，渲染时几乎看不见，自然形成"少数明亮、多数暗淡"
+  // 的分布。代价：还是单 draw call。
+  const starDomeData = createStarDome(5000, skyDomePolicy.radius * 0.92);
   const starDomeGeometry = new BufferGeometry();
   starDomeGeometry.setAttribute(
     "position",
-    new BufferAttribute(
-      createStarDomePositions(5000, skyDomePolicy.radius * 0.92),
-      3
-    )
+    new BufferAttribute(starDomeData.positions, 3)
   );
-  // size 0.85（原 1.1）：星点变多以后单点稍小才不会糊成一片亮斑，
-  // 远处看起来才像真实繁星而不是均匀光斑。
+  starDomeGeometry.setAttribute(
+    "color",
+    new BufferAttribute(starDomeData.colors, 3)
+  );
   const starDomeMaterial = new PointsMaterial({
-    color: 0xf1f5ff,
-    size: 0.85,
+    vertexColors: true,
+    size: 0.95,
     sizeAttenuation: true,
     transparent: true,
     opacity: 0,
