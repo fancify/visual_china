@@ -158,7 +158,7 @@ import {
   disposeCityMarkers,
   type CityMarkersHandle
 } from "./game/cityMarkers";
-import { realQinlingCities } from "./data/realCities";
+import { realQinlingCities } from "./data/realCities.js";
 import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
   evaluateStoryGuide,

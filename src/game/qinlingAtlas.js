@@ -1,5 +1,44 @@
 import { hydrographyFeatureToAtlasFeature } from "./hydrographyAtlas.js";
 import { qinlingModernHydrography } from "./qinlingHydrography.js";
+import { realQinlingCities } from "../data/realCities.js";
+
+// Qinling region 投影常量（与 atlas / 3D / hydrography 共用）。
+const QINLING_BOUNDS = { west: 103.5, east: 109, south: 30.4, north: 35.4 };
+const QINLING_WORLD = { width: 180, depth: 240 };
+
+// 把真实城市 lat/lon 投到 atlas 世界坐标。北 = -Z 跟 mapOrientation 一致。
+// 输出 shape 跟 feature() factory 对齐：copy: { summary } 包装 summary。
+function realCityToAtlasFeature(city) {
+  const lonSpan = QINLING_BOUNDS.east - QINLING_BOUNDS.west;
+  const latSpan = QINLING_BOUNDS.north - QINLING_BOUNDS.south;
+  const x = ((city.lon - QINLING_BOUNDS.west) / lonSpan - 0.5) * QINLING_WORLD.width;
+  const z =
+    (0.5 - (city.lat - QINLING_BOUNDS.south) / latSpan) * QINLING_WORLD.depth;
+  const tierLabel =
+    city.tier === "capital"
+      ? "京城"
+      : city.tier === "prefecture"
+        ? "州府"
+        : "县城";
+  const summary = city.hint ?? `${tierLabel}（真实坐标）`;
+  return {
+    id: `real-city-${city.id}`,
+    name: city.name,
+    layer: "city",
+    geometry: "point",
+    world: { x, y: z },
+    displayPriority: city.tier === "capital" ? 10 : city.tier === "prefecture" ? 8 : 6,
+    terrainRole: "real-coord-city",
+    themes: ["culture", "livelihood"],
+    source: {
+      name: "real-city-coords",
+      confidence: "verified",
+      verification: "external-vector"
+    },
+    copy: { summary },
+    visualRule: { symbol: "settlement", color: "#f3d692", emphasis: "real" }
+  };
+}
 
 export const qinlingAtlasPolicy = {
   sourceOfTruth: "2d-atlas-first",
@@ -75,12 +114,13 @@ export const qinlingAtlasRequiredNames = [
   "嘉陵江",
   "褒水",
   "斜水",
-  "长安",
-  "咸阳",
-  "宝鸡/陈仓",
+  // 西安（古称长安）现在跟 3D 共用 realCities 真实坐标，atlas 用现代
+  // 行政名称。咸阳 / 昭化 / 宝鸡/陈仓 复合名等"叙事性手画"已删，城市
+  // 列表完全靠 realCities 表（28 个真实城市）覆盖关中-蜀道节点。
+  "西安",
+  "宝鸡",
   "汉中",
   "广元",
-  "昭化",
   "剑门关",
   "成都",
   "都江堰",
@@ -269,90 +309,10 @@ export const qinlingAtlasFeatures = [
     themes: ["terrain", "livelihood"]
   }),
   ...qinlingModernWaterFeatures,
-  feature({
-    id: "city-changan",
-    name: "长安",
-    layer: "city",
-    geometry: "point",
-    world: point(88.04, -69.12),
-    displayPriority: 10,
-    terrainRole: "capital-node",
-    summary: "关中叙事起点，政治组织力从这里向山地边缘延伸。",
-    visualRule: citySymbol,
-    themes: ["culture", "military", "livelihood"]
-  }),
-  feature({
-    id: "city-xianyang",
-    name: "咸阳",
-    layer: "city",
-    geometry: "point",
-    world: point(80.51, -68.64),
-    displayPriority: 7,
-    terrainRole: "plain-city",
-    summary: "关中城市带的一环，帮助读出平原不是孤点而是连续面。",
-    visualRule: citySymbol,
-    themes: ["culture", "livelihood"]
-  }),
-  feature({
-    id: "city-baoji-chencang",
-    name: "宝鸡/陈仓",
-    layer: "city",
-    geometry: "point",
-    world: point(29.45, -70.08),
-    displayPriority: 9,
-    terrainRole: "western-gate-city",
-    summary: "关中西端的山前节点，陈仓道由此获得战略意义。",
-    visualRule: citySymbol,
-    themes: ["military", "road"]
-  }),
-  feature({
-    id: "city-hanzhong",
-    name: "汉中",
-    layer: "city",
-    geometry: "point",
-    world: point(25.53, -8.16),
-    displayPriority: 10,
-    terrainRole: "basin-hinge",
-    summary: "秦岭南侧的盆地枢纽，连接关中、巴蜀与汉水走廊。",
-    visualRule: citySymbol,
-    themes: ["military", "livelihood"]
-  }),
-  feature({
-    id: "city-guangyuan",
-    name: "广元",
-    layer: "city",
-    geometry: "point",
-    world: point(-13.42, 22.08),
-    displayPriority: 9,
-    terrainRole: "shu-gate-city",
-    summary: "汉中南下入蜀前的关键节点，邻近嘉陵江与剑门关。",
-    visualRule: citySymbol,
-    themes: ["military", "road"]
-  }),
-  feature({
-    id: "city-zhaohua",
-    name: "昭化",
-    layer: "city",
-    geometry: "point",
-    world: point(-9.49, 27.84),
-    displayPriority: 7,
-    terrainRole: "river-town",
-    summary: "嘉陵江节点，适合表达水陆转运和山地聚落。",
-    visualRule: citySymbol,
-    themes: ["livelihood", "road"]
-  }),
-  feature({
-    id: "city-chengdu",
-    name: "成都",
-    layer: "city",
-    geometry: "point",
-    world: point(-71.35, 107.04),
-    displayPriority: 9,
-    terrainRole: "plain-center",
-    summary: "入蜀后的空间中心，和长安形成南北两端的组织对照。",
-    visualRule: citySymbol,
-    themes: ["culture", "livelihood"]
-  }),
+  // 城市改用 realQinlingCities 真实坐标（spread 在数组末尾，见文件底）。
+  // 老的 7 个手画城市（长安/咸阳/宝鸡-陈仓/汉中/广元/昭化/成都）已删，
+  // 用户反馈 atlas 跟 3D 信息对不上、3D 更准——atlas 现在跟 3D 共用同一
+  // 套真实坐标。
   feature({
     id: "livelihood-dujiangyan",
     name: "都江堰",
@@ -496,7 +456,9 @@ export const qinlingAtlasFeatures = [
     summary: "栈道维护、峡谷通行和军需运输可以在这里被具象化。",
     visualRule: { symbol: "plank-road", color: "#c88955", emphasis: "infrastructure" },
     themes: ["military", "livelihood", "road"]
-  })
+  }),
+  // 真实坐标城市批量注入（替换上方被删除的手画 city features）。
+  ...realQinlingCities.map(realCityToAtlasFeature)
 ];
 
 export const qinlingWaterSystem = qinlingAtlasFeatures.filter(
