@@ -189,6 +189,9 @@ export function applySkyVisuals(
   handle.shellMaterial.uniforms.zenithColor.value.copy(zenith);
   handle.shellMaterial.uniforms.groundColor.value.copy(ground);
   handle.starDomeMaterial.opacity = options.starOpacity;
+  // 白天 starOpacity 接近 0，但 GPU 仍要处理 5000 个 point 的顶点+片元——
+  // visible:false 让它整体跳过 draw call，省一笔白天的 GPU 浪费。
+  handle.starDome.visible = options.starOpacity > 0.02;
 }
 
 export interface CloudLayerHandle {
