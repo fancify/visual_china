@@ -548,6 +548,11 @@ type WaterEnvironmentMaterial = {
 };
 const waterEnvironmentMaterials: WaterEnvironmentMaterial[] = [];
 
+// 河流 ShaderMaterial 的"白天"高光基色，与 createRiverRibbonShaderMaterial
+// 的默认 uHighlightColor 一致。applyWaterEnvironmentVisuals 把这个基色
+// 按环境的 highlightMultiplier dim 下来，模拟夜晚/雨天的暗淡水面。
+const RIVER_SHADER_HIGHLIGHT_BASE = new Color(0xd9efef);
+
 function clearGroup(group: Group): void {
   while (group.children.length > 0) {
     const child = group.children[0];
@@ -925,6 +930,8 @@ function applyWaterEnvironmentVisuals(visuals: EnvironmentVisuals): void {
     if (entry.material instanceof ShaderMaterial) {
       // ShaderMaterial（河流主带）：opacity / baseColor 在 uniforms 上，
       // 而不是 material 直接字段。uTime / uSunDirection 由主循环单独更新。
+      // 还要 dim uHighlightColor（涟漪/Fresnel/sun-glint 都用它做高光），
+      // 否则夜里 + 雨天主带还会维持白天的亮闪——codex 87fb7df review 抓到。
       entry.material.uniforms.uOpacity.value = Math.min(
         entry.baseOpacity,
         opacity
@@ -932,6 +939,9 @@ function applyWaterEnvironmentVisuals(visuals: EnvironmentVisuals): void {
       entry.material.uniforms.uBaseColor.value
         .copy(entry.baseColor)
         .multiplyScalar(colorMultiplier);
+      entry.material.uniforms.uHighlightColor.value
+        .copy(RIVER_SHADER_HIGHLIGHT_BASE)
+        .multiplyScalar(environmentStyle.highlightMultiplier);
     } else {
       entry.material.opacity = Math.min(entry.baseOpacity, opacity);
       entry.material.color.copy(entry.baseColor).multiplyScalar(colorMultiplier);
