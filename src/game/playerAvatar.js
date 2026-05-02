@@ -9,7 +9,9 @@ export const woodHorseAvatarParts = [
   { name: "back-right-leg" },
   { name: "traveler-head" },
   { name: "traveler-cloak" },
-  { name: "route-banner" }
+  { name: "traveler-douli" },
+  { name: "traveler-eye-left" },
+  { name: "traveler-eye-right" }
 ];
 
 export function avatarHeadingForMovement({ x, z }) {

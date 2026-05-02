@@ -2,11 +2,9 @@ import {
   BoxGeometry,
   ConeGeometry,
   CylinderGeometry,
-  DoubleSide,
   Group,
   Mesh,
   MeshPhongMaterial,
-  PlaneGeometry,
   SphereGeometry
 } from "three";
 
@@ -62,14 +60,16 @@ export function createPlayerAvatar(): PlayerAvatarHandle {
     color: 0x3d2a20,
     flatShading: true
   });
-  const banderMaterial = new MeshPhongMaterial({
-    color: 0xd7b56b,
-    flatShading: true
-  });
-  const bannerMaterial = new MeshPhongMaterial({
-    color: 0x9d4234,
+  const douliMaterial = new MeshPhongMaterial({
+    // 浅竹/麦秆色斗笠，配合骑手衣袍颜色
+    color: 0xc89968,
     flatShading: true,
-    side: DoubleSide
+    shininess: 4
+  });
+  const eyeMaterial = new MeshPhongMaterial({
+    // 黑亮眼珠：shininess 调高让小球反光，不会糊成一团
+    color: 0x141414,
+    shininess: 80
   });
 
   const horseBody = new Mesh(new BoxGeometry(2.7, 0.86, 1.12), woodMaterial);
@@ -125,16 +125,21 @@ export function createPlayerAvatar(): PlayerAvatarHandle {
   cloak.position.set(0, 2.2, 0);
   cloak.rotation.y = Math.PI / 5;
 
-  const bannerPole = new Mesh(
-    new CylinderGeometry(0.05, 0.05, 2.8, 6),
-    banderMaterial
-  );
-  bannerPole.position.set(-0.4, 3.2, 0);
+  // 斗笠（中式遮阳竹帽）：替换原来的红旗，给骑手一个文化标识 + 圆润可爱感。
+  // ConeGeometry 默认 tip 在 +Y，rim 在 -Y——正好符合斗笠形状（顶尖底圆）。
+  const douli = new Mesh(new ConeGeometry(0.55, 0.22, 12), douliMaterial);
+  douli.name = "traveler-douli";
+  douli.position.set(0.05, 3.18, 0);
 
-  const banner = new Mesh(new PlaneGeometry(1.1, 0.74), bannerMaterial);
-  banner.name = "route-banner";
-  banner.position.set(0.1, 3.45, 0);
-  banner.rotation.y = Math.PI / 2;
+  // 一对眼珠：放在 head sphere 前面（玩家朝向 +X），轻微抬高使脸看上去
+  // 是"圆润看前方"。两眼 z 对称，间距 0.32。
+  const eyeGeometry = new SphereGeometry(0.05, 8, 8);
+  const eyeLeft = new Mesh(eyeGeometry, eyeMaterial);
+  eyeLeft.name = "traveler-eye-left";
+  eyeLeft.position.set(0.34, 2.84, 0.16);
+  const eyeRight = new Mesh(eyeGeometry, eyeMaterial);
+  eyeRight.name = "traveler-eye-right";
+  eyeRight.position.set(0.34, 2.84, -0.16);
 
   const player = new Group();
   player.add(
@@ -147,8 +152,9 @@ export function createPlayerAvatar(): PlayerAvatarHandle {
     saddle,
     cloak,
     rider,
-    bannerPole,
-    banner
+    douli,
+    eyeLeft,
+    eyeRight
   );
 
   return { player, horseLegsByName };

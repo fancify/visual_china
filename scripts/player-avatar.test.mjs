@@ -17,7 +17,10 @@ test("wood horse avatar has readable toy horse and rider parts", () => {
   assert.ok(partNames.has("back-left-leg"));
   assert.ok(partNames.has("back-right-leg"));
   assert.ok(partNames.has("traveler-cloak"));
-  assert.ok(partNames.has("route-banner"));
+  // route-banner（红旗）按用户要求去掉，换成更可爱的斗笠 + 眼睛
+  assert.ok(partNames.has("traveler-douli"));
+  assert.ok(partNames.has("traveler-eye-left"));
+  assert.ok(partNames.has("traveler-eye-right"));
 });
 
 test("wood horse head points toward the movement vector", () => {
