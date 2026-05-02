@@ -29,6 +29,7 @@ import {
   Points,
   PointsMaterial,
   Scene,
+  ShaderMaterial,
   SphereGeometry,
   Sprite,
   SpriteMaterial,
@@ -186,7 +187,10 @@ import {
   attachTerrainShaderEnhancements,
   updateTerrainShaderHeightFog
 } from "./game/terrainShaderEnhancer";
-import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
+import {
+  createRiverRibbonShaderMaterial,
+  createWaterSurfaceMaterial
+} from "./game/waterSurfaceShader";
 
 interface FragmentVisual {
   sprite: Sprite;
@@ -536,7 +540,7 @@ scene.add(routeGroup);
 const fragmentVisuals = new Map<string, FragmentVisual>();
 type WaterEnvironmentMaterialRole = "ribbon" | "highlight" | "line";
 type WaterEnvironmentMaterial = {
-  material: MeshBasicMaterial | LineBasicMaterial;
+  material: MeshBasicMaterial | LineBasicMaterial | ShaderMaterial;
   baseColor: Color;
   baseOpacity: number;
   style: ReturnType<typeof waterVisualStyle>;
@@ -887,15 +891,20 @@ function createWaterSurfaceRibbon(
 }
 
 function registerWaterEnvironmentMaterial(
-  material: MeshBasicMaterial | LineBasicMaterial,
+  material: MeshBasicMaterial | LineBasicMaterial | ShaderMaterial,
   baseColor: number,
   style: ReturnType<typeof waterVisualStyle>,
   role: WaterEnvironmentMaterialRole
 ): void {
+  // ShaderMaterial 没有 .opacity 字段，用 uOpacity uniform 当 baseOpacity。
+  const baseOpacity =
+    material instanceof ShaderMaterial
+      ? (material.uniforms.uOpacity?.value ?? 1)
+      : material.opacity;
   waterEnvironmentMaterials.push({
     material,
     baseColor: new Color(baseColor),
-    baseOpacity: material.opacity,
+    baseOpacity,
     style,
     role
   });
@@ -913,9 +922,36 @@ function applyWaterEnvironmentVisuals(visuals: EnvironmentVisuals): void {
         ? environmentStyle.highlightMultiplier
         : environmentStyle.colorMultiplier;
 
-    entry.material.opacity = Math.min(entry.baseOpacity, opacity);
-    entry.material.color.copy(entry.baseColor).multiplyScalar(colorMultiplier);
+    if (entry.material instanceof ShaderMaterial) {
+      // ShaderMaterial（河流主带）：opacity / baseColor 在 uniforms 上，
+      // 而不是 material 直接字段。uTime / uSunDirection 由主循环单独更新。
+      entry.material.uniforms.uOpacity.value = Math.min(
+        entry.baseOpacity,
+        opacity
+      );
+      entry.material.uniforms.uBaseColor.value
+        .copy(entry.baseColor)
+        .multiplyScalar(colorMultiplier);
+    } else {
+      entry.material.opacity = Math.min(entry.baseOpacity, opacity);
+      entry.material.color.copy(entry.baseColor).multiplyScalar(colorMultiplier);
+    }
   });
+}
+
+/**
+ * 把每帧 uTime / uSunDirection 推给所有"启用了 water shader"的 ribbon 实例。
+ * 主循环每帧调用一次。
+ */
+function updateRiverShaderUniforms(time: number, sunDirection: Vector3): void {
+  for (const entry of waterEnvironmentMaterials) {
+    if (entry.material instanceof ShaderMaterial) {
+      entry.material.uniforms.uTime.value = time;
+      entry.material.uniforms.uSunDirection.value
+        .copy(sunDirection)
+        .normalize();
+    }
+  }
 }
 
 // 0x3d7d8c：把水的色相往真实河流的"深绿青"上推。原来的 0x6aa7b0 太接近
@@ -1024,14 +1060,31 @@ function rebuildWaterSystemVisuals(): void {
     const lineColor = 0xb5e7df;
     const highlightColor = 0xe2faf2;
 
-    const ribbon = createWaterSurfaceRibbon(points, {
-        width: waterStyle.ribbonWidth,
-        yOffset: waterStyle.ribbonYOffset,
-        color: ribbonColor,
-        opacity: waterStyle.ribbonOpacity,
-        renderOrder: 4
-      });
-    registerWaterEnvironmentMaterial(ribbon.material, ribbonColor, waterStyle, "ribbon");
+    // 主水带改用 waterSurface ShaderMaterial：恢复 ripple/Fresnel/sun
+    // glint 效果（codex ffa22ed review 抓到的 P2：之前 ambient plane
+    // 隐藏后整个 shader 失效）。每条河自己一个 ShaderMaterial 实例，
+    // 这样 uBaseColor/uOpacity 可以按主河 vs 支流差异化。
+    const ribbonGeometry = new BufferGeometry();
+    ribbonGeometry.setAttribute(
+      "position",
+      new BufferAttribute(
+        buildWaterRibbonVertices(points, {
+          width: waterStyle.ribbonWidth,
+          yOffset: waterStyle.ribbonYOffset,
+          sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
+        }),
+        3
+      )
+    );
+    const ribbonShaderMaterial = createRiverRibbonShaderMaterial({
+      baseColor: ribbonColor,
+      highlightColor: 0xd9efef,
+      opacity: waterStyle.ribbonOpacity,
+      depthTest: true
+    });
+    const ribbon = new Mesh(ribbonGeometry, ribbonShaderMaterial);
+    ribbon.renderOrder = 4;
+    registerWaterEnvironmentMaterial(ribbonShaderMaterial, ribbonColor, waterStyle, "ribbon");
     waterSystemGroup.add(ribbon);
 
     const highlight = createWaterSurfaceRibbon(points, {
@@ -2859,6 +2912,7 @@ function update(deltaSeconds: number): void {
   applyAmbientWaterSurfaceVisuals(visuals);
   applyWaterEnvironmentVisuals(visuals);
   waterSurface.setTime(clock.elapsedTime);
+  updateRiverShaderUniforms(clock.elapsedTime, visuals.sunDirection);
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 60;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
   cloudSprites.forEach((cloud, index) => {
