@@ -1129,12 +1129,12 @@ function rebuildWaterSystemVisuals(): void {
       opacity: waterStyle.ribbonOpacity,
       renderOrder: 4
     });
-    // 高视角河流可见性 - 第四轮：把 ribbon 移到 opaque pass（transparent:
-    // false），靠 polygonOffset 在 depth 上赢 terrain，但城墙 / 岸边树
-    // 因为 Y 高于 ribbon 仍会赢 ribbon 的 depth → 正确遮挡。
-    // 用户反馈 depthTest:false 让河穿透山 / 城墙，所以不能 disable
-    // depth；segment 密化 + 强 polygonOffset 也不够；改 opaque 路径让
-    // ribbon 写 depth、跟其它 opaque 一起按 z-buffer 排序最干净。
+    // 高视角河流可见性 - 最终轮：ribbon 进 opaque pass（transparent:false
+    // + depthWrite:true）让 z-buffer 排序自动处理 cities/trees 遮挡。
+    // 之前透明路径下 polygonOffset 不够强，俯视依然被 terrain 占赢；
+    // opaque 路径走标准 depth pipeline 干净可靠。runtime 的"夜晚/雨天
+    // 调暗"通过 .color 直接乘 colorMultiplier 实现，等效但不用 opacity
+    // 通道（codex 93474de P2 抓到 transparent:false 时 opacity 不起作用）。
     ribbon.material.transparent = false;
     ribbon.material.depthTest = true;
     ribbon.material.depthWrite = true;
