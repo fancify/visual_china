@@ -2991,8 +2991,31 @@ function update(deltaSeconds: number): void {
     if (!terrainSampler) return y;
     const halfWidth = terrainSampler.asset.world.width * 0.5;
     const halfDepth = terrainSampler.asset.world.depth * 0.5;
-    const sampleX = Math.max(-halfWidth, Math.min(halfWidth, x));
-    const sampleZ = Math.max(-halfDepth, Math.min(halfDepth, z));
+
+    let sampleX = x;
+    let sampleZ = z;
+    // 出界时用"player→camera 射线和 DEM 矩形的交点"作为采样点，
+    // 而不是把 (x,z) 各自 clamp 到边界——后者等价于"正交投影到矩形",
+    // 当相机斜着出界时拿到的不是真正挡视线的那块边界山脊（codex
+    // a177a9c review 给出过 18m 高度差的反例）。射线交点正是 player 看
+    // 出去的那个方向上、地图最后一格地形所在。
+    if (Math.abs(x) > halfWidth || Math.abs(z) > halfDepth) {
+      const px = player.position.x;
+      const pz = player.position.z;
+      const dx = x - px;
+      const dz = z - pz;
+      const tCandidates: number[] = [];
+      if (dx > 0) tCandidates.push((halfWidth - px) / dx);
+      else if (dx < 0) tCandidates.push((-halfWidth - px) / dx);
+      if (dz > 0) tCandidates.push((halfDepth - pz) / dz);
+      else if (dz < 0) tCandidates.push((-halfDepth - pz) / dz);
+      const tExit = tCandidates.length
+        ? Math.max(0, Math.min(1, Math.min(...tCandidates)))
+        : 1;
+      sampleX = px + dx * tExit;
+      sampleZ = pz + dz * tExit;
+    }
+
     const terrainAt = terrainSampler.sampleHeight(sampleX, sampleZ);
     return Math.max(y, terrainAt + cameraTerrainClearance);
   }
