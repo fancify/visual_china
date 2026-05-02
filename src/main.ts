@@ -735,29 +735,33 @@ function rebuildLandmarkVisuals(): void {
     landmarkChunkIds.set(landmark.name, chunkId);
     const ground = 0;
     if (landmark.kind === "pass") {
-      // 关隘改成石碑：两件套（base + 主碑 + 顶冠）。Y 抬到地表上方。
-      const stele = new Mesh(landmarkGeometries.stele, passSteleMaterial);
-      stele.position.set(landmark.position.x, ground + 1.05 + 0.32, landmark.position.y);
-      stele.userData.chunkId = chunkId;
-      stele.userData.sharedResources = true;
-      landmarkGroup.add(stele);
-
-      const steleBase = new Mesh(landmarkGeometries.steleBase, passSteleCapMaterial);
-      steleBase.position.set(landmark.position.x, ground + 0.16, landmark.position.y);
-      steleBase.userData.chunkId = chunkId;
-      steleBase.userData.sharedResources = true;
-      landmarkGroup.add(steleBase);
-
-      const steleCap = new Mesh(landmarkGeometries.steleCap, passSteleCapMaterial);
-      steleCap.position.set(landmark.position.x, ground + 2.41, landmark.position.y);
-      steleCap.userData.chunkId = chunkId;
-      steleCap.userData.sharedResources = true;
-      landmarkGroup.add(steleCap);
+      // 关隘改成石碑：3 件套（台座 + 主碑 + 顶冠），各自有独立 Y 高度。
+      // 用 userData.terrainYOffset 把各档的 Y 偏移记下来，让后续的
+      // applyTerrainFromSampler re-center 循环不会把三件压成一层（codex
+      // 9332266 P1 抓到）。
+      const stelePieces: Array<[
+        keyof typeof landmarkGeometries,
+        MeshPhongMaterial,
+        number
+      ]> = [
+        ["steleBase", passSteleCapMaterial, 0.16],
+        ["stele", passSteleMaterial, 1.37],
+        ["steleCap", passSteleCapMaterial, 2.41]
+      ];
+      stelePieces.forEach(([geomKey, mat, yOffset]) => {
+        const piece = new Mesh(landmarkGeometries[geomKey], mat);
+        piece.position.set(landmark.position.x, ground + yOffset, landmark.position.y);
+        piece.userData.chunkId = chunkId;
+        piece.userData.sharedResources = true;
+        piece.userData.terrainYOffset = yOffset;
+        landmarkGroup.add(piece);
+      });
 
       const label = createTextSprite(landmark.name, "#efcf83");
       label.scale.multiplyScalar(1.18);
       label.position.set(landmark.position.x, ground + 4.6, landmark.position.y);
       label.userData.chunkId = chunkId;
+      label.userData.terrainYOffset = 4.6;
       landmarkGroup.add(label);
       return;
     }
@@ -771,11 +775,13 @@ function rebuildLandmarkVisuals(): void {
     marker.position.set(landmark.position.x, ground + 1.8, landmark.position.y);
     marker.userData.chunkId = chunkId;
     marker.userData.sharedResources = true;
+    marker.userData.terrainYOffset = 1.8;
 
     if (landmark.kind !== "plain") {
       const label = createTextSprite(landmark.name, "#f3ebd4");
       label.position.set(landmark.position.x, ground + 6.4, landmark.position.y);
       label.userData.chunkId = chunkId;
+      label.userData.terrainYOffset = 6.4;
       landmarkGroup.add(label);
     }
 
@@ -3311,17 +3317,14 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   underpaint.position.y = underpaintLevel;
 
   landmarkGroup.children.forEach((child) => {
-    if (child instanceof Sprite) {
+    if (child instanceof Sprite || child instanceof Mesh) {
       const x = child.position.x;
       const z = child.position.z;
-      child.position.y = sampler.sampleHeight(x, z) + 6.4;
-      return;
-    }
-
-    if (child instanceof Mesh) {
-      const x = child.position.x;
-      const z = child.position.z;
-      child.position.y = sampler.sampleHeight(x, z) + 1.8;
+      // 优先用 mesh.userData.terrainYOffset；否则按类型用默认（Sprite=6.4 标签，
+      // Mesh=1.8 marker）。Stele 三件套各自记了自己的 yOffset，避免被一刀切平。
+      const fallback = child instanceof Sprite ? 6.4 : 1.8;
+      const yOffset = (child.userData.terrainYOffset as number | undefined) ?? fallback;
+      child.position.y = sampler.sampleHeight(x, z) + yOffset;
     }
   });
 
