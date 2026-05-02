@@ -104,13 +104,16 @@ export function createSkyDome(): SkyDomeHandle {
   starDomeGeometry.setAttribute(
     "position",
     new BufferAttribute(
-      createStarDomePositions(360, skyDomePolicy.radius * 0.92),
+      createStarDomePositions(5000, skyDomePolicy.radius * 0.92),
       3
     )
   );
+  // size 0.85（原 1.1）：星点变多以后单点稍小才不会糊成一片亮斑，
+  // 远处看起来才像真实繁星而不是均匀光斑。
   const starDomeMaterial = new PointsMaterial({
     color: 0xf1f5ff,
-    size: 1.1,
+    size: 0.85,
+    sizeAttenuation: true,
     transparent: true,
     opacity: 0,
     depthTest: false,
