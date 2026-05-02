@@ -980,12 +980,13 @@ canvas {
   flex-direction: column;
   transform: translateX(100%);
   transition: transform 200ms ease;
-  backdrop-filter: blur(18px);
-  background:
-    radial-gradient(circle at 80% 12%, rgba(241, 206, 119, 0.09), transparent 0 28%),
-    linear-gradient(180deg, rgba(10, 18, 19, 0.88) 0%, rgba(6, 12, 13, 0.92) 100%);
-  border-left: 1px solid rgba(242, 227, 178, 0.12);
-  box-shadow: -24px 0 80px rgba(0, 0, 0, 0.28);
+  /* 不用 backdrop-filter blur——340px 宽 panel 实测让 fps 从 120 砸到 8。
+     用纯不透明背景代替，视觉差别 minimal、GPU 成本 0。 */
+  /* 纯不透明深色背景 + 单 px 边框 —— 任何 gradient / blur / 大 shadow
+     都会让浏览器在 panel 区域 every frame 重新合成 webgl 画布下层，
+     panel 占整个视口右 1/3 时损耗显著（实测从 33fps 砸到 8fps）。 */
+  background: #0a1213;
+  border-left: 1px solid rgba(242, 227, 178, 0.18);
 }
 .city-detail-panel.open {
   transform: translateX(0);
