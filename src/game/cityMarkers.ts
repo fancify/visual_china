@@ -8,7 +8,7 @@ import {
   Shape
 } from "three";
 
-import type { CityTier, RealCity } from "../data/realCities";
+import type { CityTier, RealCity } from "../data/realCities.js";
 import type { TerrainSampler } from "./demSampler";
 import type { DemBounds, DemWorld } from "./demSampler";
 import { projectGeoToWorld } from "./mapOrientation.js";

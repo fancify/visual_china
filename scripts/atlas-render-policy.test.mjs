@@ -22,10 +22,15 @@ test("atlas render policy keeps the default overview readable", () => {
   const visible = atlasVisibleFeatures(qinlingAtlasFeatures, qinlingAtlasLayers);
   const visibleLayers = new Set(visible.map((feature) => feature.layer));
 
+  // 城市层现在 by-default 可见——真实城市表全部 verification:
+  // external-vector，跟 3D 共用同一个 source-of-truth。其他 layer 还是
+  // unverified curated draft（landform / road / pass 都 manual-atlas-
+  // draft，curated 水系 confidence:medium 但没 verification 标记）所以
+  // 仍不出现在默认渲染里。
+  assert.ok(visibleLayers.has("city"), "verified real cities should render by default");
   assert.ok(!visibleLayers.has("landform"));
   assert.ok(!visibleLayers.has("water"));
   assert.ok(!visibleLayers.has("road"));
-  assert.ok(!visibleLayers.has("city"));
   assert.ok(!visibleLayers.has("pass"));
   assert.ok(!visibleLayers.has("culture"));
   assert.ok(!visibleLayers.has("military"));
