@@ -2977,9 +2977,12 @@ function update(deltaSeconds: number): void {
 
   // 地形碰撞 clamp：minElevation 现在允许相机降到与玩家齐平（看天空），
   // 但代价是后方上坡时相机会嵌进山里、屏幕被山体填满。
-  // 实现要点（codex review e2ab87a 之后修正）：
-  //   - 出界保护：只在 (x,z) 落在 DEM 世界范围内时采样；否则 sampleHeight
-  //     会把坐标 clamp 到边界格子的高度，反而把已经飘到地图外的相机抬起来。
+  // 实现要点（codex aa67c5c review 之后修正）：
+  //   - 边界处理：把采样坐标 clamp 到 DEM 范围内再 sampleHeight，而不是
+  //     "出界就跳过"。理由是相机往外飘到边界外时，相机和玩家之间的边界山
+  //     还实实在在挡视线；跳过会让低 pitch 相机继续穿进边界山脊。clamp
+  //     到 nearest border cell 偶尔会在"远远飘出地图、空中无物"时把相机
+  //     稍微抬高一点，cosmetic 而非 bug。
   //   - 既 clamp target 也 clamp post-lerp position：lerp 0.12 每帧只补 12%，
   //     如果上一帧 camera 已经在山里，光改 target 还要好几帧才出来；所以
   //     lerp 之后立即再 clamp 一次实际相机位置。
@@ -2988,8 +2991,9 @@ function update(deltaSeconds: number): void {
     if (!terrainSampler) return y;
     const halfWidth = terrainSampler.asset.world.width * 0.5;
     const halfDepth = terrainSampler.asset.world.depth * 0.5;
-    if (Math.abs(x) > halfWidth || Math.abs(z) > halfDepth) return y;
-    const terrainAt = terrainSampler.sampleHeight(x, z);
+    const sampleX = Math.max(-halfWidth, Math.min(halfWidth, x));
+    const sampleZ = Math.max(-halfDepth, Math.min(halfDepth, z));
+    const terrainAt = terrainSampler.sampleHeight(sampleX, sampleZ);
     return Math.max(y, terrainAt + cameraTerrainClearance);
   }
 
