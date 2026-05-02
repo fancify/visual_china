@@ -553,6 +553,8 @@ const cityLabelSpritesByTier: { capital: Sprite[]; prefecture: Sprite[] } = {
 // county 名签按 proximity reveal：每个县城预创建一个 hidden sprite，
 // nearbyRealCity 是 county 时显示对应的那个，否则全部隐藏。
 const countyLabelSpriteByCityId = new Map<string, Sprite>();
+// 关隘石碑名签 sprites，跟 prefecture tier 同档 fade（170-240）。
+const passLandmarkLabelSprites: Sprite[] = [];
 
 /**
  * 距离视角分档 fade：camera 远了 county 先消失、再 prefecture 消失，
@@ -580,6 +582,17 @@ function updateCityLodFade(): void {
   const treeAlpha = 1 - MathUtils.smoothstep(distance, 110, 165);
   sharedTreeMaterial.opacity = treeAlpha;
   sharedTreeMaterial.visible = treeAlpha > 0.01;
+  // 关隘石碑跟 prefecture 同档 fade：170-240，默认相机 118 全亮，
+  // overview 170 起点开始 fade。两个共享 material 一起调，sprite 单独循环。
+  const passAlpha = 1 - MathUtils.smoothstep(distance, 170, 240);
+  passSteleMaterial.opacity = passAlpha;
+  passSteleMaterial.visible = passAlpha > 0.01;
+  passSteleCapMaterial.opacity = passAlpha;
+  passSteleCapMaterial.visible = passAlpha > 0.01;
+  for (const sprite of passLandmarkLabelSprites) {
+    sprite.material.opacity = passAlpha;
+    sprite.visible = passAlpha > 0.01;
+  }
   if (!cityMarkersHandle) return;
   const countyAlpha = 1 - MathUtils.smoothstep(distance, 70, 140);
   const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 170, 240);
@@ -711,13 +724,17 @@ const passSteleMaterial = new MeshPhongMaterial({
   color: 0xa8a294,
   emissive: 0x2c2820,
   flatShading: true,
-  shininess: 4
+  shininess: 4,
+  transparent: true,
+  opacity: 1
 });
 const passSteleCapMaterial = new MeshPhongMaterial({
   color: 0x6e655a,
   emissive: 0x1c1812,
   flatShading: true,
-  shininess: 6
+  shininess: 6,
+  transparent: true,
+  opacity: 1
 });
 
 // 真实 instanced city marker 已经覆盖的"意象"地标位置——这些 legacy
@@ -760,6 +777,7 @@ function realCityLandmarksForHud(): Landmark[] {
 function rebuildLandmarkVisuals(): void {
   clearGroup(landmarkGroup);
   landmarkChunkIds.clear();
+  passLandmarkLabelSprites.length = 0;
 
   landmarks.forEach((landmark) => {
     if (isLegacyOverlappingCityLandmark(landmark)) {
@@ -799,6 +817,7 @@ function rebuildLandmarkVisuals(): void {
       label.userData.chunkId = chunkId;
       label.userData.terrainYOffset = 4.6;
       landmarkGroup.add(label);
+      passLandmarkLabelSprites.push(label);
       return;
     }
 
@@ -903,6 +922,8 @@ const collectedIds = new Set<string>();
 let selectedFragmentId: string | null = null;
 let toastTimeout: number | null = null;
 let journalOpen = false;
+let cityDetailPanelOpen = false;
+let cityDetailOpenCityId: string | null = null;
 let lastTerrainColorSignature = "";
 let lastVisuals: EnvironmentVisuals | null = null;
 let hudRefreshTimer = 0;
@@ -1062,6 +1083,7 @@ function createWaterSurfaceRibbon(
     opacity: number;
     renderOrder: number;
     depthTest?: boolean;
+    maxSegmentLength?: number;
   }
 ): Mesh<BufferGeometry, MeshBasicMaterial> {
   const geometry = new BufferGeometry();
@@ -1071,6 +1093,7 @@ function createWaterSurfaceRibbon(
       buildWaterRibbonVertices(points, {
         width: options.width,
         yOffset: options.yOffset,
+        maxSegmentLength: options.maxSegmentLength,
         sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
       }),
       3
@@ -1229,12 +1252,15 @@ function rebuildWaterSystemVisuals(): void {
     // 无涟漪 / 无中间反光白条）。polygonOffset 配合低 yOffset 让 ribbon
     // 看起来贴在地形上而不是飘在空中——polygonOffset 推 depth、yOffset
     // 控视觉层级。
+    // 干流（displayPriority >= 9）密化 0.9 单元贴地；支流用 1.5，
+    // build-time 节省约 40% 顶点。
     const ribbon = createWaterSurfaceRibbon(points, {
       width: waterStyle.ribbonWidth,
       yOffset: waterStyle.ribbonYOffset,
       color: ribbonColor,
       opacity: waterStyle.ribbonOpacity,
-      renderOrder: 4
+      renderOrder: 4,
+      maxSegmentLength: river.displayPriority >= 9 ? 0.9 : 1.5
     });
     // 高视角河流可见性 - 最终轮：ribbon 进 opaque pass（transparent:false
     // + depthWrite:true）让 z-buffer 排序自动处理 cities/trees 遮挡。
@@ -2668,19 +2694,33 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  // I（info）: 走到城市跟前按 I 弹出详情。E/F/T/O 都已绑定（rotate /
-  // follow / time / overview），I 是空键。codex 995d07b/fd28316 review
-  // 一连抓到 F、T 都已占用——用 I 终于不冲突。
+  // I（info）: 走到城市跟前按 I 弹出详情面板（替换原 toast）。
   if (normalized === "i" && nearbyRealCity) {
     event.preventDefault();
     const city = nearbyRealCity;
-    const tier =
-      city.tier === "capital"
-        ? "京城"
-        : city.tier === "prefecture"
-          ? "州府"
-          : "县城";
-    showToast(`${city.name}（${tier}）：${city.hint ?? "（详情待补）"}`);
+    if (cityDetailPanelOpen && cityDetailOpenCityId === city.id) {
+      // 同一个城市的面板已开，不重复
+      return;
+    }
+    cityDetailPanelOpen = true;
+    cityDetailOpenCityId = city.id;
+    hud.setCityDetailPanelOpen({
+      id: city.id,
+      name: city.name,
+      tier: city.tier,
+      lat: city.lat,
+      lon: city.lon,
+      hint: city.hint,
+      description: city.description
+    });
+    return;
+  }
+  // ESC 关闭城市详情面板（注意要在 atlas ESC 之前——用户优先关 panel）。
+  if (normalized === "escape" && cityDetailPanelOpen) {
+    event.preventDefault();
+    cityDetailPanelOpen = false;
+    cityDetailOpenCityId = null;
+    hud.setCityDetailPanelOpen(null);
     return;
   }
 
@@ -2811,6 +2851,12 @@ window.addEventListener("resize", () => {
 hud.closeJournalButton.addEventListener("click", () => {
   journalOpen = false;
   renderJournal();
+});
+
+hud.closeCityDetailButton.addEventListener("click", () => {
+  cityDetailPanelOpen = false;
+  cityDetailOpenCityId = null;
+  hud.setCityDetailPanelOpen(null);
 });
 
 function handleAtlasLayerClick(event: MouseEvent): void {
