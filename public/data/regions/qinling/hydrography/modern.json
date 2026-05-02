@@ -203,6 +203,137 @@
           }
         ]
       }
+    },
+    {
+      "id": "river-minjiang-upper",
+      "name": "岷江",
+      "aliases": [],
+      "kind": "river",
+      "rank": 1,
+      "basin": "长江流域",
+      "eraId": "modern",
+      "source": {
+        "name": "curated-modern-qinling",
+        "confidence": "medium"
+      },
+      "relations": [
+        "livelihood-dujiangyan-engineering",
+        "city-dujiangyan"
+      ],
+      "geometry": {
+        "points": [
+          {
+            "x": -86,
+            "y": -2
+          },
+          {
+            "x": -88,
+            "y": 18
+          },
+          {
+            "x": -89,
+            "y": 38
+          },
+          {
+            "x": -88,
+            "y": 58
+          },
+          {
+            "x": -87,
+            "y": 76
+          },
+          {
+            "x": -86,
+            "y": 92
+          }
+        ]
+      }
+    },
+    {
+      "id": "river-minjiang-outer",
+      "name": "外江",
+      "displayName": "外江",
+      "aliases": [
+        "金马河",
+        "岷江外江"
+      ],
+      "kind": "river",
+      "rank": 1,
+      "basin": "长江流域",
+      "eraId": "modern",
+      "source": {
+        "name": "curated-modern-qinling",
+        "confidence": "medium"
+      },
+      "relations": [
+        "livelihood-dujiangyan-engineering"
+      ],
+      "geometry": {
+        "points": [
+          {
+            "x": -86,
+            "y": 92
+          },
+          {
+            "x": -86,
+            "y": 100
+          },
+          {
+            "x": -84,
+            "y": 110
+          },
+          {
+            "x": -81,
+            "y": 119
+          }
+        ]
+      }
+    },
+    {
+      "id": "river-minjiang-inner",
+      "name": "内江",
+      "displayName": "内江",
+      "aliases": [
+        "走马河",
+        "蒲阳河",
+        "岷江内江"
+      ],
+      "kind": "river",
+      "rank": 2,
+      "basin": "长江流域",
+      "eraId": "modern",
+      "source": {
+        "name": "curated-modern-qinling",
+        "confidence": "medium"
+      },
+      "relations": [
+        "livelihood-dujiangyan-engineering",
+        "real-city-chengdu"
+      ],
+      "geometry": {
+        "points": [
+          {
+            "x": -86,
+            "y": 92
+          },
+          {
+            "x": -84,
+            "y": 95
+          },
+          {
+            "x": -80,
+            "y": 99
+          },
+          {
+            "x": -76,
+            "y": 103
+          },
+          {
+            "x": -71.5,
+            "y": 107.5
+          }
+        ]
+      }
     }
   ]
 }
