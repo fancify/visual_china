@@ -110,6 +110,8 @@ export function modeColor(
     // 陡坡推向裸岩色（灰），沿河推向湿润亮绿。
     // 旧版 hue 0.15→0.10（黄色调）+ 弱植被 overlay 只能盖住 20-32%，
     // 出来整体土黄沙漠感，是用户反馈的根因。
+    // Band 间端点必须连续 —— 否则在 h=0.18/0.45/0.75/0.92 处会出现一道
+    // 暗色等高环（codex b65e2d0 review 抓到）。
     let hue, sat, lum;
     if (h < 0.18) {
       hue = 0.22;
@@ -117,9 +119,9 @@ export function modeColor(
       lum = MathUtils.lerp(0.46, 0.52, h / 0.18);
     } else if (h < 0.45) {
       const t = (h - 0.18) / 0.27;
-      hue = MathUtils.lerp(0.24, 0.30, t);
-      sat = MathUtils.lerp(0.46, 0.42, t);
-      lum = MathUtils.lerp(0.42, 0.34, t);
+      hue = MathUtils.lerp(0.22, 0.30, t);
+      sat = MathUtils.lerp(0.40, 0.42, t);
+      lum = MathUtils.lerp(0.52, 0.34, t);
     } else if (h < 0.75) {
       const t = (h - 0.45) / 0.30;
       hue = MathUtils.lerp(0.30, 0.32, t);
@@ -132,8 +134,8 @@ export function modeColor(
       lum = MathUtils.lerp(0.40, 0.62, t);
     } else {
       const t = (h - 0.92) / 0.08;
-      hue = MathUtils.lerp(0.10, 0.08, t);
-      sat = MathUtils.lerp(0.18, 0.06, t);
+      hue = MathUtils.lerp(0.32, 0.08, t);
+      sat = MathUtils.lerp(0.20, 0.06, t);
       lum = MathUtils.lerp(0.62, 0.84, t);
     }
 
@@ -152,10 +154,13 @@ export function modeColor(
       color.lerp(riparianTint, river * 0.36);
     }
 
-    // 聚落附近向耕地黄绿推（农田 + 灌丛 mix）。
+    // 聚落附近向耕地黄绿推（农田 + 灌丛 mix）。Gate by slope —— 真正的
+    // 农田只长在缓坡，陡坡上即使 settlementMask 高也不应该被涂成农田色
+    // （否则盆地壁、悬崖会反过来从裸岩被拉回黄绿，codex b65e2d0 抓到）。
     if (settle > 0.5 && h < 0.35) {
+      const gentle = MathUtils.clamp(1 - slope / 0.55, 0, 1);
       const agricultureTint = new Color().setHSL(0.20, 0.42, 0.50);
-      color.lerp(agricultureTint, (settle - 0.5) * 0.4);
+      color.lerp(agricultureTint, (settle - 0.5) * 0.4 * gentle);
     }
   } else if (mode === "livelihood") {
     color = new Color().setHSL(
