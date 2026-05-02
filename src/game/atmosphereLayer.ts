@@ -172,21 +172,26 @@ export function createSkyDome(): SkyDomeHandle {
 
 /**
  * 当 EnvironmentController 重新算完一帧 visuals 后调用，把当前 sky shader 的
- * 颜色 uniform 同步过去。zenith 比 horizon 更深更冷一些，模拟空气透视。
+ * 颜色 uniform 同步过去。
+ *
+ * 参数变化：早期版本只接受 skyColor，shader 内部把 zenith 算成 horizon * 0.62；
+ * 现在 environment 直接给出 horizon / zenith 双色，因为朝阳/黄昏需要"地平线
+ * 暖橙、天顶蓝紫"的对比，单一 skyColor 推算不出。skyColor 仍传过来给 ground
+ * 用——地下"伪反射"色继续按整体天色 18% 取。
  */
 export function applySkyVisuals(
   handle: SkyDomeHandle,
   options: {
     skyColor: Color;
+    skyHorizonColor: Color;
+    skyZenithColor: Color;
     starOpacity: number;
   }
 ): void {
-  const horizon = options.skyColor;
-  const zenith = horizon.clone().multiplyScalar(0.62).offsetHSL(0.012, -0.05, -0.04);
-  const ground = horizon.clone().multiplyScalar(0.18);
+  const ground = options.skyColor.clone().multiplyScalar(0.18);
 
-  handle.shellMaterial.uniforms.horizonColor.value.copy(horizon);
-  handle.shellMaterial.uniforms.zenithColor.value.copy(zenith);
+  handle.shellMaterial.uniforms.horizonColor.value.copy(options.skyHorizonColor);
+  handle.shellMaterial.uniforms.zenithColor.value.copy(options.skyZenithColor);
   handle.shellMaterial.uniforms.groundColor.value.copy(ground);
   handle.starDomeMaterial.opacity = options.starOpacity;
   // 白天 starOpacity 接近 0，但 GPU 仍要处理 5000 个 point 的顶点+片元——

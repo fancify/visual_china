@@ -272,10 +272,21 @@ export function riverCorridorInfluenceAtPoint(
 
 export function buildRiverVegetationSamples(
   features,
-  { maxSamples = 420, spacing = 3.6, bankOffset = 2.8 } = {}
+  {
+    maxSamples = 420,
+    spacing = 3.6,
+    bankOffset = 2.8,
+    minDisplayPriority = 9
+  } = {}
 ) {
   const samples = [];
-  const renderableFeatures = selectRenderableWaterFeatures(features);
+  // 跟 selectRenderableWaterFeatures 默认 9 一致，但允许调用方下调到 8
+  // 把支流（rank-2，displayPriority=8）也放进岸边植被采样，避免支流有水
+  // 没植被。codex 3dbdd04 review 抓到：main.ts 的水带选 priority>=8，但
+  // vegetation 这边还在用默认 9，新开的支流就只有水道、没有岸树。
+  const renderableFeatures = selectRenderableWaterFeatures(features, {
+    minDisplayPriority
+  });
 
   renderableFeatures.forEach((feature, featureIndex) => {
     const points = feature.world.points;

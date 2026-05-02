@@ -14,6 +14,13 @@ export interface EnvironmentState {
 
 export interface EnvironmentVisuals {
   skyColor: Color;
+  // 朝阳 / 黄昏 用——sky shader 拿这两个组合出"地平线暖、天顶冷"的渐变。
+  // skyHorizonColor 在白天 == skyColor、夜里也 == skyColor；只在 twilight
+  // 时才被混入暖色（橙/粉）。skyZenithColor 默认 = skyColor * 0.62 + HSL，
+  // 在 twilight 时被往 deep blue-purple 拉，强化对比。
+  skyHorizonColor: Color;
+  skyZenithColor: Color;
+  twilightStrength: number; // 0..1，朝阳/黄昏强度（sun 在地平线附近达到峰值）
   fogColor: Color;
   ambientColor: Color;
   sunColor: Color;
@@ -52,6 +59,9 @@ interface SeasonConfig {
   ambient: string;
   sun: string;
   rim: string;
+  // 朝阳/黄昏地平线暖色：春夏偏粉橙、秋偏深橙红、冬偏冷粉。
+  // sun 在地平线±0.35 之间被混进 sky / fog / sun 颜色。
+  twilight: string;
 }
 
 interface WeatherConfig {
@@ -76,7 +86,8 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     fogNight: "#0d1822",
     ambient: "#efe0bd",
     sun: "#ffe9b9",
-    rim: "#8ab6c3"
+    rim: "#8ab6c3",
+    twilight: "#f3a37c"
   },
   summer: {
     label: "夏",
@@ -86,7 +97,8 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     fogNight: "#0b1720",
     ambient: "#f3e6c2",
     sun: "#fff1ce",
-    rim: "#7cb2bf"
+    rim: "#7cb2bf",
+    twilight: "#ff9a72"
   },
   autumn: {
     label: "秋",
@@ -96,7 +108,8 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     fogNight: "#161b28",
     ambient: "#f0dec0",
     sun: "#ffdca2",
-    rim: "#a8b4cb"
+    rim: "#a8b4cb",
+    twilight: "#e8753a"
   },
   winter: {
     label: "冬",
@@ -106,7 +119,8 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     fogNight: "#0c1320",
     ambient: "#dfe7ef",
     sun: "#f7f6ff",
-    rim: "#9ec0dd"
+    rim: "#9ec0dd",
+    twilight: "#dc8a8a"
   }
 };
 
@@ -352,6 +366,29 @@ export class EnvironmentController {
       MathUtils.lerp(celestial.nightReadability, 1, daylight)
     );
     const sunColor = new Color(season.sun).lerp(new Color("#cfd8ef"), 1 - daylight);
+
+    // 朝阳 / 黄昏：solar 接近 0 时（太阳在地平线附近）twilightStrength 高。
+    // 死区窗口拉到 [0.02, 0.42]，太阳越近地平线效果越浓。
+    const twilightStrength = MathUtils.clamp(
+      1 - MathUtils.smoothstep(Math.abs(solar), 0.02, 0.42),
+      0,
+      1
+    );
+    const twilightColor = new Color(season.twilight);
+    // 地平线 0.85 混合，几乎完全占满暖色；天顶往深蓝紫推 0.7，强反差让
+    // 玩家一眼看到"火烧云 + 紫天"对比；雾 0.6 让远山金色；太阳 0.85 几乎
+    // 整圆橙红。0.65/0.55/0.42 的旧值在 1080p 截图里几乎看不到色调变化。
+    const skyHorizonColor = skyColor.clone().lerp(twilightColor, twilightStrength * 0.85);
+    const skyZenithColor = skyColor
+      .clone()
+      .multiplyScalar(0.62)
+      .offsetHSL(0.012, -0.05, -0.04)
+      .lerp(new Color("#2c3a55"), twilightStrength * 0.7);
+    fogColor.lerp(twilightColor, twilightStrength * 0.6);
+    sunColor.lerp(twilightColor, twilightStrength * 0.85);
+    // skyColor 本身也被推一点暖色——renderer.setClearColor 用它，
+    // sky dome 视野以外的"留白"也跟着 dawn/dusk 一起变暖。
+    skyColor.lerp(twilightColor, twilightStrength * 0.4);
     const moonColor = new Color("#dce7ff").lerp(new Color("#fff2d0"), daylight * 0.18);
     const cloudColor = new Color("#d7d2ad").lerp(new Color("#f4ead0"), daylight);
     const rimColor = new Color(season.rim).multiplyScalar(MathUtils.lerp(0.5, 1, daylight));
@@ -365,6 +402,9 @@ export class EnvironmentController {
 
     return {
       skyColor,
+      skyHorizonColor,
+      skyZenithColor,
+      twilightStrength,
       fogColor,
       ambientColor,
       sunColor,

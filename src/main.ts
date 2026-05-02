@@ -1259,7 +1259,10 @@ function rebuildRiverVegetationVisuals(rivers: QinlingAtlasFeature[]): void {
   const samples = buildRiverVegetationSamples(rivers, {
     maxSamples: 520,
     spacing: 3.25,
-    bankOffset: 2.6
+    bankOffset: 2.6,
+    // 跟 selectRenderableWaterFeatures 在 main 里 selectRenderableWaterFeatures
+    // 调的 minDisplayPriority 对齐——主流 + 支流都要有岸边植被。
+    minDisplayPriority: 8
   });
   const treeMatrices: Matrix4[] = [];
   const shrubMatrices: Matrix4[] = [];
@@ -2763,6 +2766,19 @@ function syncStoryGuideState(silent = false): void {
 }
 
 const keys = new Set<string>();
+// 反方向键映射：按下任一方向键时，如果反向键还在 keys 里，先把反向移除。
+// 让"刚按下"成为唯一意图，避免 w+s 同时按 → forward=0 cancel → 松开 s 又
+// 开始 walking 的体验问题。
+const OPPOSITE_DIRECTION_KEY: Record<string, string> = {
+  w: "s",
+  s: "w",
+  a: "d",
+  d: "a",
+  arrowup: "arrowdown",
+  arrowdown: "arrowup",
+  arrowleft: "arrowright",
+  arrowright: "arrowleft"
+};
 let cameraHeading = qinlingCameraRig.initialHeading;
 let cameraElevation = qinlingCameraRig.initialElevation;
 let cameraDistance = qinlingCameraRig.initialDistance;
@@ -2882,6 +2898,14 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (isGameplayInputKey(event)) {
+    // 反方向键互相取消（codex 0a8e1b9 和用户反馈的"按反方向只能暂停，松手
+    // 后还继续走"）。原本按 w + s 同时 forward = 0 cancel，松开 s 后只剩 w，
+    // 玩家又开始往前走——感受像"我让它停它没听"。改成：按 s 时如果 w 还在，
+    // 把 w 移除，让"刚按下的方向"成为唯一意图，s 松手后玩家完全停住。
+    const opposite = OPPOSITE_DIRECTION_KEY[normalized];
+    if (opposite && keys.has(opposite)) {
+      keys.delete(opposite);
+    }
     keys.add(normalized);
   }
 });
@@ -3217,19 +3241,21 @@ function update(deltaSeconds: number): void {
   skyDomeGroup.position.copy(camera.position);
   applySkyVisuals(skyDome, {
     skyColor: visuals.skyColor,
+    skyHorizonColor: visuals.skyHorizonColor,
+    skyZenithColor: visuals.skyZenithColor,
     starOpacity: visuals.starOpacity
   });
   // 把当前 sky horizon 色更新到 terrain shader 的 height fog uniform，
   // 让山顶融到与天空一致的雾色。整区 + 所有 chunk 都要更新。
   updateTerrainShaderHeightFog(
     terrainMaterial,
-    visuals.skyColor
+    visuals.skyHorizonColor
   );
   terrainChunkMeshes.forEach((chunk) => {
     if (!Array.isArray(chunk.mesh.material)) {
       updateTerrainShaderHeightFog(
         chunk.mesh.material as MeshPhongMaterial,
-        visuals.skyColor
+        visuals.skyHorizonColor
       );
     }
   });
