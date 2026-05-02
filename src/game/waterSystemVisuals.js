@@ -143,9 +143,11 @@ export function buildWaterRibbonVertices(points, options) {
 
   const halfWidth = options.width * 0.5;
   const yOffset = options.yOffset ?? 0;
-  // 折线密化：把任何 > 2 单元的段拆成 ≤ 2 单元的子段，使每个 cross-
-  // section 都贴着真实地形采样。
-  points = densifyPolyline(points, 2);
+  // 折线密化：把任何 > 0.9 单元的段拆成 ≤ 0.9 单元的子段，对齐 Qinling
+  // L1 DEM 的 ~0.94×1.0 cell 大小（codex 93474de P1 抓到 2 单元跨多个
+  // cell，仍可能在 cell 中间位置低于 terrain）。每个 cross-section 都贴
+  // 着真实地形采样。
+  points = densifyPolyline(points, 0.9);
   // Slope-aware Y（capped lift, never below center）：每个截面在中心、
   // 左、右三点采样地形。
   // - cross-slope（一边比中心高）：抬到 upslope 上方，最多比中心高
