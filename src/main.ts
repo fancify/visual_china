@@ -559,11 +559,13 @@ const countyLabelSpriteByCityId = new Map<string, Sprite>();
  * capital 始终保持。让相机拉远时画面信息密度自动降级，符合用户"分层
  * 加载、远的不展示"的诉求。淡入淡出用 smoothstep，避免 snap 跳变。
  *
- * cameraDistance 在 26 (近) 到 170 (远) 之间。fade 阈值：
- *   county        : 0..50 全亮，50..100 fade 到 0
- *   prefecture    : 0..100 全亮，100..160 fade 到 0
+ * cameraDistance 在 26 (近) 到 170 (远) 之间。新阈值（提高保留范围）：
+ *   county        : 0..70 全亮，70..140 fade 到 0
+ *   prefecture    : 0..170 全亮，170..240 fade 到 0（默认相机 118 全亮，
+ *                   按 O 切到 overview 170 仍接近全亮）
  *   capital       : 始终 1
- */
+ * 用户反馈"城市在摄像头变化时容易消失"——之前 prefecture fade 100-160
+ * 让默认 118 距离已经在 fade 中段（69% opacity），按 O 直接消失。
 function updateCityLodFade(): void {
   // 用渲染相机的实际位置算距离，而不是 target 的 cameraDistance——
   // cameraDistance 改变时（按 o/f 或滚轮）相机用 lerp 缓动跟过去，立即
@@ -578,8 +580,8 @@ function updateCityLodFade(): void {
   sharedTreeMaterial.opacity = treeAlpha;
   sharedTreeMaterial.visible = treeAlpha > 0.01;
   if (!cityMarkersHandle) return;
-  const countyAlpha = 1 - MathUtils.smoothstep(distance, 50, 100);
-  const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 100, 160);
+  const countyAlpha = 1 - MathUtils.smoothstep(distance, 70, 140);
+  const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 170, 240);
   const capitalAlpha = 1.0;
   cityMarkersHandle.tierMaterials.county.opacity = countyAlpha;
   cityMarkersHandle.tierMaterials.county.visible = countyAlpha > 0.01;
