@@ -660,17 +660,29 @@ const landmarkMaterials = {
     flatShading: true
   })
 };
-const gatePostMaterial = new MeshPhongMaterial({
-  color: 0x8a4d22,
-  emissive: 0x2d1608,
-  flatShading: true
-});
-// 几何也共享：所有 city marker 用同一个 cylinder，所有 non-city marker 用另一个。
+// 几何共享。pass kind 改用 stele（石碑）—— 用户反馈"两个柱子+圆锥"
+// 看不出含义，换成扁立的方碑更像关隘的纪念碑。
 const landmarkGeometries = {
   city: new CylinderGeometry(0.18, 0.48, 2.8, 5),
   generic: new CylinderGeometry(0.14, 0.36, 2.4, 4),
-  gatePost: new CylinderGeometry(0.14, 0.24, 4.1, 5)
+  stele: new BoxGeometry(0.7, 2.1, 0.22),
+  steleBase: new BoxGeometry(0.95, 0.32, 0.4),
+  steleCap: new BoxGeometry(0.85, 0.18, 0.32)
 };
+
+// stele 自己的灰岩石材质，与原 pass 黄棕色（landmarkMaterials.pass）区分。
+const passSteleMaterial = new MeshPhongMaterial({
+  color: 0xa8a294,
+  emissive: 0x2c2820,
+  flatShading: true,
+  shininess: 4
+});
+const passSteleCapMaterial = new MeshPhongMaterial({
+  color: 0x6e655a,
+  emissive: 0x1c1812,
+  flatShading: true,
+  shininess: 6
+});
 
 // 真实 instanced city marker 已经覆盖的"意象"地标位置——这些 legacy
 // kind=city POI 留着会和真实城市 mesh 重叠，需要从渲染 + HUD 一起过滤。
@@ -722,6 +734,34 @@ function rebuildLandmarkVisuals(): void {
       : null;
     landmarkChunkIds.set(landmark.name, chunkId);
     const ground = 0;
+    if (landmark.kind === "pass") {
+      // 关隘改成石碑：两件套（base + 主碑 + 顶冠）。Y 抬到地表上方。
+      const stele = new Mesh(landmarkGeometries.stele, passSteleMaterial);
+      stele.position.set(landmark.position.x, ground + 1.05 + 0.32, landmark.position.y);
+      stele.userData.chunkId = chunkId;
+      stele.userData.sharedResources = true;
+      landmarkGroup.add(stele);
+
+      const steleBase = new Mesh(landmarkGeometries.steleBase, passSteleCapMaterial);
+      steleBase.position.set(landmark.position.x, ground + 0.16, landmark.position.y);
+      steleBase.userData.chunkId = chunkId;
+      steleBase.userData.sharedResources = true;
+      landmarkGroup.add(steleBase);
+
+      const steleCap = new Mesh(landmarkGeometries.steleCap, passSteleCapMaterial);
+      steleCap.position.set(landmark.position.x, ground + 2.41, landmark.position.y);
+      steleCap.userData.chunkId = chunkId;
+      steleCap.userData.sharedResources = true;
+      landmarkGroup.add(steleCap);
+
+      const label = createTextSprite(landmark.name, "#efcf83");
+      label.scale.multiplyScalar(1.18);
+      label.position.set(landmark.position.x, ground + 4.6, landmark.position.y);
+      label.userData.chunkId = chunkId;
+      landmarkGroup.add(label);
+      return;
+    }
+
     const geometry =
       landmark.kind === "city"
         ? landmarkGeometries.city
@@ -730,37 +770,16 @@ function rebuildLandmarkVisuals(): void {
     const marker = new Mesh(geometry, material);
     marker.position.set(landmark.position.x, ground + 1.8, landmark.position.y);
     marker.userData.chunkId = chunkId;
-    // 共享 geometry / material，clearGroup 时不要 dispose
     marker.userData.sharedResources = true;
 
     if (landmark.kind !== "plain") {
-      const label = createTextSprite(
-        landmark.name,
-        landmark.kind === "pass" ? "#efcf83" : "#f3ebd4"
-      );
-      if (landmark.kind === "pass") {
-        label.scale.multiplyScalar(1.18);
-      }
+      const label = createTextSprite(landmark.name, "#f3ebd4");
       label.position.set(landmark.position.x, ground + 6.4, landmark.position.y);
       label.userData.chunkId = chunkId;
       landmarkGroup.add(label);
     }
 
     landmarkGroup.add(marker);
-
-    if (landmark.kind === "pass") {
-      [-0.72, 0.72].forEach((offset) => {
-        const gatePost = new Mesh(landmarkGeometries.gatePost, gatePostMaterial);
-        gatePost.position.set(
-          landmark.position.x + offset,
-          ground + 2.65,
-          landmark.position.y
-        );
-        gatePost.userData.chunkId = chunkId;
-        gatePost.userData.sharedResources = true;
-        landmarkGroup.add(gatePost);
-      });
-    }
   });
 }
 

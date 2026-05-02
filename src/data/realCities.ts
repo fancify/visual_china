@@ -126,5 +126,6 @@ export const realQinlingCities: RealCity[] = [
   { id: "chenggu", name: "城固", lat: 33.16, lon: 107.34, tier: "county", hint: "汉中盆地东部，子午道汉中端" },
   { id: "nanjiang", name: "南江", lat: 32.36, lon: 106.84, tier: "county", hint: "米仓道腹心" },
   { id: "zhenba", name: "镇巴", lat: 32.55, lon: 107.90, tier: "county", hint: "荔枝道汉中端" },
-  { id: "xixiang", name: "西乡", lat: 32.99, lon: 107.77, tier: "county", hint: "汉中盆地东段，子午道汉中端" }
+  { id: "xixiang", name: "西乡", lat: 32.99, lon: 107.77, tier: "county", hint: "汉中盆地东段，子午道汉中端" },
+  { id: "dujiangyan", name: "都江堰", lat: 31.00, lon: 103.62, tier: "county", hint: "战国李冰所修水利工程，成都平原灌溉源头" }
 ];
