@@ -27,7 +27,11 @@ function realCityToAtlasFeature(city) {
     layer: "city",
     geometry: "point",
     world: { x, y: z },
-    displayPriority: city.tier === "capital" ? 10 : city.tier === "prefecture" ? 8 : 6,
+    // capital / prefecture 都拉到默认阈值（9）以上，否则 atlas 默认视图
+    // 看不到 宝鸡/汉中/广元/都江堰 这些主轴节点（codex 8c58368 P2 抓到
+    // atlasMinimumDisplayPriority 默认 9）。county 留在 6，缩放放大时
+    // 才出现，避免默认 28 个城市挤成一片。
+    displayPriority: city.tier === "capital" ? 10 : city.tier === "prefecture" ? 9 : 6,
     terrainRole: "real-coord-city",
     themes: ["culture", "livelihood"],
     source: {
@@ -313,18 +317,10 @@ export const qinlingAtlasFeatures = [
   // 老的 7 个手画城市（长安/咸阳/宝鸡-陈仓/汉中/广元/昭化/成都）已删，
   // 用户反馈 atlas 跟 3D 信息对不上、3D 更准——atlas 现在跟 3D 共用同一
   // 套真实坐标。
-  feature({
-    id: "livelihood-dujiangyan",
-    name: "都江堰",
-    layer: "livelihood",
-    geometry: "point",
-    world: point(-86.07, 91.2),
-    displayPriority: 8,
-    terrainRole: "irrigation-node",
-    summary: "成都平原的水利意象，用于解释平原为什么能承载高密度生活。",
-    visualRule: { symbol: "waterwork", color: "#7fc8a9", emphasis: "civil-engineering" },
-    themes: ["livelihood", "culture"]
-  }),
+  // 都江堰 已经从 realQinlingCities 当作真实城市渲染（id real-city-
+  // dujiangyan），原 livelihood-dujiangyan 同坐标会撞 hit-test → 删除
+  // （codex 8c58368 P3）。如果以后想给水利工程一个独立"民生"层 POI，
+  // 把它放在偏移坐标 + 不同 id 即可。
   feature({
     id: "pass-dasanguan",
     name: "大散关",

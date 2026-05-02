@@ -80,11 +80,16 @@ export function selectedAtlasFeature(
   features: QinlingAtlasFeature[]
 ): QinlingAtlasFeature | null;
 
+export interface FindAtlasFeatureOptions {
+  minDisplayPriority?: number;
+}
+
 export function findAtlasFeatureAtCanvasPoint(
   features: QinlingAtlasFeature[],
   state: AtlasWorkbenchState,
   pointer: QinlingAtlasPoint,
   world: { width: number; depth: number },
   canvas: { width: number; height: number },
-  maxDistance?: number
+  maxDistance?: number,
+  options?: FindAtlasFeatureOptions
 ): QinlingAtlasFeature | null;
