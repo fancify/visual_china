@@ -2,6 +2,11 @@ import path from "node:path";
 
 import { fabdemDataset } from "./china-dem-common.mjs";
 
+// 2026-05 east extension 试做：扩到 110 后所有 hardcoded river / placemark
+// world coords 跟实际经度漂移 15%（poi-geography 测试三连失败 + 河流明显
+// 走偏）。需要先把 hardcoded {x,y} 全部从 lat/lon 重新投影才能安全扩。
+// 暂回到 109，把这件 refactor 列入 backlog #54，先把新 POI 用 atlas-only
+// 方式上去。
 export const qinlingBounds = {
   west: 103.5,
   east: 109.0,

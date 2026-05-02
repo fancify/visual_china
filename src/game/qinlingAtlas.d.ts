@@ -22,7 +22,9 @@ export type QinlingScenicRole =
 export type QinlingAncientRole =
   | "shu-bronze-altar"
   | "shu-sun-bird"
-  | "yangshao-dwelling";
+  | "yangshao-dwelling"
+  | "qin-terracotta-army"
+  | "qin-imperial-mausoleum";
 
 export interface QinlingScenicLandmark {
   id: string;

@@ -975,9 +975,16 @@ const ancientGeometries = {
   // 金沙：方形低台 + 太阳神鸟金箔（薄金色圆盘，立在台上）。
   jinshaPodium: new BoxGeometry(2.6, 0.45, 2.6),
   sunBirdDisk: new CylinderGeometry(0.95, 0.95, 0.06, 24),
-  // 大地湾：F901 仰韶大房址——圆形夯土平台 + 4 根复原柱础。
+  // 大地湾 / 半坡 共用：F901 仰韶大房址——圆形夯土平台 + 4 根复原柱础。
   yangshaoPlatform: new CylinderGeometry(2.8, 3.0, 0.32, 18),
-  yangshaoPost: new CylinderGeometry(0.16, 0.18, 1.4, 6)
+  yangshaoPost: new CylinderGeometry(0.16, 0.18, 1.4, 6),
+  // 兵马俑：阵列 1 排 6 兵俑（5 cylinder + 头球）+ 2 块带边土坑边缘。
+  terracottaSoldier: new CylinderGeometry(0.16, 0.20, 1.0, 6),
+  terracottaHead: new SphereGeometry(0.16, 6, 6),
+  terracottaPit: new BoxGeometry(4.6, 0.18, 1.4),
+  // 秦始皇陵：高耸的封土山（76 m → 缩成 6 单元高）+ 顶端小石碑指向陵园。
+  qinMausoleumMound: new ConeGeometry(4.4, 6.0, 12),
+  qinMausoleumStele: new BoxGeometry(0.5, 1.4, 0.18)
 };
 
 const ancientMaterials = {
@@ -999,6 +1006,16 @@ const ancientMaterials = {
   }),
   woodPost: new MeshPhongMaterial({
     color: 0x6f4f30, emissive: 0x140a06, flatShading: true, shininess: 4,
+    transparent: true, opacity: 1
+  }),
+  // 兵马俑：陶土灰褐色（真品颜色）。
+  terracottaClay: new MeshPhongMaterial({
+    color: 0x8c6e54, emissive: 0x18120a, flatShading: true, shininess: 4,
+    transparent: true, opacity: 1
+  }),
+  // 秦始皇陵封土：黄褐土壤。
+  qinEarth: new MeshPhongMaterial({
+    color: 0xa48560, emissive: 0x1c1408, flatShading: true, shininess: 3,
     transparent: true, opacity: 1
   })
 };
@@ -1313,7 +1330,7 @@ function rebuildAncientVisuals(): void {
       addPiece(disk, 1.45);
       labelHeight = 3.2;
     } else if (site.role === "yangshao-dwelling") {
-      // 大地湾：圆形夯土平台 + 4 根复原柱础呈方阵。
+      // 大地湾 / 半坡 共用：圆形夯土平台 + 4 根复原柱础呈方阵。
       addPiece(new Mesh(ancientGeometries.yangshaoPlatform, ancientMaterials.rammedEarth), 0.16);
       const postOffsets: Array<[number, number]> = [
         [-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]
@@ -1322,6 +1339,36 @@ function rebuildAncientVisuals(): void {
         addPiece(new Mesh(ancientGeometries.yangshaoPost, ancientMaterials.woodPost), 1.02, dx, dz);
       });
       labelHeight = 2.6;
+    } else if (site.role === "qin-terracotta-army") {
+      // 兵马俑：长条土坑（4.6m 长，朝东西方向）+ 6 排兵阵列。
+      addPiece(new Mesh(ancientGeometries.terracottaPit, ancientMaterials.earthFoundation), 0.09);
+      // 6 个兵俑成一排，沿 x 方向间距 0.7。每个兵 = 圆柱身 + 球头。
+      for (let i = 0; i < 6; i += 1) {
+        const dx = -1.75 + i * 0.7;
+        addPiece(
+          new Mesh(ancientGeometries.terracottaSoldier, ancientMaterials.terracottaClay),
+          0.65,
+          dx,
+          0
+        );
+        addPiece(
+          new Mesh(ancientGeometries.terracottaHead, ancientMaterials.terracottaClay),
+          1.30,
+          dx,
+          0
+        );
+      }
+      labelHeight = 2.3;
+    } else if (site.role === "qin-imperial-mausoleum") {
+      // 秦始皇陵：4.4 半径 × 6m 高的封土山 + 顶端小石碑代表陵园朝向。
+      addPiece(new Mesh(ancientGeometries.qinMausoleumMound, ancientMaterials.qinEarth), 3.0);
+      addPiece(
+        new Mesh(ancientGeometries.qinMausoleumStele, ancientMaterials.bronzeRelic),
+        6.7,
+        0,
+        0
+      );
+      labelHeight = 8.4;
     }
 
     // 考古 label 用米白色，跟 scenic 的青金色稍区分；走 prefecture LOD。
