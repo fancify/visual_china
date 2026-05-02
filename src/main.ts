@@ -617,16 +617,22 @@ const landmarkGeometries = {
   gatePost: new CylinderGeometry(0.14, 0.24, 4.1, 5)
 };
 
+// 真实 instanced city marker 已经覆盖的"意象"地标位置——这些 legacy
+// kind=city POI 留着会和真实城市 mesh 重叠，需要从渲染 + HUD 一起过滤。
+// 注意：成都平原 的坐标 (-44,104) 跟真实 成都 (~-71,107) 不重合，是
+// 盆地标签不是城市，保留。
+const LEGACY_OVERLAPPING_CITY_NAMES = new Set(["长安意象", "汉中盆地"]);
+
+function isLegacyOverlappingCityLandmark(landmark: Landmark): boolean {
+  return landmark.kind === "city" && LEGACY_OVERLAPPING_CITY_NAMES.has(landmark.name);
+}
+
 function rebuildLandmarkVisuals(): void {
   clearGroup(landmarkGroup);
   landmarkChunkIds.clear();
 
   landmarks.forEach((landmark) => {
-    // P4 真实城市 instanced markers 现在覆盖 长安意象 / 汉中盆地 /
-    // 成都平原 这几个 kind=city 的"意象"地标，留着会和 city marker
-    // 的 instanced building 重叠。整体跳过 kind=city，passes/plain 仍然
-    // 渲染（关隘 + 普通地标不冲突）。
-    if (landmark.kind === "city") {
+    if (isLegacyOverlappingCityLandmark(landmark)) {
       return;
     }
     const chunkId = regionChunkManifest
@@ -634,8 +640,10 @@ function rebuildLandmarkVisuals(): void {
       : null;
     landmarkChunkIds.set(landmark.name, chunkId);
     const ground = 0;
-    // city 已在上面 return，这里只剩 pass / river / mountain / plain。
-    const geometry = landmarkGeometries.generic;
+    const geometry =
+      landmark.kind === "city"
+        ? landmarkGeometries.city
+        : landmarkGeometries.generic;
     const material = landmarkMaterials[landmark.kind] ?? landmarkMaterials.plain;
     const marker = new Mesh(geometry, material);
     marker.position.set(landmark.position.x, ground + 1.8, landmark.position.y);
@@ -1723,15 +1731,20 @@ function nearestLandmarkText(): string {
   }
 
   const currentPosition = new Vector2(player.position.x, player.position.z);
+  // 跟 rebuildLandmarkVisuals 保持一致：legacy 重叠的"意象"城市地标不
+  // 进 HUD nearest，否则玩家站在 西安 city 旁还是被告知"附近：长安意象"。
+  const renderableLandmarks = landmarks.filter(
+    (landmark) => !isLegacyOverlappingCityLandmark(landmark)
+  );
   const visibleLandmarks =
     regionChunkManifest && visibleChunkIds.size > 0
-      ? landmarks.filter((landmark) => {
+      ? renderableLandmarks.filter((landmark) => {
           const chunkId = landmarkChunkIds.get(landmark.name) ?? null;
           return !chunkId || visibleChunkIds.has(chunkId);
         })
-      : landmarks;
+      : renderableLandmarks;
 
-  const landmarksToUse = visibleLandmarks.length > 0 ? visibleLandmarks : landmarks;
+  const landmarksToUse = visibleLandmarks.length > 0 ? visibleLandmarks : renderableLandmarks;
 
   const nearest = landmarksToUse.reduce((best, landmark) => {
     const bestDistance = best.position.distanceTo(currentPosition);
