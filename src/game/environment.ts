@@ -205,28 +205,22 @@ function copyWeatherConfig(w: WeatherConfig): EffectiveWeather {
   };
 }
 
-// Linear bounded approach：每帧最多走 step（= dt / 过渡总秒数 × 满程 1.0），
-// 这样从 1 → 0 的过渡严格在 transitionSeconds 秒内结束，而不是 lerp 的
-// 指数衰减会拖到 60+ 秒尾巴（codex adb9879 review 抓到雨切晴后粒子能
-// 残留 75s 才 fade 完）。
-function approachBounded(current: number, target: number, maxStep: number): number {
-  const delta = target - current;
-  if (Math.abs(delta) <= maxStep) return target;
-  return current + Math.sign(delta) * maxStep;
-}
-
-function lerpEffectiveWeather(
-  current: EffectiveWeather,
-  target: EffectiveWeather,
-  step: number
+// 同步过渡：单个 t（0→1，过渡总秒数内走完），所有 channel 用同一个 t 在
+// previousWeather 和 targetWeather 间 lerp。codex c66a54e P1 抓到的问题
+// 是：用 absolute step 时 sunCut(范围 0.42) 比 rain(范围 1.0) 快 2.4 倍
+// 收敛，雨还在但天已经"清"了——视觉上严重不一致。
+function blendEffectiveWeather(
+  out: EffectiveWeather,
+  from: EffectiveWeather,
+  to: EffectiveWeather,
+  t: number
 ): void {
-  current.wind = approachBounded(current.wind, target.wind, step);
-  current.rain = approachBounded(current.rain, target.rain, step);
-  current.snow = approachBounded(current.snow, target.snow, step);
-  // fogBoost 量级很小（~0.002），用相对单位的 step 让它也在同周期内完成。
-  current.fogBoost = approachBounded(current.fogBoost, target.fogBoost, step * 0.0021);
-  current.sunCut = approachBounded(current.sunCut, target.sunCut, step);
-  current.shimmer = approachBounded(current.shimmer, target.shimmer, step);
+  out.wind = from.wind + (to.wind - from.wind) * t;
+  out.rain = from.rain + (to.rain - from.rain) * t;
+  out.snow = from.snow + (to.snow - from.snow) * t;
+  out.fogBoost = from.fogBoost + (to.fogBoost - from.fogBoost) * t;
+  out.sunCut = from.sunCut + (to.sunCut - from.sunCut) * t;
+  out.shimmer = from.shimmer + (to.shimmer - from.shimmer) * t;
 }
 
 export class EnvironmentController {
@@ -235,13 +229,18 @@ export class EnvironmentController {
   private weatherTimer = 0;
   private seasonTimer = 0;
   private nextWeatherDelay = 45;
-  // 平滑天气切换：每帧把 effectiveWeather 朝 target 配置插值，过渡 ~12 秒。
-  // 之前 weather 切换是硬跳，computeVisuals 里 sunCut/rain/snow 等数值瞬变
-  // 让 fog/雨粒子/水面 shimmer 都跳一帧，用户反馈"过渡生硬"。改成连续值后
-  // 雨从无到有需要 ~12s 慢慢起来，云慢慢压低 sunIntensity。
+  // 平滑天气切换：保留"过渡前"和"过渡后"两个快照 + 一个 t（0→1，12 秒
+  // 内走完）。所有 channel 用同一个 t lerp，避免不同 channel 范围不同导
+  // 致收敛速度不同步（codex c66a54e P1 反例：rain 切 clear 时 sunCut 5s
+  // 收完了但 rain 还要 12s 才走完）。
   private effectiveWeather: EffectiveWeather = copyWeatherConfig(
     weatherConfig[weathers[0]]
   );
+  private weatherTransitionFrom: EffectiveWeather = copyWeatherConfig(
+    weatherConfig[weathers[0]]
+  );
+  private weatherTransitionT = 1;
+  private weatherTransitionTarget: Weather = weathers[0];
   private static readonly WEATHER_TRANSITION_SECONDS = 12;
 
   state: EnvironmentState = {
@@ -274,10 +273,27 @@ export class EnvironmentController {
       this.advanceSeason();
     }
 
-    // 平滑过渡：linear bounded，确保 12 秒内严格走完 0→1 / 1→0。
-    const target = weatherConfig[this.state.weather];
-    const step = deltaSeconds / EnvironmentController.WEATHER_TRANSITION_SECONDS;
-    lerpEffectiveWeather(this.effectiveWeather, copyWeatherConfig(target), step);
+    // 同步过渡：t 在 12 秒内走完 0→1，所有 channel 同步 lerp。
+    if (this.weatherTransitionTarget !== this.state.weather) {
+      // 新 target：把当前 effective 锁为 from，新 target 设进 transitionTarget。
+      this.weatherTransitionFrom = { ...this.effectiveWeather };
+      this.weatherTransitionTarget = this.state.weather;
+      this.weatherTransitionT = 0;
+    }
+    if (this.weatherTransitionT < 1) {
+      this.weatherTransitionT = Math.min(
+        1,
+        this.weatherTransitionT +
+          deltaSeconds / EnvironmentController.WEATHER_TRANSITION_SECONDS
+      );
+      const target = copyWeatherConfig(weatherConfig[this.weatherTransitionTarget]);
+      blendEffectiveWeather(
+        this.effectiveWeather,
+        this.weatherTransitionFrom,
+        target,
+        this.weatherTransitionT
+      );
+    }
 
     return this.state;
   }
