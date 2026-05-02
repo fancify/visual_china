@@ -156,6 +156,12 @@ import {
 } from "./game/regionChunks";
 import { createChunkScenery, disposeScenery } from "./game/scenery";
 import {
+  createCityMarkers,
+  disposeCityMarkers,
+  type CityMarkersHandle
+} from "./game/cityMarkers";
+import { realQinlingCities } from "./data/realCities";
+import {
   evaluateStoryGuide,
   formatStoryGuideLine,
   getQinlingStoryBeats,
@@ -527,6 +533,10 @@ scene.add(riverVegetationGroup);
 
 const routeGroup = new Group();
 scene.add(routeGroup);
+
+const cityMarkersGroup = new Group();
+scene.add(cityMarkersGroup);
+let cityMarkersHandle: CityMarkersHandle | null = null;
 
 const fragmentVisuals = new Map<string, FragmentVisual>();
 type WaterEnvironmentMaterialRole = "ribbon" | "highlight" | "line";
@@ -3093,6 +3103,31 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   terrainGeometry.computeVertexNormals();
   rebuildWaterSystemVisuals();
   rebuildRouteVisuals();
+
+  // 真实城市 instanced mesh：用 region asset 的 bounds + world 投影坐标，
+  // 跟 atlas / hydrography 同一个 mapOrientation 投影。地图内的城市才落
+  // mesh，落到 region bounds 之外的（暂无）会被 isInsideBounds 跳过。
+  if (cityMarkersHandle) {
+    disposeCityMarkers(cityMarkersHandle);
+    cityMarkersGroup.clear();
+    cityMarkersHandle = null;
+  }
+  if (sampler.asset.bounds) {
+    const visibleCities = realQinlingCities.filter(
+      (city) =>
+        city.lat >= sampler.asset.bounds!.south &&
+        city.lat <= sampler.asset.bounds!.north &&
+        city.lon >= sampler.asset.bounds!.west &&
+        city.lon <= sampler.asset.bounds!.east
+    );
+    cityMarkersHandle = createCityMarkers(
+      visibleCities,
+      sampler.asset.bounds,
+      sampler.asset.world,
+      sampler
+    );
+    cityMarkersGroup.add(cityMarkersHandle.group);
+  }
 
   const waterLevel = sampler.asset.presentation?.waterLevel ?? sampler.asset.minHeight - 2.5;
   const underpaintLevel =
