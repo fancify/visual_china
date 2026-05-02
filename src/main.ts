@@ -583,6 +583,13 @@ function updateCityLodFade(): void {
   const capitalAlpha = 1.0;
   cityMarkersHandle.tierMaterials.county.opacity = countyAlpha;
   cityMarkersHandle.tierMaterials.county.visible = countyAlpha > 0.01;
+  // 跟着 county wall 一起 fade：proximity reveal 出来的 county 名签
+  // 在镜头拉远时也得隐藏，否则标签会孤零零飘在 fade 掉的城墙上方
+  // （codex 8784358 P2 抓到）。
+  countyLabelSpriteByCityId.forEach((sprite) => {
+    sprite.material.opacity = countyAlpha;
+    if (countyAlpha <= 0.01) sprite.visible = false;
+  });
   cityMarkersHandle.tierMaterials.prefecture.opacity = prefectureAlpha;
   cityMarkersHandle.tierMaterials.prefecture.visible = prefectureAlpha > 0.01;
   cityMarkersHandle.tierMaterials.capital.opacity = capitalAlpha;
