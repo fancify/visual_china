@@ -584,11 +584,14 @@ function updateCityLodFade(): void {
   cityMarkersHandle.tierMaterials.county.opacity = countyAlpha;
   cityMarkersHandle.tierMaterials.county.visible = countyAlpha > 0.01;
   // 跟着 county wall 一起 fade：proximity reveal 出来的 county 名签
-  // 在镜头拉远时也得隐藏，否则标签会孤零零飘在 fade 掉的城墙上方
-  // （codex 8784358 P2 抓到）。
-  countyLabelSpriteByCityId.forEach((sprite) => {
+  // 在镜头拉远时也得隐藏；zoom 回来又要恢复（如果还在 nearby）。所以
+  // visible 由 alpha 阈值 + 是否就是 nearbyRealCity 共同决定（codex
+  // 8171d2e P2 抓到 zoom out + zoom in 不动 player 时标签卡死隐藏）。
+  countyLabelSpriteByCityId.forEach((sprite, cityId) => {
     sprite.material.opacity = countyAlpha;
-    if (countyAlpha <= 0.01) sprite.visible = false;
+    const isNearby =
+      nearbyRealCity?.tier === "county" && nearbyRealCity.id === cityId;
+    sprite.visible = isNearby && countyAlpha > 0.01;
   });
   cityMarkersHandle.tierMaterials.prefecture.opacity = prefectureAlpha;
   cityMarkersHandle.tierMaterials.prefecture.visible = prefectureAlpha > 0.01;
