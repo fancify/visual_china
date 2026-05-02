@@ -60,11 +60,12 @@ function makeWalledCompoundGeometry(
     bevelEnabled: false,
     curveSegments: 1
   });
+  // rotateX(-PI/2) 把 (x, y, z) 映射成 (x, z, -y)。原本 z=0..height 的
+  // extrusion 旋转后变成 y=0..height（在地表之上向上长），原 shape 的
+  // y 维度（-outerHalf..+outerHalf）旋转后变 z（同范围），刚好是俯视的
+  // "口"字型。base 已经在 y=0，**不要**再 translate（codex d90c5e7 P1
+  // 抓到的：之前再 +height 把整圈墙抬高了一档，看上去是飘在地上）。
   geom.rotateX(-Math.PI / 2);
-  // 经过 rotateX(-PI/2)，原本 (x, y, z) 变成 (x, z, -y)。
-  // shape 原本 z=0..height 朝 +Z extrude，rotate 后变成 y=0..-height（向下）。
-  // 所以再 translate +height 让墙站在 y=0 之上。
-  geom.translate(0, height, 0);
   return geom;
 }
 
