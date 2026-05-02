@@ -1238,7 +1238,12 @@ function rebuildWaterSystemVisuals(): void {
     return;
   }
 
-  const rivers = selectRenderableWaterFeatures(atlasFeatures);
+  // minDisplayPriority 8 让一级支流（rank=2，priority 8）也加入渲染——
+  // 这样 河流密度 LOD 才有意义（干流 priority 10 用 0.9 单元，支流用
+  // 1.5 单元省顶点）。否则默认 9 阈值只放主干进来，整张图都是 0.9 密度。
+  const rivers = selectRenderableWaterFeatures(atlasFeatures, {
+    minDisplayPriority: 8
+  });
   visibleWaterFeatures = rivers;
 
   rebuildRiverVegetationVisuals(rivers);
@@ -2678,6 +2683,15 @@ document.addEventListener("keydown", (event) => {
   // 路径，不受中文输入法 IME 影响。否则 macOS 中文用户按 Q/E/W/A/S/D 全部失效。
   const normalized = normalizeInputKey(event);
 
+  // ESC 优先级：先关 city detail panel，再关 atlas fullscreen——panel 是
+  // 用户最近一次主动开的覆盖层，应该最先响应取消（codex 084972c P3 抓到）。
+  if (normalized === "escape" && cityDetailPanelOpen) {
+    event.preventDefault();
+    cityDetailPanelOpen = false;
+    cityDetailOpenCityId = null;
+    hud.setCityDetailPanelOpen(null);
+    return;
+  }
   if (normalized === "escape" && atlasWorkbench.isFullscreen) {
     event.preventDefault();
     resetGameplayInput();
@@ -2695,7 +2709,9 @@ document.addEventListener("keydown", (event) => {
   }
 
   // I（info）: 走到城市跟前按 I 弹出详情面板（替换原 toast）。
-  if (normalized === "i" && nearbyRealCity) {
+  // atlas 全屏时不响应 I——panel 会被 atlas 罩住，按下去看似无效但状态
+  // 已变（codex 084972c P2）。
+  if (normalized === "i" && nearbyRealCity && !atlasWorkbench.isFullscreen) {
     event.preventDefault();
     const city = nearbyRealCity;
     if (cityDetailPanelOpen && cityDetailOpenCityId === city.id) {
@@ -2715,15 +2731,6 @@ document.addEventListener("keydown", (event) => {
     });
     return;
   }
-  // ESC 关闭城市详情面板（注意要在 atlas ESC 之前——用户优先关 panel）。
-  if (normalized === "escape" && cityDetailPanelOpen) {
-    event.preventDefault();
-    cityDetailPanelOpen = false;
-    cityDetailOpenCityId = null;
-    hud.setCityDetailPanelOpen(null);
-    return;
-  }
-
   // 纯相机 / 环境快捷键在 atlas 全屏时也允许使用：
   // 玩家可以一边看地图一边转身、切天气、切季节，不需要先关 atlas。
   if (normalized === "k") {
