@@ -34,7 +34,8 @@ test("geographic and game coordinates use a strict linear reversible mapping", (
   const roundTrip = worldToGeo(hanzhong, qinlingBounds, qinlingWorld);
 
   nearlyEqual(hanzhong.x, 25.52727272727273);
-  nearlyEqual(hanzhong.z, 8.159999999999997);
+  // 新 mapOrientation：北 = -Z，所以 lat=33.07（中部偏北）→ 负 z 值。
+  nearlyEqual(hanzhong.z, -8.159999999999997);
   nearlyEqual(roundTrip.lon, 107.03);
   nearlyEqual(roundTrip.lat, 33.07);
 });

@@ -3,15 +3,17 @@ import test from "node:test";
 
 import { qinlingRoutes, routeAffinityAt } from "../src/game/qinlingRoutes.js";
 
+// 新 mapOrientation 契约：北 = -Z（即 .y 字段为负值）。
+// 路径数据已翻转：原 y=+28 改为 y=-28。
 test("Qinling route affinity does not use unverified hand-drawn routes by default", () => {
-  const influence = routeAffinityAt({ x: 34, y: 28 });
+  const influence = routeAffinityAt({ x: 34, y: -28 });
 
   assert.equal(influence.affinity, 0);
   assert.equal(influence.nearestRoute, null);
 });
 
 test("Qinling draft route affinity remains available for QA when explicitly requested", () => {
-  const influence = routeAffinityAt({ x: 34, y: 28 }, 11, {
+  const influence = routeAffinityAt({ x: 34, y: -28 }, 11, {
     includeUnverifiedRoutes: true
   });
 
@@ -20,7 +22,8 @@ test("Qinling draft route affinity remains available for QA when explicitly requ
 });
 
 test("Qinling route affinity is low away from the Guanzhong-Hanzhong crossings", () => {
-  const influence = routeAffinityAt({ x: -62, y: -42 });
+  // 这个点远离任何古道（西南偏远区域），新约定下 z 改正——但这点本来就远，OK。
+  const influence = routeAffinityAt({ x: -62, y: 42 });
 
   assert.ok(influence.affinity < 0.2);
 });

@@ -32,7 +32,7 @@ test("atlas render policy keeps the default overview readable", () => {
   assert.ok(!visibleLayers.has("livelihood"));
 });
 
-test("atlas render policy does not expose unverified hand-drawn features as facts", () => {
+test("atlas render policy does not expose unverified or raw evidence features as facts", () => {
   const features = [
     {
       id: "draft-landform",
@@ -45,6 +45,12 @@ test("atlas render policy does not expose unverified hand-drawn features as fact
       layer: "water",
       displayPriority: 8,
       source: { name: "openstreetmap-overpass", verification: "external-vector" }
+    },
+    {
+      id: "primary-water",
+      layer: "water",
+      displayPriority: 8,
+      source: { name: "primary-modern-qinling", verification: "external-vector" }
     }
   ];
   const layers = [
@@ -54,12 +60,17 @@ test("atlas render policy does not expose unverified hand-drawn features as fact
 
   assert.deepEqual(
     atlasVisibleFeatures(features, layers).map((feature) => feature.id),
-    ["osm-water"]
+    ["primary-water"]
   );
   assert.deepEqual(
     atlasVisibleFeatures(features, layers, { includeUnverifiedFeatures: true })
       .map((feature) => feature.id),
-    ["draft-landform", "osm-water"]
+    ["draft-landform", "primary-water"]
+  );
+  assert.deepEqual(
+    atlasVisibleFeatures(features, layers, { includeEvidenceFeatures: true })
+      .map((feature) => feature.id),
+    ["osm-water", "primary-water"]
   );
 });
 
@@ -74,12 +85,13 @@ test("atlas render order puts landform under water, road, and point labels", () 
 });
 
 test("world points convert to overview pixels without changing geographic proportions", () => {
+  // 新 mapOrientation 契约：北 = -Z → 画布 y 小（上方）；南 = +Z → 画布 y 大。
   assert.deepEqual(
-    worldPointToOverviewPixel({ x: -90, y: 120 }, world, { width: 220, height: 270 }),
+    worldPointToOverviewPixel({ x: -90, y: -120 }, world, { width: 220, height: 270 }),
     { x: 0, y: 0 }
   );
   assert.deepEqual(
-    worldPointToOverviewPixel({ x: 90, y: -120 }, world, { width: 220, height: 270 }),
+    worldPointToOverviewPixel({ x: 90, y: 120 }, world, { width: 220, height: 270 }),
     { x: 220, y: 270 }
   );
 });
@@ -87,7 +99,7 @@ test("world points convert to overview pixels without changing geographic propor
 test("atlas canvas points clamp out-of-bounds features to the overview frame", () => {
   assert.deepEqual(
     atlasCanvasPoint(
-      { x: 120, y: -160 },
+      { x: 120, y: 160 },
       world,
       { width: 220, height: 270 }
     ),
@@ -100,8 +112,8 @@ test("atlas feature center uses the average of rendered world points", () => {
     {
       world: {
         points: [
-          { x: -90, y: 120 },
-          { x: 90, y: -120 }
+          { x: -90, y: -120 },
+          { x: 90, y: 120 }
         ]
       }
     },
@@ -135,9 +147,10 @@ test("atlas render policy exposes interpolated DEM tile gaps as map quality area
   assert.ok(rects[0].minY < rects[0].maxY, "missing tile rect should have visible north-south span");
 });
 
-test("atlas render policy reveals dense evidence layers only when zoomed in", () => {
-  assert.equal(atlasMinimumDisplayPriority({ fullscreen: false, scale: 1 }), 7);
-  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 1 }), 7);
+test("atlas render policy keeps compact overview to reviewed main rivers", () => {
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: false, scale: 1 }), 9);
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 1 }), 9);
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 1.5 }), 7);
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 2 }), 4);
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 4 }), 4);
 
@@ -145,30 +158,47 @@ test("atlas render policy reveals dense evidence layers only when zoomed in", ()
     {
       id: "major",
       layer: "water",
+      displayPriority: 10,
+      source: { verification: "external-vector" }
+    },
+    {
+      id: "primary-tributary",
+      layer: "water",
       displayPriority: 8,
-      source: { verification: "external-vector" }
-    },
-    {
-      id: "tributary",
-      layer: "water",
-      displayPriority: 4,
-      source: { verification: "external-vector" }
-    },
-    {
-      id: "local",
-      layer: "water",
-      displayPriority: 0,
       source: { verification: "external-vector" }
     }
   ];
   const layers = [{ id: "water", defaultVisible: true }];
 
   assert.deepEqual(
-    atlasVisibleFeatures(features, layers, { minDisplayPriority: 7 }).map((feature) => feature.id),
+    atlasVisibleFeatures(features, layers, { minDisplayPriority: 9 }).map((feature) => feature.id),
     ["major"]
   );
   assert.deepEqual(
-    atlasVisibleFeatures(features, layers, { minDisplayPriority: 4 }).map((feature) => feature.id),
-    ["major", "tributary"]
+    atlasVisibleFeatures(features, layers, { minDisplayPriority: 7 }).map((feature) => feature.id),
+    ["major", "primary-tributary"]
+  );
+});
+
+test("atlas render policy keeps needs-review water out of the default overview", () => {
+  const features = [
+    {
+      id: "review-water",
+      layer: "water",
+      displayPriority: 8,
+      source: { name: "primary-modern-qinling", verification: "needs-review" }
+    },
+    {
+      id: "verified-water",
+      layer: "water",
+      displayPriority: 8,
+      source: { name: "primary-modern-qinling", verification: "external-vector" }
+    }
+  ];
+  const layers = [{ id: "water", defaultVisible: true }];
+
+  assert.deepEqual(
+    atlasVisibleFeatures(features, layers).map((feature) => feature.id),
+    ["verified-water"]
   );
 });

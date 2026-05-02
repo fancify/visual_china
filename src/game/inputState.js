@@ -12,12 +12,51 @@ const GAMEPLAY_KEYS = new Set([
   "shift"
 ]);
 
-export function normalizeInputKey(key) {
-  return key.toLowerCase();
+// 物理按键 code → 游戏按键名映射。在中文输入法激活时 event.key 不再是 'q'，
+// 但 event.code 始终是 'KeyQ'（物理按键，不受 IME 影响）。这是 macOS 中文用户
+// 反馈"按 Q 没反应"的根因。
+const KEY_CODE_MAP = {
+  KeyW: "w",
+  KeyA: "a",
+  KeyS: "s",
+  KeyD: "d",
+  KeyQ: "q",
+  KeyE: "e",
+  KeyK: "k",
+  KeyL: "l",
+  KeyT: "t",
+  KeyM: "m",
+  KeyO: "o",
+  KeyF: "f",
+  KeyJ: "j",
+  ArrowUp: "arrowup",
+  ArrowDown: "arrowdown",
+  ArrowLeft: "arrowleft",
+  ArrowRight: "arrowright",
+  ShiftLeft: "shift",
+  ShiftRight: "shift",
+  Space: " ",
+  Escape: "escape"
+};
+
+/**
+ * 把 KeyboardEvent 或字符串归一化成内部按键标识。
+ * 优先用 event.code（不受 IME 影响），fallback 到 event.key.toLowerCase()。
+ */
+export function normalizeInputKey(eventOrKey) {
+  if (typeof eventOrKey === "string") {
+    return eventOrKey.toLowerCase();
+  }
+  // KeyboardEvent
+  const fromCode = KEY_CODE_MAP[eventOrKey.code];
+  if (fromCode !== undefined) {
+    return fromCode;
+  }
+  return (eventOrKey.key ?? "").toLowerCase();
 }
 
-export function isGameplayInputKey(key) {
-  return GAMEPLAY_KEYS.has(normalizeInputKey(key));
+export function isGameplayInputKey(eventOrKey) {
+  return GAMEPLAY_KEYS.has(normalizeInputKey(eventOrKey));
 }
 
 export function movementAxesFromKeys(keys) {

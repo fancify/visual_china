@@ -54,6 +54,34 @@ export function zoneNameAt(x: number, z: number, sampler: TerrainSampler): strin
   return "盆地边缘";
 }
 
+export function terrainVegetationCover({
+  normalizedHeight,
+  slope,
+  river,
+  settlement
+}: {
+  normalizedHeight: number;
+  slope: number;
+  river: number;
+  settlement: number;
+}): {
+  agriculture: number;
+  riparian: number;
+  forest: number;
+} {
+  const lowland = MathUtils.clamp(1 - normalizedHeight / 0.42, 0, 1);
+  const gentle = MathUtils.clamp(1 - slope / 0.72, 0, 1);
+  const forestBand =
+    MathUtils.clamp(1 - Math.abs(normalizedHeight - 0.48) / 0.36, 0, 1) *
+    MathUtils.clamp(1 - slope / 0.92, 0, 1);
+
+  return {
+    agriculture: lowland * gentle * MathUtils.clamp(0.28 + settlement * 0.55, 0, 1),
+    riparian: MathUtils.clamp(river * 0.72 + lowland * gentle * 0.18, 0, 1),
+    forest: forestBand * MathUtils.clamp(0.35 + river * 0.18, 0, 1)
+  };
+}
+
 export function modeColor(
   mode: "terrain" | "livelihood" | "war" | "military",
   x: number,
@@ -77,6 +105,16 @@ export function modeColor(
       MathUtils.lerp(0.3, 0.42, h),
       MathUtils.lerp(0.24, 0.86, Math.pow(h, 1.15))
     );
+
+    const vegetation = terrainVegetationCover({
+      normalizedHeight: h,
+      slope,
+      river,
+      settlement: settle
+    });
+    color.lerp(new Color("#778d52"), vegetation.agriculture * 0.2);
+    color.lerp(new Color("#5f8052"), vegetation.riparian * 0.24);
+    color.lerp(new Color("#496840"), vegetation.forest * 0.32);
   } else if (mode === "livelihood") {
     color = new Color().setHSL(
       MathUtils.lerp(0.09, 0.24, settle),

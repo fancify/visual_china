@@ -42,6 +42,24 @@ test("converts tributary streams to lower-priority water features", () => {
   assert.match(atlasFeature.copy.summary, /汉江流域/);
 });
 
+test("converts primary tributaries into visible L1 water features", () => {
+  const atlasFeature = hydrographyFeatureToAtlasFeature({
+    id: "river-fenghe",
+    name: "沣河",
+    aliases: [],
+    kind: "river",
+    rank: 2,
+    basin: "黄河流域",
+    eraId: "modern",
+    source: { name: "primary-modern-qinling", confidence: "medium", verification: "external-vector" },
+    relations: [],
+    geometry: { points: [{ x: 0, y: 0 }, { x: 4, y: 8 }] }
+  });
+
+  assert.equal(atlasFeature.displayPriority, 8);
+  assert.equal(atlasFeature.terrainRole, "primary-tributary");
+});
+
 test("uses atlas display names without changing the underlying hydrography name", () => {
   const atlasFeature = hydrographyFeatureToAtlasFeature({
     id: "river-hanjiang",

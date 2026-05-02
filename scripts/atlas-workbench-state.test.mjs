@@ -25,12 +25,17 @@ const canvas = { width: 220, height: 270 };
 test("atlas workbench starts with default-visible layers enabled", () => {
   const state = createAtlasWorkbenchState(qinlingAtlasLayers);
 
+  // 地貌 / 水系 / 城市 / 关隘 / 古道 默认开，让用户打开 atlas 第一眼就能
+  // 看到秦岭叙事网络（长安、剑门关、陈仓道），而不是空白底图。
+  // 军事 / 民生 / 人文 是专题图层，按需打开。
   assert.equal(state.visibleLayerIds.has("landform"), true);
   assert.equal(state.visibleLayerIds.has("water"), true);
-  assert.equal(state.visibleLayerIds.has("road"), false);
-  assert.equal(state.visibleLayerIds.has("city"), false);
-  assert.equal(state.visibleLayerIds.has("pass"), false);
+  assert.equal(state.visibleLayerIds.has("road"), true);
+  assert.equal(state.visibleLayerIds.has("city"), true);
+  assert.equal(state.visibleLayerIds.has("pass"), true);
   assert.equal(state.visibleLayerIds.has("military"), false);
+  assert.equal(state.visibleLayerIds.has("livelihood"), false);
+  assert.equal(state.visibleLayerIds.has("culture"), false);
   assert.equal(state.isFullscreen, false);
   assert.deepEqual(state.mapView, { scale: 1, offsetX: 0, offsetY: 0 });
 });
@@ -81,6 +86,46 @@ test("atlas map zoom keeps the pointer anchored to the same world point", () => 
   assert.equal(Math.abs(before.y - after.y) < 0.000001, true);
 });
 
+test("fullscreen atlas cover mode fills a wide page instead of staying in a vertical strip", () => {
+  const state = {
+    ...createAtlasWorkbenchState(qinlingAtlasLayers),
+    mapView: { scale: 1, offsetX: 0, offsetY: 0, fitMode: "cover" }
+  };
+  const wideCanvas = { width: 1200, height: 600 };
+  const center = atlasMapWorldToCanvasPoint({ x: 0, y: 0 }, world, wideCanvas, state.mapView);
+  const west = atlasMapWorldToCanvasPoint(
+    { x: -world.width / 2, y: 0 },
+    world,
+    wideCanvas,
+    state.mapView
+  );
+  const east = atlasMapWorldToCanvasPoint(
+    { x: world.width / 2, y: 0 },
+    world,
+    wideCanvas,
+    state.mapView
+  );
+  // 新 mapOrientation：北 = -Z（point.y 是世界 z），南 = +Z。
+  const north = atlasMapWorldToCanvasPoint(
+    { x: 0, y: -world.depth / 2 },
+    world,
+    wideCanvas,
+    state.mapView
+  );
+  const south = atlasMapWorldToCanvasPoint(
+    { x: 0, y: world.depth / 2 },
+    world,
+    wideCanvas,
+    state.mapView
+  );
+
+  assert.deepEqual(center, { x: 600, y: 300 });
+  assert.equal(west.x, 0);
+  assert.equal(east.x, 1200);
+  assert.ok(north.y < 0, "cover mode should crop vertical edges on a wide canvas");
+  assert.ok(south.y > 600, "cover mode should crop vertical edges on a wide canvas");
+});
+
 test("atlas map pan shifts rendered canvas points without mutating prior state", () => {
   const state = createAtlasWorkbenchState(qinlingAtlasLayers);
   const panned = panAtlasMap(state, { x: 12, y: -8 });
@@ -90,6 +135,73 @@ test("atlas map pan shifts rendered canvas points without mutating prior state",
   assert.deepEqual(state.mapView, { scale: 1, offsetX: 0, offsetY: 0 });
   assert.equal(shifted.x - original.x, 12);
   assert.equal(shifted.y - original.y, -8);
+});
+
+test("fullscreen atlas pan is clamped so cover mode does not expose blank side margins", () => {
+  const state = {
+    ...createAtlasWorkbenchState(qinlingAtlasLayers),
+    mapView: { scale: 1, offsetX: 0, offsetY: 0, fitMode: "cover" }
+  };
+  const wideCanvas = { width: 1200, height: 600 };
+  const panned = panAtlasMap(
+    state,
+    { x: 400, y: 900 },
+    world,
+    wideCanvas
+  );
+  const west = atlasMapWorldToCanvasPoint(
+    { x: -world.width / 2, y: 0 },
+    world,
+    wideCanvas,
+    panned.mapView
+  );
+  const east = atlasMapWorldToCanvasPoint(
+    { x: world.width / 2, y: 0 },
+    world,
+    wideCanvas,
+    panned.mapView
+  );
+  // 新 mapOrientation：北 = -Z（point.y 是世界 z），南 = +Z。
+  const north = atlasMapWorldToCanvasPoint(
+    { x: 0, y: -world.depth / 2 },
+    world,
+    wideCanvas,
+    panned.mapView
+  );
+  const south = atlasMapWorldToCanvasPoint(
+    { x: 0, y: world.depth / 2 },
+    world,
+    wideCanvas,
+    panned.mapView
+  );
+
+  assert.equal(west.x, 0);
+  assert.equal(east.x, 1200);
+  assert.ok(north.y <= 0);
+  assert.ok(south.y >= 600);
+});
+
+test("fullscreen atlas zoom clamps offsets after returning to minimum scale", () => {
+  const state = panAtlasMap(
+    {
+      ...createAtlasWorkbenchState(qinlingAtlasLayers),
+      mapView: { scale: 2, offsetX: -900, offsetY: 900, fitMode: "cover" }
+    },
+    { x: 0, y: 0 },
+    world,
+    { width: 1200, height: 600 }
+  );
+  const zoomedOut = zoomAtlasMapAtPoint(
+    state,
+    0.01,
+    { x: 600, y: 300 },
+    world,
+    { width: 1200, height: 600 }
+  );
+
+  assert.equal(zoomedOut.mapView.scale, 1);
+  assert.equal(zoomedOut.mapView.offsetX, 0);
+  assert.ok(Math.abs(zoomedOut.mapView.offsetY) <= 500);
 });
 
 test("atlas map reset returns to the full-region view", () => {

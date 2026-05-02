@@ -19,7 +19,7 @@ export const qinlingRuntimeBudget: RuntimePerformanceBudget = {
     maxLoadedTerrainChunks: 25
   },
   scenery: {
-    maxTreesPerChunk: 28,
+    maxTreesPerChunk: 46,
     maxSettlementMarkersPerChunk: 4
   }
 };

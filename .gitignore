@@ -12,3 +12,9 @@ data/hydrography/raw/
 *.log
 .env
 .env.*
+
+# Playwright MCP screenshot debris (one-off iteration captures, not assets).
+/*.jpeg
+/*.png
+.playwright-mcp/
+atlas-snapshot.md

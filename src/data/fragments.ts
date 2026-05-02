@@ -20,7 +20,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "guanzhong-heartland",
     title: "腹地残简",
     zone: "关中平原",
-    position: new Vector2(2, 86),
+    position: new Vector2(84, -69),
     pickupLine: "你拾得《关中残简》：平原不只适合行走，它也适合组织。 ",
     details: {
       geo: "渭河平原连贯、开阔、坡度温和，是天然适合聚落、道路与农田扩展的空间。",
@@ -32,7 +32,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "north-loess-edge",
     title: "塬上风痕",
     zone: "关中北缘",
-    position: new Vector2(-42, 78),
+    position: new Vector2(-42, -78),
     pickupLine: "你拾得《塬上风痕》：边缘地带往往先看见道路，也先看见威胁。",
     details: {
       geo: "黄土台塬与平原交错的边缘，不像纯平原那样一马平川，却也不会像高山那样完全封闭。",
@@ -44,7 +44,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "qinling-wall",
     title: "山墙初见",
     zone: "秦岭北麓",
-    position: new Vector2(10, 38),
+    position: new Vector2(10, -38),
     pickupLine: "你拾得《山墙初见》：秦岭像墙，不因为它最高，而因为它连续。",
     details: {
       geo: "真正改变通行的往往不是单峰高度，而是山脊是否连续、谷道是否稀少。",
@@ -56,7 +56,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "mountain-pass",
     title: "关口回响",
     zone: "秦岭山口",
-    position: new Vector2(-32, 16),
+    position: new Vector2(-32, -16),
     pickupLine: "你拾得《关口回响》：真正重要的地方，常常不是山顶，而是能过山的那条缝。",
     details: {
       geo: "山口会把地形阻隔收束成一个可通行的狭窄切口，因此比周围大片山体更具行动意义。",
@@ -68,7 +68,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "hanzhong-hinge",
     title: "门轴之地",
     zone: "汉中盆地",
-    position: new Vector2(26, 8),
+    position: new Vector2(26, -8),
     pickupLine: "你拾得《门轴之地》：翻过山以后，并不是终点，而是方向突然变多了。",
     details: {
       geo: "汉中处在多条山间通路的汇接处，是盆地与谷道之间的缓冲平台。",
@@ -80,7 +80,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "southern-compression",
     title: "南下折岭",
     zone: "米仓山前",
-    position: new Vector2(0, -56),
+    position: new Vector2(0, 56),
     pickupLine: "你拾得《南下折岭》：同样是前进，山道会把时间拉长，把错误放大。",
     details: {
       geo: "离开汉中以后，南侧山地再次抬高，行动从盆地展开重新回到谷道压缩。",
@@ -92,7 +92,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "sichuan-gate",
     title: "入蜀片羽",
     zone: "入蜀谷口",
-    position: new Vector2(12, -84),
+    position: new Vector2(12, 84),
     pickupLine: "你拾得《入蜀片羽》：一旦道路再次变窄，争夺就会重新聚焦到少数节点。",
     details: {
       geo: "进入四川盆地前，山势与河谷会再次把路线压进更少的通道中。",
@@ -104,7 +104,7 @@ export const knowledgeFragments: KnowledgeFragment[] = [
     id: "chengdu-release",
     title: "盆地舒展",
     zone: "成都平原",
-    position: new Vector2(-42, -102),
+    position: new Vector2(-42, 102),
     pickupLine: "你拾得《盆地舒展》：穿过险道后，世界忽然像能被安顿下来。",
     details: {
       geo: "四川盆地内部地势相对舒缓，成都平原尤其适合农耕、水利与稳定聚落。",

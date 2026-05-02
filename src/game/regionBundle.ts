@@ -1,4 +1,8 @@
-import { loadDemAsset, type LoadedDemAsset } from "./demSampler";
+import {
+  loadDemAsset,
+  type ExperienceProfile,
+  type LoadedDemAsset
+} from "./demSampler";
 import {
   loadRegionChunkManifest,
   type RegionChunkManifest
@@ -19,6 +23,12 @@ export interface LoadedRegionBundle {
   chunkManifest: RegionChunkManifest | null;
   chunkManifestUrl: string | null;
   content: LoadedRegionContent | null;
+  /**
+   * 区域的 experience profile（速度 / 镜头 / 内容密度 / 事件密度乘子）。
+   * 来自 manifest.experienceProfile，运行时按这一份配置缩放体验节奏。
+   * 如果 manifest 没声明，就是 undefined，调用方按默认（=1）处理。
+   */
+  experienceProfile?: ExperienceProfile;
   warnings: RegionBundleWarning[];
 }
 
@@ -76,6 +86,7 @@ export async function loadRegionBundle(
     chunkManifest,
     chunkManifestUrl,
     content,
+    experienceProfile: terrain.manifest?.experienceProfile,
     warnings
   };
 }
