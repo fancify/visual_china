@@ -47,10 +47,15 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   );
   geometry.setAttribute("color", colorAttribute);
 
+  // transparent + opacity 默认 0 让 chunk 第一次出现时从透明 fade in，
+  // 不会"嗒"地一下从全黑突然变成完整地形（codex c039a4b P1 抓到 chunk
+  // 流式加载时 mesh.visible 切换是硬跳）。main.ts 维护 fade timer。
   const material = new MeshPhongMaterial({
     vertexColors: true,
     flatShading: true,
-    shininess: 8
+    shininess: 8,
+    transparent: true,
+    opacity: 0
   });
   attachTerrainShaderEnhancements(material, {
     heightFogColor: new Color(0xb6c4be)

@@ -2375,6 +2375,9 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         const existing = terrainChunkMeshes.get(chunk.id);
 
         if (existing) {
+          if (!existing.mesh.visible) {
+            existing.mesh.userData.fadeStart = clock.elapsedTime;
+          }
           existing.mesh.visible = true;
         }
 
@@ -2388,6 +2391,9 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         const existing = terrainChunkMeshes.get(chunk.id);
 
         if (existing) {
+          if (!existing.mesh.visible) {
+            existing.mesh.userData.fadeStart = clock.elapsedTime;
+          }
           existing.mesh.visible = true;
         }
 
@@ -2419,6 +2425,7 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         }
 
         terrainChunk.mesh.userData.chunkId = chunk.id;
+        terrainChunk.mesh.userData.fadeStart = clock.elapsedTime;
         terrainChunkGroup.add(terrainChunk.mesh);
         terrainChunkMeshes.set(chunk.id, terrainChunk);
       })()
@@ -2435,7 +2442,33 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
   );
 
   terrainChunkMeshes.forEach((terrainChunk, chunkId) => {
-    terrainChunk.mesh.visible = chunkIds.has(chunkId);
+    const wasVisible = terrainChunk.mesh.visible;
+    const willBeVisible = chunkIds.has(chunkId);
+    if (willBeVisible && !wasVisible) {
+      terrainChunk.mesh.userData.fadeStart = clock.elapsedTime;
+    }
+    terrainChunk.mesh.visible = willBeVisible;
+  });
+}
+
+// Chunk fade-in：每帧把刚切到 visible 的 chunk 从 opacity 0 涨到 1，
+// 1.2 秒走完。复用 mesh.userData.fadeStart 时间戳做差。
+function updateChunkFadeIn(): void {
+  const fadeDuration = 1.2;
+  terrainChunkMeshes.forEach((terrainChunk) => {
+    const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
+    const material = terrainChunk.mesh.material as MeshPhongMaterial;
+    if (fadeStart === undefined) {
+      material.opacity = 1;
+      return;
+    }
+    const elapsed = clock.elapsedTime - fadeStart;
+    if (elapsed >= fadeDuration) {
+      material.opacity = 1;
+      delete terrainChunk.mesh.userData.fadeStart;
+      return;
+    }
+    material.opacity = MathUtils.clamp(elapsed / fadeDuration, 0, 1);
   });
 }
 
@@ -3034,6 +3067,7 @@ function update(deltaSeconds: number): void {
   applyWaterEnvironmentVisuals(visuals);
   waterSurface.setTime(clock.elapsedTime);
   updateCityLodFade();
+  updateChunkFadeIn();
   updateNearbyRealCity();
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 60;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
