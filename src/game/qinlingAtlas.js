@@ -79,7 +79,13 @@ export const qinlingAtlasLayers = [
     id: "scenic",
     name: "名胜",
     defaultVisible: true,
-    description: "太白山、青城山、九寨沟、法门寺、乾陵——区域内最有名的山岳与古迹。"
+    description: "太白山、青城山、九寨沟、法门寺、乾陵、黄龙、汉中天坑——区域内最有名的山岳古迹与地貌奇观。"
+  },
+  {
+    id: "ancient",
+    name: "考古",
+    defaultVisible: true,
+    description: "三星堆、金沙、大地湾——区域内已发掘的史前/古蜀文明遗址（真实坐标）。"
   },
   {
     id: "livelihood",
@@ -220,8 +226,61 @@ export const qinlingScenicLandmarks = [
     summary: "唐高宗与武则天合葬陵，唐代石刻无字碑、石狮以雄浑著称。",
     symbol: scenicHeritageSymbol,
     role: "imperial-mausoleum"
+  },
+  {
+    id: "scenic-huanglong",
+    name: "黄龙",
+    lat: 32.75,
+    lon: 103.83,
+    summary: "高原钙华梯田，金黄水池层层叠瀑，与九寨沟同为阿坝喀斯特世界遗产。",
+    symbol: scenicMountainSymbol,
+    role: "travertine-terraces"
+  },
+  {
+    id: "scenic-hanzhong-tiankeng",
+    name: "汉中天坑群",
+    lat: 32.50,
+    lon: 107.80,
+    summary: "2016 年发现的世界级喀斯特天坑群，分布在镇巴/宁强/南郑/西乡。",
+    symbol: scenicMountainSymbol,
+    role: "karst-sinkhole"
   }
 ];
+
+// 考古遗址：跟 scenicLandmarks 同样 schema，但 layer 是 ancient（考古），
+// 3D 渲染走另一组 mesh（青铜台座 / 太阳神鸟 / 仰韶圆台）。
+export const qinlingAncientSites = [
+  {
+    id: "ancient-sanxingdui",
+    name: "三星堆",
+    lat: 30.99,
+    lon: 104.34,
+    summary: "古蜀青铜文明祭祀坑（约前 3000–前 1200 年），纵目面具、青铜立人。",
+    role: "shu-bronze-altar"
+  },
+  {
+    id: "ancient-jinsha",
+    name: "金沙遗址",
+    lat: 30.68,
+    lon: 104.00,
+    summary: "古蜀晚期都邑（约前 1200–前 650 年），太阳神鸟金箔、玉璋祭祀坑。",
+    role: "shu-sun-bird"
+  },
+  {
+    id: "ancient-dadiwan",
+    name: "大地湾遗址",
+    lat: 35.05,
+    lon: 105.91,
+    summary: "甘肃秦安，仰韶文化早期大型聚落（约前 5800 年），F901 大房址。",
+    role: "yangshao-dwelling"
+  }
+];
+
+const ancientSymbol = {
+  symbol: "ruin-podium",
+  color: "#a8895c",
+  emphasis: "archaeological-site"
+};
 
 const qinlingModernWaterFeatures = qinlingModernHydrography.features.map(
   hydrographyFeatureToAtlasFeature
@@ -300,8 +359,8 @@ export const qinlingAtlasFeatures = [
   // 线，atlas 跟着对齐。
   // 真实坐标城市批量注入。
   ...realQinlingCities.map(realCityToAtlasFeature),
-  // 著名景点：太白山 / 青城山 / 九寨沟 / 法门寺 / 乾陵——全部用真实坐标，
-  // verification: external-vector，跟 3D 一致地展示。
+  // 著名景点：太白山 / 青城山 / 九寨沟 / 法门寺 / 乾陵 / 黄龙 / 汉中天坑——
+  // 全部真实坐标，verification: external-vector，跟 3D 一致地展示。
   ...qinlingScenicLandmarks.map((spot) => ({
     id: spot.id,
     name: spot.name,
@@ -318,6 +377,24 @@ export const qinlingAtlasFeatures = [
     },
     copy: { summary: spot.summary },
     visualRule: spot.symbol
+  })),
+  // 考古遗址 atlas feature：三星堆 / 金沙 / 大地湾，layer ancient。
+  ...qinlingAncientSites.map((site) => ({
+    id: site.id,
+    name: site.name,
+    layer: "ancient",
+    geometry: "point",
+    world: scenicWorldPoint(site.lon, site.lat),
+    displayPriority: 9,
+    terrainRole: site.role,
+    themes: ["culture", "history"],
+    source: {
+      name: "real-archaeological-site",
+      confidence: "verified",
+      verification: "external-vector"
+    },
+    copy: { summary: site.summary },
+    visualRule: ancientSymbol
   }))
 ];
 

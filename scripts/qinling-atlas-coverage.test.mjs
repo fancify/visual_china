@@ -19,7 +19,7 @@ test("Qinling 2D atlas has the required independent map layers", () => {
   // 关隘 / 民生（都江堰水利工程）。
   assert.deepEqual(
     qinlingAtlasLayers.map((layer) => layer.id),
-    ["water", "city", "pass", "scenic", "livelihood"]
+    ["water", "city", "pass", "scenic", "ancient", "livelihood"]
   );
   assert.equal(qinlingAtlasPolicy.coordinatePolicy, "strict-geographic");
   assert.equal(qinlingAtlasPolicy.sourceOfTruth, "2d-atlas-first");
