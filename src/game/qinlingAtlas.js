@@ -317,10 +317,21 @@ export const qinlingAtlasFeatures = [
   // 老的 7 个手画城市（长安/咸阳/宝鸡-陈仓/汉中/广元/昭化/成都）已删，
   // 用户反馈 atlas 跟 3D 信息对不上、3D 更准——atlas 现在跟 3D 共用同一
   // 套真实坐标。
-  // 都江堰 已经从 realQinlingCities 当作真实城市渲染（id real-city-
-  // dujiangyan），原 livelihood-dujiangyan 同坐标会撞 hit-test → 删除
-  // （codex 8c58368 P3）。如果以后想给水利工程一个独立"民生"层 POI，
-  // 把它放在偏移坐标 + 不同 id 即可。
+  // 都江堰 城市自身在 realQinlingCities 里渲染（id real-city-dujiangyan）；
+  // 这里给民生层留一个独立的"水利工程"POI，避开 hit-test 跟城市相撞，
+  // 坐标向南偏 2 单元代表 鱼嘴/宝瓶口/飞沙堰 的水利核心区。
+  feature({
+    id: "livelihood-dujiangyan-engineering",
+    name: "都江堰水利工程",
+    layer: "livelihood",
+    geometry: "point",
+    world: point(-86.07, 93.5),
+    displayPriority: 8,
+    terrainRole: "irrigation-node",
+    summary: "战国李冰主持，鱼嘴-宝瓶口-飞沙堰把岷江分流灌溉成都平原。",
+    visualRule: { symbol: "waterwork", color: "#7fc8a9", emphasis: "civil-engineering" },
+    themes: ["livelihood", "culture"]
+  }),
   feature({
     id: "pass-dasanguan",
     name: "大散关",
