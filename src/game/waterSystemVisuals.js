@@ -121,13 +121,15 @@ export function buildWaterRibbonVertices(points, options) {
 
   const halfWidth = options.width * 0.5;
   const yOffset = options.yOffset ?? 0;
-  // Slope-aware Y（capped lift）：每个截面在中心、左、右三点采样地形。
-  // - cross-slope（一边比中心高）：抬到 upslope 一侧上方，避免上坡边
-  //   扎进地形（codex a75386c review 抓到的"66/1278 顶点埋地"）。
-  // - incised channel（两岸都比河床高）：如果直接用 max(left,right)
-  //   会让 ribbon 抬到岸顶高度，跟不再贴着河床的 codex 62b24c5 review
-  //   抓到的"floating river"问题一致。所以把抬升量上限封顶：最多比中
-  //   心高 maxLift = 0.6m，深刻河床时仍然保持在中心略上方。
+  // Slope-aware Y（capped lift, never below center）：每个截面在中心、
+  // 左、右三点采样地形。
+  // - cross-slope（一边比中心高）：抬到 upslope 上方，最多比中心高
+  //   maxLift（封顶），避免深刻河床上 ribbon 飞到岸顶（codex 62b24c5
+  //   review 抓到的 "floating river"）。
+  // - convex（中心比两岸高，山顶河）：抬升量 = 0，ribbon 保持在中心，
+  //   绝对不会比中心还低（codex 3a26910 review 抓到 cap 把山顶处压到
+  //   地下导致俯视看不见——同时也是用户反馈"高视角时河流看不见"的
+  //   根因）。
   const maxLift = 0.6;
   const sections = points.map((point, index) => {
     const normal = pointNormal(points, index);
@@ -139,8 +141,13 @@ export function buildWaterRibbonVertices(points, options) {
     const yLeft = options.sampleHeight(leftX, leftZ);
     const yRight = options.sampleHeight(rightX, rightZ);
     const upslope = Math.max(yLeft, yRight);
-    const baseY = Math.min(upslope, yCenter + maxLift);
-    return waterRibbonCrossSection(point, normal, halfWidth, baseY + yOffset);
+    const liftAmount = Math.min(Math.max(0, upslope - yCenter), maxLift);
+    return waterRibbonCrossSection(
+      point,
+      normal,
+      halfWidth,
+      yCenter + liftAmount + yOffset
+    );
   });
   const vertices = [];
   const pushVertex = (point) => {
