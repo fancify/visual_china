@@ -434,9 +434,15 @@ const terrainChunkGroup = new Group();
 scene.add(terrainChunkGroup);
 
 const waterSurface = createWaterSurfaceMaterial();
+// 旧的 ambient water plane（一块 60x125 单元的平面，固定 Y）会被用户看到
+// "浮在地形上空的一条带子"——尤其当 terrain 边缘外露时它会作为水色矩形露出。
+// 真正的河流由 waterSystemVisuals 单独渲染并 sample 地形高度，所以这层
+// ambient plane 弊大于利，先 visible=false。waterSurface shader 仍被河流
+// ribbon 复用（共用 material），所以保留 mesh 和 material 实例不删。
 const waterRibbon = new Mesh(new PlaneGeometry(1, 1), waterSurface.material);
 waterRibbon.rotation.x = -Math.PI / 2;
 waterRibbon.position.y = -8;
+waterRibbon.visible = false;
 scene.add(waterRibbon);
 const ambientWaterStyle: ReturnType<typeof waterVisualStyle> = {
   bankWidth: 0,
