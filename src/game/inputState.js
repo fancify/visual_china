@@ -28,6 +28,7 @@ const KEY_CODE_MAP = {
   KeyM: "m",
   KeyO: "o",
   KeyF: "f",
+  KeyI: "i",
   KeyJ: "j",
   ArrowUp: "arrowup",
   ArrowDown: "arrowdown",
