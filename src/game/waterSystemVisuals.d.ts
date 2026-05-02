@@ -50,13 +50,8 @@ export function waterVisualStyle(feature: QinlingAtlasFeature): {
   bankOpacity: number;
   ribbonWidth: number;
   ribbonYOffset: number;
-  lineYOffset: number;
   ribbonOpacity: number;
-  highlightWidth: number;
-  lineOpacity: number;
   depthTest: boolean;
-  lineDepthTest: boolean;
-  highlightDepthTest: boolean;
 };
 
 export function waterEnvironmentVisualStyle(
@@ -74,7 +69,5 @@ export function waterEnvironmentVisualStyle(
 ): {
   bankOpacity: number;
   ribbonOpacity: number;
-  lineOpacity: number;
   colorMultiplier: number;
-  highlightMultiplier: number;
 };
