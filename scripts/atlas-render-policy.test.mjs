@@ -80,14 +80,14 @@ test("atlas render policy does not expose unverified or raw evidence features as
   );
 });
 
-test("atlas render order puts water under city/pass/livelihood point labels", () => {
-  // landform / road / military / culture 整层删除后，draw order 跟着收缩
-  // 到 4 层。水系作为底色先画，pass / livelihood 作为叙事节点后画压在
-  // 城市之上。
+test("atlas render order puts water under city/pass/scenic/livelihood point labels", () => {
+  // landform / road / military / culture 整层删除、scenic（名胜）后续加上。
+  // 水系作为底色先画，叙事节点 pass / scenic / livelihood 后画压在城市之上。
   assert.deepEqual(atlasLayerDrawOrder, [
     "water",
     "city",
     "pass",
+    "scenic",
     "livelihood"
   ]);
 });
