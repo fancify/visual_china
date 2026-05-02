@@ -1,4 +1,4 @@
-import { CanvasTexture, MathUtils } from "three";
+import { CanvasTexture } from "three";
 
 /**
  * 这一组 helper 用 Canvas2D 离屏画一些简单贴图（光晕、月亮、云朵），
@@ -85,20 +85,35 @@ export function createMoonTexture(size = 256): CanvasTexture {
   return texture;
 }
 
+/**
+ * 星空 dome 上的随机点分布。
+ *
+ * 旧版 `((index * 61) % 100) / 100` 只产 100 档 elevation，count > 100 后
+ * 每档堆很多点，夜空看上去会出现明显的水平条纹。换成"球面 Fibonacci 螺旋"
+ * （golden-angle azimuth + 单调 colatitude）：在球面上严格无重叠地分布
+ * count 个点，5000 颗也不会出现 banding。
+ *
+ * 这里只取上半球（cos(phi) >= 0.08，对应高度角 ~4.6° 以上），地平线下不渲染。
+ */
 export function createStarDomePositions(
   count: number,
   radius: number
 ): Float32Array {
   const positions = new Float32Array(count * 3);
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const minSinElevation = 0.08;
 
   for (let index = 0; index < count; index += 1) {
-    const azimuth = ((index * 137.508) % 360) * MathUtils.DEG2RAD;
-    const elevation = MathUtils.lerp(0.08, 0.96, ((index * 61) % 100) / 100);
-    const horizontalRadius = Math.cos(elevation) * radius;
+    // (index + 0.5) / count 在 (0, 1) 区间均匀分布；
+    // 映射到 sin(elevation) ∈ [minSinElevation, 1] 实现"只用上半球"。
+    const sinElevation =
+      minSinElevation + ((index + 0.5) / count) * (1 - minSinElevation);
+    const cosElevation = Math.sqrt(Math.max(0, 1 - sinElevation * sinElevation));
+    const azimuth = index * goldenAngle;
 
-    positions[index * 3] = Math.cos(azimuth) * horizontalRadius;
-    positions[index * 3 + 1] = Math.sin(elevation) * radius;
-    positions[index * 3 + 2] = Math.sin(azimuth) * horizontalRadius;
+    positions[index * 3] = Math.cos(azimuth) * cosElevation * radius;
+    positions[index * 3 + 1] = sinElevation * radius;
+    positions[index * 3 + 2] = Math.sin(azimuth) * cosElevation * radius;
   }
 
   return positions;
