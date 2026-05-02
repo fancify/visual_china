@@ -2902,11 +2902,17 @@ function update(deltaSeconds: number): void {
     cloud.material.color.copy(visuals.cloudColor);
   });
 
+  // 把 effective weather 的连续值离散化（步长 0.1）丢进 signature，让
+  // weather 平滑过渡时 terrain 颜色每 1.2 秒重涂一次，跟上雨量/雪量/雾
+  // 浓度的渐变（codex df32918 review 抓到 signature 只在 discrete 切换时
+  // 变，整个 12 秒过渡里 terrain 只会重画一两次）。
   const terrainColorSignature = [
     currentMode,
     environmentController.state.season,
     environmentController.state.weather,
-    Math.floor(environmentController.state.timeOfDay * 3)
+    Math.floor(environmentController.state.timeOfDay * 3),
+    Math.round((visuals.terrainSaturationMul ?? 1) * 10),
+    Math.round((visuals.terrainLightnessMul ?? 1) * 10)
   ].join(":");
 
   if (terrainColorSignature !== lastTerrainColorSignature) {
@@ -3096,23 +3102,28 @@ function update(deltaSeconds: number): void {
   mistPlane.position.x = player.position.x * 0.015;
   mistPlane.position.z = player.position.z * 0.02;
 
-  const weather = environment.weather;
   precipitation.position.x = player.position.x;
   precipitation.position.z = player.position.z;
   precipitation.position.y = player.position.y;
-  precipitation.visible = weather === "rain" || weather === "snow";
+  // 用平滑过渡后的 precipitationOpacity 决定可见性，而不是 discrete state。
+  // 否则切到 clear 时立刻 visible=false，effectiveWeather 还没把粒子 fade
+  // 完就一帧消失（codex df32918 review）。0.001 阈值留点 cushion 让收尾
+  // 也走 fade，不会肉眼看到突然没。
+  precipitation.visible = visuals.precipitationOpacity > 0.001;
   precipitationMaterial.opacity = visuals.precipitationOpacity;
   precipitationMaterial.color.copy(visuals.precipitationColor);
   precipitationMaterial.size = visuals.precipitationSize;
 
   if (precipitation.visible) {
-    const fallSpeed = weather === "snow" ? 4.5 : 18;
+    // 雪 vs 雨 fall speed：用 precipitationSize 做代理（雪粒子大，落得慢）。
+    const snowiness = MathUtils.clamp((visuals.precipitationSize - 0.18) / 0.24, 0, 1);
+    const fallSpeed = MathUtils.lerp(18, 4.5, snowiness);
 
     for (let index = 0; index < precipitationCount; index += 1) {
       const i3 = index * 3;
       precipitationPositions[i3 + 1] -= fallSpeed * deltaSeconds;
 
-      if (weather === "snow") {
+      if (snowiness > 0.5) {
         precipitationPositions[i3] += Math.sin(clock.elapsedTime + precipitationOffsets[index]!) * 0.15;
         precipitationPositions[i3 + 2] += Math.cos(clock.elapsedTime * 0.8 + precipitationOffsets[index]!) * 0.08;
       }
