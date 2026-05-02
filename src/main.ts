@@ -1088,15 +1088,13 @@ function rebuildWaterSystemVisuals(): void {
       opacity: waterStyle.ribbonOpacity,
       renderOrder: 4
     });
-    // 高视角河流可见性：第二轮调（用户在 polygonOffset -2/-4 的版本仍
-    // 反馈"俯视看不见"）。根因：terrain mesh 在 vertex 间做线性插值，
-    // ribbon 截面在不同 sample 点取 max 后做不同插值——像素级两种插值
-    // 路径下，terrain 跑赢 depth test 把 ribbon 盖住。彻底修：关掉
-    // ribbon 的 depthTest，让它无视 depth buffer 始终画在 terrain 上面。
-    // 副作用：相机如果隔山看远处的河，ribbon 会"穿透"山体显示——但
-    // (a) 河水在低洼处，山在两侧，正常机位很少出现这种相对几何；
-    // (b) 即使出现一点点也比"俯视看不见"好。配合 renderOrder 4，确保
-    // ribbon 在 terrain 之后画。
+    // 高视角河流可见性 - 第三轮（commit 98e704b 试过 depthTest:false，
+    // codex 抓到会让 ribbon 压过岸边树；上一轮 polygonOffset -8/-16
+    // 又不够）。最终接受 trade-off：depthTest:false 让 ribbon 始终可
+    // 见，岸边树有时会被略微叠盖。理由 1）用户多次反馈"高视角看不见河"
+    // 是 P0；2）岸树被叠在视觉上不刺眼（树是小尖锥、ribbon 半透明，
+    // 重叠像素融合后仍能看到树形）；3）河流是地图上最重要的视觉锚，
+    // 必须始终可见。
     ribbon.material.depthTest = false;
     ribbon.material.polygonOffset = true;
     ribbon.material.polygonOffsetFactor = -2;
