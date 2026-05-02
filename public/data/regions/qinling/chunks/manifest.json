@@ -19,8 +19,8 @@
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     },
     {
@@ -37,8 +37,8 @@
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     },
     {
@@ -55,8 +55,8 @@
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     },
     {
@@ -73,8 +73,8 @@
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     },
     {
@@ -91,8 +91,8 @@
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -109,8 +109,8 @@
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -127,8 +127,8 @@
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -145,8 +145,8 @@
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -235,8 +235,8 @@
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -253,8 +253,8 @@
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -271,8 +271,8 @@
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -289,8 +289,8 @@
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -307,8 +307,8 @@
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     },
     {
@@ -325,8 +325,8 @@
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     },
     {
@@ -343,8 +343,8 @@
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     },
     {
@@ -361,8 +361,8 @@
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     }
   ]

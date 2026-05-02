@@ -1,5 +1,6 @@
 export function hydrographyFeatureToAtlasFeature(feature) {
   const mainRiver = feature.rank <= 1;
+  const primaryTributary = feature.rank === 2;
   const displayName = feature.displayName ?? feature.name;
   const stableWaterId = feature.id.replace(/^(river|stream)-/, "");
 
@@ -9,8 +10,8 @@ export function hydrographyFeatureToAtlasFeature(feature) {
     layer: "water",
     geometry: feature.kind === "lake" || feature.kind === "wetland" ? "area" : "polyline",
     world: feature.geometry,
-    displayPriority: mainRiver ? 10 : 7,
-    terrainRole: mainRiver ? "main-river" : "tributary-river",
+    displayPriority: mainRiver ? 10 : primaryTributary ? 8 : 7,
+    terrainRole: mainRiver ? "main-river" : primaryTributary ? "primary-tributary" : "tributary-river",
     themes: ["terrain", "livelihood"],
     source: {
       ...(feature.source ?? {}),

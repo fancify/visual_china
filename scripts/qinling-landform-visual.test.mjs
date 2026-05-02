@@ -5,6 +5,9 @@ import test from "node:test";
 const asset = JSON.parse(
   fs.readFileSync("public/data/qinling-slice-dem.json", "utf8")
 );
+const regionManifest = JSON.parse(
+  fs.readFileSync("public/data/regions/qinling/manifest.json", "utf8")
+);
 
 function sampleHeightAt(lon, lat) {
   const { bounds, grid, heights } = asset;
@@ -86,6 +89,55 @@ test("Qinling real DEM uses all required FABDEM source tiles", () => {
   assert.ok(
     !asset.notes.some((note) => note.includes("Missing required tiles")),
     "Qinling DEM should not contain neighbor-interpolated FABDEM tile gaps"
+  );
+});
+
+test("Qinling L1 declares national touring resolution strategy", () => {
+  const strategy = asset.resolutionStrategy;
+
+  assert.equal(strategy?.experienceLayer, "L1-national-tour-local-pilot");
+  assert.equal(strategy?.baseTerrainResolutionMeters, 90);
+  assert.equal(strategy?.detailCorrectionResolutionMeters, 30);
+  assert.equal(strategy?.sparseRegionResolutionMeters, 450);
+  assert.equal(strategy?.coordinatePolicy, "strict-geographic");
+  assert.ok(
+    strategy.runtimeSampleSpacingKm.eastWest >= 2 &&
+      strategy.runtimeSampleSpacingKm.eastWest <= 2.4
+  );
+  assert.ok(
+    strategy.runtimeSampleSpacingKm.northSouth >= 2.2 &&
+      strategy.runtimeSampleSpacingKm.northSouth <= 2.5
+  );
+  assert.deepEqual(
+    strategy.detailCorrectionZones.map((zone) => zone.id),
+    [
+      "guanzhong-plain",
+      "hanzhong-basin",
+      "northern-sichuan-basin",
+      "qinling-shu-road-corridors"
+    ]
+  );
+  assert.ok(
+    asset.notes.some((note) => note.includes("90m touring terrain base")),
+    "asset notes should describe the 90m L1 base"
+  );
+  assert.ok(
+    asset.notes.some((note) => note.includes("30m correction zones")),
+    "asset notes should describe the 30m correction zones"
+  );
+});
+
+test("Qinling region manifest exposes the same scale architecture", () => {
+  assert.equal(
+    regionManifest.scaleArchitecture?.currentLayer,
+    asset.resolutionStrategy.experienceLayer
+  );
+  assert.equal(regionManifest.scaleArchitecture?.nationalTouringBaseMeters, 90);
+  assert.equal(regionManifest.scaleArchitecture?.detailCorrectionMeters, 30);
+  assert.equal(regionManifest.scaleArchitecture?.sparseRegionMeters, 450);
+  assert.deepEqual(
+    regionManifest.scaleArchitecture?.runtimeSampleSpacingKm,
+    asset.resolutionStrategy.runtimeSampleSpacingKm
   );
 });
 

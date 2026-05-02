@@ -12,6 +12,21 @@ import {
 import { TerrainSampler } from "./demSampler";
 import type { RuntimePerformanceBudget } from "./performanceBudget";
 
+// 共享 geometry / material：scenery 在每个 chunk 加载时被频繁创建/卸载，
+// 共享资源避免重复 GPU 上传和材质实例数膨胀。
+const sharedTreeGeometry = new ConeGeometry(0.38, 1.75, 5);
+const sharedTreeMaterial = new MeshPhongMaterial({
+  color: 0x4f7f58,
+  flatShading: true,
+  shininess: 5
+});
+const sharedSettlementGeometry = new CylinderGeometry(0.42, 0.58, 1.4, 5);
+const sharedSettlementMaterial = new MeshPhongMaterial({
+  color: 0xb89b63,
+  flatShading: true,
+  shininess: 7
+});
+
 function pseudoRandom(seed: number): number {
   const value = Math.sin(seed * 12.9898) * 43758.5453;
   return value - Math.floor(value);
@@ -27,39 +42,18 @@ function normalizedHeight(height: number, sampler: TerrainSampler): number {
   );
 }
 
-function disposeMaterial(material: Mesh["material"]): void {
-  if (Array.isArray(material)) {
-    material.forEach((entry) => entry.dispose());
-    return;
-  }
-
-  material.dispose();
-}
-
 export function createChunkScenery(
   sampler: TerrainSampler,
   budget: RuntimePerformanceBudget["scenery"]
 ): Group {
   const group = new Group();
   const dummy = new Object3D();
-  const treeGeometry = new ConeGeometry(0.38, 1.75, 5);
-  const treeMaterial = new MeshPhongMaterial({
-    color: 0x4f7f58,
-    flatShading: true,
-    shininess: 5
-  });
-  const settlementGeometry = new CylinderGeometry(0.42, 0.58, 1.4, 5);
-  const settlementMaterial = new MeshPhongMaterial({
-    color: 0xb89b63,
-    flatShading: true,
-    shininess: 7
-  });
 
   const treeMatrices: Matrix4[] = [];
   const settlementMatrices: Matrix4[] = [];
   const { width, depth } = sampler.asset.world;
-  const columns = 9;
-  const rows = 9;
+  const columns = 12;
+  const rows = 12;
 
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
@@ -73,14 +67,17 @@ export function createChunkScenery(
       const slope = sampler.sampleSlope(x, z);
       const river = sampler.sampleRiver(x, z);
       const settlement = sampler.sampleSettlement(x, z);
+      const forestBand = Math.max(0, 1 - Math.abs(h - 0.46) / 0.34);
+      const lowlandGreen = Math.max(0, 1 - h / 0.44) * Math.max(0, 1 - slope / 0.72);
+      const vegetationChance = 0.12 + river * 0.22 + forestBand * 0.24 + lowlandGreen * 0.16;
 
       if (
         treeMatrices.length < budget.maxTreesPerChunk &&
-        h > 0.32 &&
-        h < 0.74 &&
-        slope < 0.5 &&
+        h > 0.18 &&
+        h < 0.78 &&
+        slope < 0.62 &&
         settlement < 0.74 &&
-        pseudoRandom(seed + 31) < 0.28 + river * 0.12
+        pseudoRandom(seed + 31) < vegetationChance
       ) {
         const scale = 0.62 + pseudoRandom(seed + 43) * 0.55;
         dummy.position.set(x, height + 0.88 * scale, z);
@@ -108,33 +105,46 @@ export function createChunkScenery(
   }
 
   const trees = new InstancedMesh(
-    treeGeometry,
-    treeMaterial,
+    sharedTreeGeometry,
+    sharedTreeMaterial,
     Math.max(1, treeMatrices.length)
   );
   trees.count = treeMatrices.length;
   treeMatrices.forEach((matrix, index) => trees.setMatrixAt(index, matrix));
   trees.instanceMatrix.needsUpdate = true;
+  trees.userData.sharedResources = true;
   group.add(trees);
 
   const settlements = new InstancedMesh(
-    settlementGeometry,
-    settlementMaterial,
+    sharedSettlementGeometry,
+    sharedSettlementMaterial,
     Math.max(1, settlementMatrices.length)
   );
   settlements.count = settlementMatrices.length;
-  settlementMatrices.forEach((matrix, index) => settlements.setMatrixAt(index, matrix));
+  settlementMatrices.forEach((matrix, index) =>
+    settlements.setMatrixAt(index, matrix)
+  );
   settlements.instanceMatrix.needsUpdate = true;
+  settlements.userData.sharedResources = true;
   group.add(settlements);
 
   return group;
 }
 
 export function disposeScenery(group: Group): void {
+  // geometry / material 是模块级共享资源，不能 dispose；
+  // InstancedMesh 自身的 instanceMatrix buffer 由 GC 回收。
   group.traverse((child) => {
-    if (child instanceof Mesh) {
+    if (child instanceof InstancedMesh) {
+      // 释放 instance 缓冲，避免 GPU 端孤儿 buffer 累积。
+      child.dispose();
+    } else if (child instanceof Mesh) {
       child.geometry.dispose();
-      disposeMaterial(child.material);
+      if (Array.isArray(child.material)) {
+        child.material.forEach((entry) => entry.dispose());
+      } else {
+        child.material.dispose();
+      }
     }
   });
 }

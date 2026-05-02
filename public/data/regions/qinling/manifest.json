@@ -7,7 +7,7 @@
   "coordinatePolicy": "strict-geographic",
   "parentWorldId": "china-mainland",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-01T10:59:47.229Z",
+  "generatedAt": "2026-05-01T12:33:46.345Z",
   "bounds": {
     "west": 103.5,
     "east": 109,
@@ -21,6 +21,58 @@
   "geographicFootprintKm": {
     "width": 420,
     "depth": 560
+  },
+  "scaleArchitecture": {
+    "currentLayer": "L1-national-tour-local-pilot",
+    "nationalTouringBaseMeters": 90,
+    "detailCorrectionMeters": 30,
+    "sparseRegionMeters": 450,
+    "runtimeSampleSpacingKm": {
+      "eastWest": 2.19,
+      "northSouth": 2.33
+    },
+    "detailCorrectionZones": [
+      {
+        "id": "guanzhong-plain",
+        "role": "basin-edge-readability",
+        "bounds": {
+          "west": 106.4,
+          "east": 109,
+          "south": 33.75,
+          "north": 34.95
+        }
+      },
+      {
+        "id": "hanzhong-basin",
+        "role": "basin-floor-readability",
+        "bounds": {
+          "west": 106.05,
+          "east": 108,
+          "south": 32.55,
+          "north": 33.55
+        }
+      },
+      {
+        "id": "northern-sichuan-basin",
+        "role": "basin-transition-readability",
+        "bounds": {
+          "west": 103.5,
+          "east": 106.25,
+          "south": 30.4,
+          "north": 32.35
+        }
+      },
+      {
+        "id": "qinling-shu-road-corridors",
+        "role": "route-corridor-terrain",
+        "bounds": {
+          "west": 104.7,
+          "east": 108.65,
+          "south": 31.45,
+          "north": 34.65
+        }
+      }
+    ]
   },
   "experienceScaleMultiplier": 2.3,
   "experienceProfile": {

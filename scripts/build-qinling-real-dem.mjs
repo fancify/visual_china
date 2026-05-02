@@ -7,6 +7,7 @@ import {
   intersectBounds,
   parseFabdemTileName,
   qinlingBounds,
+  qinlingResolutionStrategy,
   qinlingOutputGrid,
   qinlingRegionManifestBounds,
   qinlingWorkspacePath,
@@ -110,6 +111,68 @@ function normalizeHeights(rawHeights, minRawHeight, maxRawHeight) {
   }
 
   return { normalized, minHeight, maxHeight };
+}
+
+function geoAt(column, row) {
+  const lon =
+    qinlingBounds.west +
+    (column / (columns - 1)) * (qinlingBounds.east - qinlingBounds.west);
+  const lat =
+    qinlingBounds.north -
+    (row / (rows - 1)) * (qinlingBounds.north - qinlingBounds.south);
+
+  return { lon, lat };
+}
+
+function zoneWeightAt(lon, lat, zone) {
+  const { bounds, correctionWeight } = zone;
+
+  if (
+    lon < bounds.west ||
+    lon > bounds.east ||
+    lat < bounds.south ||
+    lat > bounds.north
+  ) {
+    return 0;
+  }
+
+  const lonSpan = bounds.east - bounds.west || 1;
+  const latSpan = bounds.north - bounds.south || 1;
+  const westFade = smoothstep((lon - bounds.west) / lonSpan, 0, 0.16);
+  const eastFade = smoothstep((bounds.east - lon) / lonSpan, 0, 0.16);
+  const southFade = smoothstep((lat - bounds.south) / latSpan, 0, 0.18);
+  const northFade = smoothstep((bounds.north - lat) / latSpan, 0, 0.18);
+
+  return correctionWeight * Math.min(westFade, eastFade, southFade, northFade);
+}
+
+function detailCorrectionWeightAt(lon, lat) {
+  return qinlingResolutionStrategy.detailCorrectionZones.reduce(
+    (maxWeight, zone) => Math.max(maxWeight, zoneWeightAt(lon, lat, zone)),
+    0
+  );
+}
+
+function buildTouringLayerRawHeights(rawHeights) {
+  const touringBase = smoothHeightField(rawHeights, columns, rows, {
+    passes: 1,
+    blend: 0.62
+  });
+  const result = new Float32Array(rawHeights.length);
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const index = indexAt(column, row, columns);
+      const { lon, lat } = geoAt(column, row);
+      const correctionWeight = detailCorrectionWeightAt(lon, lat);
+
+      result[index] =
+        touringBase[index] * (1 - correctionWeight) +
+        rawHeights[index] * correctionWeight;
+    }
+  }
+
+  return result;
 }
 
 const tilesDir = qinlingWorkspacePath("data", "fabdem", "qinling", "tiles");
@@ -305,7 +368,7 @@ for (let index = 0; index < rawHeights.length; index += 1) {
 }
 
 let { normalized, minHeight, maxHeight } = normalizeHeights(
-  rawHeights,
+  buildTouringLayerRawHeights(rawHeights),
   minRawHeight,
   maxRawHeight
 );
@@ -358,6 +421,7 @@ const asset = {
   bounds: qinlingRegionManifestBounds,
   world: qinlingWorld,
   grid: qinlingOutputGrid,
+  resolutionStrategy: qinlingResolutionStrategy,
   minHeight: Number(minHeight.toFixed(3)),
   maxHeight: Number(maxHeight.toFixed(3)),
   presentation: {
@@ -371,6 +435,8 @@ const asset = {
   settlementMask,
   notes: [
     "Built from FABDEM tiles intersecting the Qinling region bounds.",
+    "L1 national touring layer uses a 90m touring terrain base synthesized from the 30m FABDEM source before gameplay normalization.",
+    "30m correction zones retain more source detail around Guanzhong, Hanzhong, northern Sichuan, and Qinling-Shu route corridors.",
     "Real elevations are normalized into a gameplay-friendly stylized height range that keeps lowland basins readable.",
     `Raw sampled coverage before interpolation: ${(coverageRatio * 100).toFixed(2)}%.`,
     `Required FABDEM tiles: ${requiredTileNames.length}. Available required tiles: ${requiredTileNames.length - missingRequiredTileNames.length}.`,

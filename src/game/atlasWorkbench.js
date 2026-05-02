@@ -47,7 +47,13 @@ export function selectAtlasFeature(state, featureId) {
 export function setAtlasFullscreen(state, isFullscreen) {
   return {
     ...state,
-    isFullscreen
+    isFullscreen,
+    mapView: {
+      ...(state.mapView ?? DEFAULT_MAP_VIEW),
+      // 全屏：contain 模式（地图完整显示，不裁切）。
+      // 小窗 mini-map：stretch 模式（充满 220x270 框）。
+      fitMode: isFullscreen ? "contain" : "stretch"
+    }
   };
 }
 
@@ -66,8 +72,117 @@ function canvasCenter(canvas) {
   };
 }
 
+function atlasFitFrame(world, canvas, fitMode = "stretch") {
+  if (fitMode === "cover") {
+    // 覆盖模式：地图填满 canvas 但会裁切短边方向。
+    const scale = Math.max(canvas.width / world.width, canvas.height / world.depth);
+    const width = world.width * scale;
+    const height = world.depth * scale;
+    return {
+      x: (canvas.width - width) / 2,
+      y: (canvas.height - height) / 2,
+      width,
+      height
+    };
+  }
+
+  if (fitMode === "contain") {
+    // 包含模式：保持长宽比，地图完整显示，多余空间留空。
+    // 这是 atlas 全屏的默认——保证用户看到整个秦岭区域，
+    // 而不是被 cover 模式裁掉汉中/四川盆地。
+    const scale = Math.min(canvas.width / world.width, canvas.height / world.depth);
+    const width = world.width * scale;
+    const height = world.depth * scale;
+    return {
+      x: (canvas.width - width) / 2,
+      y: (canvas.height - height) / 2,
+      width,
+      height
+    };
+  }
+
+  // 默认 stretch：填充整个 canvas（小窗 minimap 用，长宽比与 world 不一致时会变形）。
+  return {
+    x: 0,
+    y: 0,
+    width: canvas.width,
+    height: canvas.height
+  };
+}
+
+function transformedAtlasBounds(world, canvas, view) {
+  const west = atlasMapWorldToCanvasPoint(
+    { x: -world.width / 2, y: 0 },
+    world,
+    canvas,
+    view
+  );
+  const east = atlasMapWorldToCanvasPoint(
+    { x: world.width / 2, y: 0 },
+    world,
+    canvas,
+    view
+  );
+  const north = atlasMapWorldToCanvasPoint(
+    { x: 0, y: world.depth / 2 },
+    world,
+    canvas,
+    view
+  );
+  const south = atlasMapWorldToCanvasPoint(
+    { x: 0, y: -world.depth / 2 },
+    world,
+    canvas,
+    view
+  );
+
+  return {
+    minX: Math.min(west.x, east.x),
+    maxX: Math.max(west.x, east.x),
+    minY: Math.min(north.y, south.y),
+    maxY: Math.max(north.y, south.y)
+  };
+}
+
+function clampOffsetForAxis(offset, min, max, size) {
+  const span = max - min;
+
+  if (span <= size) {
+    return offset + (size * 0.5 - (min + max) * 0.5);
+  }
+
+  if (min > 0) {
+    return offset - min;
+  }
+
+  if (max < size) {
+    return offset + size - max;
+  }
+
+  return offset;
+}
+
+function clampMapView(view, world, canvas) {
+  if (!world || !canvas) {
+    return view;
+  }
+
+  const bounds = transformedAtlasBounds(world, canvas, view);
+
+  return {
+    ...view,
+    offsetX: clampOffsetForAxis(view.offsetX, bounds.minX, bounds.maxX, canvas.width),
+    offsetY: clampOffsetForAxis(view.offsetY, bounds.minY, bounds.maxY, canvas.height)
+  };
+}
+
 export function atlasMapWorldToCanvasPoint(point, world, canvas, view) {
-  const base = worldPointToOverviewPixel(point, world, canvas);
+  const frame = atlasFitFrame(world, canvas, view.fitMode);
+  const base = {
+    x: frame.x + ((point.x / world.width) + 0.5) * frame.width,
+    // mapOrientation 契约：北 = -Z，所以 z 小 → canvas y 小（屏幕上方 = 北上）。
+    y: frame.y + (point.y / world.depth + 0.5) * frame.height
+  };
   const center = canvasCenter(canvas);
 
   return {
@@ -82,10 +197,12 @@ export function atlasMapCanvasToWorldPoint(point, world, canvas, view) {
     x: center.x + (point.x - center.x - view.offsetX) / view.scale,
     y: center.y + (point.y - center.y - view.offsetY) / view.scale
   };
+  const frame = atlasFitFrame(world, canvas, view.fitMode);
 
   return {
-    x: ((base.x / canvas.width) - 0.5) * world.width,
-    y: (0.5 - base.y / canvas.height) * world.depth
+    x: (((base.x - frame.x) / frame.width) - 0.5) * world.width,
+    // 反推：canvas y 小 → 北 (-Z)；canvas y 大 → 南 (+Z)。
+    y: (((base.y - frame.y) / frame.height) - 0.5) * world.depth
   };
 }
 
@@ -103,35 +220,57 @@ export function zoomAtlasMapAtPoint(state, zoomFactor, pointer, world, canvas) {
     currentView
   );
   const center = canvasCenter(canvas);
-  const anchoredBase = worldPointToOverviewPixel(anchoredWorldPoint, world, canvas);
+  const frame = atlasFitFrame(world, canvas, currentView.fitMode);
+  const anchoredBase = {
+    x: frame.x + ((anchoredWorldPoint.x / world.width) + 0.5) * frame.width,
+    y: frame.y + (anchoredWorldPoint.y / world.depth + 0.5) * frame.height
+  };
+
+  const mapView = clampMapView(
+    {
+      scale: nextScale,
+      offsetX: pointer.x - center.x - (anchoredBase.x - center.x) * nextScale,
+      offsetY: pointer.y - center.y - (anchoredBase.y - center.y) * nextScale,
+      fitMode: currentView.fitMode
+    },
+    world,
+    canvas
+  );
 
   return {
     ...state,
-    mapView: {
-      scale: nextScale,
-      offsetX: pointer.x - center.x - (anchoredBase.x - center.x) * nextScale,
-      offsetY: pointer.y - center.y - (anchoredBase.y - center.y) * nextScale
-    }
+    mapView
   };
 }
 
-export function panAtlasMap(state, delta) {
+export function panAtlasMap(state, delta, world, canvas) {
   const currentView = state.mapView ?? DEFAULT_MAP_VIEW;
-
-  return {
-    ...state,
-    mapView: {
+  const mapView = clampMapView(
+    {
       ...currentView,
       offsetX: currentView.offsetX + delta.x,
       offsetY: currentView.offsetY + delta.y
-    }
+    },
+    world,
+    canvas
+  );
+
+  return {
+    ...state,
+    mapView
   };
 }
 
 export function resetAtlasMapView(state) {
+  const mapView = { ...DEFAULT_MAP_VIEW };
+
+  if (state.mapView?.fitMode) {
+    mapView.fitMode = state.mapView.fitMode;
+  }
+
   return {
     ...state,
-    mapView: { ...DEFAULT_MAP_VIEW }
+    mapView
   };
 }
 

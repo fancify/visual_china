@@ -16,6 +16,7 @@ export interface AtlasMapView {
   scale: number;
   offsetX: number;
   offsetY: number;
+  fitMode?: "stretch" | "cover";
 }
 
 export function createAtlasWorkbenchState(
@@ -65,7 +66,9 @@ export function zoomAtlasMapAtPoint(
 
 export function panAtlasMap(
   state: AtlasWorkbenchState,
-  delta: QinlingAtlasPoint
+  delta: QinlingAtlasPoint,
+  world?: { width: number; depth: number },
+  canvas?: { width: number; height: number }
 ): AtlasWorkbenchState;
 
 export function resetAtlasMapView(

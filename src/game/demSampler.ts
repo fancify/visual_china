@@ -535,7 +535,8 @@ export class TerrainSampler {
     const halfDepth = this.asset.world.depth * 0.5;
 
     const u = clamp((x + halfWidth) / this.asset.world.width, 0, 1);
-    const v = clamp((halfDepth - z) / this.asset.world.depth, 0, 1);
+    // 新 mapOrientation 契约：北 = -Z，所以 z 越小 → row 越小（DEM 第 0 行 = 最北）。
+    const v = clamp((z + halfDepth) / this.asset.world.depth, 0, 1);
 
     const gx = u * (columns - 1);
     const gy = v * (rows - 1);

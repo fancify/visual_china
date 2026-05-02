@@ -20,10 +20,10 @@ export const qinlingModernHydrography = {
       relations: ["city-changan", "city-xianyang", "city-baoji-chencang"],
       geometry: {
         points: [
-          { x: 24, y: 72 },
-          { x: 48, y: 70 },
-          { x: 70, y: 69 },
-          { x: 90, y: 68 }
+          { x: 24, y: -72 },
+          { x: 48, y: -70 },
+          { x: 70, y: -69 },
+          { x: 90, y: -68 }
         ]
       }
     },
@@ -40,10 +40,10 @@ export const qinlingModernHydrography = {
       relations: ["city-hanzhong", "road-jinniu-jianmen"],
       geometry: {
         points: [
-          { x: -8, y: 3 },
-          { x: 14, y: 8 },
-          { x: 26, y: 9 },
-          { x: 42, y: 7 },
+          { x: -8, y: -3 },
+          { x: 14, y: -8 },
+          { x: 26, y: -9 },
+          { x: 42, y: -7 },
           { x: 62, y: 0 }
         ]
       }
@@ -60,10 +60,10 @@ export const qinlingModernHydrography = {
       relations: ["city-guangyuan", "city-zhaohua", "pass-jianmen"],
       geometry: {
         points: [
-          { x: -8, y: 3 },
-          { x: -12, y: -20 },
-          { x: -10, y: -28 },
-          { x: -8, y: -64 }
+          { x: -8, y: -3 },
+          { x: -12, y: 20 },
+          { x: -10, y: 28 },
+          { x: -8, y: 64 }
         ]
       }
     },
@@ -80,10 +80,10 @@ export const qinlingModernHydrography = {
       relations: ["road-baoxie", "military-shimen"],
       geometry: {
         points: [
-          { x: 24, y: 11 },
-          { x: 30, y: 18 },
-          { x: 34, y: 28 },
-          { x: 38, y: 39 }
+          { x: 24, y: -11 },
+          { x: 30, y: -18 },
+          { x: 34, y: -28 },
+          { x: 38, y: -39 }
         ]
       }
     },
@@ -99,10 +99,10 @@ export const qinlingModernHydrography = {
       relations: ["road-baoxie"],
       geometry: {
         points: [
-          { x: 58, y: 70 },
-          { x: 51, y: 58 },
-          { x: 44, y: 48 },
-          { x: 38, y: 39 }
+          { x: 58, y: -70 },
+          { x: 51, y: -58 },
+          { x: 44, y: -48 },
+          { x: 38, y: -39 }
         ]
       }
     }

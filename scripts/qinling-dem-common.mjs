@@ -16,9 +16,56 @@ export const qinlingWorld = {
   depth: 240
 };
 
+export const qinlingGeographicFootprintKm = {
+  width: 420,
+  depth: 560
+};
+
 export const qinlingOutputGrid = {
   columns: 193,
   rows: 241
+};
+
+export const qinlingResolutionStrategy = {
+  experienceLayer: "L1-national-tour-local-pilot",
+  coordinatePolicy: "strict-geographic",
+  baseTerrainResolutionMeters: 90,
+  detailCorrectionResolutionMeters: 30,
+  sparseRegionResolutionMeters: 450,
+  runtimeSampleSpacingKm: {
+    eastWest: Number(
+      (qinlingGeographicFootprintKm.width / (qinlingOutputGrid.columns - 1)).toFixed(2)
+    ),
+    northSouth: Number(
+      (qinlingGeographicFootprintKm.depth / (qinlingOutputGrid.rows - 1)).toFixed(2)
+    )
+  },
+  detailCorrectionZones: [
+    {
+      id: "guanzhong-plain",
+      role: "basin-edge-readability",
+      bounds: { west: 106.4, east: 109.0, south: 33.75, north: 34.95 },
+      correctionWeight: 0.7
+    },
+    {
+      id: "hanzhong-basin",
+      role: "basin-floor-readability",
+      bounds: { west: 106.05, east: 108.0, south: 32.55, north: 33.55 },
+      correctionWeight: 0.8
+    },
+    {
+      id: "northern-sichuan-basin",
+      role: "basin-transition-readability",
+      bounds: { west: 103.5, east: 106.25, south: 30.4, north: 32.35 },
+      correctionWeight: 0.65
+    },
+    {
+      id: "qinling-shu-road-corridors",
+      role: "route-corridor-terrain",
+      bounds: { west: 104.7, east: 108.65, south: 31.45, north: 34.65 },
+      correctionWeight: 0.75
+    }
+  ]
 };
 
 export const qinlingFabdemArchive = {

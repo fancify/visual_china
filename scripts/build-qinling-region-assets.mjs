@@ -2,23 +2,19 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { densityProfileForClass } from "../src/game/geoProjection.js";
+import {
+  qinlingBounds,
+  qinlingGeographicFootprintKm,
+  qinlingResolutionStrategy
+} from "./qinling-dem-common.mjs";
 
 const root = process.cwd();
 const legacyAssetPath = path.join(root, "public", "data", "qinling-slice-dem.json");
 const regionRoot = path.join(root, "public", "data", "regions", "qinling");
 const chunksRoot = path.join(regionRoot, "chunks");
 
-const regionBounds = {
-  west: 103.5,
-  east: 109.0,
-  south: 30.4,
-  north: 35.4
-};
-
-const geographicFootprintKm = {
-  width: 420,
-  depth: 560
-};
+const regionBounds = qinlingBounds;
+const geographicFootprintKm = qinlingGeographicFootprintKm;
 
 const chunkColumns = 4;
 const chunkRows = 5;
@@ -211,6 +207,18 @@ const regionManifest = {
   bounds: regionBounds,
   world: asset.world,
   geographicFootprintKm,
+  scaleArchitecture: {
+    currentLayer: qinlingResolutionStrategy.experienceLayer,
+    nationalTouringBaseMeters: qinlingResolutionStrategy.baseTerrainResolutionMeters,
+    detailCorrectionMeters: qinlingResolutionStrategy.detailCorrectionResolutionMeters,
+    sparseRegionMeters: qinlingResolutionStrategy.sparseRegionResolutionMeters,
+    runtimeSampleSpacingKm: qinlingResolutionStrategy.runtimeSampleSpacingKm,
+    detailCorrectionZones: qinlingResolutionStrategy.detailCorrectionZones.map((zone) => ({
+      id: zone.id,
+      role: zone.role,
+      bounds: zone.bounds
+    }))
+  },
   experienceScaleMultiplier: 2.3,
   experienceProfile,
   lods: [

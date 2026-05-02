@@ -1,6 +1,6 @@
-export function normalizeInputKey(key: string): string;
+export function normalizeInputKey(eventOrKey: string | KeyboardEvent): string;
 
-export function isGameplayInputKey(key: string): boolean;
+export function isGameplayInputKey(eventOrKey: string | KeyboardEvent): boolean;
 
 export function movementAxesFromKeys(keys: Set<string>): {
   forward: number;

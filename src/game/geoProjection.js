@@ -1,3 +1,8 @@
+import {
+  projectGeoToWorld,
+  unprojectWorldToGeo
+} from "./mapOrientation.js";
+
 export const densityProfiles = {
   "high-focus": {
     coordinatePolicy: "strict-geographic",
@@ -29,22 +34,18 @@ export const densityProfiles = {
   }
 };
 
+/**
+ * 把经纬度投影到世界坐标 (x, z)。委托给 mapOrientation——所有方向语义来自单一真相。
+ */
 export function geoToWorld(point, bounds, world) {
-  return {
-    x:
-      ((point.lon - bounds.west) / (bounds.east - bounds.west)) * world.width -
-      world.width * 0.5,
-    z:
-      ((point.lat - bounds.south) / (bounds.north - bounds.south)) * world.depth -
-      world.depth * 0.5
-  };
+  return projectGeoToWorld(point, bounds, world);
 }
 
+/**
+ * 把世界坐标 (x, z) 反推回经纬度。
+ */
 export function worldToGeo(point, bounds, world) {
-  return {
-    lon: bounds.west + (point.x / world.width + 0.5) * (bounds.east - bounds.west),
-    lat: bounds.south + (point.z / world.depth + 0.5) * (bounds.north - bounds.south)
-  };
+  return unprojectWorldToGeo(point, bounds, world);
 }
 
 export function densityProfileForClass(densityClass) {

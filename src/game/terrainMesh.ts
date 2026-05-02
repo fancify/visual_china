@@ -11,6 +11,7 @@ import type { ViewMode } from "../data/qinlingSlice";
 import type { EnvironmentState, EnvironmentVisuals } from "./environment";
 import { TerrainSampler } from "./demSampler";
 import { modeColor } from "./terrainModel";
+import { attachTerrainShaderEnhancements } from "./terrainShaderEnhancer";
 
 export interface TerrainMeshHandle {
   mesh: Mesh;
@@ -46,14 +47,15 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   );
   geometry.setAttribute("color", colorAttribute);
 
-  const mesh = new Mesh(
-    geometry,
-    new MeshPhongMaterial({
-      vertexColors: true,
-      flatShading: true,
-      shininess: 8
-    })
-  );
+  const material = new MeshPhongMaterial({
+    vertexColors: true,
+    flatShading: true,
+    shininess: 8
+  });
+  attachTerrainShaderEnhancements(material, {
+    heightFogColor: new Color(0xb6c4be)
+  });
+  const mesh = new Mesh(geometry, material);
 
   return {
     mesh,

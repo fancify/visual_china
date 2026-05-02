@@ -1,3 +1,5 @@
+import { projectWorldToAtlasPixel } from "./mapOrientation.js";
+
 export const atlasLayerDrawOrder = [
   "landform",
   "water",
@@ -9,11 +11,17 @@ export const atlasLayerDrawOrder = [
   "culture"
 ];
 
+/**
+ * 把世界 (x, z) 点投影到 atlas overview 画布像素。
+ * Atlas feature 的 world 字段历史上把世界 z 存在 `.y` 上，因此这里先把
+ * `point.y` 作为 z 喂给统一契约函数。
+ */
 export function worldPointToOverviewPixel(point, world, canvas) {
-  return {
-    x: ((point.x / world.width) + 0.5) * canvas.width,
-    y: (0.5 - point.y / world.depth) * canvas.height
-  };
+  return projectWorldToAtlasPixel(
+    { x: point.x, z: point.y },
+    world,
+    canvas
+  );
 }
 
 function clamp(value, min, max) {
@@ -96,14 +104,18 @@ export function missingDemTileWorldRects(asset) {
 
 export function atlasMinimumDisplayPriority({ fullscreen = false, scale = 1 } = {}) {
   if (!fullscreen) {
-    return 7;
+    return 9;
   }
 
   if (scale >= 2) {
     return 4;
   }
 
-  return 7;
+  if (scale >= 1.45) {
+    return 7;
+  }
+
+  return 9;
 }
 
 export function isVerifiedAtlasFeature(feature) {
@@ -113,12 +125,21 @@ export function isVerifiedAtlasFeature(feature) {
   );
 }
 
+export function isRawEvidenceAtlasFeature(feature) {
+  return (
+    feature.source?.name === "openstreetmap-overpass" ||
+    feature.themes?.includes("evidence") ||
+    feature.terrainRole?.includes("evidence")
+  );
+}
+
 export function atlasVisibleFeatures(features, layers, options = {}) {
   const visibleLayerIds = new Set(
     layers.filter((layer) => layer.defaultVisible).map((layer) => layer.id)
   );
   const minDisplayPriority = options.minDisplayPriority ?? Number.NEGATIVE_INFINITY;
   const includeUnverifiedFeatures = options.includeUnverifiedFeatures === true;
+  const includeEvidenceFeatures = options.includeEvidenceFeatures === true;
   const order = new Map(
     atlasLayerDrawOrder.map((layerId, index) => [layerId, index])
   );
@@ -129,6 +150,10 @@ export function atlasVisibleFeatures(features, layers, options = {}) {
     .filter((feature) =>
       includeUnverifiedFeatures ||
       isVerifiedAtlasFeature(feature)
+    )
+    .filter((feature) =>
+      includeEvidenceFeatures ||
+      !isRawEvidenceAtlasFeature(feature)
     )
     .toSorted((a, b) => {
       const layerDelta = (order.get(a.layer) ?? 99) - (order.get(b.layer) ?? 99);

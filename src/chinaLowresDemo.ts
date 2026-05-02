@@ -96,8 +96,7 @@ function createChinaTerrain(asset: DemAsset): Mesh<PlaneGeometry, MeshPhongMater
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index);
     const z = positions.getZ(index);
-    const mapZ = -z;
-    const rawHeight = sampler.sampleHeight(x, mapZ);
+    const rawHeight = sampler.sampleHeight(x, z);
     const normalizedHeight = MathUtils.clamp(
       (rawHeight - asset.minHeight) / (asset.maxHeight - asset.minHeight || 1),
       0,
@@ -105,7 +104,7 @@ function createChinaTerrain(asset: DemAsset): Mesh<PlaneGeometry, MeshPhongMater
     );
 
     positions.setY(index, stylizedHeight(rawHeight, asset));
-    color.copy(terrainColor(rawHeight, normalizedHeight, sampler.sampleRiver(x, mapZ)));
+    color.copy(terrainColor(rawHeight, normalizedHeight, sampler.sampleRiver(x, z)));
     colors.setXYZ(index, color.r, color.g, color.b);
   }
 
@@ -182,6 +181,8 @@ function installControls(
   const keys = new Set<string>();
 
   function reset(): void {
+    // mapOrientation 契约：北 = -Z（与 Three.js 默认相机 forward 对齐）。
+    // yaw=0 → camera 在 +Z 方向看 -Z 方向，屏幕远端 = 北 ✓
     state.yaw = 0;
     state.pitch = 58;
     state.distance = 460;
@@ -239,23 +240,22 @@ function installControls(
 }
 
 function updateKeyboardPan(state: ViewerState, keys: Set<string>, deltaSeconds: number): void {
+  // 全国 viewer 模式：pan 走世界对齐，不跟相机 yaw 旋转——让 W=北、D=东
+  // 永远稳定。这是 worldAxis 契约的直接消费者。
   const panSpeed = 84 * deltaSeconds;
-  const yaw = MathUtils.degToRad(state.yaw);
-  const forward = new Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-  const right = new Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   const move = new Vector3();
 
   if (keys.has("w")) {
-    move.add(forward);
+    move.z += 1;
   }
   if (keys.has("s")) {
-    move.sub(forward);
+    move.z -= 1;
   }
   if (keys.has("d")) {
-    move.add(right);
+    move.x += 1;
   }
   if (keys.has("a")) {
-    move.sub(right);
+    move.x -= 1;
   }
 
   if (move.lengthSq() > 0) {
@@ -275,7 +275,7 @@ async function start(): Promise<void> {
 
   const camera = new PerspectiveCamera(42, 1, 0.1, 1400);
   const renderer = new WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 
   const terrain = createChinaTerrain(asset);
   scene.add(terrain);

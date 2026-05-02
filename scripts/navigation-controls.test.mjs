@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { cameraForwardVector, movementVectorFromInput } from "../src/game/navigation.js";
+import { qinlingCameraRig } from "../src/game/cameraRig.js";
+import {
+  cameraForwardVector,
+  cameraRightVector,
+  movementVectorFromInput
+} from "../src/game/navigation.js";
 
 function nearlyEqual(actual, expected) {
   assert.ok(
@@ -40,4 +45,11 @@ test("A/D strafe perpendicular to camera view direction", () => {
   nearlyEqual(left.z, 1);
   nearlyEqual(right.x, 0);
   nearlyEqual(right.z, -1);
+});
+
+test("default touring camera keeps geographic east on the right side of the screen", () => {
+  const right = cameraRightVector(qinlingCameraRig.initialHeading);
+
+  assert.ok(right.x > 0.99);
+  nearlyEqual(right.z, 0);
 });

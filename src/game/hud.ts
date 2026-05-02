@@ -16,6 +16,23 @@ export interface HudStatusSnapshot {
   story: string;
 }
 
+export interface HudCompassSnapshot {
+  northAngleRadians: number;
+  screenRightDirection: string;
+}
+
+export interface AtlasLayerCount {
+  layerId: QinlingAtlasLayerId;
+  layerName: string;
+  count: number;
+}
+
+export interface AtlasSummary {
+  layerCounts: AtlasLayerCount[];
+  totalFeatures: number;
+  evidenceLoaded: boolean;
+}
+
 export interface HudController {
   overviewCanvas: HTMLCanvasElement;
   atlasFullscreen: HTMLElement;
@@ -38,7 +55,9 @@ export interface HudController {
     visibleLayerIds: Set<QinlingAtlasLayerId>
   ): void;
   renderAtlasFeature(feature: QinlingAtlasFeature | null): void;
+  renderAtlasSummary(summary: AtlasSummary | null): void;
   setAtlasFullscreenOpen(isOpen: boolean): void;
+  updateCompass(snapshot: HudCompassSnapshot): void;
   updateStatus(snapshot: HudStatusSnapshot): void;
   showToast(text: string): void;
   hideToast(): void;
@@ -76,6 +95,17 @@ export function createHud(
       <div class="eyebrow">山河中国</div>
       <h1>秦岭 - 关中 - 四川盆地</h1>
       <div class="loading-line" id="loading-line"></div>
+    </div>
+    <div class="compass-block" aria-label="游戏方位">
+      <div class="compass-dial">
+        <span class="compass-cardinal compass-north">北</span>
+        <span class="compass-cardinal compass-east">东</span>
+        <span class="compass-needle" id="compass-needle"></span>
+      </div>
+      <div class="compass-copy">
+        <span>屏幕右侧</span>
+        <strong id="compass-direction">东</strong>
+      </div>
     </div>
     <details class="mode-block hud-drawer ${compactHudPanelConfig.mode.visible ? "" : hiddenClass}" ${compactHudPanelConfig.mode.openByDefault ? "open" : ""}>
       <summary>视图 · <strong id="mode-summary">${modeMeta.terrain.title}</strong></summary>
@@ -126,9 +156,9 @@ export function createHud(
       <div class="atlas-fullscreen-shell">
         <header class="atlas-fullscreen-head">
           <div>
-            <div class="eyebrow">地貌总览</div>
-            <h2>秦岭地貌总览</h2>
-            <p>滚轮缩放，拖拽平移，双击复位。先看山、水、盆地和通行关系。</p>
+            <div class="eyebrow">区域 · 秦岭 - 关中 - 汉中 - 四川盆地</div>
+            <h2>地貌总览</h2>
+            <p id="atlas-fullscreen-subtitle">山、水、盆地与通行关系。</p>
           </div>
           <button id="close-atlas-fullscreen" type="button">返回游戏</button>
         </header>
@@ -186,6 +216,8 @@ export function createHud(
   app.appendChild(hud);
 
   const loadingLine = requireElement<HTMLElement>(hud, "#loading-line");
+  const compassNeedle = requireElement<HTMLElement>(hud, "#compass-needle");
+  const compassDirection = requireElement<HTMLElement>(hud, "#compass-direction");
   const pickupToast = requireElement<HTMLElement>(hud, "#pickup-toast");
   const zoneLine = requireElement<HTMLElement>(hud, "#zone-line");
   const modeLine = requireElement<HTMLElement>(hud, "#mode-line");
@@ -203,6 +235,10 @@ export function createHud(
   const atlasFullscreenCanvas = requireElement<HTMLCanvasElement>(
     hud,
     "#atlas-fullscreen-map"
+  );
+  const atlasFullscreenSubtitle = requireElement<HTMLElement>(
+    hud,
+    "#atlas-fullscreen-subtitle"
   );
   const atlasLayerList = requireElement<HTMLElement>(hud, "#atlas-layer-list");
   const atlasFullscreenLayerList = requireElement<HTMLElement>(
@@ -235,6 +271,7 @@ export function createHud(
   });
 
   let lastStatus: HudStatusSnapshot | null = null;
+  let lastCompass: HudCompassSnapshot | null = null;
 
   const renderLayerList = (
     container: HTMLElement,
@@ -257,11 +294,13 @@ export function createHud(
       .join("");
   };
 
-  const renderFeatureCard = (
+  let lastSummary: AtlasSummary | null = null;
+
+  const renderSummaryCard = (
     container: HTMLElement,
-    feature: QinlingAtlasFeature | null
+    summary: AtlasSummary | null
   ): void => {
-    if (!feature) {
+    if (!summary || summary.totalFeatures === 0) {
       container.innerHTML = `
         <div class="atlas-card-kicker">点击地图</div>
         <strong>选择一个地理要素</strong>
@@ -270,15 +309,51 @@ export function createHud(
       return;
     }
 
-    const sourceLabel = feature.source?.name
-      ? `来源：${feature.source.name}${feature.source.verification ? ` / ${feature.source.verification}` : ""}`
-      : "来源：未标注";
+    const counts = summary.layerCounts
+      .filter((entry) => entry.count > 0)
+      .map(
+        (entry) =>
+          `<span class="atlas-summary-row"><strong>${entry.count}</strong> ${entry.layerName}</span>`
+      )
+      .join("");
+    const evidenceHint = summary.evidenceLoaded
+      ? "已加载 OSM 详细水系（缩放足够）。"
+      : "缩放到 1.45x 以上可加载 OSM 详细水系。";
+
+    container.innerHTML = `
+      <div class="atlas-card-kicker">当前可见</div>
+      <strong>共 ${summary.totalFeatures} 个要素</strong>
+      <div class="atlas-summary-grid">${counts}</div>
+      <p class="atlas-summary-hint">点击地图上任意要素查看解释。${evidenceHint}</p>
+    `;
+  };
+
+  const renderFeatureCard = (
+    container: HTMLElement,
+    feature: QinlingAtlasFeature | null
+  ): void => {
+    if (!feature) {
+      renderSummaryCard(container, lastSummary);
+      return;
+    }
+
+    // 区分"真实 GIS 数据"和"手画叙事意象"。前者来自 OSM/curated hydrography
+    // 等可信源；后者是文献位置的视觉草稿（古道、关隘点位、地貌区域），
+    // 用户必须能看出来不是事实数据。
+    const verification = feature.source?.verification;
+    const isVerified =
+      verification === "external-vector" || verification === "verified";
+    const isDraft = !isVerified;
+    const sourceLabel = isDraft
+      ? `<span class="atlas-source-draft">⚠ 手画叙事意象，待真实数据校准</span>`
+      : `<span>来源：${feature.source?.name ?? "—"}（${verification}）</span>`;
+    const nameSuffix = isDraft ? "<em class='atlas-name-draft'> · 意象</em>" : "";
 
     container.innerHTML = `
       <div class="atlas-card-kicker">${feature.layer} · ${feature.terrainRole}</div>
-      <strong>${feature.name}</strong>
+      <strong>${feature.name}${nameSuffix}</strong>
       <p>${feature.copy.summary}</p>
-      <span>${sourceLabel}</span>
+      ${sourceLabel}
       <span>视觉规则：${feature.visualRule.symbol} / ${feature.visualRule.emphasis}</span>
     `;
   };
@@ -320,9 +395,40 @@ export function createHud(
       renderFeatureCard(atlasFeatureCard, feature);
       renderFeatureCard(atlasFullscreenFeatureCard, feature);
     },
+    renderAtlasSummary(summary) {
+      lastSummary = summary;
+      // 当没有 feature 选中时刷新摘要内容（renderFeatureCard 会读 lastSummary）
+      renderFeatureCard(atlasFeatureCard, null);
+      renderFeatureCard(atlasFullscreenFeatureCard, null);
+      // 同步顶部副标题为动态摘要
+      if (summary) {
+        const parts = summary.layerCounts
+          .filter((entry) => entry.count > 0)
+          .slice(0, 4)
+          .map((entry) => `${entry.count} ${entry.layerName}`);
+        atlasFullscreenSubtitle.textContent =
+          parts.length > 0
+            ? parts.join("  ·  ") +
+              (summary.evidenceLoaded ? "  ·  含 OSM 详细水系" : "")
+            : "山、水、盆地与通行关系。";
+      } else {
+        atlasFullscreenSubtitle.textContent = "山、水、盆地与通行关系。";
+      }
+    },
     setAtlasFullscreenOpen(isOpen) {
       atlasFullscreen.classList.toggle("open", isOpen);
       atlasFullscreen.setAttribute("aria-hidden", String(!isOpen));
+    },
+    updateCompass(snapshot) {
+      if (lastCompass?.northAngleRadians !== snapshot.northAngleRadians) {
+        compassNeedle.style.transform =
+          `translate(-50%, -100%) rotate(${snapshot.northAngleRadians}rad)`;
+      }
+      if (lastCompass?.screenRightDirection !== snapshot.screenRightDirection) {
+        compassDirection.textContent = snapshot.screenRightDirection;
+      }
+
+      lastCompass = snapshot;
     },
     updateStatus(snapshot) {
       if (lastStatus?.zone !== snapshot.zone) {
@@ -357,6 +463,10 @@ export function createHud(
 
   controller.setLoadingState(`正在载入母版：${initialLoadingLabel}`);
   controller.setActiveMode("terrain");
+  controller.updateCompass({
+    northAngleRadians: 0,
+    screenRightDirection: "东"
+  });
   controller.updateStatus({
     ...defaultStatusSnapshot,
     collection: `残简：0 / ${fragmentCount}`

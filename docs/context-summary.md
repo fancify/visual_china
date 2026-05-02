@@ -20,7 +20,9 @@
 - 运行时：`Vite + TypeScript + Three.js`。
 - 默认入口：`public/data/regions/qinling/manifest.json`。
 - 地形资产链路：`region manifest -> LOD DEM asset -> chunk manifest -> POI/story content`。
-- DEM：秦岭切片已接入 `processed-real-dem`，并生成整区底图、分块 chunk 和 POI content。
+- DEM：秦岭切片已接入 `processed-real-dem`，当前明确定位为 `L1-national-tour-local-pilot`，也就是“全国游览层的局部试点”，不是最终局部细场景。
+- 分辨率策略：秦岭 L1 以 `90m` 主地貌口径生成游览层；关中、汉中、四川北缘和秦蜀道路走廊保留 `30m` 源数据修正权重；未来青藏高原、新疆等低密度荒原可按 `450m` 口径进入全国层加工。
+- 运行时尺度：当前秦岭 L1 仍是 `193 x 241` 网格，覆盖约 `420km x 560km`，也就是运行时约 `2.19km x 2.33km` 一个采样点。它服务于全国游览的地貌阅读，不服务于陈仓道、剑门关等 L2/L3 细场景。
 - 坐标：缩略图和 3D 游戏地形共用严格地理坐标映射；体验压缩通过速度、镜头、细节密度、事件密度完成。
 - Streaming：已有近身 chunk terrain、外圈保留 chunk、轻量 scenery 生命周期。
 - 叙事：已有 6 段主线推进和残简收集系统。

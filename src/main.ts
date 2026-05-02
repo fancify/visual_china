@@ -15,12 +15,15 @@ import {
   DoubleSide,
   FogExp2,
   Group,
+  InstancedMesh,
   Line,
   LineBasicMaterial,
+  Matrix4,
   MathUtils,
   Mesh,
   MeshBasicMaterial,
   MeshPhongMaterial,
+  Object3D,
   PerspectiveCamera,
   PlaneGeometry,
   Points,
@@ -48,8 +51,13 @@ import {
 import {
   AmbientAudioController
 } from "./game/ambientAudio";
-import { cameraLookTargetForMode, type CameraViewMode } from "./game/cameraView.js";
-import { qinlingCameraRig } from "./game/cameraRig";
+import {
+  cameraLookTargetForMode,
+  cameraPositionForMode,
+  effectiveCameraHeadingForMode,
+  type CameraViewMode
+} from "./game/cameraView.js";
+import { qinlingCameraRig } from "./game/cameraRig.js";
 import {
   EnvironmentController,
   seasonLabel,
@@ -57,6 +65,10 @@ import {
   formatTimeOfDay,
   type EnvironmentVisuals
 } from "./game/environment";
+import {
+  northNeedleAngleRadians,
+  screenRightDirectionLabel
+} from "./game/compass.js";
 import {
   clearGameplayInput,
   isGameplayInputKey,
@@ -72,7 +84,6 @@ import {
   atlasMinimumDisplayPriority,
   atlasVisibleFeatures,
   featureWorldPoints,
-  isVerifiedAtlasFeature,
   missingDemTileWorldRects
 } from "./game/atlasRender.js";
 import {
@@ -92,13 +103,12 @@ import {
 import { movementVectorFromInput } from "./game/navigation.js";
 import {
   avatarHeadingForMovement,
-  woodHorseLegPose,
-  woodHorseAvatarParts
+  woodHorseLegPose
 } from "./game/playerAvatar.js";
+import { createPlayerAvatar } from "./game/playerAvatarMesh";
 import {
   qinlingAtlasFeatures,
   qinlingAtlasLayers,
-  qinlingWaterSystem,
   type QinlingAtlasFeature,
   type QinlingAtlasLayerId
 } from "./game/qinlingAtlas.js";
@@ -106,6 +116,8 @@ import {
   importedHydrographyAssetToAtlasFeatures,
   type ImportedHydrographyAsset
 } from "./game/osmHydrographyAtlas.js";
+import { hydrographyFeatureToAtlasFeature } from "./game/hydrographyAtlas.js";
+import type { HydrographyFeature } from "./game/hydrographyModel.js";
 import {
   qinlingRoutes,
   routeAffinityAt,
@@ -116,6 +128,15 @@ import {
   qinlingRouteRibbonStyle
 } from "./game/routeRibbon.js";
 import {
+  buildWaterRibbonVertices,
+  buildRiverVegetationSamples,
+  riverCorridorInfluenceAtPoint,
+  selectRenderableWaterFeatures,
+  waterLabelPoint,
+  waterEnvironmentVisualStyle,
+  waterVisualStyle
+} from "./game/waterSystemVisuals.js";
+import {
   TerrainSampler,
   loadDemAsset,
   resolveTerrainAssetRequest,
@@ -125,6 +146,7 @@ import { createHud } from "./game/hud";
 import { renderJournalView } from "./game/journal";
 import { qinlingRuntimeBudget } from "./game/performanceBudget";
 import { loadRegionBundle } from "./game/regionBundle";
+import type { ExperienceProfile } from "./game/demSampler";
 import {
   buildRetainedChunkIds,
   buildVisibleChunkIds,
@@ -152,6 +174,19 @@ import {
   zoneNameAt
 } from "./game/terrainModel";
 import { textSpriteLayout } from "./game/textLabel.js";
+import { createPerfStats, isDevModeEnabled } from "./game/perfStats";
+import {
+  applySkyVisuals,
+  createCloudLayer,
+  createPrecipitationLayer,
+  createSkyDome
+} from "./game/atmosphereLayer";
+import { createCircleTexture } from "./game/proceduralTextures";
+import {
+  attachTerrainShaderEnhancements,
+  updateTerrainShaderHeightFog
+} from "./game/terrainShaderEnhancer";
+import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
 
 interface FragmentVisual {
   sprite: Sprite;
@@ -188,6 +223,33 @@ const landmarkChunkIds = new Map<string, string | null>();
 const terrainChunkMeshes = new Map<string, TerrainMeshHandle>();
 const chunkLoadPromises = new Map<string, Promise<void>>();
 const runtimeBudget = qinlingRuntimeBudget;
+// 区域 experience profile（从 manifest 读取）。决定 baseSpeed / cameraDistance /
+// scenery 密度的缩放系数。null 时按 1 处理。
+let experienceProfile: ExperienceProfile | null = null;
+
+function travelSpeedMultiplier(): number {
+  return experienceProfile?.travelSpeedMultiplier ?? 1;
+}
+function cameraScaleMultiplier(): number {
+  return experienceProfile?.cameraScaleMultiplier ?? 1;
+}
+function detailDensityMultiplier(): number {
+  return experienceProfile?.detailDensityMultiplier ?? 1;
+}
+function eventDensityMultiplier(): number {
+  return experienceProfile?.eventDensityMultiplier ?? 1;
+}
+
+function scaledSceneryBudget(): typeof runtimeBudget.scenery {
+  const m = detailDensityMultiplier();
+  return {
+    maxTreesPerChunk: Math.max(1, Math.floor(runtimeBudget.scenery.maxTreesPerChunk * m)),
+    maxSettlementMarkersPerChunk: Math.max(
+      1,
+      Math.floor(runtimeBudget.scenery.maxSettlementMarkersPerChunk * m)
+    )
+  };
+}
 let storyBeats: StoryBeat[] = getQinlingStoryBeats();
 const completedStoryBeatIds = new Set<string>();
 let storyLine = "主线：从关中出发，去看山河如何一步步把道路收紧。";
@@ -195,8 +257,54 @@ let storyGuideInitialized = false;
 let atlasWorkbench: AtlasWorkbenchState =
   createAtlasWorkbenchState(qinlingAtlasLayers);
 let atlasFeatures: QinlingAtlasFeature[] = [...qinlingAtlasFeatures];
+let visibleWaterFeatures: QinlingAtlasFeature[] = [];
+// Evidence layer：OSM 命名水系（4639 条），按 rank 是 raw evidence，不是
+// curated 主干。默认不进 atlasFeatures，避免每帧 filter/sort 4639 项。
+// Atlas workbench 在 fullscreen + zoom>=1.45 时才把它合入可见集合。
+let evidenceFeatures: QinlingAtlasFeature[] = [];
+const EVIDENCE_ZOOM_THRESHOLD = 1.45;
 
-async function loadImportedHydrographyAtlas(): Promise<void> {
+interface PrimaryHydrographyAsset {
+  features: HydrographyFeature[];
+}
+
+/**
+ * 当前帧应该在 atlas 上呈现的 feature 集合。
+ * - curated + primary：常驻
+ * - OSM evidence：仅 fullscreen + 缩放过阈值时合入
+ *
+ * 调用方（drawOverviewMap / findAtlasFeatureAtCanvasPoint / atlasVisibleFeatures
+ * 等）必须从这里取，不能直接读 atlasFeatures。
+ */
+function activeAtlasFeatures(): QinlingAtlasFeature[] {
+  const includeEvidence =
+    atlasWorkbench.isFullscreen &&
+    (atlasWorkbench.mapView?.scale ?? 1) >= EVIDENCE_ZOOM_THRESHOLD;
+  return includeEvidence
+    ? atlasFeatures.concat(evidenceFeatures)
+    : atlasFeatures;
+}
+
+async function loadHydrographyAtlas(): Promise<void> {
+  let nextAtlasFeatures = [...qinlingAtlasFeatures];
+
+  try {
+    const response = await fetch("/data/regions/qinling/hydrography/primary-modern.json");
+
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+
+    const asset = (await response.json()) as PrimaryHydrographyAsset;
+    const primaryFeatures = asset.features.map(hydrographyFeatureToAtlasFeature);
+    nextAtlasFeatures = [
+      ...qinlingAtlasFeatures.filter((feature) => feature.layer !== "water"),
+      ...primaryFeatures
+    ];
+  } catch (error) {
+    console.warn("Failed to load primary Qinling hydrography atlas layer", error);
+  }
+
   try {
     const response = await fetch("/data/regions/qinling/hydrography/osm-modern.json");
 
@@ -205,14 +313,22 @@ async function loadImportedHydrographyAtlas(): Promise<void> {
     }
 
     const asset = (await response.json()) as ImportedHydrographyAsset;
-    const importedFeatures = importedHydrographyAssetToAtlasFeatures(asset);
-    atlasFeatures = [...qinlingAtlasFeatures, ...importedFeatures];
+    evidenceFeatures = importedHydrographyAssetToAtlasFeatures(asset);
   } catch (error) {
     console.warn("Failed to load imported OSM hydrography atlas layer", error);
+    evidenceFeatures = [];
   }
+
+  atlasFeatures = nextAtlasFeatures;
+  rebuildWaterSystemVisuals();
+  if (lastVisuals) {
+    applyWaterEnvironmentVisuals(lastVisuals);
+    updateTerrainColors(lastVisuals);
+  }
+  refreshAtlasWorkbench();
 }
 
-void loadImportedHydrographyAtlas();
+void loadHydrographyAtlas();
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -224,33 +340,21 @@ const renderer = new WebGLRenderer({
   antialias: true,
   powerPreference: "high-performance"
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// pixelRatio 上限从 2 降到 1.5：在 Retina 屏 GPU 像素填充砍 ~44%，
+// 风扇噪音明显降一档。视觉上软一点，但与多自定义 shader（terrain noise +
+// height fog + water Fresnel + sky）的负担相比，这个交换很划算。
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x081213);
 app.appendChild(renderer.domElement);
 
-const skyOverlay = document.createElement("div");
-skyOverlay.className = "sky-overlay";
-skyOverlay.innerHTML = `
-  <div class="sky-dome">
-    <div class="sky-sun"></div>
-    <div class="sky-moon"></div>
-    <div class="sky-stars">
-      ${Array.from({ length: 96 }, (_, index) => {
-        const left = (index * 47 + Math.floor(index / 7) * 11) % 100;
-        const top = 5 + ((index * 29 + Math.floor(index / 5) * 7) % 70);
-        const size = 1 + (index % 4 === 0 ? 1.4 : index % 3);
-        const opacity = 0.46 + ((index * 17) % 45) / 100;
-        return `<span style="left:${left}%;top:${top}%;width:${size}px;height:${size}px;opacity:${opacity}"></span>`;
-      }).join("")}
-    </div>
-  </div>
-  <div class="sky-cloud cloud-a"></div>
-  <div class="sky-cloud cloud-b"></div>
-  <div class="sky-cloud cloud-c"></div>
-`;
-app.appendChild(skyOverlay);
-skyOverlay.hidden = true;
+const perfStats = createPerfStats({ enabled: isDevModeEnabled() });
+if (perfStats.element.hidden === false) {
+  document.body.appendChild(perfStats.element);
+}
+
+// 旧版 DOM sky overlay（96 个 span 星星 + 3 个 div 云朵）已被 WebGL sky dome
+// 完全替代，DOM 层删除以减少 compositor 负担。
 const hud = createHud(app, terrainAssetRequest, knowledgeFragments.length);
 
 const scene = new Scene();
@@ -315,294 +419,45 @@ let colorAttribute = new BufferAttribute(
 );
 terrainGeometry.setAttribute("color", colorAttribute);
 
-const terrain = new Mesh(
-  terrainGeometry,
-  new MeshPhongMaterial({
-    vertexColors: true,
-    flatShading: true,
-    shininess: 8
-  })
-);
+const terrainMaterial = new MeshPhongMaterial({
+  vertexColors: true,
+  flatShading: true,
+  shininess: 8
+});
+attachTerrainShaderEnhancements(terrainMaterial, {
+  heightFogColor: new Color(0xb6c4be)
+});
+const terrain = new Mesh(terrainGeometry, terrainMaterial);
 scene.add(terrain);
 
 const terrainChunkGroup = new Group();
 scene.add(terrainChunkGroup);
 
-const waterRibbon = new Mesh(
-  new PlaneGeometry(1, 1),
-  new MeshBasicMaterial({
-    color: 0x6aa7b0,
-    transparent: true,
-    opacity: 0.025,
-    side: DoubleSide
-  })
-);
+const waterSurface = createWaterSurfaceMaterial();
+const waterRibbon = new Mesh(new PlaneGeometry(1, 1), waterSurface.material);
 waterRibbon.rotation.x = -Math.PI / 2;
 waterRibbon.position.y = -8;
 scene.add(waterRibbon);
+const ambientWaterStyle: ReturnType<typeof waterVisualStyle> = {
+  bankWidth: 0,
+  bankYOffset: 0,
+  bankOpacity: 0,
+  ribbonWidth: 0,
+  ribbonYOffset: 0,
+  lineYOffset: 0,
+  ribbonOpacity: 0.13,
+  highlightWidth: 0,
+  lineOpacity: 0.1,
+  depthTest: true,
+  lineDepthTest: true,
+  highlightDepthTest: true
+};
 
-const player = new Group();
-
-const avatarPartNames = new Set(woodHorseAvatarParts.map((part) => part.name));
-const woodMaterial = new MeshPhongMaterial({
-  color: 0x8b633d,
-  flatShading: true,
-  shininess: 6
-});
-const darkWoodMaterial = new MeshPhongMaterial({
-  color: 0x5b3d28,
-  flatShading: true,
-  shininess: 5
-});
-const cloakMaterial = new MeshPhongMaterial({
-  color: 0xb85b3d,
-  flatShading: true,
-  shininess: 8
-});
-const riderMaterial = new MeshPhongMaterial({
-  color: 0xe2ceb0,
-  flatShading: true
-});
-
-const horseBody = new Mesh(
-  new BoxGeometry(2.7, 0.86, 1.12),
-  woodMaterial
-);
-horseBody.name = "wooden-horse-body";
-horseBody.position.y = 1.35;
-
-const horseNeck = new Mesh(
-  new BoxGeometry(0.4, 1.02, 0.48),
-  woodMaterial
-);
-horseNeck.name = "wooden-horse-neck";
-horseNeck.position.set(1.12, 1.82, 0);
-horseNeck.rotation.z = -0.35;
-
-const horseHead = new Mesh(
-  new BoxGeometry(0.92, 0.58, 0.56),
-  darkWoodMaterial
-);
-horseHead.name = "wooden-horse-head";
-horseHead.position.set(1.62, 2.16, 0);
-horseHead.rotation.z = -0.12;
-
-const horseMane = new Mesh(
-  new ConeGeometry(0.24, 0.72, 4),
-  new MeshPhongMaterial({ color: 0xd5a35f, flatShading: true, shininess: 5 })
-);
-horseMane.position.set(1.22, 2.28, 0);
-horseMane.rotation.z = Math.PI;
-
-const horseTail = new Mesh(
-  new ConeGeometry(0.18, 0.95, 5),
-  darkWoodMaterial
-);
-horseTail.name = "wooden-horse-tail";
-horseTail.position.set(-1.55, 1.42, 0);
-horseTail.rotation.z = Math.PI / 2;
-
-const horseLegs = [
-  ["front-left-leg", 0.88, 0.38],
-  ["front-right-leg", 0.88, -0.38],
-  ["back-left-leg", -0.88, 0.38],
-  ["back-right-leg", -0.88, -0.38]
-].map(([name, x, z]) => {
-  const leg = new Mesh(
-    new CylinderGeometry(0.11, 0.15, 1.08, 5),
-    darkWoodMaterial
-  );
-  leg.name = String(name);
-  leg.position.set(Number(x), 0.68, Number(z));
-  leg.rotation.z = name === "front-left-leg" || name === "back-right-leg" ? 0.1 : -0.1;
-  return leg;
-});
-const horseLegsByName = new Map(
-  horseLegs.map((leg) => [leg.name, leg])
-);
-
-const saddle = new Mesh(
-  new BoxGeometry(0.82, 0.18, 0.88),
-  new MeshPhongMaterial({ color: 0x3d2a20, flatShading: true })
-);
-saddle.position.set(0.05, 1.9, 0);
-
-const rider = new Mesh(
-  new SphereGeometry(0.36, 12, 12),
-  riderMaterial
-);
-rider.name = "traveler-head";
-rider.position.set(0.05, 2.78, 0);
-
-const cloak = new Mesh(
-  new ConeGeometry(0.62, 1.18, 5),
-  cloakMaterial
-);
-cloak.name = "traveler-cloak";
-cloak.position.set(0, 2.2, 0);
-cloak.rotation.y = Math.PI / 5;
-
-const bannerPole = new Mesh(
-  new CylinderGeometry(0.05, 0.05, 2.8, 6),
-  new MeshPhongMaterial({ color: 0xd7b56b, flatShading: true })
-);
-bannerPole.position.set(-0.4, 3.2, 0);
-
-const banner = new Mesh(
-  new PlaneGeometry(1.1, 0.74),
-  new MeshPhongMaterial({
-    color: 0x9d4234,
-    flatShading: true,
-    side: DoubleSide
-  })
-);
-banner.name = "route-banner";
-banner.position.set(0.1, 3.45, 0);
-banner.rotation.y = Math.PI / 2;
-
-if (avatarPartNames.size === 0) {
-  throw new Error("Missing wood horse avatar blueprint.");
-}
-
-player.add(
-  horseBody,
-  horseNeck,
-  horseHead,
-  horseMane,
-  horseTail,
-  ...horseLegs,
-  saddle,
-  cloak,
-  rider,
-  bannerPole,
-  banner
-);
+const { player, horseLegsByName } = createPlayerAvatar();
 scene.add(player);
 
-function createCircleTexture(
-  innerColor: string,
-  outerColor: string,
-  size = 256
-): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    throw new Error("Failed to create texture context");
-  }
-
-  const gradient = context.createRadialGradient(
-    size * 0.5,
-    size * 0.5,
-    size * 0.06,
-    size * 0.5,
-    size * 0.5,
-    size * 0.45
-  );
-  gradient.addColorStop(0, innerColor);
-  gradient.addColorStop(1, outerColor);
-
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, size, size);
-
-  const texture = new CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function createMoonTexture(size = 256): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    throw new Error("Failed to create moon texture context");
-  }
-
-  const center = size * 0.5;
-  const radius = size * 0.32;
-  context.clearRect(0, 0, size, size);
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  context.fillStyle = "rgba(232, 236, 224, 0.86)";
-  context.fill();
-
-  const markings = [
-    [0.42, 0.42, 0.055, 0.13],
-    [0.57, 0.48, 0.08, 0.1],
-    [0.47, 0.61, 0.065, 0.11],
-    [0.61, 0.62, 0.035, 0.09]
-  ];
-  markings.forEach(([x, y, r, opacity]) => {
-    context.beginPath();
-    context.arc(size * x, size * y, size * r, 0, Math.PI * 2);
-    context.fillStyle = `rgba(120, 132, 128, ${opacity})`;
-    context.fill();
-  });
-
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  context.strokeStyle = "rgba(255, 255, 246, 0.22)";
-  context.lineWidth = 2;
-  context.stroke();
-
-  const texture = new CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function createStarDomePositions(count: number, radius: number): Float32Array {
-  const positions = new Float32Array(count * 3);
-
-  for (let index = 0; index < count; index += 1) {
-    const azimuth = ((index * 137.508) % 360) * MathUtils.DEG2RAD;
-    const elevation = MathUtils.lerp(0.08, 0.96, ((index * 61) % 100) / 100);
-    const horizontalRadius = Math.cos(elevation) * radius;
-
-    positions[index * 3] = Math.cos(azimuth) * horizontalRadius;
-    positions[index * 3 + 1] = Math.sin(elevation) * radius;
-    positions[index * 3 + 2] = Math.sin(azimuth) * horizontalRadius;
-  }
-
-  return positions;
-}
-
-function createCloudTexture(size = 512): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    throw new Error("Failed to create cloud texture context");
-  }
-
-  const gradient = context.createLinearGradient(0, 0, size, size);
-  gradient.addColorStop(0, "rgba(255, 246, 214, 0)");
-  gradient.addColorStop(0.45, "rgba(255, 246, 214, 0.38)");
-  gradient.addColorStop(1, "rgba(255, 246, 214, 0)");
-  context.fillStyle = gradient;
-
-  for (let index = 0; index < 14; index += 1) {
-    const x = size * (0.12 + Math.random() * 0.76);
-    const y = size * (0.24 + Math.random() * 0.5);
-    const radiusX = size * (0.12 + Math.random() * 0.18);
-    const radiusY = size * (0.055 + Math.random() * 0.08);
-    context.beginPath();
-    context.ellipse(x, y, radiusX, radiusY, Math.random() * 0.4 - 0.2, 0, Math.PI * 2);
-    context.fill();
-  }
-
-  const texture = new CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
+// 4 个 procedural texture helper（圆形光晕、月亮、星空点云、云朵）已迁到
+// src/game/proceduralTextures.ts —— main.ts 仅 import 需要的函数。
 
 function createTextSprite(text: string, accent: string): Sprite {
   const layout = textSpriteLayout(text);
@@ -670,10 +525,22 @@ scene.add(fragmentGroup);
 const waterSystemGroup = new Group();
 scene.add(waterSystemGroup);
 
+const riverVegetationGroup = new Group();
+scene.add(riverVegetationGroup);
+
 const routeGroup = new Group();
 scene.add(routeGroup);
 
 const fragmentVisuals = new Map<string, FragmentVisual>();
+type WaterEnvironmentMaterialRole = "ribbon" | "highlight" | "line";
+type WaterEnvironmentMaterial = {
+  material: MeshBasicMaterial | LineBasicMaterial;
+  baseColor: Color;
+  baseOpacity: number;
+  style: ReturnType<typeof waterVisualStyle>;
+  role: WaterEnvironmentMaterialRole;
+};
+const waterEnvironmentMaterials: WaterEnvironmentMaterial[] = [];
 
 function clearGroup(group: Group): void {
   while (group.children.length > 0) {
@@ -685,18 +552,63 @@ function clearGroup(group: Group): void {
 
     group.remove(child);
 
-    if (child instanceof Mesh || child instanceof Line) {
+    // 标记为共享资源的对象的 geometry / material 由 owning 模块维护，
+    // 这里只移除 scene graph 节点，不 dispose。
+    const isShared = child.userData?.sharedResources === true;
+
+    if (!isShared && (child instanceof Mesh || child instanceof Line)) {
       child.geometry.dispose();
       if (Array.isArray(child.material)) {
         child.material.forEach((material) => material.dispose());
       } else {
         child.material.dispose();
       }
-    } else if (child instanceof Sprite) {
+    } else if (!isShared && child instanceof Sprite) {
       child.material.dispose();
     }
   }
 }
+
+// 全局共享 material：避免每个 landmark / gate post 都 new，减少 GPU
+// 状态切换和材质实例数。clearGroup 不会 dispose 这些（共享，下一次 rebuild 复用）。
+const landmarkMaterials = {
+  pass: new MeshPhongMaterial({
+    color: 0xd7a354,
+    emissive: 0x4d2d10,
+    flatShading: true
+  }),
+  river: new MeshPhongMaterial({
+    color: 0x5fb8d0,
+    emissive: 0x111111,
+    flatShading: true
+  }),
+  mountain: new MeshPhongMaterial({
+    color: 0xded5c3,
+    emissive: 0x111111,
+    flatShading: true
+  }),
+  city: new MeshPhongMaterial({
+    color: 0x91b67c,
+    emissive: 0x252111,
+    flatShading: true
+  }),
+  plain: new MeshPhongMaterial({
+    color: 0x91b67c,
+    emissive: 0x111111,
+    flatShading: true
+  })
+};
+const gatePostMaterial = new MeshPhongMaterial({
+  color: 0x8a4d22,
+  emissive: 0x2d1608,
+  flatShading: true
+});
+// 几何也共享：所有 city marker 用同一个 cylinder，所有 non-city marker 用另一个。
+const landmarkGeometries = {
+  city: new CylinderGeometry(0.18, 0.48, 2.8, 5),
+  generic: new CylinderGeometry(0.14, 0.36, 2.4, 4),
+  gatePost: new CylinderGeometry(0.14, 0.24, 4.1, 5)
+};
 
 function rebuildLandmarkVisuals(): void {
   clearGroup(landmarkGroup);
@@ -708,30 +620,16 @@ function rebuildLandmarkVisuals(): void {
       : null;
     landmarkChunkIds.set(landmark.name, chunkId);
     const ground = 0;
-    const marker = new Mesh(
+    const geometry =
       landmark.kind === "city"
-        ? new CylinderGeometry(0.18, 0.48, 2.8, 5)
-        : new CylinderGeometry(0.14, 0.36, 2.4, 4),
-      new MeshPhongMaterial({
-        color:
-          landmark.kind === "pass"
-            ? 0xd7a354
-            : landmark.kind === "river"
-              ? 0x5fb8d0
-              : landmark.kind === "mountain"
-                ? 0xded5c3
-                : 0x91b67c,
-        emissive:
-          landmark.kind === "city"
-            ? 0x252111
-            : landmark.kind === "pass"
-              ? 0x4d2d10
-              : 0x111111,
-        flatShading: true
-      })
-    );
+        ? landmarkGeometries.city
+        : landmarkGeometries.generic;
+    const material = landmarkMaterials[landmark.kind] ?? landmarkMaterials.plain;
+    const marker = new Mesh(geometry, material);
     marker.position.set(landmark.position.x, ground + 1.8, landmark.position.y);
     marker.userData.chunkId = chunkId;
+    // 共享 geometry / material，clearGroup 时不要 dispose
+    marker.userData.sharedResources = true;
 
     if (landmark.kind !== "plain") {
       const label = createTextSprite(
@@ -750,25 +648,32 @@ function rebuildLandmarkVisuals(): void {
 
     if (landmark.kind === "pass") {
       [-0.72, 0.72].forEach((offset) => {
-        const gatePost = new Mesh(
-          new CylinderGeometry(0.14, 0.24, 4.1, 5),
-          new MeshPhongMaterial({
-            color: 0x8a4d22,
-            emissive: 0x2d1608,
-            flatShading: true
-          })
-        );
+        const gatePost = new Mesh(landmarkGeometries.gatePost, gatePostMaterial);
         gatePost.position.set(
           landmark.position.x + offset,
           ground + 2.65,
           landmark.position.y
         );
         gatePost.userData.chunkId = chunkId;
+        gatePost.userData.sharedResources = true;
         landmarkGroup.add(gatePost);
       });
     }
   });
 }
+
+// 共享 sprite material：所有 knowledge fragment 用同色 glow + halo。
+const fragmentGlowMaterial = new SpriteMaterial({
+  map: fragmentGlowTexture,
+  color: 0xfff0a5,
+  transparent: true,
+  depthWrite: false
+});
+const fragmentHaloMaterial = new SpriteMaterial({
+  map: fragmentHaloTexture,
+  transparent: true,
+  depthWrite: false
+});
 
 function rebuildFragmentVisuals(): void {
   clearGroup(fragmentGroup);
@@ -780,26 +685,15 @@ function rebuildFragmentVisuals(): void {
       : null;
     const ground = 0;
 
-    const sprite = new Sprite(
-      new SpriteMaterial({
-        map: fragmentGlowTexture,
-        color: 0xfff0a5,
-        transparent: true,
-        depthWrite: false
-      })
-    );
+    const sprite = new Sprite(fragmentGlowMaterial);
     sprite.scale.set(2.5, 2.5, 1);
     sprite.position.set(fragment.position.x, ground + 3.5, fragment.position.y);
+    sprite.userData.sharedResources = true;
 
-    const halo = new Sprite(
-      new SpriteMaterial({
-        map: fragmentHaloTexture,
-        transparent: true,
-        depthWrite: false
-      })
-    );
+    const halo = new Sprite(fragmentHaloMaterial);
     halo.scale.set(5.8, 5.8, 1);
     halo.position.set(fragment.position.x, ground + 2.2, fragment.position.y);
+    halo.userData.sharedResources = true;
 
     fragmentGroup.add(halo, sprite);
 
@@ -816,118 +710,30 @@ function rebuildFragmentVisuals(): void {
 rebuildLandmarkVisuals();
 rebuildFragmentVisuals();
 
-const precipitationCount = 480;
-const precipitationGeometry = new BufferGeometry();
-const precipitationPositions = new Float32Array(precipitationCount * 3);
-const precipitationOffsets: number[] = [];
+// Atmosphere（sky dome + 云层 + 雨雪粒子）从 main.ts 抽出，便于独立演进 shader。
+const skyDome = createSkyDome();
+scene.add(skyDome.group);
 
-for (let index = 0; index < precipitationCount; index += 1) {
-  precipitationPositions[index * 3] = (Math.random() - 0.5) * 50;
-  precipitationPositions[index * 3 + 1] = Math.random() * 26 + 4;
-  precipitationPositions[index * 3 + 2] = (Math.random() - 0.5) * 50;
-  precipitationOffsets.push(Math.random() * Math.PI * 2);
-}
+const cloudLayer = createCloudLayer();
+scene.add(cloudLayer.group);
 
-precipitationGeometry.setAttribute(
-  "position",
-  new BufferAttribute(precipitationPositions, 3)
-);
+const precipitationLayer = createPrecipitationLayer(240);
+scene.add(precipitationLayer.points);
 
-const precipitationMaterial = new PointsMaterial({
-  color: 0xd6eef8,
-  size: 0.18,
-  transparent: true,
-  opacity: 0,
-  depthWrite: false
-});
-const precipitation = new Points(precipitationGeometry, precipitationMaterial);
-scene.add(precipitation);
-
-const skyDomeGroup = new Group();
-skyDomeGroup.renderOrder = -1000;
-scene.add(skyDomeGroup);
-
-const skyShell = new Mesh(
-  new SphereGeometry(skyDomePolicy.radius, 48, 24),
-  new MeshBasicMaterial({
-    color: 0x8eb6ac,
-    side: BackSide,
-    depthTest: false,
-    depthWrite: false,
-    fog: false
-  })
-);
-skyShell.renderOrder = -1000;
-skyDomeGroup.add(skyShell);
-
-const starDomeGeometry = new BufferGeometry();
-starDomeGeometry.setAttribute(
-  "position",
-  new BufferAttribute(createStarDomePositions(360, skyDomePolicy.radius * 0.92), 3)
-);
-const starDomeMaterial = new PointsMaterial({
-  color: 0xf1f5ff,
-  size: 1.1,
-  transparent: true,
-  opacity: 0,
-  depthTest: false,
-  depthWrite: false,
-  fog: false
-});
-const starDome = new Points(starDomeGeometry, starDomeMaterial);
-starDome.renderOrder = -999;
-skyDomeGroup.add(starDome);
-
-const sunSkyDisc = new Sprite(
-  new SpriteMaterial({
-    map: createCircleTexture("rgba(255, 244, 203, 0.9)", "rgba(255, 194, 91, 0)", 256),
-    transparent: true,
-    opacity: 0,
-    depthTest: false,
-    depthWrite: false,
-    fog: false
-  })
-);
-sunSkyDisc.renderOrder = -998;
-skyDomeGroup.add(sunSkyDisc);
-
-const moonSkyDisc = new Sprite(
-  new SpriteMaterial({
-    map: createMoonTexture(256),
-    transparent: true,
-    opacity: 0,
-    depthTest: false,
-    depthWrite: false,
-    fog: false
-  })
-);
-moonSkyDisc.renderOrder = -998;
-skyDomeGroup.add(moonSkyDisc);
-
-const cloudGroup = new Group();
-const cloudTexture = createCloudTexture();
-const cloudSprites: Sprite[] = [];
-
-for (let index = 0; index < 7; index += 1) {
-  const cloud = new Sprite(
-    new SpriteMaterial({
-      map: cloudTexture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      opacity: 0.18
-    })
-  );
-  cloud.renderOrder = 10;
-  cloud.scale.set(54 + index * 7, 18 + (index % 3) * 5, 1);
-  cloud.userData.baseX = -140 + index * 48;
-  cloud.userData.baseZ = -96 + (index % 4) * 58;
-  cloud.userData.phase = index * 0.73;
-  cloudSprites.push(cloud);
-  cloudGroup.add(cloud);
-}
-
-scene.add(cloudGroup);
+// 兼容旧引用（main 循环使用）
+const skyDomeGroup = skyDome.group;
+const skyShell = skyDome.shell;
+const starDomeMaterial = skyDome.starDomeMaterial;
+const sunSkyDisc = skyDome.sunDisc;
+const moonSkyDisc = skyDome.moonDisc;
+const cloudGroup = cloudLayer.group;
+const cloudSprites = cloudLayer.sprites;
+const precipitation = precipitationLayer.points;
+const precipitationMaterial = precipitationLayer.material;
+const precipitationGeometry = precipitationLayer.geometry;
+const precipitationPositions = precipitationLayer.positions;
+const precipitationOffsets = precipitationLayer.offsets;
+const precipitationCount = precipitationLayer.count;
 
 let currentMode: ViewMode = "terrain";
 const collectedIds = new Set<string>();
@@ -946,6 +752,9 @@ function updateTerrainColors(visuals: EnvironmentVisuals): void {
   }
 
   const color = new Color();
+  const waterTint = new Color(0x4f8a8f);
+  const wetBankTint = new Color(0x687f54);
+  const vegetationTint = new Color(0x486b3f);
 
   for (let index = 0; index < positionAttribute.count; index += 1) {
     const x = positionAttribute.getX(index);
@@ -962,6 +771,14 @@ function updateTerrainColors(visuals: EnvironmentVisuals): void {
         visuals
       )
     );
+
+    if (currentMode === "terrain" && visibleWaterFeatures.length > 0) {
+      const influence = riverCorridorInfluenceAtPoint(x, z, visibleWaterFeatures);
+      color.lerp(wetBankTint, influence.bank * 0.24);
+      color.lerp(vegetationTint, influence.vegetation * 0.34);
+      color.lerp(waterTint, influence.water * 0.38);
+    }
+
     colorAttribute.setXYZ(index, color.r, color.g, color.b);
   }
 
@@ -1024,47 +841,214 @@ function renderJournal(): void {
   });
 }
 
+function createWaterSurfaceRibbon(
+  points: Array<{ x: number; y: number }>,
+  options: {
+    width: number;
+    yOffset: number;
+    color: number;
+    opacity: number;
+    renderOrder: number;
+    depthTest?: boolean;
+  }
+): Mesh<BufferGeometry, MeshBasicMaterial> {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new BufferAttribute(
+      buildWaterRibbonVertices(points, {
+        width: options.width,
+        yOffset: options.yOffset,
+        sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
+      }),
+      3
+    )
+  );
+
+  const ribbon = new Mesh(
+    geometry,
+    new MeshBasicMaterial({
+      color: options.color,
+      transparent: true,
+      opacity: options.opacity,
+      side: DoubleSide,
+      depthWrite: false,
+      depthTest: options.depthTest ?? true,
+      // 不让 FogExp2 把远处水带雾化——之前用户反馈"水离得很近才出现"
+      // 就是因为水带在远处被场景 fog 吞了。
+      fog: false
+    })
+  );
+  ribbon.renderOrder = options.renderOrder;
+
+  return ribbon;
+}
+
+function registerWaterEnvironmentMaterial(
+  material: MeshBasicMaterial | LineBasicMaterial,
+  baseColor: number,
+  style: ReturnType<typeof waterVisualStyle>,
+  role: WaterEnvironmentMaterialRole
+): void {
+  waterEnvironmentMaterials.push({
+    material,
+    baseColor: new Color(baseColor),
+    baseOpacity: material.opacity,
+    style,
+    role
+  });
+}
+
+function applyWaterEnvironmentVisuals(visuals: EnvironmentVisuals): void {
+  waterEnvironmentMaterials.forEach((entry) => {
+    const environmentStyle = waterEnvironmentVisualStyle(entry.style, visuals);
+    const opacity =
+      entry.role === "ribbon"
+        ? environmentStyle.ribbonOpacity
+        : environmentStyle.lineOpacity;
+    const colorMultiplier =
+      entry.role === "highlight"
+        ? environmentStyle.highlightMultiplier
+        : environmentStyle.colorMultiplier;
+
+    entry.material.opacity = Math.min(entry.baseOpacity, opacity);
+    entry.material.color.copy(entry.baseColor).multiplyScalar(colorMultiplier);
+  });
+}
+
+const ambientWaterBaseColor = new Color(0x6aa7b0);
+function applyAmbientWaterSurfaceVisuals(visuals: EnvironmentVisuals): void {
+  const environmentStyle = waterEnvironmentVisualStyle(ambientWaterStyle, visuals);
+  // 把 environment-coupled 强度喂给水面 shader 的 uniform。
+  // base color 按 colorMultiplier 缩放（夜晚更暗、晴天更亮），
+  // opacity 按 environmentStyle.ribbonOpacity 控制（雨天更淡）。
+  const tintedBase = ambientWaterBaseColor
+    .clone()
+    .multiplyScalar(environmentStyle.colorMultiplier);
+  waterSurface.setBaseColor(tintedBase);
+  waterSurface.setOpacity(Math.max(0.06, environmentStyle.ribbonOpacity * 1.4));
+  waterSurface.setSunDirection(visuals.sunDirection);
+}
+
+function rebuildRiverVegetationVisuals(rivers: QinlingAtlasFeature[]): void {
+  clearGroup(riverVegetationGroup);
+
+  if (!terrainSampler || rivers.length === 0) {
+    return;
+  }
+
+  const samples = buildRiverVegetationSamples(rivers, {
+    maxSamples: 520,
+    spacing: 3.25,
+    bankOffset: 2.6
+  });
+  const treeMatrices: Matrix4[] = [];
+  const shrubMatrices: Matrix4[] = [];
+  const dummy = new Object3D();
+
+  samples.forEach((sample) => {
+    const height = terrainSampler!.sampleHeight(sample.x, sample.z);
+    const scale = sample.scale;
+
+    if (sample.variant === "tree") {
+      dummy.position.set(sample.x, height + 0.82 * scale, sample.z);
+      dummy.rotation.set(0, sample.rotation, 0);
+      dummy.scale.set(0.72 * scale, 1.08 * scale, 0.72 * scale);
+      dummy.updateMatrix();
+      treeMatrices.push(dummy.matrix.clone());
+      return;
+    }
+
+    dummy.position.set(sample.x, height + 0.28 * scale, sample.z);
+    dummy.rotation.set(0, sample.rotation, 0);
+    dummy.scale.set(0.84 * scale, 0.58 * scale, 0.84 * scale);
+    dummy.updateMatrix();
+    shrubMatrices.push(dummy.matrix.clone());
+  });
+
+  if (treeMatrices.length > 0) {
+    const trees = new InstancedMesh(
+      new ConeGeometry(0.34, 1.62, 5),
+      new MeshPhongMaterial({
+        color: 0x2f6246,
+        flatShading: true,
+        shininess: 4
+      }),
+      treeMatrices.length
+    );
+    trees.renderOrder = 8;
+    treeMatrices.forEach((matrix, index) => trees.setMatrixAt(index, matrix));
+    trees.instanceMatrix.needsUpdate = true;
+    riverVegetationGroup.add(trees);
+  }
+
+  if (shrubMatrices.length > 0) {
+    const shrubs = new InstancedMesh(
+      new CylinderGeometry(0.28, 0.46, 0.58, 5),
+      new MeshPhongMaterial({
+        color: 0x58764b,
+        flatShading: true,
+        shininess: 3
+      }),
+      shrubMatrices.length
+    );
+    shrubs.renderOrder = 8;
+    shrubMatrices.forEach((matrix, index) => shrubs.setMatrixAt(index, matrix));
+    shrubs.instanceMatrix.needsUpdate = true;
+    riverVegetationGroup.add(shrubs);
+  }
+}
+
 function rebuildWaterSystemVisuals(): void {
   clearGroup(waterSystemGroup);
+  clearGroup(riverVegetationGroup);
+  waterEnvironmentMaterials.length = 0;
+  visibleWaterFeatures = [];
 
   if (!terrainSampler) {
     return;
   }
 
-  qinlingWaterSystem.filter(isVerifiedAtlasFeature).forEach((river) => {
-    const points = featureWorldPoints(river);
-    const ribbonGeometry = new BufferGeometry();
-    ribbonGeometry.setAttribute(
-      "position",
-      new BufferAttribute(
-        buildRouteRibbonVertices(points, {
-          width: river.displayPriority >= 9 ? 1.7 : 1.15,
-          yOffset: 0.5,
-          sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
-        }),
-        3
-      )
-    );
+  const rivers = selectRenderableWaterFeatures(atlasFeatures);
+  visibleWaterFeatures = rivers;
 
-    const ribbon = new Mesh(
-      ribbonGeometry,
-      new MeshBasicMaterial({
-        color: 0x4fb6c8,
-        transparent: true,
-        opacity: river.displayPriority >= 9 ? 0.72 : 0.5,
-        side: DoubleSide,
-        depthWrite: false
-      })
-    );
-    ribbon.renderOrder = 9;
+  rebuildRiverVegetationVisuals(rivers);
+
+  rivers.forEach((river) => {
+    const points = featureWorldPoints(river);
+    const waterStyle = waterVisualStyle(river);
+    // 调亮水色：原 0x477f8f 在 hillshade 上偏暗融入地形。新色更接近"鲜亮河水"。
+    const ribbonColor = river.displayPriority >= 9 ? 0x5cabc6 : 0x6fb6c5;
+    const lineColor = 0xb5e7df;
+    const highlightColor = 0xe2faf2;
+
+    const ribbon = createWaterSurfaceRibbon(points, {
+        width: waterStyle.ribbonWidth,
+        yOffset: waterStyle.ribbonYOffset,
+        color: ribbonColor,
+        opacity: waterStyle.ribbonOpacity,
+        renderOrder: 4
+      });
+    registerWaterEnvironmentMaterial(ribbon.material, ribbonColor, waterStyle, "ribbon");
     waterSystemGroup.add(ribbon);
+
+    const highlight = createWaterSurfaceRibbon(points, {
+        width: waterStyle.highlightWidth,
+        yOffset: waterStyle.lineYOffset + 0.08,
+        color: highlightColor,
+        opacity: waterStyle.lineOpacity,
+        renderOrder: 12,
+        depthTest: waterStyle.highlightDepthTest
+      });
+    registerWaterEnvironmentMaterial(highlight.material, highlightColor, waterStyle, "highlight");
+    waterSystemGroup.add(highlight);
 
     const positions: number[] = [];
 
     points.forEach((point) => {
       positions.push(
         point.x,
-        terrainSampler!.sampleHeight(point.x, point.y) + 0.64,
+        terrainSampler!.sampleHeight(point.x, point.y) + waterStyle.lineYOffset,
         point.y
       );
     });
@@ -1078,15 +1062,36 @@ function rebuildWaterSystemVisuals(): void {
     const line = new Line(
       geometry,
       new LineBasicMaterial({
-        color: 0x62c3d4,
+        color: lineColor,
         transparent: true,
-        opacity: river.displayPriority >= 9 ? 0.9 : 0.68,
-        linewidth: 2
+        opacity: waterStyle.lineOpacity,
+        linewidth: 2,
+        depthTest: waterStyle.lineDepthTest,
+        fog: false
       })
     );
-    line.renderOrder = 10;
+    line.renderOrder = 11;
+    registerWaterEnvironmentMaterial(line.material, lineColor, waterStyle, "line");
     waterSystemGroup.add(line);
+
+    const labelPoint = waterLabelPoint(river);
+
+    if (labelPoint) {
+      const label = createTextSprite(river.name, "#bdeff0");
+      label.scale.multiplyScalar(river.displayPriority >= 9 ? 1.08 : 0.82);
+      label.position.set(
+        labelPoint.x,
+        terrainSampler!.sampleHeight(labelPoint.x, labelPoint.y) + 4.8,
+        labelPoint.y
+      );
+      label.renderOrder = 13;
+      waterSystemGroup.add(label);
+    }
   });
+
+  if (lastVisuals) {
+    applyWaterEnvironmentVisuals(lastVisuals);
+  }
 }
 
 function rebuildRouteVisuals(): void {
@@ -1210,6 +1215,209 @@ function resizeAtlasCanvasToDisplaySize(canvas: HTMLCanvasElement): void {
   }
 }
 
+const atlasBaseMapCache = new WeakMap<DemAsset, HTMLCanvasElement>();
+
+interface AtlasCanvasProjection {
+  worldToCanvas(point: { x: number; y: number }): { x: number; y: number };
+  canvasToWorld(point: { x: number; y: number }): { x: number; y: number };
+}
+
+function strictAtlasProjection(
+  asset: DemAsset,
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" }
+): AtlasCanvasProjection {
+  return {
+    worldToCanvas: (point) =>
+      atlasMapWorldToCanvasPoint(point, asset.world, canvas, mapView),
+    canvasToWorld: (point) =>
+      atlasMapCanvasToWorldPoint(point, asset.world, canvas, mapView)
+  };
+}
+
+function demSampleColor(
+  asset: DemAsset,
+  worldPoint: { x: number; y: number }
+): [number, number, number] {
+  const heightRange = asset.maxHeight - asset.minHeight || 1;
+  const column = Math.min(
+    asset.grid.columns - 1,
+    Math.max(
+      0,
+      Math.floor(((worldPoint.x / asset.world.width) + 0.5) * asset.grid.columns)
+    )
+  );
+  const row = Math.min(
+    asset.grid.rows - 1,
+    Math.max(
+      0,
+      Math.floor((0.5 - worldPoint.y / asset.world.depth) * asset.grid.rows)
+    )
+  );
+  const sample = asset.heights[row * asset.grid.columns + column] ?? asset.minHeight;
+  const h = MathUtils.clamp((sample - asset.minHeight) / heightRange, 0, 1);
+  const lowland = h < 0.28;
+  const ridge = h > 0.58;
+
+  return [
+    lowland ? 178 : ridge ? 224 : 190 + h * 34,
+    lowland ? 178 : ridge ? 211 : 170 + h * 40,
+    lowland ? 126 : ridge ? 160 : 108 + h * 36
+  ];
+}
+
+function computeHillshade(
+  asset: DemAsset,
+  column: number,
+  row: number,
+  azimuthDeg = 315,
+  altitudeDeg = 45,
+  zFactor = 6
+): number {
+  const cols = asset.grid.columns;
+  const rows = asset.grid.rows;
+  const cl = Math.max(0, column - 1);
+  const cr = Math.min(cols - 1, column + 1);
+  const ru = Math.max(0, row - 1);
+  const rd = Math.min(rows - 1, row + 1);
+  const h = (c: number, r: number) => asset.heights[r * cols + c] ?? 0;
+
+  // Sobel 梯度（标准 hillshade kernel）
+  const dzdx =
+    ((h(cr, ru) + 2 * h(cr, row) + h(cr, rd)) -
+      (h(cl, ru) + 2 * h(cl, row) + h(cl, rd))) /
+    8;
+  const dzdy =
+    ((h(cl, rd) + 2 * h(column, rd) + h(cr, rd)) -
+      (h(cl, ru) + 2 * h(column, ru) + h(cr, ru))) /
+    8;
+
+  const slope = Math.atan(zFactor * Math.sqrt(dzdx * dzdx + dzdy * dzdy));
+  const aspect = Math.atan2(dzdy, -dzdx);
+  const azimuth = (azimuthDeg * Math.PI) / 180;
+  const altitude = (altitudeDeg * Math.PI) / 180;
+  const azimuthMath = Math.PI / 2 - azimuth;
+
+  const shade =
+    Math.cos(altitude) * Math.cos(slope) +
+    Math.sin(altitude) * Math.sin(slope) * Math.cos(azimuthMath - aspect);
+
+  return Math.max(0, shade);
+}
+
+function createAtlasBaseMapCanvas(asset: DemAsset): HTMLCanvasElement {
+  const cached = atlasBaseMapCache.get(asset);
+
+  if (cached) {
+    return cached;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = asset.grid.columns;
+  canvas.height = asset.grid.rows;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    atlasBaseMapCache.set(asset, canvas);
+    return canvas;
+  }
+
+  const image = context.createImageData(canvas.width, canvas.height);
+
+  for (let row = 0; row < asset.grid.rows; row += 1) {
+    for (let column = 0; column < asset.grid.columns; column += 1) {
+      const offset = (row * canvas.width + column) * 4;
+      const color = demSampleColor(asset, {
+        x: ((column / Math.max(1, asset.grid.columns - 1)) - 0.5) * asset.world.width,
+        y: (0.5 - row / Math.max(1, asset.grid.rows - 1)) * asset.world.depth
+      });
+
+      // Hillshade：太阳从西北上方（azimuth=315°, altitude=45°）打过来。
+      // shade ∈ [0, 1]——0 完全背光、1 完全正照。把它映射到 [0.45, 1.15] 的
+      // 调色乘子，让平原保留底色（shade≈1），山阴侧明显变暗，山脊高光。
+      const shade = computeHillshade(asset, column, row);
+      const factor = 0.45 + shade * 0.7;
+
+      image.data[offset] = Math.min(255, color[0] * factor);
+      image.data[offset + 1] = Math.min(255, color[1] * factor);
+      image.data[offset + 2] = Math.min(255, color[2] * factor);
+      image.data[offset + 3] = 255;
+    }
+  }
+
+  context.putImageData(image, 0, 0);
+  atlasBaseMapCache.set(asset, canvas);
+
+  return canvas;
+}
+
+function drawAtlasBaseMap(
+  context: CanvasRenderingContext2D,
+  asset: DemAsset,
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" }
+): void {
+  const baseMap = createAtlasBaseMapCanvas(asset);
+  const topLeft = atlasMapWorldToCanvasPoint(
+    { x: -asset.world.width / 2, y: asset.world.depth / 2 },
+    asset.world,
+    canvas,
+    mapView
+  );
+  const bottomRight = atlasMapWorldToCanvasPoint(
+    { x: asset.world.width / 2, y: -asset.world.depth / 2 },
+    asset.world,
+    canvas,
+    mapView
+  );
+  const x = Math.min(topLeft.x, bottomRight.x);
+  const y = Math.min(topLeft.y, bottomRight.y);
+  const width = Math.abs(bottomRight.x - topLeft.x);
+  const height = Math.abs(bottomRight.y - topLeft.y);
+
+  context.fillStyle = "rgb(9, 17, 17)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = true;
+  context.drawImage(baseMap, x, y, width, height);
+}
+
+function drawCameraAlignedAtlasBaseMap(
+  context: CanvasRenderingContext2D,
+  asset: DemAsset,
+  canvas: HTMLCanvasElement,
+  projection: AtlasCanvasProjection
+): void {
+  const image = context.createImageData(canvas.width, canvas.height);
+
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      const worldPoint = projection.canvasToWorld({ x, y });
+      const offset = (y * canvas.width + x) * 4;
+      const inBounds =
+        worldPoint.x >= -asset.world.width / 2 &&
+        worldPoint.x <= asset.world.width / 2 &&
+        worldPoint.y >= -asset.world.depth / 2 &&
+        worldPoint.y <= asset.world.depth / 2;
+
+      if (!inBounds) {
+        image.data[offset] = 9;
+        image.data[offset + 1] = 17;
+        image.data[offset + 2] = 17;
+        image.data[offset + 3] = 255;
+        continue;
+      }
+
+      const color = demSampleColor(asset, worldPoint);
+      image.data[offset] = color[0];
+      image.data[offset + 1] = color[1];
+      image.data[offset + 2] = color[2];
+      image.data[offset + 3] = 255;
+    }
+  }
+
+  context.putImageData(image, 0, 0);
+}
+
 function drawAtlasMapCanvas(
   canvas: HTMLCanvasElement,
   asset: DemAsset,
@@ -1223,97 +1431,95 @@ function drawAtlasMapCanvas(
   }
 
   const { width, height } = canvas;
-  const image = context.createImageData(width, height);
-  const heightRange = asset.maxHeight - asset.minHeight || 1;
   const mapView = useWorkbenchView
     ? atlasWorkbench.mapView
     : { scale: 1, offsetX: 0, offsetY: 0 };
+  const projection = strictAtlasProjection(asset, canvas, mapView);
 
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const worldPoint = useWorkbenchView
-        ? atlasMapCanvasToWorldPoint({ x, y }, asset.world, canvas, mapView)
-        : {
-            x: ((x / width) - 0.5) * asset.world.width,
-            y: (0.5 - y / height) * asset.world.depth
-          };
-      const inBounds =
-        worldPoint.x >= -asset.world.width / 2 &&
-        worldPoint.x <= asset.world.width / 2 &&
-        worldPoint.y >= -asset.world.depth / 2 &&
-        worldPoint.y <= asset.world.depth / 2;
-      const offset = (y * width + x) * 4;
-
-      if (!inBounds) {
-        image.data[offset] = 9;
-        image.data[offset + 1] = 17;
-        image.data[offset + 2] = 17;
-        image.data[offset + 3] = 255;
-        continue;
-      }
-
-      const column = Math.min(
-        asset.grid.columns - 1,
-        Math.max(
-          0,
-          Math.floor(((worldPoint.x / asset.world.width) + 0.5) * asset.grid.columns)
-        )
-      );
-      const row = Math.min(
-        asset.grid.rows - 1,
-        Math.max(
-          0,
-          Math.floor((0.5 - worldPoint.y / asset.world.depth) * asset.grid.rows)
-        )
-      );
-      const sample = asset.heights[row * asset.grid.columns + column] ?? asset.minHeight;
-      const h = MathUtils.clamp((sample - asset.minHeight) / heightRange, 0, 1);
-      const lowland = h < 0.28;
-      const ridge = h > 0.58;
-
-      image.data[offset] = lowland ? 178 : ridge ? 224 : 190 + h * 34;
-      image.data[offset + 1] = lowland ? 178 : ridge ? 211 : 170 + h * 40;
-      image.data[offset + 2] = lowland ? 126 : ridge ? 160 : 108 + h * 36;
-      image.data[offset + 3] = 255;
-    }
-  }
-
-  context.putImageData(image, 0, 0);
+  drawAtlasBaseMap(context, asset, canvas, mapView);
   context.fillStyle = "rgba(247, 230, 174, 0.12)";
   context.fillRect(0, 0, width, height);
-  drawDemQualityOverlay(context, asset, canvas, mapView, useWorkbenchView);
+  drawDemQualityOverlay(context, asset, canvas, projection, useWorkbenchView);
 
   const atlasLayers = qinlingAtlasLayers.map((layer) => ({
     ...layer,
     defaultVisible: atlasWorkbench.visibleLayerIds.has(layer.id)
   }));
-  const selectedFeature = selectedAtlasFeature(atlasWorkbench, atlasFeatures);
+  const featuresForView = activeAtlasFeatures();
+  const selectedFeature = selectedAtlasFeature(atlasWorkbench, featuresForView);
   const minDisplayPriority = atlasMinimumDisplayPriority({
     fullscreen: useWorkbenchView,
     scale: mapView.scale
   });
 
-  atlasVisibleFeatures(atlasFeatures, atlasLayers, { minDisplayPriority }).forEach(
-    (feature) => {
-      drawAtlasFeature(context, feature, asset, canvas, mapView);
-    }
-  );
+  // atlas 视觉路径放行未验证 feature——长安、剑门关、陈仓道这种 manual-atlas-draft
+  // 数据是产品级叙事的一部分，verification 政策只用于事实层（hydrography 3D 渲染）。
+  atlasVisibleFeatures(featuresForView, atlasLayers, {
+    minDisplayPriority,
+    includeUnverifiedFeatures: true
+  }).forEach((feature) => {
+    drawAtlasFeature(context, feature, projection, useWorkbenchView);
+  });
+
+  drawRegionPlacemarks(context, projection, useWorkbenchView);
+  drawAtlasOverlay(context, canvas, asset, mapView, useWorkbenchView);
 
   if (selectedFeature) {
-    drawAtlasFeatureSelection(context, selectedFeature, asset, canvas, mapView);
+    drawAtlasFeatureSelection(context, selectedFeature, projection);
   }
 
-  const playerPoint = atlasMapWorldToCanvasPoint(
-    { x: playerPosition.x, y: playerPosition.z },
-    asset.world,
-    canvas,
-    mapView
-  );
+  const playerPoint = projection.worldToCanvas({
+    x: playerPosition.x,
+    y: playerPosition.z
+  });
   const playerX = MathUtils.clamp(playerPoint.x, 0, width);
   const playerY = MathUtils.clamp(playerPoint.y, 0, height);
 
+  // 全屏 atlas 上玩家标记需要更显眼：光晕 + 大圆点 + 朝向小三角。
+  // 小窗 minimap 仍保持原来的 5.5px 紧凑圆点。
+  const fullscreenScale = useWorkbenchView ? 1.7 : 1;
+  const dotRadius = 5.5 * fullscreenScale;
+
+  if (useWorkbenchView) {
+    // 半透明光晕，让玩家位置远看也能扫到
+    const haloGradient = context.createRadialGradient(
+      playerX, playerY, dotRadius * 0.4,
+      playerX, playerY, dotRadius * 4
+    );
+    haloGradient.addColorStop(0, "rgba(245, 231, 164, 0.42)");
+    haloGradient.addColorStop(1, "rgba(245, 231, 164, 0)");
+    context.fillStyle = haloGradient;
+    context.beginPath();
+    context.arc(playerX, playerY, dotRadius * 4, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  // 朝向小三角：按 cameraHeading 决定指向哪个世界方向。
+  // 玩家朝 -Z（南）时 heading=0，要让箭头指向 atlas 上的"南"=画布 +y 方向。
+  // forward (world) = (-sin h, -cos h)；atlas 上 +world.z → -canvas.y，
+  // 所以 atlas 屏幕方向 = (-sin h, +cos h)。
+  if (useWorkbenchView) {
+    const arrowAngle = Math.atan2(-Math.sin(cameraHeading), Math.cos(cameraHeading));
+    const tipDistance = dotRadius * 2.2;
+    const baseHalf = dotRadius * 0.95;
+    context.save();
+    context.translate(playerX, playerY);
+    context.rotate(arrowAngle);
+    context.beginPath();
+    context.moveTo(0, -tipDistance);
+    context.lineTo(baseHalf, dotRadius * 0.4);
+    context.lineTo(-baseHalf, dotRadius * 0.4);
+    context.closePath();
+    context.fillStyle = "rgba(245, 231, 164, 0.92)";
+    context.fill();
+    context.strokeStyle = "rgba(44, 24, 14, 0.7)";
+    context.lineWidth = 1.6;
+    context.stroke();
+    context.restore();
+  }
+
   context.beginPath();
-  context.arc(playerX, playerY, 5.5, 0, Math.PI * 2);
+  context.arc(playerX, playerY, dotRadius, 0, Math.PI * 2);
   context.fillStyle = "#f5e7a4";
   context.fill();
   context.lineWidth = 2;
@@ -1321,11 +1527,142 @@ function drawAtlasMapCanvas(
   context.stroke();
 }
 
+function drawAtlasOverlay(
+  context: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  asset: DemAsset,
+  mapView: { scale: number },
+  fullscreen: boolean
+): void {
+  if (!fullscreen) {
+    return;
+  }
+
+  // 比例尺：50km 在 worldspace 是多少世界单位？
+  // worldspace 单位 = qinlingGeographicFootprintKm.width / asset.world.width 公里。
+  // 这里 hardcode 420km / 180 unit = 2.33 km/unit。后续多 region 可改成读 manifest。
+  const kmPerUnit = 420 / asset.world.width;
+  const scaleKm = 50;
+  const scaleUnits = scaleKm / kmPerUnit;
+  const scaleBarPx =
+    (scaleUnits / asset.world.width) * canvas.width * mapView.scale;
+
+  // 把所有 overlay 放在 canvas 左下角——右上方被 atlas-side-panel 遮住。
+  const margin = 28;
+  const baseY = canvas.height - margin;
+  const barLeft = margin;
+  const barRight = barLeft + scaleBarPx;
+
+  context.save();
+
+  // 比例尺横线 + 50km 文字
+  context.strokeStyle = "rgba(247, 234, 188, 0.88)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(barLeft, baseY);
+  context.lineTo(barRight, baseY);
+  context.stroke();
+  // 端点小竖线
+  context.beginPath();
+  context.moveTo(barLeft, baseY - 5);
+  context.lineTo(barLeft, baseY + 5);
+  context.moveTo(barRight, baseY - 5);
+  context.lineTo(barRight, baseY + 5);
+  context.stroke();
+
+  context.font = "500 12px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "alphabetic";
+  context.fillStyle = "rgba(247, 234, 188, 0.9)";
+  context.fillText(`${scaleKm} km`, (barLeft + barRight) / 2, baseY - 8);
+
+  // Zoom 等级 + evidence 阈值提示（比例尺上方）
+  context.font = "600 13px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.textAlign = "left";
+  context.fillStyle = "rgba(247, 234, 188, 0.78)";
+  context.fillText(`缩放 ${mapView.scale.toFixed(2)}x`, barLeft, baseY - 30);
+  context.font = "500 11px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.fillStyle = "rgba(247, 234, 188, 0.55)";
+  context.fillText(
+    mapView.scale >= 1.45
+      ? "OSM 详细水系已加载"
+      : "缩放 ≥ 1.45x 加载 OSM 详细水系",
+    barLeft,
+    baseY - 14
+  );
+
+  // 数据源标注（更下方，最低存在感）
+  context.font = "500 10px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.textAlign = "left";
+  context.fillStyle = "rgba(247, 234, 188, 0.4)";
+  context.fillText(
+    "DEM · FABDEM V1-2     水系 · OSM Overpass",
+    barLeft,
+    baseY + 18
+  );
+
+  context.restore();
+}
+
+interface RegionPlacemark {
+  name: string;
+  world: { x: number; z: number };
+  fontSize: number;
+}
+
+// 宏观地带标签：与 feature 系统并行，作为打开 atlas 时的"地理骨架"。
+// feature 标签是细节（渭河、长安），这些是脊柱（关中平原、秦岭主脊、蜀道走廊）。
+const qinlingRegionPlacemarks: RegionPlacemark[] = [
+  { name: "关中平原", world: { x: 26, z: 80 }, fontSize: 18 },
+  { name: "渭河谷地", world: { x: -22, z: 76 }, fontSize: 14 },
+  { name: "秦岭主脊", world: { x: 6, z: 28 }, fontSize: 17 },
+  { name: "汉中盆地", world: { x: 26, z: 8 }, fontSize: 16 },
+  { name: "蜀道走廊", world: { x: -10, z: -28 }, fontSize: 14 },
+  { name: "四川盆地北缘", world: { x: -30, z: -64 }, fontSize: 14 },
+  { name: "成都平原", world: { x: -44, z: -104 }, fontSize: 16 }
+];
+
+function drawRegionPlacemarks(
+  context: CanvasRenderingContext2D,
+  projection: AtlasCanvasProjection,
+  fullscreen: boolean
+): void {
+  if (!fullscreen) {
+    return;
+  }
+  context.save();
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  qinlingRegionPlacemarks.forEach((mark) => {
+    const point = projection.worldToCanvas({ x: mark.world.x, y: mark.world.z });
+    context.font = `700 ${mark.fontSize}px 'Noto Sans SC', 'PingFang SC', sans-serif`;
+    const metrics = context.measureText(mark.name);
+    const padX = 10;
+    const padY = mark.fontSize * 0.36;
+    const rectW = metrics.width + padX * 2;
+    const rectH = mark.fontSize + padY * 2;
+    context.fillStyle = "rgba(9, 18, 19, 0.55)";
+    context.beginPath();
+    if (typeof context.roundRect === "function") {
+      context.roundRect(point.x - rectW / 2, point.y - rectH / 2, rectW, rectH, 6);
+    } else {
+      context.rect(point.x - rectW / 2, point.y - rectH / 2, rectW, rectH);
+    }
+    context.fill();
+    context.strokeStyle = "rgba(245, 231, 164, 0.32)";
+    context.lineWidth = 1;
+    context.stroke();
+    context.fillStyle = "rgba(247, 234, 188, 0.94)";
+    context.fillText(mark.name, point.x, point.y + 1);
+  });
+  context.restore();
+}
+
 function drawDemQualityOverlay(
   context: CanvasRenderingContext2D,
   asset: DemAsset,
   canvas: HTMLCanvasElement,
-  mapView: { scale: number; offsetX: number; offsetY: number },
+  projection: AtlasCanvasProjection,
   showLabel: boolean
 ): void {
   const rects = missingDemTileWorldRects(asset);
@@ -1342,18 +1679,8 @@ function drawDemQualityOverlay(
   let labelBounds: { x: number; y: number; maxX: number; maxY: number } | null = null;
 
   for (const rect of rects) {
-    const topLeft = atlasMapWorldToCanvasPoint(
-      { x: rect.minX, y: rect.maxY },
-      asset.world,
-      canvas,
-      mapView
-    );
-    const bottomRight = atlasMapWorldToCanvasPoint(
-      { x: rect.maxX, y: rect.minY },
-      asset.world,
-      canvas,
-      mapView
-    );
+    const topLeft = projection.worldToCanvas({ x: rect.minX, y: rect.maxY });
+    const bottomRight = projection.worldToCanvas({ x: rect.maxX, y: rect.minY });
     const x = Math.min(topLeft.x, bottomRight.x);
     const y = Math.min(topLeft.y, bottomRight.y);
     const w = Math.abs(bottomRight.x - topLeft.x);
@@ -1459,12 +1786,10 @@ function routeStatusText(influence: RouteInfluence): string {
 
 function atlasFeatureCenterInView(
   feature: QinlingAtlasFeature,
-  asset: DemAsset,
-  canvas: HTMLCanvasElement,
-  mapView: { scale: number; offsetX: number; offsetY: number }
+  projection: AtlasCanvasProjection
 ): { x: number; y: number } {
   const points = featureWorldPoints(feature).map((point) =>
-    atlasMapWorldToCanvasPoint(point, asset.world, canvas, mapView)
+    projection.worldToCanvas(point)
   );
   const sum = points.reduce(
     (total, point) => ({
@@ -1483,12 +1808,10 @@ function atlasFeatureCenterInView(
 function drawAtlasPath(
   context: CanvasRenderingContext2D,
   feature: QinlingAtlasFeature,
-  asset: DemAsset,
-  canvas: HTMLCanvasElement,
-  mapView: { scale: number; offsetX: number; offsetY: number }
+  projection: AtlasCanvasProjection
 ): void {
   const points = featureWorldPoints(feature).map((point) =>
-    atlasMapWorldToCanvasPoint(point, asset.world, canvas, mapView)
+    projection.worldToCanvas(point)
   );
 
   if (points.length === 0) {
@@ -1509,16 +1832,27 @@ function drawAtlasPath(
 function drawAtlasFeature(
   context: CanvasRenderingContext2D,
   feature: QinlingAtlasFeature,
-  asset: DemAsset,
-  canvas: HTMLCanvasElement,
-  mapView: { scale: number; offsetX: number; offsetY: number }
+  projection: AtlasCanvasProjection,
+  fullscreen = false
 ): void {
   context.save();
   context.lineCap = "round";
   context.lineJoin = "round";
 
+  // 判断这条 feature 是不是手画意象（manual-atlas-draft / unverified）。
+  // 古道、城市、关隘、地貌区域当前全部是手工绘制的"叙事意象"，不是真实
+  // GIS 数据。视觉上必须能区分，避免用户误读为事实。
+  const sourceName = feature.source?.name ?? "";
+  const isOsmEvidence = sourceName === "openstreetmap-overpass";
+  const isDraftImagery =
+    !isOsmEvidence &&
+    !(
+      feature.source?.verification === "external-vector" ||
+      feature.source?.verification === "verified"
+    );
+
   if (feature.layer === "landform") {
-    drawAtlasPath(context, feature, asset, canvas, mapView);
+    drawAtlasPath(context, feature, projection);
     if (feature.geometry === "area") {
       const isBasin = feature.terrainRole.includes("basin");
       const isGorge = feature.terrainRole.includes("gorge");
@@ -1531,34 +1865,79 @@ function drawAtlasFeature(
         ? "rgba(107, 52, 28, 0.34)"
         : "rgba(55, 70, 43, 0.24)";
       context.lineWidth = isGorge ? 2.1 : 1.2;
+      // draft 意象 area 用虚线边界
+      if (isDraftImagery) {
+        context.setLineDash([6, 4]);
+      }
       context.closePath();
       context.fill();
       context.stroke();
+      context.setLineDash([]);
     } else if (feature.geometry === "polyline") {
       context.strokeStyle = "rgba(87, 65, 35, 0.58)";
       context.lineWidth = 2.4;
+      if (isDraftImagery) {
+        context.setLineDash([6, 4]);
+      }
       context.stroke();
+      context.setLineDash([]);
     }
   }
 
   if (feature.layer === "water") {
-    drawAtlasPath(context, feature, asset, canvas, mapView);
-    context.strokeStyle = "rgba(20, 63, 73, 0.52)";
-    context.lineWidth = feature.displayPriority >= 9 ? 4.2 : 3.1;
-    context.stroke();
-    drawAtlasPath(context, feature, asset, canvas, mapView);
-    context.strokeStyle = "rgba(97, 198, 219, 0.9)";
-    context.lineWidth = feature.displayPriority >= 9 ? 2 : 1.35;
-    context.stroke();
+    // 按 source / displayPriority 做四级视觉权重：
+    //   - 干流（rank=1，curated/primary，priority>=10）：粗深蓝 + 白光晕，最强
+    //   - 一级支流（priority 8-9）：中等粗
+    //   - 地方支流 / 渠道：细
+    //   - OSM evidence：极细浅灰（仅在 zoom 阈值后加载）
+    // hillshade 让地形对比度高，所以水线必须够粗够亮才不会被淹没。
+    const sourceName = feature.source?.name ?? "";
+    const isEvidence = sourceName === "openstreetmap-overpass";
+    const isMajor = feature.displayPriority >= 10;
+    const isMid = feature.displayPriority >= 8 && !isMajor;
+
+    if (isEvidence) {
+      drawAtlasPath(context, feature, projection);
+      context.strokeStyle = "rgba(150, 180, 190, 0.55)";
+      context.lineWidth = 0.9;
+      context.stroke();
+    } else {
+      const outerHaloWidth = isMajor ? 11 : isMid ? 7 : 5;
+      const haloWidth = isMajor ? 7 : isMid ? 4.6 : 3.4;
+      const coreWidth = isMajor ? 3.4 : isMid ? 2.2 : 1.5;
+      const coreColor = isMajor
+        ? "rgba(96, 198, 230, 1)"
+        : isMid
+          ? "rgba(126, 212, 230, 0.95)"
+          : "rgba(160, 220, 230, 0.85)";
+
+      // 外层柔光：白色低 alpha，让水线在 hillshade 上"发亮"
+      drawAtlasPath(context, feature, projection);
+      context.strokeStyle = isMajor
+        ? "rgba(220, 245, 252, 0.32)"
+        : "rgba(220, 245, 252, 0.2)";
+      context.lineWidth = outerHaloWidth;
+      context.stroke();
+      // 中层深蓝边
+      drawAtlasPath(context, feature, projection);
+      context.strokeStyle = "rgba(20, 70, 88, 0.7)";
+      context.lineWidth = haloWidth;
+      context.stroke();
+      // 核心鲜蓝
+      drawAtlasPath(context, feature, projection);
+      context.strokeStyle = coreColor;
+      context.lineWidth = coreWidth;
+      context.stroke();
+    }
   }
 
   if (feature.layer === "road") {
-    drawAtlasPath(context, feature, asset, canvas, mapView);
+    drawAtlasPath(context, feature, projection);
     context.setLineDash([5, 4]);
     context.strokeStyle = "rgba(93, 52, 18, 0.44)";
     context.lineWidth = 2.4;
     context.stroke();
-    drawAtlasPath(context, feature, asset, canvas, mapView);
+    drawAtlasPath(context, feature, projection);
     context.strokeStyle = "rgba(229, 168, 82, 0.76)";
     context.lineWidth = 1.25;
     context.stroke();
@@ -1566,7 +1945,7 @@ function drawAtlasFeature(
   }
 
   if (feature.geometry === "point") {
-    const center = atlasFeatureCenterInView(feature, asset, canvas, mapView);
+    const center = atlasFeatureCenterInView(feature, projection);
     const isPass = feature.layer === "pass";
     const radius = isPass ? 4.2 : 3.4;
 
@@ -1584,16 +1963,23 @@ function drawAtlasFeature(
   }
 
   if (feature.displayPriority >= 9) {
-    const center = atlasFeatureCenterInView(feature, asset, canvas, mapView);
-    context.font = feature.layer === "landform"
-      ? "600 12px 'Noto Sans SC', 'PingFang SC', sans-serif"
-      : "600 10px 'Noto Sans SC', 'PingFang SC', sans-serif";
+    const center = atlasFeatureCenterInView(feature, projection);
+    // 全屏字号大幅放大——之前 12/10 在 1144x720 的全屏地图上太小看不清。
+    // 小窗 minimap 仍用紧凑字号。
+    const baseLandformPx = fullscreen ? 17 : 12;
+    const baseOtherPx = fullscreen ? 15 : 10;
+    context.font =
+      feature.layer === "landform"
+        ? `600 ${baseLandformPx}px 'Noto Sans SC', 'PingFang SC', sans-serif`
+        : `600 ${baseOtherPx}px 'Noto Sans SC', 'PingFang SC', sans-serif`;
     context.fillStyle = feature.layer === "water"
       ? "rgba(24, 82, 92, 0.86)"
       : feature.layer === "road" || feature.layer === "pass"
         ? "rgba(92, 45, 18, 0.84)"
         : "rgba(45, 35, 20, 0.8)";
-    context.fillText(feature.name, center.x + 5, center.y - 4);
+    // 手画意象在名字后追加" · 意象"提示，防止用户误读为事实数据。
+    const labelText = isDraftImagery ? `${feature.name} · 意象` : feature.name;
+    context.fillText(labelText, center.x + 5, center.y - 4);
   }
 
   context.restore();
@@ -1602,11 +1988,9 @@ function drawAtlasFeature(
 function drawAtlasFeatureSelection(
   context: CanvasRenderingContext2D,
   feature: QinlingAtlasFeature,
-  asset: DemAsset,
-  canvas: HTMLCanvasElement,
-  mapView: { scale: number; offsetX: number; offsetY: number }
+  projection: AtlasCanvasProjection
 ): void {
-  const center = atlasFeatureCenterInView(feature, asset, canvas, mapView);
+  const center = atlasFeatureCenterInView(feature, projection);
 
   context.save();
   context.beginPath();
@@ -1624,11 +2008,45 @@ function drawAtlasFeatureSelection(
 
 function refreshAtlasWorkbench(): void {
   hud.renderAtlasLayers(qinlingAtlasLayers, atlasWorkbench.visibleLayerIds);
+  // 先把 summary 喂给 hud（它在没选 feature 时显示），再喂选中 feature。
+  // 这样未选时显示统计，选中时显示具体 feature 信息。
+  const visibleFeatures = activeAtlasFeatures().filter((feature) =>
+    atlasWorkbench.visibleLayerIds.has(feature.layer)
+  );
+  const layerCounts = qinlingAtlasLayers
+    .filter((layer) => atlasWorkbench.visibleLayerIds.has(layer.id))
+    .map((layer) => ({
+      layerId: layer.id,
+      layerName: layer.name,
+      count: visibleFeatures.filter((feature) => feature.layer === layer.id).length
+    }));
+  hud.renderAtlasSummary({
+    layerCounts,
+    totalFeatures: visibleFeatures.length,
+    evidenceLoaded:
+      atlasWorkbench.isFullscreen &&
+      (atlasWorkbench.mapView?.scale ?? 1) >= EVIDENCE_ZOOM_THRESHOLD
+  });
   hud.renderAtlasFeature(
-    selectedAtlasFeature(atlasWorkbench, atlasFeatures)
+    selectedAtlasFeature(atlasWorkbench, activeAtlasFeatures())
   );
   hud.setAtlasFullscreenOpen(atlasWorkbench.isFullscreen);
   hudDirty = true;
+}
+
+// 拖动 / 缩放只需要重绘地图 canvas，不需要重生成 layer chips DOM 或 feature card。
+// 把 pointermove / wheel 路径与 layer toggle / feature select 路径分开，
+// 并合并到下一个 rAF，避免一次拖动产生几十次 innerHTML 重建。
+let atlasMapRedrawScheduled = false;
+function scheduleAtlasMapRedraw(): void {
+  hudDirty = true;
+  if (atlasMapRedrawScheduled) {
+    return;
+  }
+  atlasMapRedrawScheduled = true;
+  requestAnimationFrame(() => {
+    atlasMapRedrawScheduled = false;
+  });
 }
 
 function nearestUncollectedFragment():
@@ -1828,7 +2246,7 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         setTerrainMeshSurfaceVisible(terrainChunk, false);
         const scenery = createChunkScenery(
           chunkSampler,
-          runtimeBudget.scenery
+          scaledSceneryBudget()
         );
         const center = chunkCenterFromBounds(chunk.worldBounds);
         setTerrainMeshWorldPosition(terrainChunk, center.x, center.y, 0.12);
@@ -1987,7 +2405,11 @@ function resetGameplayInput(): void {
 }
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && atlasWorkbench.isFullscreen) {
+  // 用 normalizeInputKey(event) 而不是 event.key.toLowerCase()——它走 event.code
+  // 路径，不受中文输入法 IME 影响。否则 macOS 中文用户按 Q/E/W/A/S/D 全部失效。
+  const normalized = normalizeInputKey(event);
+
+  if (normalized === "escape" && atlasWorkbench.isFullscreen) {
     event.preventDefault();
     resetGameplayInput();
     atlasWorkbench = setAtlasFullscreen(atlasWorkbench, false);
@@ -1995,7 +2417,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key.toLowerCase() === "m") {
+  if (normalized === "m") {
     event.preventDefault();
     resetGameplayInput();
     atlasWorkbench = setAtlasFullscreen(atlasWorkbench, !atlasWorkbench.isFullscreen);
@@ -2003,54 +2425,61 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (atlasWorkbench.isFullscreen) {
-    return;
-  }
-
-  if (event.key.toLowerCase() === "k") {
+  // 纯相机 / 环境快捷键在 atlas 全屏时也允许使用：
+  // 玩家可以一边看地图一边转身、切天气、切季节，不需要先关 atlas。
+  if (normalized === "k") {
     environmentController.advanceWeather();
     hudDirty = true;
     return;
   }
 
-  if (event.key.toLowerCase() === "l") {
+  if (normalized === "l") {
     environmentController.advanceSeason();
     hudDirty = true;
     return;
   }
 
-  if (event.key.toLowerCase() === "t") {
+  if (normalized === "t") {
     environmentController.state.timeOfDay =
       (environmentController.state.timeOfDay + 3) % 24;
     hudDirty = true;
     return;
   }
 
-  if (event.key.toLowerCase() === "o") {
+  if (normalized === "o") {
     cameraViewMode = "overview";
     cameraDistance = qinlingCameraRig.maxDistance;
     cameraElevation = qinlingCameraRig.maxElevation;
     return;
   }
 
-  if (event.key.toLowerCase() === "f") {
+  if (normalized === "f") {
     cameraViewMode = "follow";
     cameraDistance = qinlingCameraRig.minDistance + 10;
     cameraElevation = 0.52;
     return;
   }
 
-  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) {
+  // Q / E 是相机转向，atlas 全屏时也保留。
+  // WASD / Arrow / Space / Shift 是玩家移动 input，atlas 全屏时屏蔽——
+  // 否则地图模式下玩家会偷偷走出当前视野。
+  const isCameraTurnKey = normalized === "q" || normalized === "e";
+
+  if (atlasWorkbench.isFullscreen && !isCameraTurnKey) {
+    return;
+  }
+
+  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(normalized)) {
     event.preventDefault();
   }
 
-  if (isGameplayInputKey(event.key)) {
-    keys.add(normalizeInputKey(event.key));
+  if (isGameplayInputKey(event)) {
+    keys.add(normalized);
   }
 });
 
 document.addEventListener("keyup", (event) => {
-  keys.delete(normalizeInputKey(event.key));
+  keys.delete(normalizeInputKey(event));
 });
 
 window.addEventListener("blur", resetGameplayInput);
@@ -2116,7 +2545,7 @@ renderer.domElement.addEventListener("wheel", (event: WheelEvent) => {
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
@@ -2145,7 +2574,7 @@ function handleAtlasLayerClick(event: MouseEvent): void {
   }
 
   atlasWorkbench = toggleAtlasLayer(atlasWorkbench, layerId);
-  const selectedFeature = selectedAtlasFeature(atlasWorkbench, atlasFeatures);
+  const selectedFeature = selectedAtlasFeature(atlasWorkbench, activeAtlasFeatures());
 
   if (selectedFeature && !atlasWorkbench.visibleLayerIds.has(selectedFeature.layer)) {
     atlasWorkbench = selectAtlasFeature(atlasWorkbench, null);
@@ -2175,7 +2604,7 @@ function selectAtlasFeatureFromCanvas(
           mapView: { scale: 1, offsetX: 0, offsetY: 0 }
         };
   const feature = findAtlasFeatureAtCanvasPoint(
-    atlasFeatures,
+    activeAtlasFeatures(),
     hitState,
     pointer,
     terrainSampler.asset.world,
@@ -2229,7 +2658,7 @@ hud.atlasFullscreenCanvas.addEventListener("wheel", (event: WheelEvent) => {
     terrainSampler.asset.world,
     hud.atlasFullscreenCanvas
   );
-  refreshAtlasWorkbench();
+  scheduleAtlasMapRedraw();
 });
 
 hud.atlasFullscreenCanvas.addEventListener("pointerdown", (event: PointerEvent) => {
@@ -2240,6 +2669,10 @@ hud.atlasFullscreenCanvas.addEventListener("pointerdown", (event: PointerEvent) 
 });
 
 hud.atlasFullscreenCanvas.addEventListener("pointermove", (event: PointerEvent) => {
+  if (!terrainSampler) {
+    return;
+  }
+
   if (!hud.atlasFullscreenCanvas.hasPointerCapture(event.pointerId)) {
     return;
   }
@@ -2259,8 +2692,13 @@ hud.atlasFullscreenCanvas.addEventListener("pointermove", (event: PointerEvent) 
   isAtlasMapDragging = true;
   atlasMapDragOriginX = event.clientX;
   atlasMapDragOriginY = event.clientY;
-  atlasWorkbench = panAtlasMap(atlasWorkbench, delta);
-  refreshAtlasWorkbench();
+  atlasWorkbench = panAtlasMap(
+    atlasWorkbench,
+    delta,
+    terrainSampler.asset.world,
+    hud.atlasFullscreenCanvas
+  );
+  scheduleAtlasMapRedraw();
 });
 
 hud.atlasFullscreenCanvas.addEventListener("pointerup", (event: PointerEvent) => {
@@ -2275,7 +2713,7 @@ hud.atlasFullscreenCanvas.addEventListener("pointerleave", () => {
 
 hud.atlasFullscreenCanvas.addEventListener("dblclick", () => {
   atlasWorkbench = resetAtlasMapView(atlasWorkbench);
-  refreshAtlasWorkbench();
+  scheduleAtlasMapRedraw();
 });
 
 renderJournal();
@@ -2356,8 +2794,24 @@ function update(deltaSeconds: number): void {
   rim.intensity = visuals.rimIntensity;
   renderer.setClearColor(visuals.skyColor);
   skyDomeGroup.position.copy(camera.position);
-  skyShell.material.color.copy(visuals.skyColor);
-  starDomeMaterial.opacity = visuals.starOpacity;
+  applySkyVisuals(skyDome, {
+    skyColor: visuals.skyColor,
+    starOpacity: visuals.starOpacity
+  });
+  // 把当前 sky horizon 色更新到 terrain shader 的 height fog uniform，
+  // 让山顶融到与天空一致的雾色。整区 + 所有 chunk 都要更新。
+  updateTerrainShaderHeightFog(
+    terrainMaterial,
+    visuals.skyColor
+  );
+  terrainChunkMeshes.forEach((chunk) => {
+    if (!Array.isArray(chunk.mesh.material)) {
+      updateTerrainShaderHeightFog(
+        chunk.mesh.material as MeshPhongMaterial,
+        visuals.skyColor
+      );
+    }
+  });
 
   const sunDomeVector = celestialDomeVector({
     timeOfDay: environment.timeOfDay,
@@ -2381,7 +2835,9 @@ function update(deltaSeconds: number): void {
   );
   moonSkyDisc.material.opacity = visuals.moonOpacity;
   mistPlane.material.opacity = visuals.mistOpacity;
-  waterRibbon.material.opacity = 0.05 + visuals.waterShimmer * 0.08;
+  applyAmbientWaterSurfaceVisuals(visuals);
+  applyWaterEnvironmentVisuals(visuals);
+  waterSurface.setTime(clock.elapsedTime);
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 60;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
   cloudSprites.forEach((cloud, index) => {
@@ -2415,6 +2871,10 @@ function update(deltaSeconds: number): void {
   if (keys.has("e")) {
     cameraHeading -= deltaSeconds * 1.2;
   }
+  const movementHeading = effectiveCameraHeadingForMode({
+    mode: cameraViewMode,
+    heading: cameraHeading
+  });
 
   const currentSlope = terrainSampler.sampleSlope(player.position.x, player.position.z);
   const routeInfluence = routeAffinityAt({
@@ -2427,14 +2887,14 @@ function update(deltaSeconds: number): void {
     routeInfluence.affinity * 0.28;
   const slopePenalty = MathUtils.lerp(1, 0.42, currentSlope);
   const offRouteCost = MathUtils.lerp(0.68, 1.08, routeInfluence.affinity);
-  const baseSpeed = keys.has("shift") ? 20 : 13.5;
+  const baseSpeed = (keys.has("shift") ? 20 : 13.5) * travelSpeedMultiplier();
   const speed = baseSpeed * (slopePenalty + routeBonus) * offRouteCost;
   const isMoving = forwardInput !== 0 || rightInput !== 0;
 
   if (isMoving) {
     cameraViewMode = "follow";
     const movement = movementVectorFromInput({
-      heading: cameraHeading,
+      heading: movementHeading,
       forward: forwardInput,
       right: rightInput
     });
@@ -2479,8 +2939,6 @@ function update(deltaSeconds: number): void {
     }
   }
 
-  const horizontalDistance = Math.cos(cameraElevation) * cameraDistance;
-  const verticalDistance = Math.sin(cameraElevation) * cameraDistance;
   const nextLookTarget = cameraLookTargetForMode({
     mode: cameraViewMode,
     player: {
@@ -2490,20 +2948,41 @@ function update(deltaSeconds: number): void {
     },
     lookAtHeight: qinlingCameraRig.lookAtHeight
   });
+  const nextCameraPosition = cameraPositionForMode({
+    mode: cameraViewMode,
+    lookTarget: nextLookTarget,
+    heading: effectiveCameraHeadingForMode({
+      mode: cameraViewMode,
+      heading: cameraHeading
+    }),
+    elevation: cameraElevation,
+    distance: cameraDistance
+  });
 
   targetCameraPosition.set(
-    nextLookTarget.x + Math.sin(cameraHeading) * horizontalDistance,
-    nextLookTarget.y + verticalDistance,
-    nextLookTarget.z + Math.cos(cameraHeading) * horizontalDistance
+    nextCameraPosition.x,
+    nextCameraPosition.y,
+    nextCameraPosition.z
   );
 
   camera.position.lerp(targetCameraPosition, qinlingCameraRig.followLerp);
+  // 始终用 +Y 作为 up：overview 模式现在改成"从南方斜俯视北"而不是纯顶视，
+  // 不需要再用 -Z 翻转 up。
+  camera.up.set(0, 1, 0);
   lookTarget.set(
     nextLookTarget.x,
     nextLookTarget.y,
     nextLookTarget.z
   );
   camera.lookAt(lookTarget);
+  const compassHeading = effectiveCameraHeadingForMode({
+    mode: cameraViewMode,
+    heading: cameraHeading
+  });
+  hud.updateCompass({
+    northAngleRadians: northNeedleAngleRadians(compassHeading),
+    screenRightDirection: screenRightDirectionLabel(compassHeading)
+  });
 
   underpaint.position.x = player.position.x * 0.04;
   underpaint.position.z = player.position.z * 0.03;
@@ -2546,6 +3025,7 @@ function update(deltaSeconds: number): void {
 }
 
 function frame(): void {
+  perfStats.beginFrame();
   const deltaSeconds = Math.min(clock.getDelta(), 0.05);
   const elapsedTime = clock.elapsedTime;
 
@@ -2558,6 +3038,7 @@ function frame(): void {
     hudDirty = false;
   }
   renderer.render(scene, camera);
+  perfStats.endFrame(renderer);
   requestAnimationFrame(frame);
 }
 
@@ -2626,6 +3107,8 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   lastVisuals = visuals;
   lastTerrainColorSignature = "";
   updateTerrainColors(visuals);
+  applyAmbientWaterSurfaceVisuals(visuals);
+  applyWaterEnvironmentVisuals(visuals);
   syncStoryGuideState(true);
   if (regionChunkManifest) {
     const initialChunkId =
@@ -2642,6 +3125,12 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
 async function init(): Promise<void> {
   const regionBundle = await loadRegionBundle(terrainAssetRequest);
   const loaded = regionBundle.terrain;
+
+  // 把 manifest 里的 experienceProfile 接入运行时——决定后续 baseSpeed /
+  // cameraDistance / scenery 密度的缩放系数。如果 manifest 没声明，所有
+  // multiplier 默认 1（high-focus 行为不变）。
+  experienceProfile = regionBundle.experienceProfile ?? null;
+  cameraDistance = qinlingCameraRig.initialDistance * cameraScaleMultiplier();
 
   regionChunkManifest = regionBundle.chunkManifest;
   regionChunkManifestUrl = regionBundle.chunkManifestUrl;
@@ -2672,8 +3161,44 @@ async function init(): Promise<void> {
 
   applyTerrainFromSampler(new TerrainSampler(loaded.asset));
   hud.setLoadingState(`已载入母版：${loaded.label}`, "success");
-  camera.position.set(-28, 40, 60);
-  camera.lookAt(new Vector3(0, 0, 0));
+
+  // 把相机直接放到玩家身后正确位置，避免 init 后玩家偏离屏幕中央被 lerp 慢慢追。
+  // 之前 hardcode 看 (0,0,0)，玩家在 (84,69) → 玩家显示在地形 "西北角" 而非中央。
+  const initLookTarget = cameraLookTargetForMode({
+    mode: cameraViewMode,
+    player: {
+      x: player.position.x,
+      y: player.position.y,
+      z: player.position.z
+    },
+    lookAtHeight: qinlingCameraRig.lookAtHeight
+  });
+  const initCameraPos = cameraPositionForMode({
+    mode: cameraViewMode,
+    lookTarget: initLookTarget,
+    heading: effectiveCameraHeadingForMode({
+      mode: cameraViewMode,
+      heading: cameraHeading
+    }),
+    elevation: cameraElevation,
+    distance: cameraDistance
+  });
+  camera.position.set(initCameraPos.x, initCameraPos.y, initCameraPos.z);
+  camera.lookAt(new Vector3(initLookTarget.x, initLookTarget.y, initLookTarget.z));
+
+  // 开发模式调试钩子：暴露关键运行时状态供 Playwright/控制台使用。
+  if (isDevModeEnabled()) {
+    (window as unknown as { __qinling: unknown }).__qinling = {
+      scene,
+      camera,
+      player,
+      get cameraHeading() { return cameraHeading; },
+      get cameraDistance() { return cameraDistance; },
+      get cameraElevation() { return cameraElevation; },
+      get terrainSampler() { return terrainSampler; }
+    };
+  }
+
   frame();
 }
 
