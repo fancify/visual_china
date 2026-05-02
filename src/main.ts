@@ -539,6 +539,21 @@ scene.add(routeGroup);
 const cityMarkersGroup = new Group();
 scene.add(cityMarkersGroup);
 let cityMarkersHandle: CityMarkersHandle | null = null;
+// 城市名签 sprites 单独 track，方便重建 region 时显式 dispose 它们的
+// SpriteMaterial + CanvasTexture（cityMarkersGroup.clear() 只 detach 不
+// dispose，会泄 GPU 资源——codex b50e5c6 review 抓到）。
+const cityLabelSprites: Sprite[] = [];
+
+function disposeCityLabelSprites(): void {
+  for (const sprite of cityLabelSprites) {
+    const material = sprite.material;
+    if (material instanceof SpriteMaterial) {
+      material.map?.dispose();
+      material.dispose();
+    }
+  }
+  cityLabelSprites.length = 0;
+}
 
 const fragmentVisuals = new Map<string, FragmentVisual>();
 type WaterEnvironmentMaterialRole = "ribbon" | "highlight" | "line";
@@ -3160,6 +3175,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   // mesh，落到 region bounds 之外的（暂无）会被 isInsideBounds 跳过。
   if (cityMarkersHandle) {
     disposeCityMarkers(cityMarkersHandle);
+    disposeCityLabelSprites();
     cityMarkersGroup.clear();
     cityMarkersHandle = null;
   }
@@ -3193,13 +3209,18 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
           sampler.asset.world
         );
         const groundY = sampler.sampleHeight(wp.x, wp.z);
-        const tierTop = city.tier === "capital" ? 5.0 : 4.4;
+        // tierTop 抬到 sprite center 应该在的高度——createTextSprite
+        // 默认 ~3.8 单元高，乘 scale 后 capital ~4.5、prefecture ~3.6，
+        // sprite 用中心定位，所以 y 偏移要等于"屋顶 + sprite 半高"才
+        // 不会撞到 building（codex b50e5c6 review）。
+        const tierTop = city.tier === "capital" ? 7.0 : 6.0;
         const accent = city.tier === "capital" ? "#fbe0a8" : "#f3d692";
         const label = createTextSprite(city.name, accent);
         label.scale.multiplyScalar(city.tier === "capital" ? 1.18 : 0.96);
         label.position.set(wp.x, groundY + tierTop, wp.z);
         label.renderOrder = 13;
         cityMarkersGroup.add(label);
+        cityLabelSprites.push(label);
       });
   }
 
