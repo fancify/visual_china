@@ -550,6 +550,9 @@ const cityLabelSpritesByTier: { capital: Sprite[]; prefecture: Sprite[] } = {
   capital: [],
   prefecture: []
 };
+// county 名签按 proximity reveal：每个县城预创建一个 hidden sprite，
+// nearbyRealCity 是 county 时显示对应的那个，否则全部隐藏。
+const countyLabelSpriteByCityId = new Map<string, Sprite>();
 
 /**
  * 距离视角分档 fade：camera 远了 county 先消失、再 prefecture 消失，
@@ -603,6 +606,14 @@ function disposeCityLabelSprites(): void {
     }
     cityLabelSpritesByTier[tier].length = 0;
   });
+  countyLabelSpriteByCityId.forEach((sprite) => {
+    const material = sprite.material;
+    if (material instanceof SpriteMaterial) {
+      material.map?.dispose();
+      material.dispose();
+    }
+  });
+  countyLabelSpriteByCityId.clear();
 }
 
 const fragmentVisuals = new Map<string, FragmentVisual>();
@@ -990,9 +1001,19 @@ function updateNearbyRealCity(): void {
     }
   }
   if (closest?.id !== nearbyRealCity?.id) {
+    // hide previous county label (if was a county)
+    if (nearbyRealCity?.tier === "county") {
+      const prev = countyLabelSpriteByCityId.get(nearbyRealCity.id);
+      if (prev) prev.visible = false;
+    }
     nearbyRealCity = closest;
     if (closest) {
       showToast(`[I] 了解 ${closest.name}`);
+      // reveal county label as the player approaches
+      if (closest.tier === "county") {
+        const sprite = countyLabelSpriteByCityId.get(closest.id);
+        if (sprite) sprite.visible = true;
+      }
     }
   }
 }
@@ -3412,6 +3433,28 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
     // CanvasTexture + 透明 sort，量上来扛不住）。县城建筑物 mesh 已经
     // 在 cityMarkersHandle 渲染，玩家走近能看到形状档级，名字可以等之
     // 后做 hover/proximity 弹出标签的交互再补，先把性能保住。
+    // 县城名签：每座 pre-create 一个 hidden sprite，updateNearbyRealCity
+    // 时只显示 nearbyRealCity 那一个。这样 19 个 sprite 同时驻留 GPU 但
+    // 只有 0..1 个 visible，draw call 增量近 0、避免之前 28 sprite 全开
+    // 的 fps 24 灾难。
+    visibleCities
+      .filter((city) => city.tier === "county")
+      .forEach((city) => {
+        const wp = projectGeoToWorld(
+          { lat: city.lat, lon: city.lon },
+          sampler.asset.bounds!,
+          sampler.asset.world
+        );
+        const groundY = sampler.sampleHeight(wp.x, wp.z);
+        const label = createTextSprite(city.name, "#e8cb89");
+        label.scale.multiplyScalar(0.78);
+        label.position.set(wp.x, groundY + 2.6, wp.z);
+        label.renderOrder = 13;
+        label.visible = false;
+        cityMarkersGroup.add(label);
+        countyLabelSpriteByCityId.set(city.id, label);
+      });
+
     visibleCities
       .filter((city) => city.tier !== "county")
       .forEach((city) => {
