@@ -159,6 +159,7 @@ import {
   type CityMarkersHandle
 } from "./game/cityMarkers";
 import { realQinlingCities } from "./data/realCities.js";
+import type { RealCity } from "./data/realCities.js";
 import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
   evaluateStoryGuide,
@@ -944,6 +945,45 @@ function showToast(text: string): void {
   toastTimeout = window.setTimeout(() => {
     hud.hideToast();
   }, 3400);
+}
+
+// proximity 触发：玩家走到真实城市附近时记录最近的一座，按 E 弹出
+// 详情。范围 12 单元（≈ 城墙外圈一圈步行距离）。
+let nearbyRealCity: RealCity | null = null;
+
+function updateNearbyRealCity(): void {
+  if (!terrainSampler?.asset.bounds) {
+    nearbyRealCity = null;
+    return;
+  }
+  const bounds = terrainSampler.asset.bounds;
+  const world = terrainSampler.asset.world;
+  const px = player.position.x;
+  const pz = player.position.z;
+  let closest: RealCity | null = null;
+  let closestDistance = 12;
+  for (const city of realQinlingCities) {
+    if (
+      city.lat < bounds.south ||
+      city.lat > bounds.north ||
+      city.lon < bounds.west ||
+      city.lon > bounds.east
+    ) {
+      continue;
+    }
+    const wp = projectGeoToWorld({ lat: city.lat, lon: city.lon }, bounds, world);
+    const distance = Math.hypot(wp.x - px, wp.z - pz);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = city;
+    }
+  }
+  if (closest?.id !== nearbyRealCity?.id) {
+    nearbyRealCity = closest;
+    if (closest) {
+      showToast(`[E] 了解 ${closest.name}`);
+    }
+  }
 }
 
 function renderJournal(): void {
@@ -2530,6 +2570,20 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  // F: 走到城市跟前按 F 弹出详情。E 已用于相机旋转，所以用 F（"fact"）。
+  if (normalized === "f" && nearbyRealCity) {
+    event.preventDefault();
+    const city = nearbyRealCity;
+    const tier =
+      city.tier === "capital"
+        ? "京城"
+        : city.tier === "prefecture"
+          ? "州府"
+          : "县城";
+    showToast(`${city.name}（${tier}）：${city.hint ?? "（详情待补）"}`);
+    return;
+  }
+
   // 纯相机 / 环境快捷键在 atlas 全屏时也允许使用：
   // 玩家可以一边看地图一边转身、切天气、切季节，不需要先关 atlas。
   if (normalized === "k") {
@@ -2967,6 +3021,7 @@ function update(deltaSeconds: number): void {
   applyWaterEnvironmentVisuals(visuals);
   waterSurface.setTime(clock.elapsedTime);
   updateCityLodFade();
+  updateNearbyRealCity();
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 60;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
   cloudSprites.forEach((cloud, index) => {
