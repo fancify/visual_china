@@ -92,15 +92,23 @@ const TIER_GEOMETRY: Record<CityTier, TierGeometry> = {
 // 城墙灰偏暖（夯土 / 砖石）。
 const WALL_COLOR = 0x8b8276;
 
-const wallMaterial = new MeshPhongMaterial({
-  color: WALL_COLOR,
-  flatShading: true,
-  shininess: 6
-});
+// 每档独立 material，让 LOD 距离淡入 / 淡出可以分档控制 opacity——
+// county 远了先 fade，prefecture 中距 fade，capital 始终可见。
+function makeWallMaterial(): MeshPhongMaterial {
+  return new MeshPhongMaterial({
+    color: WALL_COLOR,
+    flatShading: true,
+    shininess: 6,
+    transparent: true,
+    opacity: 1
+  });
+}
 
 export interface CityMarkersHandle {
   group: Group;
   cities: RealCity[];
+  /** 每档独立 material，外部按距离调 opacity 实现 LOD fade。 */
+  tierMaterials: Record<CityTier, MeshPhongMaterial>;
 }
 
 export function createCityMarkers(
@@ -123,12 +131,18 @@ export function createCityMarkers(
 
   const dummy = new Object3D();
 
+  const tierMaterials: Record<CityTier, MeshPhongMaterial> = {
+    capital: makeWallMaterial(),
+    prefecture: makeWallMaterial(),
+    county: makeWallMaterial()
+  };
+
   (Object.keys(byTier) as CityTier[]).forEach((tier) => {
     const tierCities = byTier[tier];
     if (tierCities.length === 0) return;
 
     const tierGeom = TIER_GEOMETRY[tier];
-    const wallMesh = new InstancedMesh(tierGeom.geom, wallMaterial, tierCities.length);
+    const wallMesh = new InstancedMesh(tierGeom.geom, tierMaterials[tier], tierCities.length);
     wallMesh.name = `city-walls-${tier}`;
 
     tierCities.forEach((city, index) => {
@@ -151,14 +165,16 @@ export function createCityMarkers(
     group.add(wallMesh);
   });
 
-  return { group, cities };
+  return { group, cities, tierMaterials };
 }
 
 export function disposeCityMarkers(handle: CityMarkersHandle): void {
-  // wallMaterial / roofMaterial / TIER_GEOMETRY 都是模块级共享，不要 dispose。
+  // TIER_GEOMETRY 是模块级共享，不要 dispose。tierMaterials 是 per-handle
+  // 创建的，必须 dispose 否则每次 region 重建都漏一组 MeshPhongMaterial。
   handle.group.traverse((child) => {
     if (child instanceof InstancedMesh) {
       child.dispose();
     }
   });
+  Object.values(handle.tierMaterials).forEach((m) => m.dispose());
 }
