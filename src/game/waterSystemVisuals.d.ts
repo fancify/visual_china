@@ -36,7 +36,12 @@ export function riverCorridorInfluenceAtPoint(
 
 export function buildRiverVegetationSamples(
   features: QinlingAtlasFeature[],
-  options?: { maxSamples?: number; spacing?: number; bankOffset?: number }
+  options?: {
+    maxSamples?: number;
+    spacing?: number;
+    bankOffset?: number;
+    minDisplayPriority?: number;
+  }
 ): Array<{
   featureId: string;
   x: number;
