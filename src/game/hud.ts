@@ -98,10 +98,10 @@ export function createHud(
     <div class="compass-block" aria-label="游戏方位">
       <div class="compass-dial">
         <div class="compass-rosette" id="compass-rosette">
-          <span class="compass-cardinal compass-north">北</span>
-          <span class="compass-cardinal compass-east">东</span>
-          <span class="compass-cardinal compass-south">南</span>
-          <span class="compass-cardinal compass-west">西</span>
+          <div class="compass-cardinal-anchor compass-north"><span class="compass-cardinal-label">北</span></div>
+          <div class="compass-cardinal-anchor compass-east"><span class="compass-cardinal-label">东</span></div>
+          <div class="compass-cardinal-anchor compass-south"><span class="compass-cardinal-label">南</span></div>
+          <div class="compass-cardinal-anchor compass-west"><span class="compass-cardinal-label">西</span></div>
         </div>
         <span class="compass-needle" id="compass-needle"></span>
       </div>
@@ -420,12 +420,16 @@ export function createHud(
     },
     updateCompass(snapshot) {
       // 新罗盘：箭头永远向上（指向当前视角的前方），罗盘玫瑰（北东南西
-      // 标签）按相机朝向旋转。northAngleRadians 是"在屏幕坐标里、从向上
-      // 方向到真实北的顺时针夹角"——直接用它转 rosette 让 北 标签落
-      // 到真实北的方向，箭头维持向上不变。
+      // 标签）按相机朝向旋转。同时给 rosette 写一个 CSS 变量
+      // --label-counter-rotation，让每个 cardinal label 内部反向旋转
+      // 同样角度，保证文字始终是竖直的（不会变成倒立的"南"）。
       if (lastCompass?.northAngleRadians !== snapshot.northAngleRadians) {
         compassRosette.style.transform =
           `translate(-50%, -50%) rotate(${snapshot.northAngleRadians}rad)`;
+        compassRosette.style.setProperty(
+          "--label-counter-rotation",
+          `${-snapshot.northAngleRadians}rad`
+        );
       }
 
       lastCompass = snapshot;
