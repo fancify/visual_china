@@ -346,10 +346,12 @@ const renderer = new WebGLRenderer({
   antialias: true,
   powerPreference: "high-performance"
 });
-// pixelRatio 上限从 2 降到 1.5：在 Retina 屏 GPU 像素填充砍 ~44%，
-// 风扇噪音明显降一档。视觉上软一点，但与多自定义 shader（terrain noise +
-// height fog + water Fresnel + sky）的负担相比，这个交换很划算。
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+// pixelRatio 上限再从 1.5 降到 1.25：用户反馈"风扇响得很厉害"。
+// 1.5 → 1.25 在 Retina 屏额外砍 ~31% pixel fill（1.5²/1.25² ≈ 1.44，
+// 即从 144% 降到 100% baseline），加上之前从 2.0 降到 1.5 的 44%，
+// 累计相对原生 devicePixelRatio 约砍 60% 像素填充。视觉上更软，但风扇
+// 静下来更重要——这是个浏览器原型不是 AAA 游戏。
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x081213);
 app.appendChild(renderer.domElement);
@@ -1003,11 +1005,20 @@ function showToast(text: string): void {
   }, 3400);
 }
 
-// proximity 触发：玩家走到真实城市附近时记录最近的一座，按 E 弹出
+// proximity 触发：玩家走到真实城市附近时记录最近的一座，按 I 弹出
 // 详情。范围 12 单元（≈ 城墙外圈一圈步行距离）。
+// 节流：每帧 30 个城市的距离计算 + 投影是真实开销，玩家走路速度也不
+// 需要 60Hz 检测。每 8 帧（~7-8Hz）跑一次足够，肉眼无延迟感。
 let nearbyRealCity: RealCity | null = null;
+let nearbyRealCityCheckTick = 0;
 
 function updateNearbyRealCity(): void {
+  nearbyRealCityCheckTick = (nearbyRealCityCheckTick + 1) % 8;
+  if (nearbyRealCityCheckTick !== 0) return;
+  updateNearbyRealCityCore();
+}
+
+function updateNearbyRealCityCore(): void {
   if (!terrainSampler?.asset.bounds) {
     nearbyRealCity = null;
     return;
@@ -1238,12 +1249,11 @@ function rebuildWaterSystemVisuals(): void {
     return;
   }
 
-  // minDisplayPriority 8 让一级支流（rank=2，priority 8）也加入渲染——
-  // 这样 河流密度 LOD 才有意义（干流 priority 10 用 0.9 单元，支流用
-  // 1.5 单元省顶点）。否则默认 9 阈值只放主干进来，整张图都是 0.9 密度。
-  const rivers = selectRenderableWaterFeatures(atlasFeatures, {
-    minDisplayPriority: 8
-  });
+  // 用户反馈"风扇响"——回到默认 9 阈值，只渲染主干河（priority 10）。
+  // 之前为了让 tributary 进入而降到 8 是 codex 建议的 LOD 启用，但
+  // tributary 数量多、虽然每条粗粒化省顶点，整体渲染压力还是上去了。
+  // 用户更看重静音，水系只画主干即可（汉江、渭河、嘉陵江 等）。
+  const rivers = selectRenderableWaterFeatures(atlasFeatures);
   visibleWaterFeatures = rivers;
 
   rebuildRiverVegetationVisuals(rivers);
@@ -2851,7 +2861,7 @@ renderer.domElement.addEventListener("wheel", (event: WheelEvent) => {
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
