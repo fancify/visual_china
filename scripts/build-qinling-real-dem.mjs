@@ -71,11 +71,31 @@ function meanNeighborDifference(values, column, row, columns, rows) {
 // 关键：carving 是在 normalize 之后做的，所以 depth 是游戏单位 (-2..9 范围内)
 // 而不是真实米数。每个 cell 取 min(current, riverHeight - depth*falloff)。
 const RIVER_CARVE_BY_RANK = {
-  // depth 同高度夸张同步 ×1.5 (0.55→0.83, 0.32→0.48, 0.18→0.27)
-  1: { radiusCells: 2.0, depth: 0.83 }, // 主干 (渭/汉/嘉陵/岷)
-  2: { radiusCells: 1.5, depth: 0.48 }, // 一级支流
-  3: { radiusCells: 1.0, depth: 0.27 } // 二级支流 (褒/斜/外/内)
+  // 用户反馈"小河仍然穿山"：bump radius + depth for tributaries 让 山区
+  // 小溪 (褒水/斜水/外江/内江) 也能切出可见谷。主干稍微变深一点。
+  1: { radiusCells: 2.2, depth: 1.0 }, // 主干 (渭/汉/嘉陵/岷)
+  2: { radiusCells: 1.8, depth: 0.65 }, // 一级支流
+  3: { radiusCells: 1.5, depth: 0.45 } // 二级支流 (褒/斜/外/内)
 };
+
+// 内部用：把 polyline 密化到 ~1 cell 间隔 (~0.012°, ~1.3km)，让 carving
+// 覆盖整段 (hand-typed 的 褒水/斜水/外江/内江 只有 4-5 个稀疏点，不密化的话
+// 中间地段就被漏掉，浮线穿山)。
+function densifyForCarving(points, maxDeg = 0.012) {
+  if (points.length < 2) return points.slice();
+  const out = [points[0]];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const dist = Math.hypot(b.lat - a.lat, b.lon - a.lon);
+    const subdivisions = Math.max(1, Math.ceil(dist / maxDeg));
+    for (let j = 1; j <= subdivisions; j += 1) {
+      const t = j / subdivisions;
+      out.push({ lat: a.lat + (b.lat - a.lat) * t, lon: a.lon + (b.lon - a.lon) * t });
+    }
+  }
+  return out;
+}
 
 function carveRiverValleys(heights, gridColumns, gridRows, regionBounds, riverFeatures) {
   const lonSpan = regionBounds.east - regionBounds.west;
@@ -86,9 +106,10 @@ function carveRiverValleys(heights, gridColumns, gridRows, regionBounds, riverFe
   const inSliceCount = { points: 0, features: 0 };
 
   for (const feature of riverFeatures) {
-    const points = feature.geometry?.points;
-    if (!points || points.length < 2) continue;
-    if (typeof points[0].lat !== "number") continue; // 跳过 {x,y} 格式（不该发生）
+    const rawPoints = feature.geometry?.points;
+    if (!rawPoints || rawPoints.length < 2) continue;
+    if (typeof rawPoints[0].lat !== "number") continue; // 跳过 {x,y} 格式（不该发生）
+    const points = densifyForCarving(rawPoints);
     const cfg = RIVER_CARVE_BY_RANK[feature.rank] ?? RIVER_CARVE_BY_RANK[3];
     const r = cfg.radiusCells;
 
