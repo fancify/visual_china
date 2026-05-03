@@ -100,6 +100,7 @@ function makeWallMaterial(): MeshPhongMaterial {
     flatShading: true,
     shininess: 6,
     transparent: true,
+    depthWrite: false, // fade 中半透明城墙不写 depth，避免 ghost-occlusion
     opacity: 1
   });
 }
