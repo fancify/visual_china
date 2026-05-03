@@ -17,10 +17,10 @@ test("Qinling modern hydrography asset declares modern base metadata", () => {
 test("Qinling modern hydrography includes first required river skeleton", () => {
   const names = asset.features.map((feature) => feature.name);
 
-  // 2026-05 用户："去掉目前的河，用新做的河来代替" — qinlingHydrography
-  // 全部从 NE/OSM 派生。斜水/外江 在数据源里没有，dropped。新增长江/沱江/内江。
-  // 名字 "汉江/汉水" 简化为 "汉水" (NE 标准名)。
-  ["长江", "渭河", "汉水", "嘉陵江", "岷江", "沱江", "褒河", "内江"].forEach((name) => {
+  // 2026-05 用户："只要 prototype 里有的。其他的都去掉"
+  // → 只保留 major-rivers.json (NE 10m only) 在 slice 内的 5 条河。
+  // 岷江/褒河/内江 之前是 OSM 拼的，prototype 没用 OSM，全 dropped。
+  ["长江", "渭河", "汉水", "嘉陵江", "沱江"].forEach((name) => {
     assert.ok(names.includes(name), `${name} must be present`);
   });
 });

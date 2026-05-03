@@ -315,40 +315,14 @@ function activeAtlasFeatures(): QinlingAtlasFeature[] {
 }
 
 async function loadHydrographyAtlas(): Promise<void> {
-  let nextAtlasFeatures = [...qinlingAtlasFeatures];
-
-  try {
-    const response = await fetch("/data/regions/qinling/hydrography/primary-modern.json");
-
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-
-    const asset = (await response.json()) as PrimaryHydrographyAsset;
-    const primaryFeatures = asset.features.map(hydrographyFeatureToAtlasFeature);
-    nextAtlasFeatures = [
-      ...qinlingAtlasFeatures.filter((feature) => feature.layer !== "water"),
-      ...primaryFeatures
-    ];
-  } catch (error) {
-    console.warn("Failed to load primary Qinling hydrography atlas layer", error);
-  }
-
-  try {
-    const response = await fetch("/data/regions/qinling/hydrography/osm-modern.json");
-
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-
-    const asset = (await response.json()) as ImportedHydrographyAsset;
-    evidenceFeatures = importedHydrographyAssetToAtlasFeatures(asset);
-  } catch (error) {
-    console.warn("Failed to load imported OSM hydrography atlas layer", error);
-    evidenceFeatures = [];
-  }
-
-  atlasFeatures = nextAtlasFeatures;
+  // 2026-05 用户："只要 prototype 里有的"——
+  // primary-modern.json 把 OSM + curated 合并；
+  // osm-modern.json 又是 4639 个 OSM water features 当 evidence overlay。
+  // 这两都包含 prototype 里没有的支流，全部跳过。
+  // qinlingAtlasFeatures 里的 water layer 直接来自 qinlingHydrography
+  // (= qinlingNeRivers = major-rivers.json 在 slice 内的 5 条 NE 河)。
+  atlasFeatures = [...qinlingAtlasFeatures];
+  evidenceFeatures = [];
   atlasFeaturesVersion += 1;
   rebuildWaterSystemVisuals();
   if (lastVisuals) {
