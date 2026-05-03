@@ -14,12 +14,15 @@ import type { RuntimePerformanceBudget } from "./performanceBudget";
 // 共享 geometry / material：scenery 在每个 chunk 加载时被频繁创建/卸载，
 // 共享资源避免重复 GPU 上传和材质实例数膨胀。transparent + 默认 opacity:1
 // 让外部能按距离 fade 树（保持 LOD 渐进淡入的统一手感）。
+// depthWrite=false：fade 中（半透明）的树不该写 depth，否则会 silently 挡住
+// 后面的物体（codex hygiene 建议）。
 const sharedTreeGeometry = new ConeGeometry(0.38, 1.75, 5);
 export const sharedTreeMaterial = new MeshPhongMaterial({
   color: 0x4f7f58,
   flatShading: true,
   shininess: 5,
   transparent: true,
+  depthWrite: false,
   opacity: 1
 });
 
