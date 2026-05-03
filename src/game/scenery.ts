@@ -74,7 +74,24 @@ export function createChunkScenery(
       const jitterZ = (pseudoRandom(seed + 17) - 0.5) * (depth / rows) * 0.8;
       const x = -width * 0.5 + ((column + 0.5) / columns) * width + jitterX;
       const z = -depth * 0.5 + ((row + 0.5) / rows) * depth + jitterZ;
-      const height = sampler.sampleHeight(x, z);
+      // 2026-05 用户："树也还在飘着"——
+      // 根因：sampleHeight 用 bilinear (4 corner)，GPU 渲染 mesh 用 triangle
+      // (3 corner)。河谷雕刻把单 cell 强行压低，雕刻/未雕刻交界处 bilinear
+      // 跟 triangular interp 在同一 (x,z) 可以差 0.3-0.8 单元。如果 bilinear
+      // 含高 corner、triangle 漏掉，sampleHeight > rendered face → 树底面
+      // 浮在 mesh 上方。
+      // 修法：取 4 个 cell-corner 的 MIN — 保证 tree.y ≤ 任何 triangle
+      // 三角形 face Y → 树底面绝不会浮空，最坏情况是雕刻河谷边的树轻
+      // 微嵌入 mesh (但 cone 还是大部分露出)。
+      const cellWidth = width / columns;
+      const cellDepth = depth / rows;
+      const cornerHeights = [
+        sampler.sampleHeight(x - cellWidth * 0.5, z - cellDepth * 0.5),
+        sampler.sampleHeight(x + cellWidth * 0.5, z - cellDepth * 0.5),
+        sampler.sampleHeight(x - cellWidth * 0.5, z + cellDepth * 0.5),
+        sampler.sampleHeight(x + cellWidth * 0.5, z + cellDepth * 0.5)
+      ];
+      const height = Math.min(...cornerHeights);
       const h = normalizedHeight(height, sampler);
       const slope = sampler.sampleSlope(x, z);
       const river = sampler.sampleRiver(x, z);

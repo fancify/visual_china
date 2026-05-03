@@ -162,29 +162,37 @@ export function buildWaterRibbonVertices(points, options) {
   // polyline + 未雕刻 DEM）。但现在 build-time DEM carving 已经保证河路径
   // 是最低，snap 反而让相邻 ribbon 顶点抓不同碎石单元，Y 来回跳 → 锯齿。
   // 改成直接 sampleHeight (bilinear interp)，再沿 polyline 方向做 5-tap
-  // 移动平均消掉残余 cell-aliasing 噪声。
+  // 移动平均消掉残余 cell-aliasing 噪声。yLeft / yRight 也都要平滑—— lift
+  // 计算依赖它们，noisy 的 lift 会让相邻 cross-section 的 Y 跳变。
+  const normals = points.map((_, i) => pointNormal(points, i));
   const rawCenters = points.map((p) => options.sampleHeight(p.x, p.y));
-  const smoothedCenters = rawCenters.map((_, i) => {
-    let sum = 0;
-    let count = 0;
-    for (let k = -2; k <= 2; k += 1) {
-      const j = i + k;
-      if (j < 0 || j >= rawCenters.length) continue;
-      sum += rawCenters[j];
-      count += 1;
-    }
-    return sum / count;
+  const rawLefts = points.map((p, i) => {
+    const n = normals[i];
+    return options.sampleHeight(p.x + n.x * halfWidth, p.y + n.y * halfWidth);
   });
+  const rawRights = points.map((p, i) => {
+    const n = normals[i];
+    return options.sampleHeight(p.x - n.x * halfWidth, p.y - n.y * halfWidth);
+  });
+  const smooth = (arr) =>
+    arr.map((_, i) => {
+      let sum = 0;
+      let count = 0;
+      for (let k = -2; k <= 2; k += 1) {
+        const j = i + k;
+        if (j < 0 || j >= arr.length) continue;
+        sum += arr[j];
+        count += 1;
+      }
+      return sum / count;
+    });
+  const sCenters = smooth(rawCenters);
+  const sLefts = smooth(rawLefts);
+  const sRights = smooth(rawRights);
   const sections = points.map((point, index) => {
-    const normal = pointNormal(points, index);
-    const leftX = point.x + normal.x * halfWidth;
-    const leftZ = point.y + normal.y * halfWidth;
-    const rightX = point.x - normal.x * halfWidth;
-    const rightZ = point.y - normal.y * halfWidth;
-    const yCenter = smoothedCenters[index];
-    const yLeft = options.sampleHeight(leftX, leftZ);
-    const yRight = options.sampleHeight(rightX, rightZ);
-    const upslope = Math.max(yLeft, yRight);
+    const normal = normals[index];
+    const yCenter = sCenters[index];
+    const upslope = Math.max(sLefts[index], sRights[index]);
     const liftAmount = Math.min(Math.max(0, upslope - yCenter), maxLift);
     return waterRibbonCrossSection(
       point,
