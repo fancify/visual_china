@@ -1,7 +1,7 @@
 {
   "routeStart": {
-    "x": 84,
-    "y": -69
+    "lat": 34.3375,
+    "lon": 108.81667
   },
   "storyBeats": [
     {
@@ -10,8 +10,8 @@
       "guidance": "先感受腹地的开阔，再向山前推进，拾起第一片关于组织力的残简。",
       "completionLine": "你已经读懂了：平原不仅便于行走，更便于组织。",
       "target": {
-        "x": 84,
-        "y": -69
+        "lat": 34.3375,
+        "lon": 108.81667
       },
       "completionRadius": 9,
       "requiredFragmentId": "guanzhong-heartland"
@@ -22,8 +22,8 @@
       "guidance": "继续南下，直到秦岭从背景变成阻隔本身，去看连续山脊怎样压缩路径。",
       "completionLine": "你已经贴近秦岭北麓，山墙的意义开始超过单座高峰。",
       "target": {
-        "x": 10,
-        "y": -38
+        "lat": 33.69167,
+        "lon": 106.55556
       },
       "completionRadius": 11,
       "requiredFragmentId": "qinling-wall"
@@ -34,8 +34,8 @@
       "guidance": "不要执着于最高峰，去找那条真正能过山的缝，那才是地理把人逼出的选择。",
       "completionLine": "你已经来到锁口附近，过山的意义第一次压过了直线距离。",
       "target": {
-        "x": -32,
-        "y": -16
+        "lat": 33.23333,
+        "lon": 105.27222
       },
       "completionRadius": 11,
       "requiredFragmentId": "mountain-pass"
@@ -46,8 +46,8 @@
       "guidance": "翻过山后别急着继续南下，先在汉中停一下，感受它为何像门轴而不是终点。",
       "completionLine": "你已经站上汉中门轴，方向在这里突然变多了。",
       "target": {
-        "x": 26,
-        "y": -8
+        "lat": 33.06667,
+        "lon": 107.04444
       },
       "completionRadius": 10,
       "requiredFragmentId": "hanzhong-hinge"
@@ -58,8 +58,8 @@
       "guidance": "离开汉中之后，继续向南体会第二次压缩，看看山道如何把时间和错误一起放大。",
       "completionLine": "你已经进入南侧山地，入蜀前的第二次压缩开始生效。",
       "target": {
-        "x": 12,
-        "y": 84
+        "lat": 31.15,
+        "lon": 106.61667
       },
       "completionRadius": 12,
       "requiredFragmentId": "sichuan-gate"
@@ -70,8 +70,8 @@
       "guidance": "穿过最后一道收口，去成都平原感受空间为何会忽然从险道变成可以安顿的腹地。",
       "completionLine": "你已经走完这条南北叙事线，秦岭与盆地的关系开始闭合。",
       "target": {
-        "x": -42,
-        "y": 102
+        "lat": 30.775,
+        "lon": 104.96667
       },
       "completionRadius": 12,
       "requiredFragmentId": "chengdu-release"
@@ -82,8 +82,8 @@
       "name": "长安意象",
       "kind": "city",
       "position": {
-        "x": 88.04,
-        "y": -69.12
+        "lat": 34.34,
+        "lon": 108.94011
       },
       "description": "关中腹地的组织中心。"
     },
@@ -91,8 +91,8 @@
       "name": "渭河平原",
       "kind": "plain",
       "position": {
-        "x": 26,
-        "y": -80
+        "lat": 34.56667,
+        "lon": 107.04444
       },
       "description": "开阔、连续、适合高密度农耕与交通。"
     },
@@ -100,8 +100,8 @@
       "name": "陈仓道",
       "kind": "pass",
       "position": {
-        "x": 23.89,
-        "y": -60.48
+        "lat": 34.16,
+        "lon": 106.97997
       },
       "description": "从陈仓、大散关一带折入秦岭的西线通道，山地把路线压成可控锁口。"
     },
@@ -109,8 +109,8 @@
       "name": "太白主脊",
       "kind": "mountain",
       "position": {
-        "x": 6,
-        "y": -20
+        "lat": 33.31667,
+        "lon": 106.43333
       },
       "description": "秦岭横墙在此最有压迫感。"
     },
@@ -118,8 +118,8 @@
       "name": "褒斜谷意象",
       "kind": "pass",
       "position": {
-        "x": 34,
-        "y": -28
+        "lat": 33.48333,
+        "lon": 107.28889
       },
       "description": "真正重要的不是直线距离，而是能不能过山。"
     },
@@ -127,8 +127,8 @@
       "name": "汉中盆地",
       "kind": "city",
       "position": {
-        "x": 26,
-        "y": -8
+        "lat": 33.06667,
+        "lon": 107.04444
       },
       "description": "不是终点，而是南北转换的门轴。"
     },
@@ -136,8 +136,8 @@
       "name": "米仓山",
       "kind": "mountain",
       "position": {
-        "x": -6,
-        "y": 58
+        "lat": 31.69167,
+        "lon": 106.06667
       },
       "description": "入蜀前的第二道压迫。"
     },
@@ -145,8 +145,8 @@
       "name": "剑门关",
       "kind": "pass",
       "position": {
-        "x": -23.24,
-        "y": 33.6
+        "lat": 32.2,
+        "lon": 105.53989
       },
       "description": "广元剑阁一带的入蜀锁口，两侧山势夹峙，让通道变成关隘。"
     },
@@ -154,8 +154,8 @@
       "name": "剑门蜀道",
       "kind": "pass",
       "position": {
-        "x": -18,
-        "y": 31
+        "lat": 32.25417,
+        "lon": 105.7
       },
       "description": "汉中南下入蜀的关键路线，第二次把行军面压缩成少数节点。"
     },
@@ -163,8 +163,8 @@
       "name": "成都平原",
       "kind": "city",
       "position": {
-        "x": -44,
-        "y": 104
+        "lat": 30.73333,
+        "lon": 104.90556
       },
       "description": "进入盆地后，世界忽然变得舒展。"
     }
@@ -175,8 +175,8 @@
       "title": "腹地残简",
       "zone": "关中平原",
       "position": {
-        "x": 84,
-        "y": -69
+        "lat": 34.3375,
+        "lon": 108.81667
       },
       "pickupLine": "你拾得《关中残简》：平原不只适合行走，它也适合组织。 ",
       "details": {
@@ -190,8 +190,8 @@
       "title": "塬上风痕",
       "zone": "关中北缘",
       "position": {
-        "x": -42,
-        "y": -78
+        "lat": 34.525,
+        "lon": 104.96667
       },
       "pickupLine": "你拾得《塬上风痕》：边缘地带往往先看见道路，也先看见威胁。",
       "details": {
@@ -205,8 +205,8 @@
       "title": "山墙初见",
       "zone": "秦岭北麓",
       "position": {
-        "x": 10,
-        "y": -38
+        "lat": 33.69167,
+        "lon": 106.55556
       },
       "pickupLine": "你拾得《山墙初见》：秦岭像墙，不因为它最高，而因为它连续。",
       "details": {
@@ -220,8 +220,8 @@
       "title": "关口回响",
       "zone": "秦岭山口",
       "position": {
-        "x": -32,
-        "y": -16
+        "lat": 33.23333,
+        "lon": 105.27222
       },
       "pickupLine": "你拾得《关口回响》：真正重要的地方，常常不是山顶，而是能过山的那条缝。",
       "details": {
@@ -235,8 +235,8 @@
       "title": "门轴之地",
       "zone": "汉中盆地",
       "position": {
-        "x": 26,
-        "y": -8
+        "lat": 33.06667,
+        "lon": 107.04444
       },
       "pickupLine": "你拾得《门轴之地》：翻过山以后，并不是终点，而是方向突然变多了。",
       "details": {
@@ -250,8 +250,8 @@
       "title": "南下折岭",
       "zone": "米仓山前",
       "position": {
-        "x": 0,
-        "y": 56
+        "lat": 31.73333,
+        "lon": 106.25
       },
       "pickupLine": "你拾得《南下折岭》：同样是前进，山道会把时间拉长，把错误放大。",
       "details": {
@@ -265,8 +265,8 @@
       "title": "入蜀片羽",
       "zone": "入蜀谷口",
       "position": {
-        "x": 12,
-        "y": 84
+        "lat": 31.15,
+        "lon": 106.61667
       },
       "pickupLine": "你拾得《入蜀片羽》：一旦道路再次变窄，争夺就会重新聚焦到少数节点。",
       "details": {
@@ -280,8 +280,8 @@
       "title": "盆地舒展",
       "zone": "成都平原",
       "position": {
-        "x": -42,
-        "y": 102
+        "lat": 30.775,
+        "lon": 104.96667
       },
       "pickupLine": "你拾得《盆地舒展》：穿过险道后，世界忽然像能被安顿下来。",
       "details": {

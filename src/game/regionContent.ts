@@ -2,11 +2,18 @@ import { Vector2 } from "three";
 
 import type { KnowledgeFragment } from "../data/fragments";
 import type { Landmark, LandmarkKind } from "../data/qinlingSlice";
+import { qinlingRegionBounds, qinlingRegionWorld } from "../data/qinlingRegion.js";
+import { projectGeoToWorld } from "./mapOrientation.js";
 import type { StoryBeat } from "./storyGuide";
 
+// content.json 里的 position 可以是 (a) 旧格式 {x, y}（世界坐标）或
+// (b) 新格式 {lat, lon}（地理坐标，运行期投到当前 bounds）。validatePoint2
+// 同时接受两种，{lat, lon} 优先——新数据用，旧数据迁移期间也能跑。
 interface RawPoint2 {
-  x: number;
-  y: number;
+  x?: number;
+  y?: number;
+  lat?: number;
+  lon?: number;
 }
 
 interface RawLandmark {
@@ -86,6 +93,17 @@ function asFiniteNumber(value: unknown, fieldName: string): number {
 function validatePoint2(raw: unknown, fieldName: string): Vector2 {
   if (!isRecord(raw)) {
     throw new Error(`Region content field "${fieldName}" must be an object.`);
+  }
+
+  // 优先 lat/lon（新格式）。投到当前 region 的世界坐标——bounds 改了，
+  // 旧 position 自动跟着重新投影，避免 hardcoded 漂移。
+  if (typeof raw.lat === "number" && typeof raw.lon === "number") {
+    const wp = projectGeoToWorld(
+      { lat: raw.lat, lon: raw.lon },
+      qinlingRegionBounds,
+      qinlingRegionWorld
+    );
+    return new Vector2(wp.x, wp.z);
   }
 
   return new Vector2(
