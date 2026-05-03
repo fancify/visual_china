@@ -23,14 +23,14 @@ test("atlas render policy keeps the default overview readable", () => {
   const visibleLayers = new Set(visible.map((feature) => feature.layer));
 
   // 城市层用真实坐标 verification: external-vector，跟 3D 共用同一份
-  // source-of-truth，所以默认就显示。water（curated-modern-qinling）
-  // 还没 external-vector 标记、pass 是 manual-atlas-draft，按"默认视图
-  // 只展示已核验事实"的策略仍被过滤掉。livelihood 整层 defaultVisible:
-  // false，专题视图单独打开。
+  // source-of-truth，所以默认就显示。water 主干 (渭/汉/嘉陵) 现在也是
+  // natural-earth-10m external-vector，按"默认只展示已核验事实"策略也
+  // 进默认 overview。pass 是 manual-atlas-draft、livelihood 整层
+  // defaultVisible: false，仍被过滤。
   // landform / road / military / culture 整层已经删除（codex review 后
   // 跟 3D 对齐），所以这里不再断言它们"不可见"——assertion 写出来反而误导。
   assert.ok(visibleLayers.has("city"), "verified real cities should render by default");
-  assert.ok(!visibleLayers.has("water"), "unverified curated water stays out of the default overview");
+  assert.ok(visibleLayers.has("water"), "natural-earth-sourced trunk rivers should render by default");
   assert.ok(!visibleLayers.has("pass"), "manual-draft passes stay hidden until evidence layer toggled");
   assert.ok(!visibleLayers.has("livelihood"), "livelihood is opt-in subject layer");
 });
