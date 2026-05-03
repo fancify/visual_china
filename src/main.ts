@@ -197,8 +197,7 @@ import {
   attachTerrainShaderEnhancements,
   updateTerrainShaderAtmosphericFar,
   updateTerrainShaderHeightFog,
-  updateTerrainShaderHsl,
-  updateTerrainShaderRim
+  updateTerrainShaderHsl
 } from "./game/terrainShaderEnhancer";
 import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
 
@@ -453,9 +452,7 @@ attachTerrainShaderEnhancements(terrainMaterial, {
   heightFogColor: new Color(0xb6c4be),
   // 远山初始色：千里江山图 石青调（#5f8ba6 偏冷）。runtime 每帧根据
   // environmentVisuals.skyZenithColor 改写它，让远山色随时间/天气一致。
-  atmosphericFarColor: new Color(0x5f8ba6),
-  // Rim 初始色：暖金（#ffe9b9）匹配 spring sun。runtime 每帧推 sunColor。
-  rimColor: new Color(0xffe9b9)
+  atmosphericFarColor: new Color(0x5f8ba6)
 });
 const terrain = new Mesh(terrainGeometry, terrainMaterial);
 scene.add(terrain);
@@ -3864,7 +3861,10 @@ function update(deltaSeconds: number): void {
   const visuals = environmentController.computeVisuals();
   lastVisuals = visuals;
   sceneFog.color.copy(visuals.fogColor);
-  sceneFog.density = visuals.fogDensity;
+  // 用户反馈"看不到地形"——overview 镜头下 FogExp2 把远地形染成 fog 色
+  // ≈ 天空色，整图融成一片。把 density 再砍 60%（之前砍 50% 还不够），
+  // 让 200 单元远的地形仍保留 ~85% 原色，hillshade / 河谷 都看得到。
+  sceneFog.density = visuals.fogDensity * 0.4;
   ambientLight.color.copy(visuals.ambientColor);
   ambientLight.intensity = visuals.ambientIntensity;
   sun.color.copy(visuals.sunColor);
@@ -3909,8 +3909,6 @@ function update(deltaSeconds: number): void {
     visuals.terrainSaturationMul,
     visuals.terrainLightnessMul
   );
-  // Rim 颜色跟 sunColor 走（黄昏自动镶金、白天偏冷白、夜里近黑）。
-  updateTerrainShaderRim(terrainMaterial, visuals.sunColor);
   terrainChunkMeshes.forEach((chunk) => {
     if (!Array.isArray(chunk.mesh.material)) {
       updateTerrainShaderHeightFog(
@@ -3926,10 +3924,6 @@ function update(deltaSeconds: number): void {
         visuals.terrainHueShift,
         visuals.terrainSaturationMul,
         visuals.terrainLightnessMul
-      );
-      updateTerrainShaderRim(
-        chunk.mesh.material as MeshPhongMaterial,
-        visuals.sunColor
       );
     }
   });
