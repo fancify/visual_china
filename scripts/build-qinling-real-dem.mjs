@@ -66,18 +66,17 @@ function meanNeighborDifference(values, column, row, columns, rows) {
 
 // 2026-05 河谷雕刻：DEM 1.5km/sample 平均掉真实河谷 (~200m 宽)，渲染时河
 // polyline 经常"穿"进 mesh 山体。把每条河 polyline 在 build 期反向压进 DEM
-// 高度场——用 raised-cosine falloff，半径根据 rank 变化。
+// 高度场——半径根据 rank 变化，并用更陡的 V 形 falloff 保持峡谷感。
 //
 // 关键：carving 是在 normalize 之后做的，所以 depth 是游戏单位 (-2..9 范围内)
 // 而不是真实米数。每个 cell 取 min(current, riverHeight - depth*falloff)。
 const RIVER_CARVE_BY_RANK = {
-  // 2026-05 用户反馈"河 fragmented + 城市消失"：之前 depth 1.0 / radius 2.2
-  // 雕成深 potholes，相机低角度看不到谷底 ribbon、城市坐落雕刻 cell 里被
-  // 周围地形挡。改成 wider + shallower：valleys 看起来更自然，ribbon /
-  // 城市可见角度多。
-  1: { radiusCells: 3.8, depth: 0.55 }, // 主干 (渭/汉/嘉陵/岷)
-  2: { radiusCells: 2.8, depth: 0.35 }, // 一级支流
-  3: { radiusCells: 2.0, depth: 0.22 } // 二级支流 (褒/斜/外/内)
+  // 当前约束已经变了：城市贴地修复已完成、独立 river ribbon 也已删除，
+  // 因此可以安全回到 narrower + deeper 的峡谷雕刻，而不再触发"城市消失"
+  // 或 "低角度看不到 ribbon" 两个旧问题。
+  1: { radiusCells: 2.4, depth: 0.95 }, // 主干 (渭/汉/嘉陵/岷)
+  2: { radiusCells: 1.7, depth: 0.60 }, // 一级支流
+  3: { radiusCells: 1.2, depth: 0.38 } // 二级支流 (褒/斜/外/内)
 };
 
 // 内部用：把 polyline 密化到 ~1 cell 间隔 (~0.012°, ~1.3km)，让 carving
@@ -114,9 +113,8 @@ function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBoun
     const points = densifyForCarving(rawPoints);
     const cfg = RIVER_CARVE_BY_RANK[feature.rank] ?? RIVER_CARVE_BY_RANK[3];
     const r = cfg.radiusCells;
-    // riverMask paint：用户反馈河太宽 (城市被泡)，从 r*0.6 收到 r*0.2
-    // (~1/3 宽度)；falloff 用 (1-t)^3 让边缘更锐利 (raised-cosine 太软)
-    const maskRadius = r * 0.2;
+    // riverMask paint：只把最核心的一窄条保留成纯水面，外围快速退到湿岸。
+    const maskRadius = r * 0.1;
 
     let featureCarved = false;
 
@@ -140,20 +138,28 @@ function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBoun
           const dist = Math.hypot(col - colF, row - rowF);
           if (dist > r) continue;
           const idx = row * gridColumns + col;
-          // raised-cosine falloff: 中心 1, 边缘 0
-          const falloff = 0.5 * (1 + Math.cos((dist / r) * Math.PI));
+          // 二次曲线比 raised-cosine 掉得更快：谷壁更陡，中心仍保持最深。
+          const t = dist / r;
+          const falloff = (1 - t) * (1 - t);
           const carvedTo = riverHeight - cfg.depth * falloff;
           if (heights[idx] > carvedTo) {
             heights[idx] = carvedTo;
             featureCarved = true;
           }
-          // riverMask: 核心半径 (maskRadius) 内 mask=1，外圈到 r 渐淡到 0
-          // 用 (1-t)^3 power curve, 中段平、边缘急下，水边沿更锐利
+          // riverMask: 核心半径 (maskRadius) 内 mask=1，外圈到 r 渐淡到 0。
+          // 用 (1-t)^6 把高值尽量锁在窄核心里，让水边更利。
           if (dist <= maskRadius) {
             riverMask[idx] = Math.max(riverMask[idx], 1.0);
           } else {
             const t = (dist - maskRadius) / (r - maskRadius);
-            const m = (1 - t) * (1 - t) * (1 - t);
+            const oneMinusT = 1 - t;
+            const m =
+              oneMinusT *
+              oneMinusT *
+              oneMinusT *
+              oneMinusT *
+              oneMinusT *
+              oneMinusT;
             if (m > riverMask[idx]) riverMask[idx] = m;
           }
         }
