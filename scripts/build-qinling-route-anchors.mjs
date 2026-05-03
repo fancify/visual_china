@@ -72,6 +72,8 @@ const ROUTE_DEFINITIONS = [
       { name: "七盘关", note: "陕川界险绝关隘", lat: 32.65, lon: 106.1 },
       { name: "昭化（古葭萌）", note: "嘉陵江西岸古城", lat: 32.32, lon: 105.86 },
       { name: "剑门关", note: "剑门山口核心锁钥", lat: 32.2, lon: 105.55 },
+      { name: "武连", note: "剑阁南下后的驿站节点", lat: 31.42, lon: 105.2 },
+      { name: "梓潼", note: "七曲山与古驿集中的金牛道重镇", lat: 31.64, lon: 105.16 },
       { name: "绵阳", note: "入盆地后北四川平原通道", lat: 31.47, lon: 104.74 },
       { name: "德阳", note: "成都平原北部门户", lat: 31.13, lon: 104.4 },
       { name: "成都", note: "金牛道南端终点", lat: 30.66, lon: 104.07 }
@@ -86,6 +88,31 @@ const ROUTE_DEFINITIONS = [
       { name: "米仓山主脊", note: "越大巴山主脊核心段", lat: 32.45, lon: 106.85 },
       { name: "南江", note: "米仓道入川北后的山间节点", lat: 32.36, lon: 106.83 },
       { name: "巴中", note: "川东北盆缘城市", lat: 31.85, lon: 106.75 }
+    ]
+  },
+  {
+    id: "qishan-road",
+    labelIndex: 3,
+    anchors: [
+      { name: "天水", note: "陇右起点，上邽方向的北伐目标", lat: 34.58, lon: 105.72 },
+      { name: "西和", note: "西汉水谷地中继节点", lat: 34.01, lon: 105.3 },
+      { name: "祁山堡", note: "诸葛亮屯兵处，祁山道西折关键点", lat: 34.43, lon: 104.43 },
+      { name: "成县", note: "祁山道由陇南折向嘉陵江上游的中段节点", lat: 33.74, lon: 105.73 },
+      { name: "白水江", note: "嘉陵江西岸古驿，接略阳方向", lat: 32.99, lon: 105.49 },
+      { name: "略阳", note: "与陈仓道汇合的山间重镇", lat: 33.33, lon: 106.16 },
+      { name: "勉县", note: "汉中盆地西缘门户", lat: 33.15, lon: 106.67 },
+      { name: "汉中", note: "汉中盆地核心", lat: 33.07, lon: 107.03 }
+    ]
+  },
+  {
+    id: "lizhi-road",
+    labelIndex: 2,
+    anchors: [
+      { name: "西安", note: "唐代长安起点", lat: 34.27, lon: 108.95 },
+      { name: "西乡", note: "经子午道南下后转入巴山", lat: 33.0, lon: 107.75 },
+      { name: "镇巴", note: "入大巴山南行的中转节点", lat: 32.53, lon: 107.9 },
+      { name: "大竹河 / 万源附近", note: "巴山段山间通道", lat: 32.0, lon: 108.0 },
+      { name: "涪陵", note: "南端终点，当前切片外保留锚点", lat: 29.7, lon: 107.39 }
     ]
   }
 ];

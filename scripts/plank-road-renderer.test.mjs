@@ -8,8 +8,34 @@ function makeSampler(heightFn = () => 0) {
   return {
     sampleSurfaceHeight(x, z) {
       return heightFn(x, z);
+    },
+    sampleRiver() {
+      return 0;
     }
   };
+}
+
+function makeRiverAwareSampler(heightFn = () => 0, riverFn = () => 0) {
+  return {
+    sampleSurfaceHeight(x, z) {
+      return heightFn(x, z);
+    },
+    sampleRiver(x, z) {
+      return riverFn(x, z);
+    }
+  };
+}
+
+function positionFromInstance(mesh, index) {
+  const matrix = new Matrix4();
+  const position = new Vector3();
+  const quaternion = new Quaternion();
+  const scale = new Vector3();
+
+  mesh.getMatrixAt(index, matrix);
+  matrix.decompose(position, quaternion, scale);
+
+  return position;
 }
 
 function forwardVectorFromInstance(mesh, index) {
@@ -72,4 +98,29 @@ test("plank road orients deck planks to the local route tangent, stays near grou
   assert.equal(handle.plankMesh.material.color.getHex(), 0xb89372);
 
   disposePlankRoad(handle);
+});
+
+test("plank road lifts significantly more when the sampled route crosses a river corridor", () => {
+  const points = [
+    { x: 0, y: 0 },
+    { x: 0.8, y: 0 }
+  ];
+  const dryHandle = buildPlankRoad({
+    points,
+    sampler: makeRiverAwareSampler(() => 2, () => 0)
+  });
+  const wetHandle = buildPlankRoad({
+    points,
+    sampler: makeRiverAwareSampler(() => 2, () => 0.7)
+  });
+
+  const dryPosition = positionFromInstance(dryHandle.plankMesh, 0);
+  const wetPosition = positionFromInstance(wetHandle.plankMesh, 0);
+
+  assert.ok(Math.abs(dryPosition.y - 2.02) < 1e-6);
+  assert.ok(Math.abs(wetPosition.y - 2.47) < 1e-6);
+  assert.ok(wetPosition.y - dryPosition.y > 0.4);
+
+  disposePlankRoad(dryHandle);
+  disposePlankRoad(wetHandle);
 });

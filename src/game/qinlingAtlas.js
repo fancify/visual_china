@@ -46,6 +46,15 @@ function realCityToAtlasFeature(city) {
   };
 }
 
+function isInsideCurrentSlice(city) {
+  return (
+    city.lon >= QINLING_BOUNDS.west &&
+    city.lon <= QINLING_BOUNDS.east &&
+    city.lat >= QINLING_BOUNDS.south &&
+    city.lat <= QINLING_BOUNDS.north
+  );
+}
+
 export const qinlingAtlasPolicy = {
   sourceOfTruth: "2d-atlas-first",
   coordinatePolicy: "strict-geographic",
@@ -385,7 +394,8 @@ export const qinlingAtlasFeatures = [
   // 对应、verification: unverified 不该作为"事实"展示。3D 也不画 route
   // 线，atlas 跟着对齐。
   // 真实坐标城市批量注入。
-  ...realQinlingCities.map(realCityToAtlasFeature),
+  // atlas 跟 3D 主游戏保持同一规则：slice 外城市保留在数据里，但当前不渲染。
+  ...realQinlingCities.filter(isInsideCurrentSlice).map(realCityToAtlasFeature),
   // 著名景点：太白山 / 青城山 / 九寨沟 / 法门寺 / 乾陵 / 黄龙 / 汉中天坑——
   // 全部真实坐标，verification: external-vector，跟 3D 一致地展示。
   ...qinlingScenicLandmarks.map((spot) => ({

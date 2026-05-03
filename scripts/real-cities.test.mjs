@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { qinlingRegionBounds } from "../src/data/qinlingRegion.js";
+import { realQinlingCities } from "../src/data/realCities.js";
+
+const EXPECTED_NEW_CITY_IDS = [
+  "xihe",
+  "qishan",
+  "chengxian",
+  "baishui-river",
+  "zhenba",
+  "zitong",
+  "wulian",
+  "fuling"
+];
+
+test("new qinling real cities cover added Shu roads and keep one-line historical descriptions", () => {
+  for (const cityId of EXPECTED_NEW_CITY_IDS) {
+    const city = realQinlingCities.find((entry) => entry.id === cityId);
+    assert.ok(city, `${cityId} should exist`);
+    assert.equal(typeof city.description, "string");
+    assert.ok(city.description.length > 0, `${cityId} should include a historical description`);
+  }
+});
+
+test("Fuling remains out of slice while the other newly added cities stay inside current bounds", () => {
+  for (const cityId of EXPECTED_NEW_CITY_IDS) {
+    const city = realQinlingCities.find((entry) => entry.id === cityId);
+    assert.ok(city, `${cityId} should exist`);
+
+    const isInBounds =
+      city.lat >= qinlingRegionBounds.south &&
+      city.lat <= qinlingRegionBounds.north &&
+      city.lon >= qinlingRegionBounds.west &&
+      city.lon <= qinlingRegionBounds.east;
+
+    if (cityId === "fuling") {
+      assert.equal(isInBounds, false);
+    } else {
+      assert.equal(isInBounds, true, `${cityId} should remain renderable inside the current slice`);
+    }
+  }
+});

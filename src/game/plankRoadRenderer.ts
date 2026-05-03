@@ -2,6 +2,7 @@ import {
   BoxGeometry,
   Group,
   InstancedMesh,
+  MathUtils,
   MeshPhongMaterial,
   Object3D
 } from "three";
@@ -151,7 +152,7 @@ function createInstancedMesh(
 
 function buildHandleFromSlots(
   slotsByRoute: PlankSlot[][],
-  sampler: Pick<TerrainSampler, "sampleSurfaceHeight">,
+  sampler: Pick<TerrainSampler, "sampleSurfaceHeight" | "sampleRiver">,
   liftAboveGround: number
 ): PlankRoadHandle {
   const plankCount = slotsByRoute.reduce((sum, slots) => sum + slots.length, 0);
@@ -163,8 +164,11 @@ function buildHandleFromSlots(
 
   slotsByRoute.forEach((slots) => {
     slots.forEach((slot) => {
-      const plankY =
-        sampler.sampleSurfaceHeight(slot.position.x, slot.position.z) + liftAboveGround;
+      const surfaceY = sampler.sampleSurfaceHeight(slot.position.x, slot.position.z);
+      const riverMask = sampler.sampleRiver(slot.position.x, slot.position.z);
+      // 河床会被 DEM 雕低；栈道经过强水带时额外抬高，让视觉更接近"崖壁/桥跨"。
+      const waterLift = MathUtils.smoothstep(riverMask, 0.1, 0.5) * 0.45;
+      const plankY = surfaceY + liftAboveGround + waterLift;
 
       dummy.position.set(slot.position.x, plankY, slot.position.z);
       dummy.rotation.set(0, -slot.tangentRad, 0);
@@ -199,7 +203,7 @@ export function buildPlankRoadNetwork(inputs: PlankRoadInput[]): PlankRoadHandle
   const sampler = firstInput?.sampler;
 
   if (!sampler) {
-    return buildHandleFromSlots([], { sampleSurfaceHeight: () => 0 }, liftAboveGround);
+    return buildHandleFromSlots([], { sampleSurfaceHeight: () => 0, sampleRiver: () => 0 }, liftAboveGround);
   }
 
   return buildHandleFromSlots(slotsByRoute, sampler, liftAboveGround);
