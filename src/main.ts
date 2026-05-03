@@ -36,6 +36,10 @@ import {
   Vector3,
   WebGLRenderer
 } from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
 import {
   knowledgeFragments as defaultKnowledgeFragments,
@@ -379,6 +383,24 @@ const camera = new PerspectiveCamera(
   0.1,
   800
 );
+
+// EffectComposer + UnrealBloomPass: 给 高亮 像素（雪冠 / 太阳盘 / 水面反光 /
+// dawn-dusk 火烧云）加柔和辉光。strength/radius 调到保守值——浏览器原型上
+// ~1ms 成本，保住 120fps 上限。threshold 0.78 让中调细节不被吃掉。
+const bloomComposer = new EffectComposer(renderer);
+bloomComposer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+bloomComposer.setSize(window.innerWidth, window.innerHeight);
+const bloomRenderPass = new RenderPass(scene, camera);
+bloomComposer.addPass(bloomRenderPass);
+const bloomPass = new UnrealBloomPass(
+  new Vector2(window.innerWidth, window.innerHeight),
+  0.42,
+  0.55,
+  0.78
+);
+bloomComposer.addPass(bloomPass);
+const bloomOutput = new OutputPass();
+bloomComposer.addPass(bloomOutput);
 
 const ambientLight = new AmbientLight(0xf2dfba, 1.65);
 scene.add(ambientLight);
@@ -3588,6 +3610,11 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // composer 必须跟 renderer 同步——否则 bloom 内部 framebuffer 还是旧尺寸，
+  // resize 后会出现拉伸或 viewport 错位。
+  bloomComposer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+  bloomComposer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
 hud.closeJournalButton.addEventListener("click", () => {
@@ -4214,7 +4241,9 @@ function frame(): void {
     hudRefreshTimer = 0;
     hudDirty = false;
   }
-  renderer.render(scene, camera);
+  // 走 EffectComposer 而不是 renderer.render：让 UnrealBloomPass 接管最终
+  // 输出，雪冠/水面/太阳盘/朝霞这些高亮区会带柔和辉光。普通像素几乎无成本。
+  bloomComposer.render();
   perfStats.endFrame(renderer);
   requestAnimationFrame(frame);
 }
