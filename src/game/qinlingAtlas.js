@@ -3,7 +3,9 @@ import { qinlingModernHydrography } from "./qinlingHydrography.js";
 import { realQinlingCities } from "../data/realCities.js";
 
 // Qinling region 投影常量（与 atlas / 3D / hydrography 共用）。
-const QINLING_BOUNDS = { west: 103.5, east: 109, south: 30.4, north: 35.4 };
+// 跟 src/data/qinlingRegion.js + scripts/qinling-dem-common.mjs 同值。
+// 2026-05 east 109 → 110（refactor #63 之后，bounds 改是一行）。
+const QINLING_BOUNDS = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
 const QINLING_WORLD = { width: 180, depth: 240 };
 
 // 把真实城市 lat/lon 投到 atlas 世界坐标。北 = -Z 跟 mapOrientation 一致。
@@ -273,11 +275,32 @@ export const qinlingAncientSites = [
     lon: 105.91,
     summary: "甘肃秦安，仰韶文化早期大型聚落（约前 5800 年），F901 大房址。",
     role: "yangshao-dwelling"
+  },
+  // east 109 → 110 后纳入的 3 个考古遗址（refactor #63 + Phase 4 完成）
+  {
+    id: "ancient-banpo",
+    name: "半坡遗址",
+    lat: 34.27,
+    lon: 109.07,
+    summary: "西安东郊，仰韶半坡类型典型聚落（约前 4800 年），半地穴房 + 公共墓地。",
+    role: "yangshao-dwelling"
+  },
+  {
+    id: "ancient-bingmayong",
+    name: "兵马俑",
+    lat: 34.38,
+    lon: 109.27,
+    summary: "秦始皇陵东侧 1.5 km 陪葬坑，1974 年出土万件陶兵马，世界第八奇迹。",
+    role: "qin-terracotta-army"
+  },
+  {
+    id: "ancient-qinshihuang-mausoleum",
+    name: "秦始皇陵",
+    lat: 34.38,
+    lon: 109.25,
+    summary: "中国第一个统一帝王陵（前 246–前 208 建造），封土高 76 m，地宫至今未发掘。",
+    role: "qin-imperial-mausoleum"
   }
-  // 半坡(109.07°E) / 兵马俑(109.27°E) / 秦始皇陵(109.25°E) 都在切片东界
-  // (109°E) 之外几公里。直接添加会触发 atlas-coverage 测试 x ∈ [-90, 90]
-  // 检查失败。等做正经东扩（backlog #54）把所有 hardcoded river/POI 坐标
-  // 重新从 lat/lon 投影后，再连同 华山 一起补进来。
 ];
 
 const ancientSymbol = {
