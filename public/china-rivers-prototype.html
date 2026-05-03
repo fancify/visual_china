@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>千里江山图 · 全国主干河流原型 v2</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0e1518;
+      color: #d8e6df;
+      font-family: "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+    h1 { font-size: 18px; margin: 0 0 4px; letter-spacing: 0.04em; }
+    .subtitle { font-size: 12px; color: #8aa49a; margin-bottom: 12px; max-width: 900px; text-align: center; line-height: 1.5; }
+    canvas {
+      background: linear-gradient(180deg, #0a1620 0%, #14252b 65%, #1c2a26 100%);
+      border-radius: 6px;
+      box-shadow: 0 0 0 1px rgba(120,200,200,0.18);
+      max-width: 100%;
+      height: auto;
+    }
+    .meta {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #98ada6;
+      max-width: 980px;
+      line-height: 1.6;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .meta strong { color: #d8e6df; }
+    table { border-collapse: collapse; width: 100%; font-size: 10.5px; }
+    th, td { text-align: left; padding: 3px 6px; border-bottom: 1px solid rgba(120,180,170,0.12); }
+    th { color: #c9d6cf; font-weight: 600; }
+    td.score { text-align: right; color: #f0c878; font-variant-numeric: tabular-nums; }
+    td.miss { color: #8a6a4a; }
+  </style>
+</head>
+<body>
+  <h1>千里江山图 · 全国主干河流原型 v2</h1>
+  <div class="subtitle">
+    数据：Natural Earth 10m rivers (public domain) · 选择：手工评分（干支级别+流域面积+历史意义）
+    · 匹配按 NE name 严格相等 + bbox 消歧
+  </div>
+  <canvas id="map" width="980" height="780"></canvas>
+  <div class="meta">
+    <div>
+      <strong>评分维度</strong><br>
+      <code>score = (4 - trunk) + area + story</code><br>
+      • <strong>trunk</strong>：1=干流 / 2=一级支流 / 3=二级支<br>
+      • <strong>area</strong>：5=&gt;1M km² / 4=&gt;100k / 3=&gt;10k / 2=&gt;1k / 1=&lt;1k<br>
+      • <strong>story</strong>：0-5（华夏文明源/朝代核心/南北分界/重大战事/漕运/地方文化）<br>
+      <br>
+      <strong>线宽</strong>：score 12+=3px，10-11=2px，7-9=1.4px，&lt;7=1px。<br>
+      <strong>颜色</strong>：青长江·蓝黄河·绿珠/南方·银白雅澜怒·浅蓝塞北。
+    </div>
+    <div id="rubric-table-wrap"></div>
+  </div>
+
+  <script>
+    const BOUNDS = { west: 73, east: 135, south: 18, north: 54 };
+    const W = 980, H = 780;
+    function project(lon, lat) {
+      const x = (lon - BOUNDS.west) / (BOUNDS.east - BOUNDS.west) * W;
+      const y = (1 - (lat - BOUNDS.south) / (BOUNDS.north - BOUNDS.south)) * H;
+      return { x, y };
+    }
+    const COLOR = {
+      yangtze: "#5fb8c9", yellow: "#5b8ec9", pearl: "#5fb47a",
+      southeast: "#6cb495", tibet: "#c4d6e0", northwest: "#79a4b8",
+      northeast: "#79a4b8", huai: "#7aa2c5", hai: "#7aa2c5",
+      liao: "#79a4b8", canal: "#f0c878"
+    };
+
+    const cities = [
+      ["北京", 116.4, 39.9],["上海", 121.5, 31.4],["广州", 113.3, 23.1],
+      ["重庆", 106.5, 29.6],["成都", 104.1, 30.7],["西安", 108.95, 34.27],
+      ["武汉", 114.3, 30.6],["南京", 118.8, 32.05],["杭州", 120.2, 30.27],
+      ["哈尔滨", 126.5, 45.8],["乌鲁木齐", 87.6, 43.8],["拉萨", 91.1, 29.65],
+      ["昆明", 102.7, 25.0],["兰州", 103.8, 36.06],["呼和浩特", 111.7, 40.84],
+      ["沈阳", 123.4, 41.8],["太原", 112.5, 37.87],["长沙", 112.95, 28.2]
+    ];
+
+    function widthByScore(s) {
+      if (s >= 12) return 3;
+      if (s >= 10) return 2;
+      if (s >= 7) return 1.4;
+      return 1;
+    }
+
+    fetch('/data/china/major-rivers.json').then(r => r.json()).then(data => {
+      const ctx = document.getElementById('map').getContext('2d');
+
+      // 经纬网格
+      ctx.strokeStyle = "rgba(120, 200, 200, 0.06)";
+      ctx.lineWidth = 1;
+      for (let lat = 20; lat <= 50; lat += 5) {
+        const a = project(73, lat); const b = project(135, lat);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      for (let lon = 75; lon <= 135; lon += 5) {
+        const a = project(lon, 18); const b = project(lon, 54);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+
+      // 画河流
+      data.rivers.forEach((r) => {
+        if (!r.polylines || r.polylines.length === 0) return;
+        ctx.strokeStyle = COLOR[r.basin] || "#7aa2c5";
+        ctx.lineWidth = widthByScore(r.score);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        r.polylines.forEach((seg) => {
+          ctx.beginPath();
+          seg.forEach(([lon, lat], i) => {
+            const p = project(lon, lat);
+            if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+          });
+          ctx.stroke();
+        });
+        // 给 score >= 11 的标 label
+        if (r.score >= 11) {
+          const allPts = r.polylines.flat();
+          const mid = allPts[Math.floor(allPts.length / 2)];
+          if (mid) {
+            const p = project(mid[0], mid[1]);
+            ctx.fillStyle = COLOR[r.basin] || "#aaa";
+            ctx.font = "11px 'Noto Sans SC', sans-serif";
+            ctx.fillText(r.name, p.x + 4, p.y - 4);
+          }
+        }
+      });
+
+      // 当前游戏切片框
+      const sliceTL = project(103.5, 35.4);
+      const sliceBR = project(110.0, 30.4);
+      ctx.fillStyle = "rgba(245, 231, 164, 0.10)";
+      ctx.fillRect(sliceTL.x, sliceTL.y, sliceBR.x - sliceTL.x, sliceBR.y - sliceTL.y);
+      ctx.strokeStyle = "rgba(245, 231, 164, 0.85)";
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(sliceTL.x, sliceTL.y, sliceBR.x - sliceTL.x, sliceBR.y - sliceTL.y);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(245, 231, 164, 0.95)";
+      ctx.font = "12px 'Noto Sans SC', sans-serif";
+      ctx.fillText("当前切片 · 秦岭–关中–四川", sliceTL.x + 6, sliceTL.y + 16);
+      ctx.font = "10px 'Noto Sans SC', sans-serif";
+      ctx.fillStyle = "rgba(245, 231, 164, 0.65)";
+      ctx.fillText("103.5°–110°E · 30.4°–35.4°N", sliceTL.x + 6, sliceTL.y + 30);
+
+      // 城市
+      ctx.fillStyle = "rgba(245, 231, 164, 0.85)";
+      ctx.font = "10px 'Noto Sans SC', sans-serif";
+      cities.forEach(([name, lon, lat]) => {
+        const p = project(lon, lat);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillText(name, p.x + 4, p.y - 4);
+      });
+
+      // 渲染 rubric 表
+      const tableHtml = `
+        <strong>评分明细（按 score 排）</strong>
+        <table>
+          <tr><th>河</th><th>流域</th><th>干支</th><th>面积</th><th>故事</th><th class="score">分</th><th>NE</th></tr>
+          ${data.rivers.map(r => `
+            <tr>
+              <td>${r.name}</td>
+              <td>${r.basin}</td>
+              <td>${r.trunk}</td>
+              <td>${r.area}</td>
+              <td>${r.story}</td>
+              <td class="score">${r.score}</td>
+              <td class="${r.matchedFromNE ? '' : 'miss'}">${r.matchedFromNE ? '✓' : '×'}</td>
+            </tr>
+          `).join('')}
+        </table>
+      `;
+      document.getElementById('rubric-table-wrap').innerHTML = tableHtml;
+    });
+  </script>
+</body>
+</html>
