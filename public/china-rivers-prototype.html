@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>千里江山图 · 全国主干河流原型 v2</title>
+  <title>千里江山图 · 全国主干河湖原型 v3</title>
   <style>
     body {
       margin: 0;
@@ -42,22 +42,26 @@
   </style>
 </head>
 <body>
-  <h1>千里江山图 · 全国主干河流原型 v2</h1>
+  <h1>千里江山图 · 全国主干河湖原型 v3</h1>
   <div class="subtitle">
-    数据：Natural Earth 10m rivers (public domain) · 选择：手工评分（干支级别+流域面积+历史意义）
-    · 匹配按 NE name 严格相等 + bbox 消歧
+    数据：Natural Earth 10m rivers + lakes (public domain) · 选择：手工评分（干支级别 + 历史意义）
+    · 匹配按 NE name 严格相等 + bbox 消歧 · NE 收不进的小湖（洱海/滇池/天池）用 fallback disk
   </div>
   <canvas id="map" width="980" height="780"></canvas>
   <div class="meta">
     <div>
-      <strong>评分维度</strong><br>
-      <code>score = (4 - trunk) + area + story</code><br>
-      • <strong>trunk</strong>：1=干流 / 2=一级支流 / 3=二级支<br>
+      <strong>河流评分</strong>：<code>score = (4-trunk) + area + story</code><br>
+      • <strong>trunk</strong>：1=干流 / 2=一级支 / 3=二级支<br>
       • <strong>area</strong>：5=&gt;1M km² / 4=&gt;100k / 3=&gt;10k / 2=&gt;1k / 1=&lt;1k<br>
       • <strong>story</strong>：0-5（华夏文明源/朝代核心/南北分界/重大战事/漕运/地方文化）<br>
       <br>
+      <strong>湖泊评分</strong>：<code>score = (4-trunk)*3 + story</code><br>
+      • <strong>trunk</strong>：1=国家级（五大淡水湖/高原圣湖/边境民族）/ 2=区域<br>
+      • <strong>story</strong>：0-5（同河流维度）<br>
+      <br>
       <strong>线宽</strong>：score 12+=3px，10-11=2px，7-9=1.4px，&lt;7=1px。<br>
-      <strong>颜色</strong>：青长江·蓝黄河·绿珠/南方·银白雅澜怒·浅蓝塞北。
+      <strong>颜色</strong>：青长江·蓝黄河·绿珠/南方·银白雅澜怒·浅蓝塞北 / 湖泊统一青蓝。<br>
+      <strong>湖 NE 与 disk</strong>：disk = NE 10m 收不进的小湖（&lt;500 km²），按已知中心坐标和半径生成的圆形近似。
     </div>
     <div id="rubric-table-wrap"></div>
   </div>
@@ -93,7 +97,10 @@
       return 1;
     }
 
-    fetch('/data/china/major-rivers.json').then(r => r.json()).then(data => {
+    Promise.all([
+      fetch('/data/china/major-rivers.json').then(r => r.json()),
+      fetch('/data/china/major-lakes.json').then(r => r.json())
+    ]).then(([data, lakeData]) => {
       const ctx = document.getElementById('map').getContext('2d');
 
       // 经纬网格
@@ -107,6 +114,36 @@
         const a = project(lon, 18); const b = project(lon, 54);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
+
+      // 先画湖（z 在底，让河注入湖泊那段不被湖盖住）
+      lakeData.lakes.forEach((l) => {
+        if (!l.polygons || l.polygons.length === 0) return;
+        const isFallback = l.source === "fallback-disk";
+        ctx.fillStyle = isFallback ? "rgba(110, 180, 200, 0.55)" : "rgba(95, 184, 201, 0.78)";
+        ctx.strokeStyle = isFallback ? "rgba(160, 220, 235, 0.55)" : "rgba(180, 230, 240, 0.85)";
+        ctx.lineWidth = isFallback ? 0.8 : 1;
+        l.polygons.forEach((poly) => {
+          ctx.beginPath();
+          poly.forEach((ring, ringIdx) => {
+            ring.forEach(([lon, lat], i) => {
+              const p = project(lon, lat);
+              if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            });
+          });
+          ctx.fill();
+          ctx.stroke();
+        });
+        // 给 score >= 13 的湖标 label
+        if (l.score >= 13) {
+          const ring = l.polygons[0][0];
+          const cx = ring.reduce((s, [lon]) => s + lon, 0) / ring.length;
+          const cy = ring.reduce((s, [, lat]) => s + lat, 0) / ring.length;
+          const p = project(cx, cy);
+          ctx.fillStyle = "rgba(220, 240, 245, 0.95)";
+          ctx.font = "10px 'Noto Sans SC', sans-serif";
+          ctx.fillText(l.name, p.x + 5, p.y - 3);
+        }
+      });
 
       // 画河流
       data.rivers.forEach((r) => {
@@ -165,24 +202,39 @@
       });
 
       // 渲染 rubric 表
-      const tableHtml = `
-        <strong>评分明细（按 score 排）</strong>
+      const riverTable = `
+        <strong>河流评分明细（${data.rivers.length} 条，按 score 排）</strong>
         <table>
-          <tr><th>河</th><th>流域</th><th>干支</th><th>面积</th><th>故事</th><th class="score">分</th><th>NE</th></tr>
+          <tr><th>河</th><th>流域</th><th>干</th><th>面</th><th>故</th><th class="score">分</th><th>源</th></tr>
           ${data.rivers.map(r => `
             <tr>
               <td>${r.name}</td>
               <td>${r.basin}</td>
               <td>${r.trunk}</td>
-              <td>${r.area}</td>
+              <td>${r.area ?? '-'}</td>
               <td>${r.story}</td>
               <td class="score">${r.score}</td>
-              <td class="${r.matchedFromNE ? '' : 'miss'}">${r.matchedFromNE ? '✓' : '×'}</td>
+              <td class="${r.matchedFromNE ? '' : 'miss'}">${r.matchedFromNE ? 'NE' : '×'}</td>
+            </tr>
+          `).join('')}
+        </table>
+        <br>
+        <strong>湖泊评分明细（${lakeData.lakes.length} 个，按 score 排）</strong>
+        <table>
+          <tr><th>湖</th><th>区域</th><th>干</th><th>故</th><th class="score">分</th><th>源</th></tr>
+          ${lakeData.lakes.map(l => `
+            <tr>
+              <td>${l.name}</td>
+              <td>${l.region}</td>
+              <td>${l.trunk}</td>
+              <td>${l.story}</td>
+              <td class="score">${l.score}</td>
+              <td class="${l.matchedFromNE ? '' : (l.source === 'fallback-disk' ? '' : 'miss')}">${l.matchedFromNE ? 'NE' : (l.source === 'fallback-disk' ? 'disk' : '×')}</td>
             </tr>
           `).join('')}
         </table>
       `;
-      document.getElementById('rubric-table-wrap').innerHTML = tableHtml;
+      document.getElementById('rubric-table-wrap').innerHTML = riverTable;
     });
   </script>
 </body>
