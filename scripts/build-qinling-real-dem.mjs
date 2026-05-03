@@ -99,7 +99,7 @@ function densifyForCarving(points, maxDeg = 0.012) {
   return out;
 }
 
-function carveRiverValleys(heights, gridColumns, gridRows, regionBounds, riverFeatures) {
+function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBounds, riverFeatures) {
   const lonSpan = regionBounds.east - regionBounds.west;
   const latSpan = regionBounds.north - regionBounds.south;
   // 关键：必须从 pre-carve 高度采样 riverHeight。否则密 polyline (岷江 2273 点)
@@ -114,6 +114,9 @@ function carveRiverValleys(heights, gridColumns, gridRows, regionBounds, riverFe
     const points = densifyForCarving(rawPoints);
     const cfg = RIVER_CARVE_BY_RANK[feature.rank] ?? RIVER_CARVE_BY_RANK[3];
     const r = cfg.radiusCells;
+    // riverMask paint：核心 cell mask=1.0，边缘 mask=0；让 terrain shader
+    // 在 fragment 直接画蓝色而不需要单独 ribbon mesh (用户重构方向)
+    const maskRadius = r * 0.6; // 河"宽"比 carve "谷底"更窄
 
     let featureCarved = false;
 
@@ -136,13 +139,21 @@ function carveRiverValleys(heights, gridColumns, gridRows, regionBounds, riverFe
         for (let col = minCol; col <= maxCol; col += 1) {
           const dist = Math.hypot(col - colF, row - rowF);
           if (dist > r) continue;
+          const idx = row * gridColumns + col;
           // raised-cosine falloff: 中心 1, 边缘 0
           const falloff = 0.5 * (1 + Math.cos((dist / r) * Math.PI));
           const carvedTo = riverHeight - cfg.depth * falloff;
-          const idx = row * gridColumns + col;
           if (heights[idx] > carvedTo) {
             heights[idx] = carvedTo;
             featureCarved = true;
+          }
+          // riverMask: 核心半径 (maskRadius) 内 mask=1，外圈到 r 渐淡到 0
+          if (dist <= maskRadius) {
+            riverMask[idx] = Math.max(riverMask[idx], 1.0);
+          } else {
+            const t = (dist - maskRadius) / (r - maskRadius);
+            const m = 0.5 * (1 + Math.cos(t * Math.PI));
+            if (m > riverMask[idx]) riverMask[idx] = m;
           }
         }
       }
@@ -475,8 +486,12 @@ normalized = smoothed;
 
 // 河谷雕刻——把每条已定义的河 polyline 反向压进 DEM。在 smooth 之后做，
 // 避免后续 smooth pass 把刚切的谷又抹平。再 smooth 一次会让谷壁过渡自然。
+// riverMaskPainted: carve 同步在 polyline 上画 mask = 1 (核心) → 0 (边缘),
+// 让 terrain shader 在 fragment 直接渲染水蓝色 (替代之前独立 ribbon mesh)
+const riverMaskPainted = new Float32Array(normalized.length);
 const carveStats = carveRiverValleys(
   normalized,
+  riverMaskPainted,
   columns,
   rows,
   qinlingBounds,
@@ -509,7 +524,11 @@ for (let row = 0; row < rows; row += 1) {
     const moisture = smoothstep(1 - normalizedHeight, 0.15, 0.88);
     const passPotential = clamp((1 - slope) * (0.35 + normalizedHeight * 0.8) * (1 - valley * 0.6), 0, 1);
 
-    riverMask.push(Number((valley * (1 - slope) * moisture).toFixed(4)));
+    // 取 painted (沿 polyline) 跟 procedural (湿润 valley) 的 MAX —
+    // painted 在主干河流位置 = 1.0 (蓝色实水)，procedural 给 background
+    // 湿润感 (河边林木 / 灌木带) 不至于一刀切
+    const procedural = valley * (1 - slope) * moisture;
+    riverMask.push(Number(Math.max(riverMaskPainted[index], procedural).toFixed(4)));
     passMask.push(Number((Math.pow(passPotential, 1.8) * (1 - moisture * 0.25)).toFixed(4)));
     settlementMask.push(
       Number(
