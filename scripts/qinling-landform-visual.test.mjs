@@ -75,10 +75,10 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
     verticalRange <= 24,
     `visual height range should stay readable for third-person scale, got ${verticalRange}`
   );
-  // 2026-05 高度夸张减半 (-4..18 → -2..9): 阈值同步调整 6 → 3
-  // (即仍要求 ridge 高出 关中 至少 ~30% 的总动态范围)
+  // 2026-05 高度调试历程: 22→11→16.5。阈值跟着 ×1.5 = 4.5
+  // (仍要求 ridge 高出 关中 至少 ~30% 的总动态范围)
   assert.ok(
-    qinlingRidge > guanzhong + 3,
+    qinlingRidge > guanzhong + 4.5,
     `Qinling ridge should still read as a wall above Guanzhong, got ridge=${qinlingRidge.toFixed(2)} guanzhong=${guanzhong.toFixed(2)}`
   );
   assert.ok(

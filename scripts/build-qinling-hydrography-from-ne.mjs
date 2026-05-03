@@ -31,13 +31,27 @@ function unprojectWorldToGeo({ x, y }) {
 // 切片范围
 const SLICE_BBOX = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
 
-// NE name → 我们 game 的 river id 映射
+// NE name → 我们 game 的 river id 映射 + 主流方向
+// flowDir: "lon-asc" = W→E (lon 递增), "lon-desc" = E→W, "lat-desc" = N→S, "lat-asc" = S→N
 const NAME_TO_ID = {
-  "渭河": "river-weihe",
-  "汉水": "river-hanjiang",
-  "嘉陵江": "river-jialingjiang",
-  "岷江": "river-minjiang"
+  "渭河":   { id: "river-weihe",        flowDir: "lon-asc"  },  // 黄土高原 W → 关中 E
+  "汉水":   { id: "river-hanjiang",     flowDir: "lon-asc"  },  // 汉中 W → 安康/丹江口 E
+  "嘉陵江": { id: "river-jialingjiang", flowDir: "lat-desc" },  // 凤县 N → 广元/重庆 S
+  "岷江":   { id: "river-minjiang",     flowDir: "lat-desc" }   // 松潘 N → 宜宾 S
 };
+
+// greedy join 不保证 traversal order — 子段被反向拼接时会跳点 (例如
+// "去南再回北再去南"，渲染成横穿地形的折返线)。按主流方向硬排序修。
+function sortByFlowDir(points, flowDir) {
+  const sorted = points.slice();
+  switch (flowDir) {
+    case "lon-asc":  sorted.sort((a, b) => a[0] - b[0]); break;
+    case "lon-desc": sorted.sort((a, b) => b[0] - a[0]); break;
+    case "lat-asc":  sorted.sort((a, b) => a[1] - b[1]); break;
+    case "lat-desc": sorted.sort((a, b) => b[1] - a[1]); break;
+  }
+  return sorted;
+}
 
 // Cohen-Sutherland 线段对 bbox 裁剪
 function clipSegment([x1, y1], [x2, y2], { west, south, east, north }) {
@@ -166,8 +180,8 @@ const result = {};
 let totalIn = 0;
 let totalOut = 0;
 for (const river of data.rivers) {
-  const id = NAME_TO_ID[river.name];
-  if (!id) continue;
+  const meta = NAME_TO_ID[river.name];
+  if (!meta) continue;
   if (!river.polylines || river.polylines.length === 0) continue;
   const clipped = [];
   for (const line of river.polylines) {
@@ -192,12 +206,14 @@ for (const river of data.rivers) {
   );
   // 取最长的那条作为主流；其余作为额外段（一般是支流交汇造成的小残段）
   joined.sort((a, b) => b.length - a.length);
-  const primary = joined[0];
-  result[id] = {
+  // 按主流方向排序所有点 (修 greedy join 跳序问题)
+  const primarySorted = sortByFlowDir(joined[0], meta.flowDir);
+  result[meta.id] = {
     name: river.name,
     sourceScore: river.score,
     sourceBasin: river.basin,
-    points: primary.map(([lon, lat]) => ({ lat, lon })),
+    flowDir: meta.flowDir,
+    points: primarySorted.map(([lon, lat]) => ({ lat, lon })),
     extraPolylines: joined.slice(1).map((line) => line.map(([lon, lat]) => ({ lat, lon })))
   };
 }
@@ -254,27 +270,39 @@ console.log(
 );
 if (minPrimary.length > 0) {
   // OSM 的 "岷江" 在 都江堰 dam 处停 (下游分流成 内江/外江)，
-  // 但游戏需要主干一直到南边盆地。手画 4 个 bridge 点把 汶川→都江堰 接起来，
-  // 然后保留原 hand-typed 5 个南向点 (都江堰 → 双流 → 黄龙溪)。
+  // 但游戏需要主干一直到南边盆地。手画 bridge 点沿 汶川→映秀→都江堰
+  // 真实廊道补 (避免 1 个稀疏点连出 47km 直线穿 卧龙山区)，然后保留
+  // 原 hand-typed 5 个南向点 (都江堰 → 双流 → 黄龙溪)。
   const bridgeAndDownstream = [
     { lat: 31.483, lon: 103.59 },     // 汶川县城
+    { lat: 31.42, lon: 103.535 },     // 银杏乡
+    { lat: 31.36, lon: 103.50 },      // 耿达乡 (卧龙保护区入口)
+    { lat: 31.27, lon: 103.48 },      // 沙坪
+    { lat: 31.20, lon: 103.485 },     // 草坡
+    { lat: 31.10, lon: 103.49 },      // 映秀镇北
     { lat: 31.07, lon: 103.49 },      // 映秀镇
-    { lat: 30.98333, lon: 103.62222 }, // 都江堰 (原 hand-typed 起点)
+    { lat: 31.02, lon: 103.55 },      // 紫坪铺水库
+    { lat: 30.98333, lon: 103.62222 }, // 都江堰 渠首 (原 hand-typed 起点)
     { lat: 30.92083, lon: 103.68333 },
     { lat: 30.8375, lon: 103.80556 },
     { lat: 30.75417, lon: 103.92778 },
     { lat: 30.66042, lon: 104.06528 }
   ];
-  const fullPoints = [
+  // greedy join 不保证 traversal order — OSM 子段被反向拼接时会产生
+  // out-of-order 跳点 (实测 i=2062 lat 31.365 → i=2063 lat 31.016 → i=2114
+  // lat 31.481，整段 ribbon 来回跳，渲染成横穿山脉的直线)。
+  // 岷江 N→S 单向流，fix：合并 bridge 后按 lat 降序排，强制按真实流向。
+  const merged = [
     ...minPrimary.map(([lon, lat]) => ({ lat, lon })),
     ...bridgeAndDownstream
   ];
+  merged.sort((a, b) => b.lat - a.lat); // 北→南
   result["river-minjiang"] = {
     name: "岷江",
     sourceScore: 9,
     sourceBasin: "yangtze",
-    sourceData: "openstreetmap-overpass + manual bridge across 都江堰 dam",
-    points: fullPoints,
+    sourceData: "openstreetmap-overpass + manual bridge across 都江堰 dam, sorted N→S",
+    points: merged,
     extraPolylines: minExtras.map((line) => line.map(([lon, lat]) => ({ lat, lon })))
   };
 }
