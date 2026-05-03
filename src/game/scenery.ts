@@ -119,8 +119,11 @@ export function createChunkScenery(
   treeMatrices.forEach((matrix, index) => trees.setMatrixAt(index, matrix));
   trees.instanceMatrix.needsUpdate = true;
   // 跟 cityMarkers 一样，必须 computeBoundingSphere 让 frustum culling 看
-  // instance 实际位置，否则镜头一转整 chunk 树就消失。
+  // instance 实际位置。但 InstancedMesh 的 frustum culling 在 r178 仍有
+  // 边角 bug：某些角度整组被误裁。直接关掉，每 chunk 树 ~50 棵，渲染
+  // 成本可忽略。
   trees.computeBoundingSphere();
+  trees.frustumCulled = false;
   trees.userData.sharedResources = true;
   group.add(trees);
 
