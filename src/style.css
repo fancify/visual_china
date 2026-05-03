@@ -1098,9 +1098,11 @@ canvas {
 .customization-inner {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* 不设 height: 100%——父 .customization-panel 没有显式高度，子元素
+     flex:1 0 0 会塌陷成 0（mount/avatar 卡片消失）。改成内容自撑 + max-height
+     防止画面太满。 */
+  max-height: min(80vh, 720px);
   padding: 28px 28px 22px;
-  overflow: hidden;
 }
 .customization-head {
   flex-shrink: 0;
@@ -1121,8 +1123,8 @@ canvas {
   color: rgba(241, 210, 137, 0.7);
 }
 .customization-body {
-  flex: 1 1 0;
-  min-height: 0;
+  /* 让 body 按内容高度展开，超过 max-height 时滚动。 */
+  flex: 1 1 auto;
   overflow-y: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
