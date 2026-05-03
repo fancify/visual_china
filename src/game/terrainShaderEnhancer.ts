@@ -67,8 +67,13 @@ const defaults: TerrainShaderEnhancerOptions = {
   terrainSaturationMul: 1,
   terrainLightnessMul: 1,
   rimColor: undefined as unknown as Color,
-  rimStrength: 0.32,
-  rimPower: 2.5
+  // ⚠ 默认 0：低多边形 flat-shaded terrain 上 fresnel 在大量三角面都接近 1
+  // （normal 跟视线接近垂直），rim 整体 wash-out 山地。0.32 实测整张图变灰
+  // 失彩。Rim 留给后续给 city wall / pagoda / peak mesh 这种有清晰轮廓的
+  // 物体用。terrain 这一档保持 0 直到调出更好的 mask（按高度梯度 / 法线
+  // 锐度过滤）。
+  rimStrength: 0,
+  rimPower: 3.5
 };
 
 interface ActiveEnhancer {
@@ -86,6 +91,9 @@ interface ActiveEnhancer {
     uTerrainHueShift: { value: number };
     uTerrainSaturationMul: { value: number };
     uTerrainLightnessMul: { value: number };
+    uRimColor: { value: Color };
+    uRimStrength: { value: number };
+    uRimPower: { value: number };
   };
 }
 
@@ -156,6 +164,7 @@ export function attachTerrainShaderEnhancements(
   options: Partial<TerrainShaderEnhancerOptions> & {
     heightFogColor: Color;
     atmosphericFarColor: Color;
+    rimColor: Color;
   }
 ): void {
   const config: TerrainShaderEnhancerOptions = { ...defaults, ...options };
@@ -174,17 +183,22 @@ export function attachTerrainShaderEnhancements(
       uAtmosphericMaxStrength: { value: config.atmosphericMaxStrength },
       uTerrainHueShift: { value: config.terrainHueShift },
       uTerrainSaturationMul: { value: config.terrainSaturationMul },
-      uTerrainLightnessMul: { value: config.terrainLightnessMul }
+      uTerrainLightnessMul: { value: config.terrainLightnessMul },
+      uRimColor: { value: config.rimColor.clone() },
+      uRimStrength: { value: config.rimStrength },
+      uRimPower: { value: config.rimPower }
     };
     Object.assign(shader.uniforms, uniforms);
     enhancers.set(material, { uniforms });
 
-    // 把 vWorldPos 传到 fragment shader
+    // 把 vWorldPos + view-space normal 传到 fragment shader（rim 用 normal）。
     shader.vertexShader = shader.vertexShader.replace(
       "#include <common>",
       /* glsl */ `
         #include <common>
         varying vec3 vWorldPosition;
+        varying vec3 vViewNormal;
+        varying vec3 vViewPosition;
       `
     );
     shader.vertexShader = shader.vertexShader.replace(
@@ -192,6 +206,8 @@ export function attachTerrainShaderEnhancements(
       /* glsl */ `
         #include <fog_vertex>
         vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vViewNormal = normalize(normalMatrix * normal);
+        vViewPosition = (modelViewMatrix * vec4(transformed, 1.0)).xyz;
       `
     );
 
@@ -200,6 +216,8 @@ export function attachTerrainShaderEnhancements(
       /* glsl */ `
         #include <common>
         varying vec3 vWorldPosition;
+        varying vec3 vViewNormal;
+        varying vec3 vViewPosition;
         uniform float uHeightFogStart;
         uniform float uHeightFogEnd;
         uniform vec3 uHeightFogColor;
@@ -213,6 +231,9 @@ export function attachTerrainShaderEnhancements(
         uniform float uTerrainHueShift;
         uniform float uTerrainSaturationMul;
         uniform float uTerrainLightnessMul;
+        uniform vec3 uRimColor;
+        uniform float uRimStrength;
+        uniform float uRimPower;
         ${NOISE_GLSL}
         ${HSL_GLSL}
       `
@@ -264,6 +285,16 @@ export function attachTerrainShaderEnhancements(
           uAtmosphericFarColor,
           atmosphericT * uAtmosphericMaxStrength
         );
+
+        // 5. Rim light（边缘 Fresnel）：山脊镶金边——dot(view, normal) 接近 0
+        // 时（normal 几乎垂直于视线，正是看到的山棱轮廓）rim 强度最大。
+        // 配合 sun 色 + dawn/dusk 暖色，黄昏时山脊会被金光描边。
+        vec3 viewDir = normalize(-vViewPosition);
+        float rimFresnel = pow(
+          1.0 - clamp(dot(normalize(vViewNormal), viewDir), 0.0, 1.0),
+          uRimPower
+        );
+        outgoingLight += uRimColor * (rimFresnel * uRimStrength);
 
         #include <output_fragment>
       `
@@ -322,4 +353,19 @@ export function updateTerrainShaderHsl(
   enhancer.uniforms.uTerrainHueShift.value = hueShift;
   enhancer.uniforms.uTerrainSaturationMul.value = saturationMul;
   enhancer.uniforms.uTerrainLightnessMul.value = lightnessMul;
+}
+
+/**
+ * 每帧调用：让 rim 颜色随 sun/dawn-dusk 一起变。runtime 直接拿 visuals.sunColor
+ * 推过来——黄昏时 sunColor 已经混过 twilight，rim 自动镶金。
+ */
+export function updateTerrainShaderRim(
+  material: MeshPhongMaterial,
+  rimColor: Color
+): void {
+  const enhancer = enhancers.get(material);
+  if (!enhancer) {
+    return;
+  }
+  enhancer.uniforms.uRimColor.value.copy(rimColor);
 }

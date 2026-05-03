@@ -36,11 +36,6 @@ import {
   Vector3,
   WebGLRenderer
 } from "three";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-
 import {
   knowledgeFragments as defaultKnowledgeFragments,
   type KnowledgeFragment
@@ -202,7 +197,8 @@ import {
   attachTerrainShaderEnhancements,
   updateTerrainShaderAtmosphericFar,
   updateTerrainShaderHeightFog,
-  updateTerrainShaderHsl
+  updateTerrainShaderHsl,
+  updateTerrainShaderRim
 } from "./game/terrainShaderEnhancer";
 import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
 
@@ -384,23 +380,13 @@ const camera = new PerspectiveCamera(
   800
 );
 
-// EffectComposer + UnrealBloomPass: 给 高亮 像素（雪冠 / 太阳盘 / 水面反光 /
-// dawn-dusk 火烧云）加柔和辉光。strength/radius 调到保守值——浏览器原型上
-// ~1ms 成本，保住 120fps 上限。threshold 0.78 让中调细节不被吃掉。
-const bloomComposer = new EffectComposer(renderer);
-bloomComposer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
-bloomComposer.setSize(window.innerWidth, window.innerHeight);
-const bloomRenderPass = new RenderPass(scene, camera);
-bloomComposer.addPass(bloomRenderPass);
-const bloomPass = new UnrealBloomPass(
-  new Vector2(window.innerWidth, window.innerHeight),
-  0.42,
-  0.55,
-  0.78
-);
-bloomComposer.addPass(bloomPass);
-const bloomOutput = new OutputPass();
-bloomComposer.addPass(bloomOutput);
+// Bloom 试做（commit 8563f63 加了 EffectComposer + UnrealBloomPass + OutputPass）
+// 实测 sRGB / 线性色空间在 RenderPass → BloomPass → OutputPass 链路上有错配，
+// 不论 OutputPass 在不在、bloom strength 多低，整画面 midtone 都被推灰发白
+// （山地失彩、水面过曝）。Three.js EffectComposer 在 r163+ 改过 RT 编码，
+// 跟 outputColorSpace 的交互需要更精细的调试。先回退到 direct render，bloom
+// 留到下一次连同色彩分级 LUT 一起做（那时统一定 outputColorSpace + 全链路
+// linear pipeline 一次性解决）。
 
 const ambientLight = new AmbientLight(0xf2dfba, 1.65);
 scene.add(ambientLight);
@@ -462,7 +448,9 @@ attachTerrainShaderEnhancements(terrainMaterial, {
   heightFogColor: new Color(0xb6c4be),
   // 远山初始色：千里江山图 石青调（#5f8ba6 偏冷）。runtime 每帧根据
   // environmentVisuals.skyZenithColor 改写它，让远山色随时间/天气一致。
-  atmosphericFarColor: new Color(0x5f8ba6)
+  atmosphericFarColor: new Color(0x5f8ba6),
+  // Rim 初始色：暖金（#ffe9b9）匹配 spring sun。runtime 每帧推 sunColor。
+  rimColor: new Color(0xffe9b9)
 });
 const terrain = new Mesh(terrainGeometry, terrainMaterial);
 scene.add(terrain);
@@ -3614,11 +3602,6 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  // composer 必须跟 renderer 同步——否则 bloom 内部 framebuffer 还是旧尺寸，
-  // resize 后会出现拉伸或 viewport 错位。
-  bloomComposer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
-  bloomComposer.setSize(window.innerWidth, window.innerHeight);
-  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
 hud.closeJournalButton.addEventListener("click", () => {
@@ -3911,6 +3894,8 @@ function update(deltaSeconds: number): void {
     visuals.terrainSaturationMul,
     visuals.terrainLightnessMul
   );
+  // Rim 颜色跟 sunColor 走（黄昏自动镶金、白天偏冷白、夜里近黑）。
+  updateTerrainShaderRim(terrainMaterial, visuals.sunColor);
   terrainChunkMeshes.forEach((chunk) => {
     if (!Array.isArray(chunk.mesh.material)) {
       updateTerrainShaderHeightFog(
@@ -3926,6 +3911,10 @@ function update(deltaSeconds: number): void {
         visuals.terrainHueShift,
         visuals.terrainSaturationMul,
         visuals.terrainLightnessMul
+      );
+      updateTerrainShaderRim(
+        chunk.mesh.material as MeshPhongMaterial,
+        visuals.sunColor
       );
     }
   });
@@ -4245,9 +4234,7 @@ function frame(): void {
     hudRefreshTimer = 0;
     hudDirty = false;
   }
-  // 走 EffectComposer 而不是 renderer.render：让 UnrealBloomPass 接管最终
-  // 输出，雪冠/水面/太阳盘/朝霞这些高亮区会带柔和辉光。普通像素几乎无成本。
-  bloomComposer.render();
+  renderer.render(scene, camera);
   perfStats.endFrame(renderer);
   requestAnimationFrame(frame);
 }
