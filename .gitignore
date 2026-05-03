@@ -11,6 +11,9 @@ data/etopo/
 # Raw third-party hydrography downloads are reproducible source data.
 data/hydrography/raw/
 
+# Natural Earth 10m vectors — downloaded on demand by build-china-major-* scripts.
+data/natural-earth/
+
 .DS_Store
 *.log
 .env

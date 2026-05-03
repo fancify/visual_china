@@ -1,11 +1,14 @@
-export const qinlingModernHydrography = {
+import { qinlingNeRivers } from "./data/qinlingNeRivers.js";
+
+const baseQinlingModernHydrography = {
   schema: "visual-china.region-hydrography.v1",
   regionId: "qinling",
   eraId: "modern",
   basePolicy: "modern-hydrography",
   notes: [
     "First curated modern hydrography skeleton for Qinling Atlas.",
-    "Coordinates use current project world coordinates and must be replaced or corrected by imported vector sources in later pipeline steps."
+    "主要河流 (渭河/汉水/嘉陵江) 的坐标由 Natural Earth 10m 真实矢量替换 — 跑 scripts/build-qinling-hydrography-from-ne.mjs 重新生成 src/game/data/qinlingNeRivers.js。",
+    "岷江、所有小支流 (褒水/斜水/外江/内江) 仍为 hand-typed (NE 10m 在切片范围内没收到这些)。"
   ],
   features: [
     {
@@ -178,4 +181,21 @@ export const qinlingModernHydrography = {
       }
     }
   ]
+};
+
+// 用 NE 真实矢量替换 hand-typed 控制点（仅替换 geometry.points，
+// 保留 displayName / aliases / relations / source 等手工 metadata）。
+const qinlingModernHydrographyFeatures = baseQinlingModernHydrography.features.map((feature) => {
+  const ne = qinlingNeRivers[feature.id];
+  if (!ne || !ne.points || ne.points.length === 0) return feature;
+  return {
+    ...feature,
+    geometry: { ...feature.geometry, points: ne.points },
+    source: { name: "natural-earth-10m", confidence: "high", verification: "external-vector" }
+  };
+});
+
+export const qinlingModernHydrography = {
+  ...baseQinlingModernHydrography,
+  features: qinlingModernHydrographyFeatures
 };
