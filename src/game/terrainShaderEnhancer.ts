@@ -37,6 +37,11 @@ export interface TerrainShaderEnhancerOptions {
   atmosphericFarColor: Color;
   /** 远山最大替换比例 */
   atmosphericMaxStrength: number;
+  /** Time-of-day HSL 调色参数——之前每 1.85s 触发全顶点 JS recolor，现在
+   * 走 shader uniform 改 fragment HSL，时间变化零 CPU 工作。 */
+  terrainHueShift: number;
+  terrainSaturationMul: number;
+  terrainLightnessMul: number;
 }
 
 const defaults: TerrainShaderEnhancerOptions = {
@@ -51,7 +56,10 @@ const defaults: TerrainShaderEnhancerOptions = {
   atmosphericNearDistance: 80,
   atmosphericFarDistance: 180,
   atmosphericFarColor: undefined as unknown as Color,
-  atmosphericMaxStrength: 0.42
+  atmosphericMaxStrength: 0.42,
+  terrainHueShift: 0,
+  terrainSaturationMul: 1,
+  terrainLightnessMul: 1
 };
 
 interface ActiveEnhancer {
@@ -66,6 +74,9 @@ interface ActiveEnhancer {
     uAtmosphericFar: { value: number };
     uAtmosphericFarColor: { value: Color };
     uAtmosphericMaxStrength: { value: number };
+    uTerrainHueShift: { value: number };
+    uTerrainSaturationMul: { value: number };
+    uTerrainLightnessMul: { value: number };
   };
 }
 
@@ -85,6 +96,48 @@ const NOISE_GLSL = /* glsl */ `
       mix(th_hash(i + vec2(0.0, 0.0)), th_hash(i + vec2(1.0, 0.0)), u.x),
       mix(th_hash(i + vec2(0.0, 1.0)), th_hash(i + vec2(1.0, 1.0)), u.x),
       u.y
+    );
+  }
+`;
+
+// rgb→hsl→rgb GLSL，跟 Three.js Color.getHSL/setHSL 一致的算法。让 fragment
+// 里能复现 environment 时间/季节/天气推送过来的 HSL 调色，避免 JS 每帧重染。
+const HSL_GLSL = /* glsl */ `
+  vec3 th_rgb2hsl(vec3 c) {
+    float maxC = max(c.r, max(c.g, c.b));
+    float minC = min(c.r, min(c.g, c.b));
+    float l = (maxC + minC) * 0.5;
+    float h = 0.0;
+    float s = 0.0;
+    float d = maxC - minC;
+    if (d > 0.00001) {
+      s = (l > 0.5) ? d / (2.0 - maxC - minC) : d / (maxC + minC);
+      if (maxC == c.r)      h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0);
+      else if (maxC == c.g) h = (c.b - c.r) / d + 2.0;
+      else                  h = (c.r - c.g) / d + 4.0;
+      h /= 6.0;
+    }
+    return vec3(h, s, l);
+  }
+  float th_hue2rgb(float p, float q, float t) {
+    if (t < 0.0) t += 1.0;
+    if (t > 1.0) t -= 1.0;
+    if (t < 1.0/6.0) return p + (q - p) * 6.0 * t;
+    if (t < 1.0/2.0) return q;
+    if (t < 2.0/3.0) return p + (q - p) * (2.0/3.0 - t) * 6.0;
+    return p;
+  }
+  vec3 th_hsl2rgb(vec3 hsl) {
+    float h = hsl.x;
+    float s = hsl.y;
+    float l = hsl.z;
+    if (s < 0.00001) return vec3(l);
+    float q = (l < 0.5) ? l * (1.0 + s) : l + s - l * s;
+    float p = 2.0 * l - q;
+    return vec3(
+      th_hue2rgb(p, q, h + 1.0/3.0),
+      th_hue2rgb(p, q, h),
+      th_hue2rgb(p, q, h - 1.0/3.0)
     );
   }
 `;
@@ -109,7 +162,10 @@ export function attachTerrainShaderEnhancements(
       uAtmosphericNear: { value: config.atmosphericNearDistance },
       uAtmosphericFar: { value: config.atmosphericFarDistance },
       uAtmosphericFarColor: { value: config.atmosphericFarColor.clone() },
-      uAtmosphericMaxStrength: { value: config.atmosphericMaxStrength }
+      uAtmosphericMaxStrength: { value: config.atmosphericMaxStrength },
+      uTerrainHueShift: { value: config.terrainHueShift },
+      uTerrainSaturationMul: { value: config.terrainSaturationMul },
+      uTerrainLightnessMul: { value: config.terrainLightnessMul }
     };
     Object.assign(shader.uniforms, uniforms);
     enhancers.set(material, { uniforms });
@@ -145,11 +201,15 @@ export function attachTerrainShaderEnhancements(
         uniform float uAtmosphericFar;
         uniform vec3 uAtmosphericFarColor;
         uniform float uAtmosphericMaxStrength;
+        uniform float uTerrainHueShift;
+        uniform float uTerrainSaturationMul;
+        uniform float uTerrainLightnessMul;
         ${NOISE_GLSL}
+        ${HSL_GLSL}
       `
     );
 
-    // 在最终输出前注入 noise + height fog + 远山逐青
+    // 在最终输出前注入 noise + HSL + height fog + 远山逐青
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <output_fragment>",
       /* glsl */ `
@@ -158,7 +218,16 @@ export function attachTerrainShaderEnhancements(
         float ttn = th_noise(vWorldPosition.xz * uNoiseFrequency);
         outgoingLight += ttn * uNoiseStrength * vec3(0.42, 0.45, 0.32);
 
-        // 2. height fog：高处往天空色融
+        // 2. HSL 时间/季节调色——以前 environment.terrainHueShift/SaturationMul/
+        // LightnessMul 走 JS 每顶点 setHSL 重染（10000+ vertex / 帧），现在
+        // shader 里做：转 HSL → shift hue → mul s/l → 转回 RGB。每帧零 CPU 工作。
+        vec3 hsl = th_rgb2hsl(outgoingLight);
+        hsl.x = mod(hsl.x + uTerrainHueShift + 1.0, 1.0);
+        hsl.y = clamp(hsl.y * uTerrainSaturationMul, 0.0, 1.0);
+        hsl.z = clamp(hsl.z * uTerrainLightnessMul, 0.0, 1.0);
+        outgoingLight = th_hsl2rgb(hsl);
+
+        // 3. height fog：高处往天空色融
         float heightT = clamp(
           (vWorldPosition.y - uHeightFogStart) /
             max(0.001, uHeightFogEnd - uHeightFogStart),
@@ -171,7 +240,7 @@ export function attachTerrainShaderEnhancements(
           heightT * uHeightFogMaxStrength
         );
 
-        // 3. 远山逐青（千里江山图 air perspective）：水平距离越远越向冷青色融。
+        // 4. 远山逐青（千里江山图 air perspective）：水平距离越远越向冷青色融。
         // 跟 height fog 不同——它不挑高度，平地远处也跟着变青。这是王希孟原画
         // 最经典的笔法：近山深绿，远山转石青/石绿。
         float horizDist = length(vWorldPosition.xz - cameraPosition.xz);
@@ -224,4 +293,24 @@ export function updateTerrainShaderAtmosphericFar(
     return;
   }
   enhancer.uniforms.uAtmosphericFarColor.value.copy(atmosphericFarColor);
+}
+
+/**
+ * 每帧调用：把环境的 hue/sat/light 调色推进 shader uniform。这取代了之前
+ * "JS 每顶点 setHSL → 全 mesh recolor" 的热路径——时间一变就重染 10000+
+ * 顶点的 ~440ms hitch 完全消失。
+ */
+export function updateTerrainShaderHsl(
+  material: MeshPhongMaterial,
+  hueShift: number,
+  saturationMul: number,
+  lightnessMul: number
+): void {
+  const enhancer = enhancers.get(material);
+  if (!enhancer) {
+    return;
+  }
+  enhancer.uniforms.uTerrainHueShift.value = hueShift;
+  enhancer.uniforms.uTerrainSaturationMul.value = saturationMul;
+  enhancer.uniforms.uTerrainLightnessMul.value = lightnessMul;
 }

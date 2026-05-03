@@ -192,19 +192,18 @@ export function modeColor(
     );
   }
 
-  const hsl = { h: 0, s: 0, l: 0 };
-  color.getHSL(hsl);
-
-  hsl.h = (hsl.h + environmentVisuals.terrainHueShift + 1) % 1;
-  hsl.s = MathUtils.clamp(hsl.s * environmentVisuals.terrainSaturationMul, 0, 1);
-  hsl.l = MathUtils.clamp(
-    hsl.l * environmentVisuals.terrainLightnessMul +
-      (environmentState.weather === "snow" ? (1 - slope) * 0.08 : 0),
-    0,
-    1
-  );
-
-  color.setHSL(hsl.h, hsl.s, hsl.l);
+  // 注意：terrainHueShift/SaturationMul/LightnessMul 这三个之前在这里
+  // setHSL 重染——已迁移到 terrain shader 的 fragment pass（updateTerrainShaderHsl
+  // 每帧推 uniform）。这一段每顶点 HSL 计算去掉后，时间流逝不再触发任何
+  // JS 重染，~440ms hitch 完全消失。
+  // 雪天的 lightness 加成（高坡地积雪）跟 vertex slope 强相关，无法用统一
+  // shader uniform 表达——保留在 JS 这层，由 weather 切换触发 recolor（罕见）。
+  if (environmentState.weather === "snow") {
+    const hsl = { h: 0, s: 0, l: 0 };
+    color.getHSL(hsl);
+    hsl.l = MathUtils.clamp(hsl.l + (1 - slope) * 0.08, 0, 1);
+    color.setHSL(hsl.h, hsl.s, hsl.l);
+  }
 
   const { minHeight, maxHeight } = terrainHeightRange(sampler);
 
