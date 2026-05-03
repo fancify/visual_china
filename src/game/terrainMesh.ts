@@ -61,7 +61,9 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
     heightFogColor: new Color(0xb6c4be),
     // 跟主 terrainMaterial 同款远山初始色（千里江山图 石青）。每帧 main loop
     // 会 updateTerrainShaderAtmosphericFar 把它跟天色 mix 后写回。
-    atmosphericFarColor: new Color(0x5f8ba6)
+    atmosphericFarColor: new Color(0x5f8ba6),
+    // Rim 初始色：暖金（runtime 推 sunColor）。
+    rimColor: new Color(0xffe9b9)
   });
   const mesh = new Mesh(geometry, material);
 
