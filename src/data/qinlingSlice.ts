@@ -51,18 +51,6 @@ export const modeMeta: Record<ViewMode, ModeMeta> = {
 
 export const landmarks: Landmark[] = [
   {
-    name: "长安意象",
-    kind: "city",
-    position: new Vector2(88.04, -69.12),
-    description: "关中腹地的组织中心。"
-  },
-  {
-    name: "渭河平原",
-    kind: "plain",
-    position: new Vector2(26, -80),
-    description: "开阔、连续、适合高密度农耕与交通。"
-  },
-  {
     name: "陈仓道",
     kind: "pass",
     subKind: "gorge-pass",
@@ -74,19 +62,6 @@ export const landmarks: Landmark[] = [
     kind: "mountain",
     position: new Vector2(6, -20),
     description: "秦岭横墙在此最有压迫感。"
-  },
-  {
-    name: "褒斜谷意象",
-    kind: "pass",
-    subKind: "gorge-pass",
-    position: new Vector2(34, -28),
-    description: "真正重要的不是直线距离，而是能不能过山。"
-  },
-  {
-    name: "汉中盆地",
-    kind: "city",
-    position: new Vector2(26, -8),
-    description: "不是终点，而是南北转换的门轴。"
   },
   {
     name: "米仓山",
@@ -107,12 +82,6 @@ export const landmarks: Landmark[] = [
     subKind: "gorge-pass",
     position: new Vector2(-18, 31),
     description: "汉中南下入蜀的关键路线，第二次把行军面压缩成少数节点。"
-  },
-  {
-    name: "成都平原",
-    kind: "city",
-    position: new Vector2(-44, 104),
-    description: "进入盆地后，世界忽然变得舒展。"
   }
 ];
 

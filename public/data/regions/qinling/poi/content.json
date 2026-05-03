@@ -79,24 +79,6 @@
   ],
   "landmarks": [
     {
-      "name": "长安意象",
-      "kind": "city",
-      "position": {
-        "lat": 34.34,
-        "lon": 108.94011
-      },
-      "description": "关中腹地的组织中心。"
-    },
-    {
-      "name": "渭河平原",
-      "kind": "plain",
-      "position": {
-        "lat": 34.56667,
-        "lon": 107.04444
-      },
-      "description": "开阔、连续、适合高密度农耕与交通。"
-    },
-    {
       "name": "陈仓道",
       "kind": "pass",
       "subKind": "gorge-pass",
@@ -114,25 +96,6 @@
         "lon": 106.43333
       },
       "description": "秦岭横墙在此最有压迫感。"
-    },
-    {
-      "name": "褒斜谷意象",
-      "kind": "pass",
-      "subKind": "gorge-pass",
-      "position": {
-        "lat": 33.48333,
-        "lon": 107.28889
-      },
-      "description": "真正重要的不是直线距离，而是能不能过山。"
-    },
-    {
-      "name": "汉中盆地",
-      "kind": "city",
-      "position": {
-        "lat": 33.06667,
-        "lon": 107.04444
-      },
-      "description": "不是终点，而是南北转换的门轴。"
     },
     {
       "name": "米仓山",
@@ -162,15 +125,6 @@
         "lon": 105.7
       },
       "description": "汉中南下入蜀的关键路线，第二次把行军面压缩成少数节点。"
-    },
-    {
-      "name": "成都平原",
-      "kind": "city",
-      "position": {
-        "lat": 30.73333,
-        "lon": 104.90556
-      },
-      "description": "进入盆地后，世界忽然变得舒展。"
     }
   ],
   "fragments": [
