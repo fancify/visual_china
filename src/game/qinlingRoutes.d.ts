@@ -8,7 +8,11 @@ export interface QinlingRoute {
   name: string;
   source?: {
     name?: string;
-    verification?: "unverified" | "external-vector" | "verified";
+    verification?:
+      | "unverified"
+      | "external-vector"
+      | "verified"
+      | "historical-references";
   };
   label?: string;
   description: string;

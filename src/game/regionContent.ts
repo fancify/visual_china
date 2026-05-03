@@ -19,6 +19,7 @@ interface RawPoint2 {
 interface RawLandmark {
   name: string;
   kind: LandmarkKind;
+  subKind?: string;
   position: RawPoint2;
   description: string;
 }
@@ -128,6 +129,8 @@ function validateLandmark(raw: unknown, index: number): Landmark {
   return {
     name: asString(raw.name, `landmarks[${index}].name`),
     kind: asString(raw.kind, `landmarks[${index}].kind`) as LandmarkKind,
+    subKind:
+      raw.subKind === undefined ? undefined : asString(raw.subKind, `landmarks[${index}].subKind`),
     position: validatePoint2(raw.position, `landmarks[${index}].position`),
     description: asString(raw.description, `landmarks[${index}].description`)
   };

@@ -1,82 +1,72 @@
+import { qinlingRouteAnchors } from "./data/qinlingRouteAnchors.js";
+
+const historicalRouteSource = Object.freeze({
+  name: "historical-anchor-points",
+  verification: "historical-references"
+});
+
+function isHistoricalRouteVisible(route) {
+  return (
+    route.source?.verification === "external-vector" ||
+    route.source?.verification === "verified" ||
+    route.source?.verification === "historical-references"
+  );
+}
+
 export const qinlingRoutes = [
   {
     id: "chencang-road",
     name: "陈仓道",
-    source: { name: "manual-route-draft", verification: "unverified" },
+    source: historicalRouteSource,
     label: "陈仓道",
-    description: "从关中西侧折入秦岭，绕开主脊正面压力的西线通道。",
-    labelPoint: { x: 17, y: -44 },
-    points: [
-      { x: 29.45, y: -70.08 },
-      { x: 23.89, y: -60.48 },
-      { x: 16.36, y: -43.2 },
-      { x: -3.27, y: -20.64 },
-      { x: 14.07, y: -12.48 },
-      { x: 25.53, y: -8.16 }
-    ]
+    description: "从宝鸡、凤县沿嘉陵江上游南下，是绕开秦岭正面的西线主干。",
+    labelPoint: qinlingRouteAnchors["chencang-road"].labelPoint,
+    points: qinlingRouteAnchors["chencang-road"].points
   },
   {
     id: "baoxie-road",
     name: "褒斜道",
-    source: { name: "manual-route-draft", verification: "unverified" },
+    source: historicalRouteSource,
     label: "褒斜道",
-    description: "沿褒斜谷穿越秦岭，是关中与汉中之间最直观的谷道意象。",
-    labelPoint: { x: 43, y: -39 },
-    points: [
-      { x: 58, y: -70 },
-      { x: 48, y: -56 },
-      { x: 40, y: -42 },
-      { x: 34, y: -28 },
-      { x: 30, y: -17 },
-      { x: 26, y: -8 }
-    ]
+    description: "从斜谷北口绕太白西侧入褒水，是关中直抵汉中的经典谷道。",
+    labelPoint: qinlingRouteAnchors["baoxie-road"].labelPoint,
+    points: qinlingRouteAnchors["baoxie-road"].points
   },
   {
     id: "tangluo-road",
     name: "傥骆道",
-    source: { name: "manual-route-draft", verification: "unverified" },
+    source: historicalRouteSource,
     label: "傥骆道",
-    description: "从关中东南侧入山，路线更陡更碎，体现山地机动的代价。",
-    labelPoint: { x: 58, y: -36 },
-    points: [
-      { x: 76, y: -68 },
-      { x: 66, y: -52 },
-      { x: 56, y: -36 },
-      { x: 46, y: -22 },
-      { x: 36, y: -12 },
-      { x: 26, y: -8 }
-    ]
+    description: "由周至骆谷越黑河源、十八盘南下洋县，路陡而碎，机动性强但代价高。",
+    labelPoint: qinlingRouteAnchors["tangluo-road"].labelPoint,
+    points: qinlingRouteAnchors["tangluo-road"].points
   },
   {
     id: "ziwu-road",
     name: "子午道",
-    source: { name: "manual-route-draft", verification: "unverified" },
+    source: historicalRouteSource,
     label: "子午道",
-    description: "从长安方向南入秦岭，直线诱人，但山地风险和补给压力更高。",
-    labelPoint: { x: 66, y: -36 },
-    points: [
-      { x: 88, y: -69 },
-      { x: 78, y: -53 },
-      { x: 66, y: -38 },
-      { x: 54, y: -24 },
-      { x: 40, y: -13 },
-      { x: 26, y: -8 }
-    ]
+    description: "从长安子午谷南入秦岭，直线最短但补给最艰，三国时多次成为奇袭通道。",
+    labelPoint: qinlingRouteAnchors["ziwu-road"].labelPoint,
+    points: qinlingRouteAnchors["ziwu-road"].points
   },
   {
-    id: "jianmen-shu-road",
-    name: "剑门蜀道",
-    source: { name: "manual-route-draft", verification: "unverified" },
-    label: "剑门蜀道",
-    description: "从汉中南下，经广元、剑门关进入蜀地，是第二次山地收束的关键通道。",
-    labelPoint: { x: -18, y: 31 },
-    points: [
-      { x: 25.53, y: -8.16 },
-      { x: -13.42, y: 22.08 },
-      { x: -23.24, y: 33.6 },
-      { x: -8.18, y: 64.32 },
-      { x: -71.35, y: 107.04 }
-    ]
+    id: "jinniu-road",
+    name: "金牛道",
+    source: historicalRouteSource,
+    label: "金牛道",
+    description: "自汉中经宁强、昭化、剑门关入成都，是连接汉中与蜀地腹心的主干蜀道。",
+    labelPoint: qinlingRouteAnchors["jinniu-road"].labelPoint,
+    points: qinlingRouteAnchors["jinniu-road"].points
+  },
+  {
+    id: "micang-road",
+    name: "米仓道",
+    source: historicalRouteSource,
+    label: "米仓道",
+    description: "由汉中南下穿米仓山抵南江、巴中，是越大巴山进入川东北的要道。",
+    labelPoint: qinlingRouteAnchors["micang-road"].labelPoint,
+    points: qinlingRouteAnchors["micang-road"].points
   }
 ];
 
@@ -134,10 +124,7 @@ export function routeAffinityAt(point, maxDistance = 11) {
   const searchDistance = typeof maxDistance === "number" ? maxDistance : 11;
   const routes = options.includeUnverifiedRoutes
     ? qinlingRoutes
-    : qinlingRoutes.filter((route) =>
-      route.source?.verification === "external-vector" ||
-      route.source?.verification === "verified"
-    );
+    : qinlingRoutes.filter((route) => isHistoricalRouteVisible(route));
   let nearestRoute = null;
   let nearestDistance = Number.POSITIVE_INFINITY;
 

@@ -99,6 +99,7 @@
     {
       "name": "陈仓道",
       "kind": "pass",
+      "subKind": "gorge-pass",
       "position": {
         "lat": 34.16,
         "lon": 106.97997
@@ -117,6 +118,7 @@
     {
       "name": "褒斜谷意象",
       "kind": "pass",
+      "subKind": "gorge-pass",
       "position": {
         "lat": 33.48333,
         "lon": 107.28889
@@ -144,6 +146,7 @@
     {
       "name": "剑门关",
       "kind": "pass",
+      "subKind": "major-pass",
       "position": {
         "lat": 32.2,
         "lon": 105.53989
@@ -153,6 +156,7 @@
     {
       "name": "剑门蜀道",
       "kind": "pass",
+      "subKind": "gorge-pass",
       "position": {
         "lat": 32.25417,
         "lon": 105.7

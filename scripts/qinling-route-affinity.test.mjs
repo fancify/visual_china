@@ -3,39 +3,40 @@ import test from "node:test";
 
 import { qinlingRoutes, routeAffinityAt } from "../src/game/qinlingRoutes.js";
 
-// 新 mapOrientation 契约：北 = -Z（即 .y 字段为负值）。
-// 路径数据已翻转：原 y=+28 改为 y=-28。
-test("Qinling route affinity does not use unverified hand-drawn routes by default", () => {
-  const influence = routeAffinityAt({ x: 34, y: -28 });
-
-  assert.equal(influence.affinity, 0);
-  assert.equal(influence.nearestRoute, null);
-});
-
-test("Qinling draft route affinity remains available for QA when explicitly requested", () => {
-  const influence = routeAffinityAt({ x: 34, y: -28 }, 11, {
-    includeUnverifiedRoutes: true
-  });
+test("Qinling route affinity uses historical-reference routes by default", () => {
+  const influence = routeAffinityAt({ x: 15.23, y: -36 });
 
   assert.ok(influence.affinity > 0.7);
   assert.equal(influence.nearestRoute?.id, "baoxie-road");
 });
 
+test("Qinling historical routes stay available when explicitly including unverified routes", () => {
+  const influence = routeAffinityAt({ x: -24.65, y: 27.84 }, 11, {
+    includeUnverifiedRoutes: true
+  });
+
+  assert.ok(influence.affinity > 0.7);
+  assert.equal(influence.nearestRoute?.id, "jinniu-road");
+});
+
 test("Qinling route affinity is low away from the Guanzhong-Hanzhong crossings", () => {
-  // 这个点远离任何古道（西南偏远区域），新约定下 z 改正——但这点本来就远，OK。
-  const influence = routeAffinityAt({ x: -62, y: 42 });
+  const influence = routeAffinityAt({ x: 78, y: 78 });
 
   assert.ok(influence.affinity < 0.2);
 });
 
-test("named route labels include Chencang Road and Jianmen Shu Road", () => {
+test("named route labels include Chencang, Jinniu, and Micang roads", () => {
   const chencang = qinlingRoutes.find((route) => route.id === "chencang-road");
-  const jianmen = qinlingRoutes.find((route) => route.id === "jianmen-shu-road");
+  const jinniu = qinlingRoutes.find((route) => route.id === "jinniu-road");
+  const micang = qinlingRoutes.find((route) => route.id === "micang-road");
 
   assert.ok(chencang, "陈仓道 must be a named route");
-  assert.ok(jianmen, "剑门蜀道 must be a named route south of Hanzhong");
+  assert.ok(jinniu, "金牛道 must be a named route south of Hanzhong");
+  assert.ok(micang, "米仓道 must be a named route toward Bazhong");
   assert.equal(chencang.label, "陈仓道");
-  assert.equal(jianmen.label, "剑门蜀道");
+  assert.equal(jinniu.label, "金牛道");
+  assert.equal(micang.label, "米仓道");
   assert.ok(chencang.labelPoint, "陈仓道 needs a visible map label anchor");
-  assert.ok(jianmen.labelPoint, "剑门蜀道 needs a visible map label anchor");
+  assert.ok(jinniu.labelPoint, "金牛道 needs a visible map label anchor");
+  assert.ok(micang.labelPoint, "米仓道 needs a visible map label anchor");
 });

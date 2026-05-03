@@ -288,6 +288,9 @@ async function validatePoiManifest(filePath) {
 
     asString(landmark.name, `landmarks[${index}].name`);
     asString(landmark.kind, `landmarks[${index}].kind`);
+    if (landmark.subKind !== undefined) {
+      asString(landmark.subKind, `landmarks[${index}].subKind`);
+    }
     validatePoint2(landmark.position, `landmarks[${index}].position`);
     asString(landmark.description, `landmarks[${index}].description`);
   });
