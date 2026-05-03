@@ -1912,50 +1912,9 @@ function rebuildWaterSystemVisuals(): void {
     Math.abs(p.y) < SLICE_HALF_D - INLAND_BORDER_MARGIN;
 
   rivers.forEach((river) => {
-    const points = featureWorldPoints(river);
-    const waterStyle = waterVisualStyle(river);
-    const ribbonColor = river.displayPriority >= 9 ? 0x5cabc6 : 0x6fb6c5;
-
-    // 端点 fade：source / sink 在 slice 内陆 → fade 到透明
-    const startInland = points.length >= 2 && isInlandPoint(points[0]);
-    const endInland = points.length >= 2 && isInlandPoint(points[points.length - 1]);
-
-    // 单层简单 ribbon：MeshBasic（不再 ShaderMaterial / 无 Fresnel /
-    // 无涟漪 / 无中间反光白条）。polygonOffset 配合低 yOffset 让 ribbon
-    // 看起来贴在地形上而不是飘在空中——polygonOffset 推 depth、yOffset
-    // 控视觉层级。
-    // 干流（displayPriority >= 9）密化 0.9 单元贴地；支流用 1.5，
-    // build-time 节省约 40% 顶点。
-    const ribbon = createWaterSurfaceRibbon(points, {
-      width: waterStyle.ribbonWidth,
-      yOffset: waterStyle.ribbonYOffset,
-      color: ribbonColor,
-      opacity: waterStyle.ribbonOpacity,
-      renderOrder: 4,
-      maxSegmentLength: river.displayPriority >= 9 ? 0.9 : 1.5,
-      fadeStartAlpha: startInland ? 0 : 1,
-      fadeEndAlpha: endInland ? 0 : 1,
-      fadeFraction: 0.08
-    });
-    // 端点 fade 需要 transparent + alpha blending；其他时候 ribbon 走 opaque
-    // pass (transparent:false + depthWrite:true) 让 z-buffer 排序自动处理
-    // cities/trees 遮挡（codex 93474de P2 抓到 transparent:false 时 opacity
-    // 不起作用，所以 runtime 调暗用 .color 乘）。
-    if (!startInland && !endInland) {
-      ribbon.material.transparent = false;
-      ribbon.material.opacity = 1;
-    } else {
-      // fade 路径：transparent + depthWrite=true 保 Z 顺序
-      ribbon.material.transparent = true;
-      ribbon.material.opacity = 1;
-    }
-    ribbon.material.depthTest = true;
-    ribbon.material.depthWrite = true;
-    ribbon.material.polygonOffset = true;
-    ribbon.material.polygonOffsetFactor = -2;
-    ribbon.material.polygonOffsetUnits = -4;
-    registerWaterEnvironmentMaterial(ribbon.material, ribbonColor, waterStyle, "ribbon");
-    waterSystemGroup.add(ribbon);
+    // 2026-05 重构：河面渲染移到 terrain shader (modeColor 里 riverMask
+    // > 0.6 → 蓝色)。这里不再单独建 ribbon mesh — 一层 mesh = 没有
+    // z-buffer 冲突 / bilinear vs triangle Y 不匹配。只保留 label + 河边植被。
 
     const labelPoint = waterLabelPoint(river);
 
