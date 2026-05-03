@@ -11,6 +11,7 @@ export interface ModeMeta {
 export interface Landmark {
   name: string;
   kind: LandmarkKind;
+  subKind?: string;
   position: Vector2;
   description: string;
 }
@@ -64,6 +65,7 @@ export const landmarks: Landmark[] = [
   {
     name: "陈仓道",
     kind: "pass",
+    subKind: "gorge-pass",
     position: new Vector2(23.89, -60.48),
     description: "从陈仓、大散关一带折入秦岭的西线通道，山地把路线压成可控锁口。"
   },
@@ -76,6 +78,7 @@ export const landmarks: Landmark[] = [
   {
     name: "褒斜谷意象",
     kind: "pass",
+    subKind: "gorge-pass",
     position: new Vector2(34, -28),
     description: "真正重要的不是直线距离，而是能不能过山。"
   },
@@ -94,12 +97,14 @@ export const landmarks: Landmark[] = [
   {
     name: "剑门关",
     kind: "pass",
+    subKind: "major-pass",
     position: new Vector2(-23.24, 33.6),
     description: "广元剑阁一带的入蜀锁口，两侧山势夹峙，让通道变成关隘。"
   },
   {
     name: "剑门蜀道",
     kind: "pass",
+    subKind: "gorge-pass",
     position: new Vector2(-18, 31),
     description: "汉中南下入蜀的关键路线，第二次把行军面压缩成少数节点。"
   },

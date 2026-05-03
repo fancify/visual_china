@@ -143,6 +143,10 @@ import {
   qinlingRouteRibbonStyle
 } from "./game/routeRibbon.js";
 import {
+  buildPassLandmarkMeshes,
+  passLandmarkGeometries
+} from "./game/passLandmarks.js";
+import {
   buildWaterRibbonVertices,
   buildWaterRibbonAlphas,
   buildRiverVegetationSamples,
@@ -889,14 +893,14 @@ const landmarkMaterials = {
     flatShading: true
   })
 };
-// 几何共享。pass kind 改用 stele（石碑）—— 用户反馈"两个柱子+圆锥"
-// 看不出含义，换成扁立的方碑更像关隘的纪念碑。
+// 几何共享。pass 现在按 subKind 走 helper 里的多档造型；这里保留 stele
+// 三件套引用，给 memorial-stele fallback 继续复用。
 const landmarkGeometries = {
   city: new CylinderGeometry(0.18, 0.48, 2.8, 5),
   generic: new CylinderGeometry(0.14, 0.36, 2.4, 4),
-  stele: new BoxGeometry(0.7, 2.1, 0.22),
-  steleBase: new BoxGeometry(0.95, 0.32, 0.4),
-  steleCap: new BoxGeometry(0.85, 0.18, 0.32)
+  stele: passLandmarkGeometries.stele,
+  steleBase: passLandmarkGeometries.steleBase,
+  steleCap: passLandmarkGeometries.steleCap
 };
 
 // stele 自己的灰岩石材质，与原 pass 黄棕色（landmarkMaterials.pass）区分。
@@ -1121,25 +1125,19 @@ function rebuildLandmarkVisuals(): void {
     landmarkChunkIds.set(landmark.name, chunkId);
     const ground = 0;
     if (landmark.kind === "pass") {
-      // 关隘改成石碑：3 件套（台座 + 主碑 + 顶冠），各自有独立 Y 高度。
-      // 用 userData.terrainYOffset 把各档的 Y 偏移记下来，让后续的
-      // applyTerrainFromSampler re-center 循环不会把三件压成一层（codex
-      // 9332266 P1 抓到）。
-      const stelePieces: Array<[
-        keyof typeof landmarkGeometries,
-        MeshPhongMaterial,
-        number
-      ]> = [
-        ["steleBase", passSteleCapMaterial, 0.16],
-        ["stele", passSteleMaterial, 1.37],
-        ["steleCap", passSteleCapMaterial, 2.41]
-      ];
-      stelePieces.forEach(([geomKey, mat, yOffset]) => {
-        const piece = new Mesh(landmarkGeometries[geomKey], mat);
-        piece.position.set(landmark.position.x, ground + yOffset, landmark.position.y);
-        piece.userData.chunkId = chunkId;
-        piece.userData.sharedResources = true;
-        piece.userData.terrainYOffset = yOffset;
+      // pass 按 subKind 分三档：major-pass 双层关楼、gorge-pass 谷道关楼、
+      // memorial-stele 旧碑亭 fallback。所有 piece 继续记录 terrainYOffset，
+      // 避免 sampler re-center 时被压回同一层。
+      buildPassLandmarkMeshes({
+        position: landmark.position,
+        ground,
+        chunkId,
+        subKind: landmark.subKind,
+        materials: {
+          body: passSteleMaterial,
+          accent: passSteleCapMaterial
+        }
+      }).forEach((piece) => {
         landmarkGroup.add(piece);
       });
 
@@ -1955,7 +1953,8 @@ function rebuildRouteVisuals(): void {
   qinlingRoutes
     .filter((route) =>
       route.source?.verification === "external-vector" ||
-      route.source?.verification === "verified"
+      route.source?.verification === "verified" ||
+      route.source?.verification === "historical-references"
     )
     .forEach((route) => {
       if (route.labelPoint && route.label) {
