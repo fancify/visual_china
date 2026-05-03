@@ -202,6 +202,7 @@ import {
   modeColor,
   zoneNameAt
 } from "./game/terrainModel";
+import { isSpriteOccludedByTerrain } from "./game/labelOcclusion";
 import { textSpriteLayout } from "./game/textLabel.js";
 import { createPerfStats, isDevModeEnabled } from "./game/perfStats";
 import {
@@ -770,31 +771,22 @@ function updateCityLodFade(): void {
   // 山体遮挡（occlusion）：用 terrainSampler 沿 camera→label 线段做软光线
   // 步进，碰到任何采样点高度 > 当前线段高度，就把 sprite.visible 设为 false。
   // 比 GPU depthTest 可靠（Three.js Sprite + transparent + depthTest 实测整体
-  // 不渲染，疑似 transparent pass 不读 opaque pass 写的深度）。每帧 ~30 个
-  // sprite × 8 步 = 240 次 sampleHeight 调用，sampler 走 bilinear 查表，开销
-  // 可忽略。
+  // 不渲染，疑似 transparent pass 不读 opaque pass 写的深度）。这里改成
+  // 24 步 + sampleSurfaceHeight：远视野每步约 10u，能命中秦岭窄山脊，且跟
+  // GPU 三角化表面一致，不会在陡坡上低估地表高度。
   if (terrainSampler) {
+    const sampler = terrainSampler;
     const cameraWorld = camera.position;
     const occlude = (sprite: Sprite): void => {
       if (!sprite.visible) return; // 已经被距离 fade 隐去就不必再算
-      const target = sprite.position;
-      const dx = target.x - cameraWorld.x;
-      const dy = target.y - cameraWorld.y;
-      const dz = target.z - cameraWorld.z;
-      // 8 步线性插值采样（不含端点 t=0 和 t=1，端点本身没意义：
-      // 0 在相机内、1 是 label 自身位置）。
-      for (let i = 1; i <= 8; i += 1) {
-        const t = i / 9;
-        const sx = cameraWorld.x + dx * t;
-        const sy = cameraWorld.y + dy * t;
-        const sz = cameraWorld.z + dz * t;
-        const groundY = terrainSampler!.sampleHeight(sx, sz);
-        // groundY > sy 表示这一段地形比视线高 → 山挡住了 label。
-        // 给 0.6 单元容差，避免 label 自己脚下小起伏触发误判。
-        if (groundY > sy + 0.6) {
-          sprite.visible = false;
-          return;
-        }
+      if (
+        isSpriteOccludedByTerrain({
+          camera: cameraWorld,
+          target: sprite.position,
+          sampler
+        })
+      ) {
+        sprite.visible = false;
       }
     };
     cityLabelSpritesByTier.capital.forEach(occlude);
