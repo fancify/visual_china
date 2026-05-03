@@ -9,6 +9,7 @@ import {
   Path,
   Shape
 } from "three";
+import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import type { CityTier, RealCity } from "../data/realCities.js";
 import type { TerrainSampler } from "./demSampler";
@@ -33,17 +34,56 @@ import { projectGeoToWorld } from "./mapOrientation.js";
 
 function makeWalledCompoundGeometry(
   outerSide: number,
-  _innerSide: number,
+  innerSide: number,
   height: number
 ): BufferGeometry {
-  // 2026-05 用户反馈"看着是透明的"：之前是 ExtrudeGeometry 的 "口" 字
-  // 中空环 (4 面墙 + 顶开 + 底开)，低角度看穿到对面墙。换成实心 BoxGeometry
-  // 直接消除"穿透"假象。geometry y 范围 = -height/2..+height/2，translate
-  // 上来让 base 在 y=0、top 在 y=height，跟旧 ExtrudeGeometry 对齐 (instance
-  // matrix 不需要变).
-  const geom = new BoxGeometry(outerSide, height, outerSide);
-  geom.translate(0, height * 0.5, 0);
-  return geom;
+  // 用户："应该是回字形"。回 = 外环城墙 + 内块城核 (两层 concentric)。
+  // 之前 "口" (空心环) 看穿；纯实心 box 太单调。回 shape 同时解决这两个：
+  //   - 外环: ExtrudeGeometry "口" 字 (中空，让外墙形态可见)
+  //   - 内核: BoxGeometry 实心 (填中间空洞，避免 see-through)
+  //   - 内核 height 更高 (× 1.4) 让视觉层级有"中央台/宫城"感
+  // 用 BufferGeometryUtils.mergeGeometries 把两段合一以保 InstancedMesh
+  // 单 mesh，不增 draw call.
+  const half = outerSide * 0.5;
+  const innerHalf = innerSide * 0.5;
+
+  // 外环：ExtrudeGeometry with hole
+  const ringShape = new Shape();
+  ringShape.moveTo(-half, -half);
+  ringShape.lineTo(half, -half);
+  ringShape.lineTo(half, half);
+  ringShape.lineTo(-half, half);
+  ringShape.lineTo(-half, -half);
+  const hole = new Path();
+  hole.moveTo(-innerHalf, -innerHalf);
+  hole.lineTo(innerHalf, -innerHalf);
+  hole.lineTo(innerHalf, innerHalf);
+  hole.lineTo(-innerHalf, innerHalf);
+  hole.lineTo(-innerHalf, -innerHalf);
+  ringShape.holes.push(hole);
+  const ringGeom = new ExtrudeGeometry(ringShape, {
+    depth: height,
+    bevelEnabled: false,
+    curveSegments: 1
+  });
+  ringGeom.rotateX(-Math.PI / 2);
+  // 旋转后 y 范围 = -height..0；translate 让 base=0, top=height
+  ringGeom.translate(0, height, 0);
+
+  // 内核：实心 box, 比外墙稍矮 (0.7×) 让外墙仍是主体形态
+  const coreSide = innerSide * 0.85;
+  const coreHeight = height * 0.7;
+  const coreGeom = new BoxGeometry(coreSide, coreHeight, coreSide);
+  coreGeom.translate(0, coreHeight * 0.5, 0);
+
+  // 合并成单 BufferGeometry. mergeGeometries 要求 attributes 一致；
+  // ExtrudeGeometry 默认有 position+normal+uv, BoxGeometry 也有，OK.
+  const merged = BufferGeometryUtils.mergeGeometries([ringGeom, coreGeom]);
+  if (!merged) {
+    // fallback 极少触发；保险起见直接退化到 ring 单形
+    return ringGeom;
+  }
+  return merged;
 }
 
 interface TierGeometry {
