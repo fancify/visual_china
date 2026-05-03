@@ -10,6 +10,7 @@ import {
 import type { ViewMode } from "../data/qinlingSlice";
 import type { EnvironmentState, EnvironmentVisuals } from "./environment";
 import { TerrainSampler } from "./demSampler";
+import { configureChunkTerrainFrustum } from "./terrainMeshFrustum.js";
 import { modeColor } from "./terrainModel";
 import { attachTerrainShaderEnhancements } from "./terrainShaderEnhancer";
 
@@ -64,6 +65,7 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
     atmosphericFarColor: new Color(0x5f8ba6)
   });
   const mesh = new Mesh(geometry, material);
+  configureChunkTerrainFrustum(mesh, geometry);
 
   return {
     mesh,

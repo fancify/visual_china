@@ -4008,9 +4008,20 @@ function update(deltaSeconds: number): void {
   applySkyVisuals(skyDome, {
     skyColor: visuals.skyColor,
     skyHorizonColor: visuals.skyHorizonColor,
+    horizonCoolColor: visuals.skyHorizonCoolColor,
     skyZenithColor: visuals.skyZenithColor,
-    starOpacity: visuals.starOpacity
+    groundColor: visuals.skyGroundColor,
+    starOpacity: visuals.starOpacity,
+    sunDirection: visuals.sunDirection,
+    sunWarmColor: visuals.skySunWarmColor,
+    sunInfluence: visuals.skySunInfluence
   });
+  const starTwinkleUniforms = starDomeMaterial.userData.twinkleUniforms as
+    | { twinkleTime: { value: number } }
+    | undefined;
+  if (starTwinkleUniforms) {
+    starTwinkleUniforms.twinkleTime.value = clock.elapsedTime;
+  }
   // 把当前 sky horizon 色更新到 terrain shader 的 height fog uniform，
   // 让山顶融到与天空一致的雾色。整区 + 所有 chunk 都要更新。
   updateTerrainShaderHeightFog(

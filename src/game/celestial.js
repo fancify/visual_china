@@ -52,14 +52,16 @@ export function celestialCycle({
   const solar = solarPhase(timeOfDay);
   const daylight = smoothstep(solar, -0.08, 0.38);
   const night = 1 - daylight;
+  // 星星不跟着 night 线性出现，而是等太阳明显落到地平线下再开启。
+  const starGate = smoothstep(-solar, 0.1, 0.35);
   const cloudWeatherBoost = clamp(weatherSunCut * 0.55 + fogBoost * 110, 0, 0.5);
 
   return {
     daylight,
     nightReadability: clamp(0.68 + night * 0.26 - weatherSunCut * 0.1, 0.58, 0.94),
     terrainLightnessFloor: clamp(1.14 + night * 0.18 - weatherSunCut * 0.08, 1.02, 1.34),
-    moonOpacity: clamp(night * (0.88 - weatherSunCut * 0.28), 0, 0.9),
-    starOpacity: clamp(night * (0.98 - weatherSunCut * 0.42), 0, 1),
+    moonOpacity: clamp(night * (1 - weatherSunCut * 0.28), 0, 1),
+    starOpacity: clamp(starGate * night * 0.98 - weatherSunCut * 0.4, 0, 1),
     sunDiscOpacity: clamp(daylight * (0.86 - weatherSunCut * 0.5), 0, 0.86),
     cloudOpacity: clamp(0.16 + cloudWeatherBoost + night * 0.08, 0.12, 0.62),
     cloudDriftSpeed: 0.008 + windStrength * 0.028

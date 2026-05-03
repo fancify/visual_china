@@ -14,12 +14,14 @@ export interface EnvironmentState {
 
 export interface EnvironmentVisuals {
   skyColor: Color;
-  // 朝阳 / 黄昏 用——sky shader 拿这两个组合出"地平线暖、天顶冷"的渐变。
-  // skyHorizonColor 在白天 == skyColor、夜里也 == skyColor；只在 twilight
-  // 时才被混入暖色（橙/粉）。skyZenithColor 默认 = skyColor * 0.62 + HSL，
-  // 在 twilight 时被往 deep blue-purple 拉，强化对比。
+  // skyHorizonColor / skyZenithColor 仍保留给 shader 的主渐变。
+  // 额外的 cool/warm/ground 则给 dawn-dusk 定向染色和夜晚地平线压暗使用。
   skyHorizonColor: Color;
+  skyHorizonCoolColor: Color;
+  skySunWarmColor: Color;
   skyZenithColor: Color;
+  skyGroundColor: Color;
+  skySunInfluence: number;
   twilightStrength: number; // 0..1，朝阳/黄昏强度（sun 在地平线附近达到峰值）
   fogColor: Color;
   ambientColor: Color;
@@ -360,7 +362,14 @@ export class EnvironmentController {
       new Color("#314648"),
       celestial.nightReadability * 0.34
     );
-    const skyColor = nightReadableSky.lerp(new Color(season.skyDay), daylight);
+    const nightHorizonBase = new Color(season.fogNight)
+      .lerp(new Color("#18232f"), celestial.nightReadability * 0.16)
+      .multiplyScalar(0.82);
+    const dayHorizonBase = new Color(season.skyDay);
+    const dayZenithBase = new Color(season.skyDay)
+      .multiplyScalar(0.62)
+      .offsetHSL(0.012, -0.05, -0.04);
+    const skyColor = nightReadableSky.clone().lerp(dayHorizonBase, daylight);
     const fogColor = new Color(season.fogNight)
       .lerp(new Color("#49645e"), celestial.nightReadability * 0.35)
       .lerp(new Color(season.fogDay), daylight);
@@ -377,20 +386,26 @@ export class EnvironmentController {
       1
     );
     const twilightColor = new Color(season.twilight);
-    // 地平线 0.85 混合，几乎完全占满暖色；天顶往深蓝紫推 0.7，强反差让
-    // 玩家一眼看到"火烧云 + 紫天"对比；雾 0.6 让远山金色；太阳 0.85 几乎
-    // 整圆橙红。0.65/0.55/0.42 的旧值在 1080p 截图里几乎看不到色调变化。
-    const skyHorizonColor = skyColor.clone().lerp(twilightColor, twilightStrength * 0.85);
-    const skyZenithColor = skyColor
+    const skyHorizonColor = nightHorizonBase.clone().lerp(dayHorizonBase, daylight);
+    const skyHorizonCoolColor = skyHorizonColor
       .clone()
-      .multiplyScalar(0.62)
-      .offsetHSL(0.012, -0.05, -0.04)
+      .lerp(new Color("#4d6284"), twilightStrength * 0.42);
+    const skySunWarmColor = skyHorizonColor
+      .clone()
+      .lerp(twilightColor, twilightStrength * 0.96);
+    const skyZenithColor = nightReadableSky
+      .clone()
+      .lerp(dayZenithBase, daylight)
       .lerp(new Color("#2c3a55"), twilightStrength * 0.7);
-    fogColor.lerp(twilightColor, twilightStrength * 0.6);
+    const skyGroundColor =
+      daylight > 0.28
+        ? skyHorizonColor.clone().multiplyScalar(0.18)
+        : new Color("#06080c").lerp(skyHorizonColor, daylight * 0.28);
+    fogColor.lerp(twilightColor, twilightStrength * 0.42);
     sunColor.lerp(twilightColor, twilightStrength * 0.85);
     // skyColor 本身也被推一点暖色——renderer.setClearColor 用它，
     // sky dome 视野以外的"留白"也跟着 dawn/dusk 一起变暖。
-    skyColor.lerp(twilightColor, twilightStrength * 0.4);
+    skyColor.lerp(twilightColor, twilightStrength * 0.24);
     const moonColor = new Color("#dce7ff").lerp(new Color("#fff2d0"), daylight * 0.18);
     const cloudColor = new Color("#d7d2ad").lerp(new Color("#f4ead0"), daylight);
     const rimColor = new Color(season.rim).multiplyScalar(MathUtils.lerp(0.5, 1, daylight));
@@ -405,7 +420,11 @@ export class EnvironmentController {
     return {
       skyColor,
       skyHorizonColor,
+      skyHorizonCoolColor,
+      skySunWarmColor,
       skyZenithColor,
+      skyGroundColor,
+      skySunInfluence: twilightStrength,
       twilightStrength,
       fogColor,
       ambientColor,
