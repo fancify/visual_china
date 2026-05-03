@@ -1,6 +1,14 @@
 import type { ViewMode } from "../data/qinlingSlice";
 import { modeMeta, viewModes } from "../data/qinlingSlice";
 import { compactHudPanelConfig } from "./hudChrome.js";
+import {
+  AVATAR_DEFINITIONS,
+  type AvatarId
+} from "./avatars.js";
+import {
+  MOUNT_DEFINITIONS,
+  type MountId
+} from "./mounts.js";
 import type {
   QinlingAtlasFeature,
   QinlingAtlasLayer,
@@ -63,6 +71,21 @@ export interface HudController {
   cityDetailPanel: HTMLElement;
   closeCityDetailButton: HTMLButtonElement;
   setCityDetailPanelOpen(snapshot: CityDetailSnapshot | null): void;
+  customizationPanel: HTMLElement;
+  closeCustomizationButton: HTMLButtonElement;
+  /** 设置面板开关。null = 关闭。snapshot = 打开并刷新选中态。 */
+  setCustomizationPanelOpen(
+    snapshot: CustomizationPanelSnapshot | null
+  ): void;
+  /** 用户在面板里点选 mount 的回调。由 main.ts 注入。 */
+  onSelectMount(handler: (id: MountId) => void): void;
+  /** 用户在面板里点选 avatar 的回调。由 main.ts 注入。 */
+  onSelectAvatar(handler: (id: AvatarId) => void): void;
+}
+
+export interface CustomizationPanelSnapshot {
+  mountId: MountId;
+  avatarId: AvatarId;
 }
 
 export interface CityDetailSnapshot {
@@ -206,6 +229,9 @@ export function createHud(
         <span>T 快进时辰</span>
         <span>K 切天气</span>
         <span>L 切季节</span>
+        <span>P 坐骑/造型</span>
+        <span>[ ] 切坐骑</span>
+        <span>- = 切造型</span>
         <span>点击画面启用声音</span>
       </div>
     </details>
@@ -220,6 +246,54 @@ export function createHud(
         <div class="city-detail-description" id="city-detail-description"></div>
         <footer class="city-detail-foot">
           <button id="close-city-detail" type="button">返回游戏</button>
+        </footer>
+      </div>
+    </aside>
+    <aside class="customization-panel" id="customization-panel" aria-hidden="true">
+      <div class="customization-inner">
+        <header class="customization-head">
+          <div class="eyebrow">坐骑 · 造型</div>
+          <h2>选你的伙伴与行装</h2>
+          <p class="customization-hint">键盘：[ ] 切坐骑 · - = 切造型 · P 关闭</p>
+        </header>
+        <div class="customization-body">
+          <section class="customization-column">
+            <div class="customization-col-title">坐骑</div>
+            <div class="customization-list" id="customization-mount-list">
+              ${MOUNT_DEFINITIONS.map(
+                (mount) => `
+                  <button
+                    class="customization-card"
+                    data-mount="${mount.id}"
+                    type="button"
+                  >
+                    <strong>${mount.name}</strong>
+                    <span>${mount.description}</span>
+                  </button>
+                `
+              ).join("")}
+            </div>
+          </section>
+          <section class="customization-column">
+            <div class="customization-col-title">造型</div>
+            <div class="customization-list" id="customization-avatar-list">
+              ${AVATAR_DEFINITIONS.map(
+                (avatar) => `
+                  <button
+                    class="customization-card"
+                    data-avatar="${avatar.id}"
+                    type="button"
+                  >
+                    <strong>${avatar.name}</strong>
+                    <span>${avatar.description}</span>
+                  </button>
+                `
+              ).join("")}
+            </div>
+          </section>
+        </div>
+        <footer class="customization-foot">
+          <button id="close-customization" type="button">返回游戏</button>
         </footer>
       </div>
     </aside>
@@ -300,6 +374,61 @@ export function createHud(
     hud,
     "#close-city-detail"
   );
+
+  const customizationPanel = requireElement<HTMLElement>(
+    hud,
+    "#customization-panel"
+  );
+  const customizationMountList = requireElement<HTMLElement>(
+    hud,
+    "#customization-mount-list"
+  );
+  const customizationAvatarList = requireElement<HTMLElement>(
+    hud,
+    "#customization-avatar-list"
+  );
+  const closeCustomizationButton = requireElement<HTMLButtonElement>(
+    hud,
+    "#close-customization"
+  );
+
+  let mountSelectHandler: ((id: MountId) => void) | null = null;
+  let avatarSelectHandler: ((id: AvatarId) => void) | null = null;
+
+  // 卡片点击：dispatch 给外部注入的 handler。一次绑定，依赖 data-* 属性识别 id。
+  customizationMountList.addEventListener("click", (event) => {
+    const target = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+      "[data-mount]"
+    );
+    if (!target || !mountSelectHandler) return;
+    const id = target.dataset.mount as MountId | undefined;
+    if (id) {
+      mountSelectHandler(id);
+    }
+  });
+  customizationAvatarList.addEventListener("click", (event) => {
+    const target = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+      "[data-avatar]"
+    );
+    if (!target || !avatarSelectHandler) return;
+    const id = target.dataset.avatar as AvatarId | undefined;
+    if (id) {
+      avatarSelectHandler(id);
+    }
+  });
+
+  const setActiveCard = (
+    container: HTMLElement,
+    attribute: string,
+    activeId: string
+  ): void => {
+    container.querySelectorAll<HTMLElement>(`[${attribute}]`).forEach((card) => {
+      card.classList.toggle(
+        "active",
+        card.getAttribute(attribute) === activeId
+      );
+    });
+  };
 
   const modeChips = new Map<ViewMode, HTMLElement>();
 
@@ -537,6 +666,25 @@ export function createHud(
       }
       cityDetailPanel.classList.add("open");
       cityDetailPanel.setAttribute("aria-hidden", "false");
+    },
+    customizationPanel,
+    closeCustomizationButton,
+    setCustomizationPanelOpen(snapshot) {
+      if (snapshot === null) {
+        customizationPanel.classList.remove("open");
+        customizationPanel.setAttribute("aria-hidden", "true");
+        return;
+      }
+      setActiveCard(customizationMountList, "data-mount", snapshot.mountId);
+      setActiveCard(customizationAvatarList, "data-avatar", snapshot.avatarId);
+      customizationPanel.classList.add("open");
+      customizationPanel.setAttribute("aria-hidden", "false");
+    },
+    onSelectMount(handler) {
+      mountSelectHandler = handler;
+    },
+    onSelectAvatar(handler) {
+      avatarSelectHandler = handler;
     }
   };
 
