@@ -418,7 +418,11 @@ export class EnvironmentController {
       ambientIntensity: MathUtils.lerp(1.18, 1.75, daylight),
       sunIntensity: MathUtils.lerp(0.1, 2.9, daylight) * (1 - weather.sunCut),
       rimIntensity: MathUtils.lerp(0.25, 0.82, daylight),
-      fogDensity: MathUtils.lerp(0.0075, 0.0032, daylight) + weather.fogBoost * 0.55,
+      // fogDensity 砍半（用户："看不到地形"）——之前 0.003-0.0075 范围
+      // 在 cameraDistance 170 overview 视角下让 200 单元远的地形 76% 失彩，
+      // 整图灰蒙。FogExp2 衰减 = exp(-density² × distance²)，density 减半
+      // 同距离 fog factor 从 ~0.24 → ~0.7（保留 70% 原色）。
+      fogDensity: MathUtils.lerp(0.0036, 0.0016, daylight) + weather.fogBoost * 0.55,
       mistOpacity: MathUtils.lerp(0.012, 0.055, 1 - daylight) + weather.fogBoost * 9,
       // 粒子透明度 / 颜色 / 尺寸 现在按 rain / snow 的连续混合算，
       // 让"晴 → 雨"过渡里粒子能从无到有平滑显现，而不是瞬间满。

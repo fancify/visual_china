@@ -3412,9 +3412,15 @@ const OPPOSITE_DIRECTION_KEY: Record<string, string> = {
   arrowright: "arrowleft"
 };
 let cameraHeading = qinlingCameraRig.initialHeading;
-let cameraElevation = qinlingCameraRig.initialElevation;
-let cameraDistance = qinlingCameraRig.initialDistance;
-let cameraViewMode: CameraViewMode = "overview";
+let cameraElevation = 0.52;
+let cameraDistance = qinlingCameraRig.minDistance + 10;
+// 默认 follow（之前 overview）——overview 视角离地形太远 + FogExp2 衰减
+// 让首屏看不到地形细节，用户反馈"看不到地形"。follow 是常用游戏视角，
+// 玩家想看大地图按 O 切 overview。
+let cameraViewMode: CameraViewMode = "follow";
+// 首屏 cameraDistance / Elevation 也按 F 键（follow 重置）的值放——
+// initialDistance 118 / Elevation 1.02 仍像半 overview，加 fog 看不见
+// 地形细节。给 F 同款近镜头让玩家一进来就看到草、树、河、城。
 let isDragging = false;
 let dragOriginX = 0;
 let dragOriginY = 0;
