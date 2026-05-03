@@ -1789,6 +1789,9 @@ function rebuildRiverVegetationVisuals(rivers: QinlingAtlasFeature[]): void {
     trees.renderOrder = 8;
     treeMatrices.forEach((matrix, index) => trees.setMatrixAt(index, matrix));
     trees.instanceMatrix.needsUpdate = true;
+    // 跟 cityMarkers 一样：必须 computeBoundingSphere 把所有 instance 位置
+    // 算进 culling sphere，否则镜头转到河流另一侧会整批 trees 被裁掉。
+    trees.computeBoundingSphere();
     riverVegetationGroup.add(trees);
   }
 
@@ -1805,6 +1808,7 @@ function rebuildRiverVegetationVisuals(rivers: QinlingAtlasFeature[]): void {
     shrubs.renderOrder = 8;
     shrubMatrices.forEach((matrix, index) => shrubs.setMatrixAt(index, matrix));
     shrubs.instanceMatrix.needsUpdate = true;
+    shrubs.computeBoundingSphere();
     riverVegetationGroup.add(shrubs);
   }
 }

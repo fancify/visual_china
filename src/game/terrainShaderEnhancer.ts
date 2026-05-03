@@ -42,6 +42,12 @@ export interface TerrainShaderEnhancerOptions {
   terrainHueShift: number;
   terrainSaturationMul: number;
   terrainLightnessMul: number;
+  /** Rim light：山脊/边缘 Fresnel 高光，跟太阳色保持一致——黄昏时山脊
+   * 镶金边，模拟 Expedition 33 + 千里江山图 山棱光感。 */
+  rimColor: Color;
+  rimStrength: number;
+  /** Fresnel 指数，越大 rim 越窄（只挑最锐利的边缘）。2.5 接近经典 rim。 */
+  rimPower: number;
 }
 
 const defaults: TerrainShaderEnhancerOptions = {
@@ -59,7 +65,10 @@ const defaults: TerrainShaderEnhancerOptions = {
   atmosphericMaxStrength: 0.42,
   terrainHueShift: 0,
   terrainSaturationMul: 1,
-  terrainLightnessMul: 1
+  terrainLightnessMul: 1,
+  rimColor: undefined as unknown as Color,
+  rimStrength: 0.32,
+  rimPower: 2.5
 };
 
 interface ActiveEnhancer {

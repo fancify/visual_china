@@ -162,6 +162,13 @@ export function createCityMarkers(
     });
 
     wallMesh.instanceMatrix.needsUpdate = true;
+    // ⚠ Three.js InstancedMesh frustum culling 默认只看 geometry 的
+    // boundingSphere（几米半径，绕原点），不看 instance matrices。所以
+    // 当原点在视锥外（玩家镜头转向某些角度）时整组城市会被一起裁掉，
+    // 即使个别 instance 还在画面里——这就是用户反馈的"近的城市镜头一
+    // 转就消失再转回来又出现"。computeBoundingSphere 会 walk 所有 instance
+    // 位置算出真正包围 sphere，让 culling 跟实际视锥对得上。
+    wallMesh.computeBoundingSphere();
     group.add(wallMesh);
   });
 
