@@ -5,7 +5,8 @@ import {
   Group,
   Mesh,
   MeshPhongMaterial,
-  SphereGeometry
+  SphereGeometry,
+  Vector3
 } from "three";
 
 /**
@@ -384,8 +385,8 @@ function buildDonkey(): MountHandle {
   };
 }
 
-/** 灵狐：极矮但夸张拉大 → 当成"灵兽"骑乘，玩家骑在背上。长尾、橙红、尖耳。 */
-function buildFox(): MountHandle {
+/** 灵狐：细长短腿，鞍位比大坐骑低一档，但仍保持可骑乘。 */
+export function buildFox(): MountHandle {
   const furMaterial = new MeshPhongMaterial({
     color: 0xc94d2a,
     flatShading: true,
@@ -404,64 +405,90 @@ function buildFox(): MountHandle {
     flatShading: true
   });
 
-  // 灵狐放大成可骑乘大小：身长 2.2, 高 0.78
-  const body = new Mesh(new BoxGeometry(2.2, 0.78, 0.82), furMaterial);
+  // 狐身改成更细长苗条，避免比马/驴还粗壮。
+  const body = new Mesh(new BoxGeometry(1.7, 0.55, 0.55), furMaterial);
   body.name = "mount-fox-body";
-  body.position.y = 1.05;
-  // 圆润感：把 body 的角通过 Y 轴轻微缩腰
-  body.scale.y = 1.0;
+  body.position.y = 0.78;
 
-  const chest = new Mesh(new SphereGeometry(0.45, 8, 6), tipMaterial);
-  chest.position.set(0.5, 0.95, 0);
-  chest.scale.set(1.3, 0.7, 0.9);
+  const chest = new Mesh(new SphereGeometry(0.34, 8, 6), tipMaterial);
+  chest.position.set(0.42, 0.72, 0);
+  chest.scale.set(1.18, 0.62, 0.82);
 
-  const neck = new Mesh(new BoxGeometry(0.42, 0.6, 0.55), furMaterial);
-  neck.position.set(0.95, 1.42, 0);
+  const neck = new Mesh(new BoxGeometry(0.32, 0.46, 0.42), furMaterial);
+  neck.position.set(0.75, 1.05, 0);
   neck.rotation.z = -0.3;
 
-  const head = new Mesh(new BoxGeometry(0.7, 0.55, 0.62), furMaterial);
-  head.position.set(1.4, 1.72, 0);
+  const head = new Mesh(new BoxGeometry(0.54, 0.42, 0.46), furMaterial);
+  head.position.set(1.08, 1.28, 0);
 
-  const muzzle = new Mesh(new ConeGeometry(0.18, 0.4, 4), tipMaterial);
-  muzzle.position.set(1.78, 1.62, 0);
+  const muzzle = new Mesh(new ConeGeometry(0.14, 0.3, 4), tipMaterial);
+  muzzle.position.set(1.37, 1.2, 0);
   muzzle.rotation.z = -Math.PI / 2;
 
   // 尖耳：两个 triangle cone
-  const earGeometry = new ConeGeometry(0.13, 0.32, 4);
+  const earGeometry = new ConeGeometry(0.1, 0.24, 4);
   const earLeft = new Mesh(earGeometry, furMaterial);
-  earLeft.position.set(1.32, 2.05, 0.22);
+  earLeft.position.set(1.02, 1.52, 0.16);
   const earRight = new Mesh(earGeometry, furMaterial);
-  earRight.position.set(1.32, 2.05, -0.22);
+  earRight.position.set(1.02, 1.52, -0.16);
 
-  // 长尾：分两段，末端白尖
-  const tailBase = new Mesh(new ConeGeometry(0.2, 1.0, 5), furMaterial);
-  tailBase.position.set(-1.4, 1.3, 0);
-  tailBase.rotation.set(0, 0, Math.PI / 2 + 0.4);
-  const tailTip = new Mesh(new ConeGeometry(0.16, 0.5, 5), tipMaterial);
-  tailTip.position.set(-1.95, 1.6, 0);
-  tailTip.rotation.set(0, 0, Math.PI / 2 + 0.55);
+  // 长尾：先算橙尾尖端，再反推白尖中心，确保两段在几何上首尾相接。
+  const tailBaseHeight = 0.78;
+  const tailBaseTilt = 0.4;
+  const tailBaseRotation = Math.PI / 2 + tailBaseTilt;
+  const tailBasePosition = new Vector3(-1.08, 0.97, 0);
+  const tailBaseDirection = new Vector3(
+    -Math.cos(tailBaseTilt),
+    -Math.sin(tailBaseTilt),
+    0
+  );
+  const tailBaseTipPosition = tailBasePosition
+    .clone()
+    .add(tailBaseDirection.clone().multiplyScalar(tailBaseHeight * 0.5));
+
+  const tailBase = new Mesh(new ConeGeometry(0.15, tailBaseHeight, 5), furMaterial);
+  tailBase.name = "mount-fox-tail-base";
+  tailBase.position.copy(tailBasePosition);
+  tailBase.rotation.set(0, 0, tailBaseRotation);
+
+  const tailTipHeight = 0.39;
+  const tailTipBend = 0.1;
+  const tailTipRotation = tailBaseRotation + tailTipBend;
+  const tailTipDirection = new Vector3(
+    -Math.cos(tailBaseTilt + tailTipBend),
+    -Math.sin(tailBaseTilt + tailTipBend),
+    0
+  );
+  const tailTipPosition = tailBaseTipPosition
+    .clone()
+    .add(tailTipDirection.clone().multiplyScalar(tailTipHeight * 0.5));
+
+  const tailTip = new Mesh(new ConeGeometry(0.12, tailTipHeight, 5), tipMaterial);
+  tailTip.name = "mount-fox-tail-tip";
+  tailTip.position.copy(tailTipPosition);
+  tailTip.rotation.set(0, 0, tailTipRotation);
 
   // 黑眼睛点缀
-  const eyeGeometry = new SphereGeometry(0.04, 6, 6);
+  const eyeGeometry = new SphereGeometry(0.03, 6, 6);
   const eyeLeft = new Mesh(eyeGeometry, darkMaterial);
-  eyeLeft.position.set(1.62, 1.82, 0.18);
+  eyeLeft.position.set(1.24, 1.31, 0.13);
   const eyeRight = new Mesh(eyeGeometry, darkMaterial);
-  eyeRight.position.set(1.62, 1.82, -0.18);
+  eyeRight.position.set(1.24, 1.31, -0.13);
 
   // 狐狸腿短细
   const legs = buildLegs(
     [
-      { name: "front-left-leg", x: 0.78, z: 0.3, y: 0.45, length: 0.7, radiusTop: 0.08, radiusBottom: 0.1, baseRotation: 0.08 },
-      { name: "front-right-leg", x: 0.78, z: -0.3, y: 0.45, length: 0.7, radiusTop: 0.08, radiusBottom: 0.1, baseRotation: -0.08 },
-      { name: "back-left-leg", x: -0.78, z: 0.3, y: 0.45, length: 0.7, radiusTop: 0.08, radiusBottom: 0.1, baseRotation: -0.08 },
-      { name: "back-right-leg", x: -0.78, z: -0.3, y: 0.45, length: 0.7, radiusTop: 0.08, radiusBottom: 0.1, baseRotation: 0.08 }
+      { name: "front-left-leg", x: 0.6, z: 0.22, y: 0.28, length: 0.55, radiusTop: 0.06, radiusBottom: 0.07, baseRotation: 0.08 },
+      { name: "front-right-leg", x: 0.6, z: -0.22, y: 0.28, length: 0.55, radiusTop: 0.06, radiusBottom: 0.07, baseRotation: -0.08 },
+      { name: "back-left-leg", x: -0.6, z: 0.22, y: 0.28, length: 0.55, radiusTop: 0.06, radiusBottom: 0.07, baseRotation: -0.08 },
+      { name: "back-right-leg", x: -0.6, z: -0.22, y: 0.28, length: 0.55, radiusTop: 0.06, radiusBottom: 0.07, baseRotation: 0.08 }
     ],
     darkMaterial
   );
 
-  // 狐狸偏矮，鞍 / 骑手坐稍低
-  const saddle = new Mesh(new BoxGeometry(0.7, 0.12, 0.7), saddleMaterial);
-  saddle.position.set(-0.05, 1.5, 0);
+  // 狐狸偏矮，鞍随 body 同步下调，避免骑手悬空。
+  const saddle = new Mesh(new BoxGeometry(0.54, 0.1, 0.54), saddleMaterial);
+  saddle.position.set(-0.04, 1.18, 0);
 
   const mount = new Group();
   mount.name = "mount-fox";
@@ -484,8 +511,8 @@ function buildFox(): MountHandle {
   return {
     mount,
     legsByName: new Map(legs.map((leg) => [leg.name, leg])),
-    saddleHeight: 1.58,
-    saddleX: -0.05
+    saddleHeight: 1.25,
+    saddleX: -0.04
   };
 }
 
