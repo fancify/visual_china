@@ -1,14 +1,18 @@
 import {
+  Color,
   ConeGeometry,
   Group,
   InstancedMesh,
+  MathUtils,
   Matrix4,
   Mesh,
   MeshPhongMaterial,
   Object3D
 } from "three";
 
+import { biomeWeightsAt } from "./biomeZones";
 import { TerrainSampler } from "./demSampler";
+import { unprojectWorldToGeo } from "./mapOrientation.js";
 import type { RuntimePerformanceBudget } from "./performanceBudget";
 
 // 共享 geometry / material：scenery 在每个 chunk 加载时被频繁创建/卸载，
@@ -18,7 +22,7 @@ import type { RuntimePerformanceBudget } from "./performanceBudget";
 // 后面的物体（codex hygiene 建议）。
 const sharedTreeGeometry = new ConeGeometry(0.38, 1.75, 5);
 export const sharedTreeMaterial = new MeshPhongMaterial({
-  color: 0x4f7f58,
+  color: 0xffffff,
   flatShading: true,
   shininess: 5,
   transparent: true,
@@ -53,6 +57,8 @@ export function createChunkScenery(
   const dummy = new Object3D();
 
   const treeMatrices: Matrix4[] = [];
+  const treeColors: Color[] = [];
+  const bounds = sampler.asset.bounds;
   const { width, depth } = sampler.asset.world;
   const columns = 12;
   const rows = 12;
@@ -91,7 +97,16 @@ export function createChunkScenery(
       // 是农田 + 村落，长树合理。
       const forestBand = Math.max(0, 1 - Math.abs(h - 0.46) / 0.34);
       const lowlandGreen = Math.max(0, 1 - h / 0.44) * Math.max(0, 1 - slope / 0.72);
-      const vegetationChance = 0.12 + river * 0.22 + forestBand * 0.24 + lowlandGreen * 0.16;
+      const biome =
+        bounds
+          ? biomeWeightsAt(unprojectWorldToGeo({ x, z }, bounds, sampler.asset.world))
+          : null;
+      const baseVegetationChance =
+        0.12 + river * 0.22 + forestBand * 0.24 + lowlandGreen * 0.16;
+      const vegetationChance = Math.min(
+        1,
+        baseVegetationChance * (biome?.vegetationDensity ?? 1)
+      );
 
       if (
         treeMatrices.length < budget.maxTreesPerChunk &&
@@ -106,6 +121,20 @@ export function createChunkScenery(
         dummy.scale.set(scale, scale, scale);
         dummy.updateMatrix();
         treeMatrices.push(dummy.matrix.clone());
+        const hueJitter = (pseudoRandom(seed + 71) - 0.5) * 0.018;
+        const sat = MathUtils.clamp(0.52 * (biome?.satScale ?? 1), 0.32, 0.7);
+        const lum = MathUtils.clamp(
+          0.34 * (biome?.lumScale ?? 1) + (pseudoRandom(seed + 89) - 0.5) * 0.04,
+          0.24,
+          0.44
+        );
+        treeColors.push(
+          new Color().setHSL(
+            MathUtils.euclideanModulo((biome?.treeHue ?? 0.28) + hueJitter, 1),
+            sat,
+            lum
+          )
+        );
       }
     }
   }
@@ -116,8 +145,14 @@ export function createChunkScenery(
     Math.max(1, treeMatrices.length)
   );
   trees.count = treeMatrices.length;
-  treeMatrices.forEach((matrix, index) => trees.setMatrixAt(index, matrix));
+  treeMatrices.forEach((matrix, index) => {
+    trees.setMatrixAt(index, matrix);
+    trees.setColorAt(index, treeColors[index]);
+  });
   trees.instanceMatrix.needsUpdate = true;
+  if (trees.instanceColor) {
+    trees.instanceColor.needsUpdate = true;
+  }
   // 跟 cityMarkers 一样，必须 computeBoundingSphere 让 frustum culling 看
   // instance 实际位置。但 InstancedMesh 的 frustum culling 在 r178 仍有
   // 边角 bug：某些角度整组被误裁。直接关掉，每 chunk 树 ~50 棵，渲染
