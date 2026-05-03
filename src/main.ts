@@ -267,6 +267,10 @@ let storyGuideInitialized = false;
 let atlasWorkbench: AtlasWorkbenchState =
   createAtlasWorkbenchState(qinlingAtlasLayers);
 let atlasFeatures: QinlingAtlasFeature[] = [...qinlingAtlasFeatures];
+// 每次 atlasFeatures / evidenceFeatures 更新时 ++，atlasStaticCacheKey 用它
+// 让 cache 自动 invalidate。codex review d2eafde 抓到：异步 OSM 水系加载完
+// 后 cache 不知道数据变了，可能一直贴老底图。
+let atlasFeaturesVersion = 0;
 let visibleWaterFeatures: QinlingAtlasFeature[] = [];
 // Evidence layer：OSM 命名水系（4639 条），按 rank 是 raw evidence，不是
 // curated 主干。默认不进 atlasFeatures，避免每帧 filter/sort 4639 项。
@@ -330,6 +334,7 @@ async function loadHydrographyAtlas(): Promise<void> {
   }
 
   atlasFeatures = nextAtlasFeatures;
+  atlasFeaturesVersion += 1;
   rebuildWaterSystemVisuals();
   if (lastVisuals) {
     applyWaterEnvironmentVisuals(lastVisuals);
@@ -2256,10 +2261,12 @@ function atlasStaticCacheKey(
   useWorkbenchView: boolean,
   selectedFeatureId: string | null,
   layerIds: Set<string>,
-  mode: string
+  mode: string,
+  featuresVersion: number
 ): string {
   // 把所有影响 base 渲染的状态打成一个 string——下次进 drawAtlasMapCanvas
-  // 直接对比，相同就跳过 ~12ms canvas2d 重画。
+  // 直接对比，相同就跳过 ~12ms canvas2d 重画。featuresVersion 让异步加载的
+  // OSM 水系一旦换了 atlasFeatures 就强制重画（codex review d2eafde 抓到）。
   const layers = [...layerIds].sort().join("/");
   return [
     canvas.width,
@@ -2271,7 +2278,8 @@ function atlasStaticCacheKey(
     mapView.fitMode ?? "default",
     selectedFeatureId ?? "-",
     layers,
-    mode
+    mode,
+    featuresVersion
   ].join("|");
 }
 
@@ -2349,7 +2357,8 @@ function drawAtlasMapCanvas(
     useWorkbenchView,
     atlasWorkbench.selectedFeatureId ?? null,
     atlasWorkbench.visibleLayerIds,
-    currentMode
+    currentMode,
+    atlasFeaturesVersion
   );
   if (!cache) {
     const surface = document.createElement("canvas");
