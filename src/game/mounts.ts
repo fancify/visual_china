@@ -6,20 +6,29 @@ import {
   Mesh,
   MeshPhongMaterial,
   SphereGeometry,
+  TorusGeometry,
   Vector3
 } from "three";
 
 /**
- * 5 种坐骑（mount）。
+ * 8 种坐骑（mount）。
  *
  * 设计目标：
  * - 都用 low-poly Three primitives，零外部 asset
- * - 共享 4 条腿名（"front-left-leg" 等），main loop 走通用 leg pose
+ * - 优先复用 "front-left-leg" 等命名，让 main loop 继续走通用 leg pose
  * - 每种 mount 暴露 saddleHeight + saddleX，让骑手坐稳在背上中央
  * - 整体尺寸跟原木马接近（背高 ~1.85m），方便骑手位置兼容
  */
 
-export type MountId = "horse" | "ox" | "sheep" | "donkey" | "fox";
+export type MountId =
+  | "horse"
+  | "ox"
+  | "sheep"
+  | "donkey"
+  | "fox"
+  | "pig"
+  | "chicken"
+  | "boar";
 
 export interface MountDefinition {
   id: MountId;
@@ -34,14 +43,18 @@ export const MOUNT_DEFINITIONS: MountDefinition[] = [
   { id: "ox", name: "黄牛", description: "宽身长角，沉稳跋涉。" },
   { id: "sheep", name: "绵羊", description: "蓬松米白，山道灵巧。" },
   { id: "donkey", name: "毛驴", description: "灰身长耳，轻便代步。" },
-  { id: "fox", name: "灵狐", description: "橙红长尾，山林灵兽。" }
+  { id: "fox", name: "灵狐", description: "橙红长尾，山林灵兽。" },
+  { id: "pig", name: "家猪", description: "粉灰肉色，乡土田园伙伴。" },
+  { id: "chicken", name: "灵鸡", description: "双足金羽，骑感独特。" },
+  { id: "boar", name: "野猪", description: "獠牙竖耳，山林彪悍。" }
 ];
 
 export interface MountHandle {
   mount: Group;
   /**
-   * 4 条腿引用，按 name 索引。共用 woodHorseLegPose 输出的 key:
+   * 动画腿引用，按 name 索引。优先复用 woodHorseLegPose 输出的 key:
    * "front-left-leg" / "front-right-leg" / "back-left-leg" / "back-right-leg"。
+   * 鸡只暴露两条腿，因此 size=2。
    */
   legsByName: Map<string, Mesh>;
   /** 鞍座（骑手底部）在 mount 局部坐标的 Y 高度。 */
@@ -65,7 +78,7 @@ interface LegSpec {
 }
 
 function buildLegs(specs: LegSpec[], material: MeshPhongMaterial): Mesh[] {
-  // 4 条腿 geometry 不复用——不同 mount 的腿粗细/长度都不一样，单独建更简单。
+  // 腿 geometry 不复用——不同 mount 的腿粗细/长度都不一样，单独建更简单。
   return specs.map((spec) => {
     const geometry = new CylinderGeometry(
       spec.radiusTop,
@@ -77,6 +90,38 @@ function buildLegs(specs: LegSpec[], material: MeshPhongMaterial): Mesh[] {
     leg.name = spec.name;
     leg.position.set(spec.x, spec.y, spec.z);
     leg.rotation.z = spec.baseRotation;
+    return leg;
+  });
+}
+
+function buildBirdLegs(specs: LegSpec[], material: MeshPhongMaterial): Mesh[] {
+  const toeGeometry = new BoxGeometry(0.11, 0.03, 0.03);
+  return specs.map((spec) => {
+    const leg = new Mesh(
+      new CylinderGeometry(
+        spec.radiusTop,
+        spec.radiusBottom,
+        spec.length,
+        5
+      ),
+      material
+    );
+    leg.name = spec.name;
+    leg.position.set(spec.x, spec.y, spec.z);
+    leg.rotation.z = spec.baseRotation;
+
+    const toeOffsets: Array<[number, number, number, number]> = [
+      [0.06, -spec.length * 0.5 + 0.01, 0, 0],
+      [0.05, -spec.length * 0.5 + 0.01, 0.05, 0.24],
+      [0.05, -spec.length * 0.5 + 0.01, -0.05, -0.24]
+    ];
+    toeOffsets.forEach(([x, y, z, rotationY]) => {
+      const toe = new Mesh(toeGeometry, material);
+      toe.position.set(x, y, z);
+      toe.rotation.y = rotationY;
+      leg.add(toe);
+    });
+
     return leg;
   });
 }
@@ -516,12 +561,365 @@ export function buildFox(): MountHandle {
   };
 }
 
+function buildPig(): MountHandle {
+  const furMaterial = new MeshPhongMaterial({
+    color: 0xc89c8c,
+    flatShading: true,
+    shininess: 4
+  });
+  const bellyMaterial = new MeshPhongMaterial({
+    color: 0xd2a99a,
+    flatShading: true,
+    shininess: 3
+  });
+  const snoutMaterial = new MeshPhongMaterial({
+    color: 0xb5887e,
+    flatShading: true,
+    shininess: 5
+  });
+  const darkMaterial = new MeshPhongMaterial({
+    color: 0x1a1410,
+    flatShading: true
+  });
+  const saddleMaterial = new MeshPhongMaterial({
+    color: 0x4a3528,
+    flatShading: true
+  });
+
+  const body = new Mesh(new BoxGeometry(1.5, 0.5, 0.6), furMaterial);
+  body.name = "mount-pig-body";
+  body.position.y = 0.55;
+
+  const chest = new Mesh(new SphereGeometry(0.4, 8, 6), bellyMaterial);
+  chest.position.set(0.32, 0.5, 0);
+  chest.scale.set(1.2, 0.7, 1.0);
+
+  const head = new Mesh(new BoxGeometry(0.42, 0.36, 0.42), furMaterial);
+  head.position.set(0.85, 0.85, 0);
+
+  const snout = new Mesh(new CylinderGeometry(0.13, 0.15, 0.18, 8), snoutMaterial);
+  snout.position.set(1.1, 0.78, 0);
+  snout.rotation.z = Math.PI / 2;
+
+  const earGeometry = new BoxGeometry(0.15, 0.2, 0.05);
+  const earLeft = new Mesh(earGeometry, furMaterial);
+  earLeft.position.set(0.78, 1.0, 0.2);
+  earLeft.rotation.set(0.6, 0, 0.52);
+  const earRight = new Mesh(earGeometry, furMaterial);
+  earRight.position.set(0.78, 1.0, -0.2);
+  earRight.rotation.set(0.6, 0, -0.52);
+
+  const eyeGeometry = new SphereGeometry(0.04, 6, 6);
+  const eyeLeft = new Mesh(eyeGeometry, darkMaterial);
+  eyeLeft.position.set(0.99, 0.88, 0.14);
+  const eyeRight = new Mesh(eyeGeometry, darkMaterial);
+  eyeRight.position.set(0.99, 0.88, -0.14);
+
+  const tail = new Mesh(
+    new TorusGeometry(0.12, 0.04, 8, 16, Math.PI * 1.5),
+    furMaterial
+  );
+  tail.position.set(-0.85, 0.65, 0);
+  tail.rotation.z = -Math.PI / 2;
+
+  const legs = buildLegs(
+    [
+      { name: "front-left-leg", x: 0.45, z: 0.18, y: 0.225, length: 0.45, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: 0.06 },
+      { name: "front-right-leg", x: 0.45, z: -0.18, y: 0.225, length: 0.45, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: -0.06 },
+      { name: "back-left-leg", x: -0.45, z: 0.18, y: 0.225, length: 0.45, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: -0.06 },
+      { name: "back-right-leg", x: -0.45, z: -0.18, y: 0.225, length: 0.45, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: 0.06 }
+    ],
+    darkMaterial
+  );
+
+  const saddle = new Mesh(new BoxGeometry(0.5, 0.1, 0.5), saddleMaterial);
+  saddle.position.set(-0.05, 0.85, 0);
+
+  const mount = new Group();
+  mount.name = "mount-pig";
+  mount.add(
+    body,
+    chest,
+    head,
+    snout,
+    earLeft,
+    earRight,
+    eyeLeft,
+    eyeRight,
+    tail,
+    ...legs,
+    saddle
+  );
+
+  return {
+    mount,
+    legsByName: new Map(legs.map((leg) => [leg.name, leg])),
+    saddleHeight: 0.92,
+    saddleX: -0.05
+  };
+}
+
+function buildBoar(): MountHandle {
+  const furMaterial = new MeshPhongMaterial({
+    color: 0x4a3526,
+    flatShading: true,
+    shininess: 5
+  });
+  const bellyMaterial = new MeshPhongMaterial({
+    color: 0x6a4a35,
+    flatShading: true
+  });
+  const accentMaterial = new MeshPhongMaterial({
+    color: 0x2c1f15,
+    flatShading: true
+  });
+  const tuskMaterial = new MeshPhongMaterial({
+    color: 0xe8e4d5,
+    flatShading: true,
+    shininess: 25
+  });
+  const darkMaterial = new MeshPhongMaterial({
+    color: 0x140a05,
+    flatShading: true
+  });
+  const saddleMaterial = new MeshPhongMaterial({
+    color: 0x4a3528,
+    flatShading: true
+  });
+
+  // 野猪保持同级坐骑体量，但更修长、前肩更强壮。
+  const body = new Mesh(new BoxGeometry(1.55, 0.55, 0.55), furMaterial);
+  body.name = "mount-boar-body";
+  body.position.y = 0.6;
+
+  const shoulder = new Mesh(new SphereGeometry(0.42, 8, 6), furMaterial);
+  shoulder.position.set(0.45, 0.7, 0);
+  shoulder.scale.set(1.3, 1.1, 1.05);
+
+  const belly = new Mesh(new SphereGeometry(0.34, 8, 6), bellyMaterial);
+  belly.position.set(-0.15, 0.45, 0);
+  belly.scale.set(1.4, 0.7, 0.95);
+
+  const head = new Mesh(new BoxGeometry(0.45, 0.34, 0.42), furMaterial);
+  head.position.set(0.92, 0.78, 0);
+
+  const snout = new Mesh(new CylinderGeometry(0.13, 0.16, 0.28, 8), accentMaterial);
+  snout.rotation.z = Math.PI / 2;
+  snout.position.set(1.22, 0.72, 0);
+
+  const tuskGeometry = new ConeGeometry(0.028, 0.12, 4);
+  const tuskLeft = new Mesh(tuskGeometry, tuskMaterial);
+  tuskLeft.name = "mount-boar-tusk-left";
+  tuskLeft.position.set(1.2, 0.75, 0.1);
+  tuskLeft.rotation.set(0, 0, Math.PI / 2 - 0.5);
+  const tuskRight = new Mesh(tuskGeometry, tuskMaterial);
+  tuskRight.name = "mount-boar-tusk-right";
+  tuskRight.position.set(1.2, 0.75, -0.1);
+  tuskRight.rotation.set(0, 0, Math.PI / 2 - 0.5);
+
+  const earGeometry = new ConeGeometry(0.08, 0.2, 4);
+  const earLeft = new Mesh(earGeometry, furMaterial);
+  earLeft.position.set(0.78, 1.05, 0.16);
+  const earRight = new Mesh(earGeometry, furMaterial);
+  earRight.position.set(0.78, 1.05, -0.16);
+
+  const bristleSpine: Mesh[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    const t = i / 5;
+    const bristle = new Mesh(new ConeGeometry(0.04, 0.18, 4), accentMaterial);
+    bristle.name = `mount-boar-bristle-${i + 1}`;
+    bristle.position.set(0.55 - t * 1.1, 0.92 - t * 0.05, 0);
+    bristleSpine.push(bristle);
+  }
+
+  const eyeGeometry = new SphereGeometry(0.04, 6, 6);
+  const eyeLeft = new Mesh(eyeGeometry, darkMaterial);
+  eyeLeft.position.set(1.05, 0.86, 0.16);
+  const eyeRight = new Mesh(eyeGeometry, darkMaterial);
+  eyeRight.position.set(1.05, 0.86, -0.16);
+
+  const tail = new Mesh(new BoxGeometry(0.05, 0.08, 0.05), accentMaterial);
+  tail.position.set(-0.85, 0.55, 0);
+  const tailTip = new Mesh(new ConeGeometry(0.06, 0.1, 5), accentMaterial);
+  tailTip.position.set(-0.85, 0.45, 0);
+  tailTip.rotation.x = Math.PI;
+
+  const legs = buildLegs(
+    [
+      { name: "front-left-leg", x: 0.55, z: 0.18, y: 0.27, length: 0.55, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: 0.06 },
+      { name: "front-right-leg", x: 0.55, z: -0.18, y: 0.27, length: 0.55, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: -0.06 },
+      { name: "back-left-leg", x: -0.55, z: 0.18, y: 0.27, length: 0.55, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: -0.06 },
+      { name: "back-right-leg", x: -0.55, z: -0.18, y: 0.27, length: 0.55, radiusTop: 0.1, radiusBottom: 0.12, baseRotation: 0.06 }
+    ],
+    darkMaterial
+  );
+
+  const saddle = new Mesh(new BoxGeometry(0.5, 0.1, 0.5), saddleMaterial);
+  saddle.position.set(-0.05, 0.95, 0);
+
+  const mount = new Group();
+  mount.name = "mount-boar";
+  mount.add(
+    body,
+    shoulder,
+    belly,
+    head,
+    snout,
+    tuskLeft,
+    tuskRight,
+    earLeft,
+    earRight,
+    ...bristleSpine,
+    eyeLeft,
+    eyeRight,
+    tail,
+    tailTip,
+    ...legs,
+    saddle
+  );
+
+  return {
+    mount,
+    legsByName: new Map(legs.map((leg) => [leg.name, leg])),
+    saddleHeight: 1.02,
+    saddleX: -0.05
+  };
+}
+
+function buildChicken(): MountHandle {
+  const featherMaterial = new MeshPhongMaterial({
+    color: 0xc04935,
+    flatShading: true,
+    shininess: 4
+  });
+  const altFeatherMaterial = new MeshPhongMaterial({
+    color: 0xe8d4a8,
+    flatShading: true,
+    shininess: 3
+  });
+  const combMaterial = new MeshPhongMaterial({
+    color: 0xc41a1a,
+    flatShading: true
+  });
+  const beakMaterial = new MeshPhongMaterial({
+    color: 0xe5b54a,
+    flatShading: true
+  });
+  const legMaterial = new MeshPhongMaterial({
+    color: 0xd9a64a,
+    flatShading: true
+  });
+  const darkMaterial = new MeshPhongMaterial({
+    color: 0x140e08,
+    flatShading: true
+  });
+  const saddleMaterial = new MeshPhongMaterial({
+    color: 0x4a3528,
+    flatShading: true
+  });
+
+  const body = new Mesh(new SphereGeometry(0.32, 8, 6), featherMaterial);
+  body.name = "mount-chicken-body";
+  body.position.set(0, 0.55, 0);
+  body.scale.set(1.0, 0.9, 0.85);
+
+  const neck = new Mesh(new SphereGeometry(0.16, 8, 6), altFeatherMaterial);
+  neck.position.set(0.08, 0.74, 0);
+  neck.scale.set(0.9, 1.0, 0.8);
+
+  const head = new Mesh(new SphereGeometry(0.18, 8, 6), altFeatherMaterial);
+  head.position.set(0.2, 0.92, 0);
+
+  const combGeometry = new ConeGeometry(0.06, 0.16, 4);
+  const combLeft = new Mesh(combGeometry, combMaterial);
+  combLeft.position.set(0.14, 1.07, 0);
+  combLeft.rotation.z = 0.12;
+  const combMiddle = new Mesh(combGeometry, combMaterial);
+  combMiddle.position.set(0.2, 1.12, 0);
+  const combRight = new Mesh(combGeometry, combMaterial);
+  combRight.position.set(0.26, 1.07, 0);
+  combRight.rotation.z = -0.12;
+
+  const wattle = new Mesh(new SphereGeometry(0.05, 6, 6), combMaterial);
+  wattle.position.set(0.32, 0.78, 0);
+
+  const beak = new Mesh(new ConeGeometry(0.05, 0.12, 4), beakMaterial);
+  beak.position.set(0.36, 0.88, 0);
+  beak.rotation.z = -Math.PI / 2;
+
+  const eyeGeometry = new SphereGeometry(0.025, 6, 6);
+  const eyeLeft = new Mesh(eyeGeometry, darkMaterial);
+  eyeLeft.position.set(0.3, 0.96, 0.07);
+  const eyeRight = new Mesh(eyeGeometry, darkMaterial);
+  eyeRight.position.set(0.3, 0.96, -0.07);
+
+  const wingGeometry = new BoxGeometry(0.3, 0.04, 0.18);
+  const wingLeft = new Mesh(wingGeometry, altFeatherMaterial);
+  wingLeft.position.set(0.0, 0.6, 0.3);
+  wingLeft.rotation.z = 0.15;
+  const wingRight = new Mesh(wingGeometry, altFeatherMaterial);
+  wingRight.position.set(0.0, 0.6, -0.3);
+  wingRight.rotation.z = -0.15;
+
+  const tailCenter = new Mesh(new BoxGeometry(0.1, 0.32, 0.08), featherMaterial);
+  tailCenter.position.set(-0.32, 0.82, 0);
+  const tailLeft = new Mesh(new BoxGeometry(0.1, 0.32, 0.08), darkMaterial);
+  tailLeft.position.set(-0.32, 0.78, 0.08);
+  tailLeft.rotation.z = 0.44;
+  const tailRight = new Mesh(new BoxGeometry(0.1, 0.32, 0.08), darkMaterial);
+  tailRight.position.set(-0.32, 0.78, -0.08);
+  tailRight.rotation.z = -0.44;
+
+  const legs = buildBirdLegs(
+    [
+      { name: "front-left-leg", x: 0.0, z: 0.13, y: 0.18, length: 0.36, radiusTop: 0.04, radiusBottom: 0.05, baseRotation: 0.08 },
+      { name: "front-right-leg", x: 0.0, z: -0.13, y: 0.18, length: 0.36, radiusTop: 0.04, radiusBottom: 0.05, baseRotation: -0.08 }
+    ],
+    legMaterial
+  );
+
+  const saddle = new Mesh(new BoxGeometry(0.32, 0.06, 0.32), saddleMaterial);
+  saddle.position.set(0, 0.78, 0);
+
+  const mount = new Group();
+  mount.name = "mount-chicken";
+  mount.add(
+    body,
+    neck,
+    head,
+    combLeft,
+    combMiddle,
+    combRight,
+    wattle,
+    beak,
+    eyeLeft,
+    eyeRight,
+    wingLeft,
+    wingRight,
+    tailCenter,
+    tailLeft,
+    tailRight,
+    ...legs,
+    saddle
+  );
+
+  return {
+    mount,
+    legsByName: new Map(legs.map((leg) => [leg.name, leg])),
+    saddleHeight: 0.85,
+    saddleX: 0
+  };
+}
+
 const MOUNT_BUILDERS: Record<MountId, () => MountHandle> = {
   horse: buildHorse,
   ox: buildOx,
   sheep: buildSheep,
   donkey: buildDonkey,
-  fox: buildFox
+  fox: buildFox,
+  pig: buildPig,
+  chicken: buildChicken,
+  boar: buildBoar
 };
 
 export function createMount(id: MountId): MountHandle {
