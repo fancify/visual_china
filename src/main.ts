@@ -317,6 +317,13 @@ function activeAtlasFeatures(): QinlingAtlasFeature[] {
 }
 
 async function loadHydrographyAtlas(): Promise<void> {
+  // Yield to the next microtask so module-level initializers
+  // (waterSystemGroup, terrainChunkGroup, etc.) finish first. Old
+  // version had `await fetch(...)` which deferred implicitly; after
+  // we removed the OSM/primary fetches the function became sync and
+  // ran before module init → "Cannot access 'waterSystemGroup' before
+  // initialization".
+  await Promise.resolve();
   // 2026-05 用户："只要 prototype 里有的"——
   // primary-modern.json 把 OSM + curated 合并；
   // osm-modern.json 又是 4639 个 OSM water features 当 evidence overlay。
