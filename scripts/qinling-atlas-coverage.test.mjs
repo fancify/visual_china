@@ -58,11 +58,9 @@ test("Qinling atlas explicitly models the visible water system", () => {
   assert.ok(waterNames.includes("渭河"), "渭河 must be visible north of Qinling");
   assert.ok(waterNames.includes("汉水"), "汉水 must be visible through Hanzhong");
   assert.ok(waterNames.includes("嘉陵江"), "嘉陵江 must be visible near Guangyuan/Jianmen");
-  // 2026-05 user replaced curated rivers with NE/OSM-sourced set.
-  // 褒水 显示名 (NE 名 "褒河") 仍在；斜水/外江 在 NE 跟 OSM 都没数据，dropped.
-  // 新增 长江/岷江/沱江/内江.
-  assert.ok(waterNames.includes("褒水"), "褒水 should explain Baoxie valley movement");
-  assert.ok(waterNames.includes("岷江"), "岷江 must be visible from 都江堰 to 黄龙溪");
+  // 2026-05 user "只要 prototype 里有的" - prototype is NE only.
+  // 褒水/岷江/内江 were OSM, dropped. 长江/沱江 are NE additions inside slice.
+  assert.ok(waterNames.includes("长江"), "长江 must be visible at slice south edge (Three Gorges entry)");
   assert.ok(waterNames.includes("沱江"), "沱江 must be visible in 四川盆地 east");
 
   for (const river of qinlingWaterSystem) {

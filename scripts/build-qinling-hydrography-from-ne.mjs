@@ -35,6 +35,9 @@ const SLICE_BBOX = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
 // flowDir: "lon-asc" = W→E (lon 递增), "lon-desc" = E→W, "lat-desc" = N→S, "lat-asc" = S→N
 // 凡是在 major-rivers.json 里有 polyline 进入 slice bbox 的，都列在这里。
 // 之前的 斜水 / 外江 因 NE/OSM 都没数据，dropped (用户："去掉目前的河，用新做的河来代替")。
+// 凡是 major-rivers.json 里有 polyline 进入 slice 的 NE 河，都列在这里。
+// (黄河/岷江 在 major-rivers.json 但 NE 数据不进 slice — 黄河走太北，
+// 岷江上游 NE 没收。warning 而已，不会进结果。)
 const NAME_TO_ID = {
   "长江":   { id: "river-changjiang",   flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "长江" },
   "黄河":   { id: "river-huanghe",      flowDir: "lon-asc",  rank: 1, basin: "黄河流域", displayName: "黄河" },
@@ -298,6 +301,11 @@ function stitchOsmRiverByName({
   return { points, segCount: segs.length, joinedCount: joined.length };
 }
 
+// 2026-05 用户："只要 prototype 里有的。其他的都去掉"
+// → prototype 用的是 major-rivers.json (Natural Earth 10m only)，不用 OSM。
+// 所以下面 OSM 拼接 (岷江上游 / 褒河 / 内江) 全部跳过。
+const SKIP_OSM_STITCHING = true;
+
 // === OSM 上游岷江 (NE 10m 没收) ===
 // 现有的 hand-typed river-minjiang 只从 都江堰 (~30.99°N) 往南 5 个点，
 // 完全缺失 松潘 → 汶川 → 都江堰 这段上游。OSM 里有 35 段 way 都叫"岷江"，
@@ -306,8 +314,11 @@ function stitchOsmRiverByName({
 // ⚠️ 名字冲突：甘肃也有一条"岷江"（嘉陵江上游支流，lon 104.3-104.8）。
 // 通过 bbox 把它过滤掉。
 const SICHUAN_MIN_CORRIDOR = { west: 103.4, east: 104.0, south: 30.4, north: 33.5 };
-const osm = JSON.parse(await fs.readFile(OSM_PATH, "utf8"));
-const minjiangSegs = osm.features
+let osm = null;
+if (!SKIP_OSM_STITCHING) {
+  osm = JSON.parse(await fs.readFile(OSM_PATH, "utf8"));
+}
+const minjiangSegs = SKIP_OSM_STITCHING ? [] : osm.features
   .filter((f) => f.name === "岷江" && f.geometry?.points?.length >= 2)
   .map((f) =>
     f.geometry.points.map((p) => {
@@ -432,7 +443,10 @@ const SMALL_TRIB_OSM_TARGETS = [
 ];
 
 console.log("\n=== 小支流 OSM 拼接 ===");
-for (const target of SMALL_TRIB_OSM_TARGETS) {
+if (SKIP_OSM_STITCHING) {
+  console.log("  (跳过 — 用户：只要 prototype 里有的)");
+}
+for (const target of SKIP_OSM_STITCHING ? [] : SMALL_TRIB_OSM_TARGETS) {
   const stitched = stitchOsmRiverByName({
     osm,
     riverName: target.osmName,
