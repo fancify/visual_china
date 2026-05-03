@@ -100,7 +100,10 @@ function makeWallMaterial(): MeshPhongMaterial {
     flatShading: true,
     shininess: 6,
     transparent: true,
-    depthWrite: false, // fade 中半透明城墙不写 depth，避免 ghost-occlusion
+    // 注意：solid wall 必须 depthWrite=true，否则同一实例内 4 面墙互相
+    // 看穿（用户："建筑透视有点问题，像透明的"）。仅在 fade 透明阶段
+    // 不该写 depth，但材质级别没法区分 fading vs solid。trade-off：保留
+    // depthWrite=true 以保 solid 视觉，接受 fade 时可能轻微 z-fight。
     opacity: 1
   });
 }
@@ -171,13 +174,12 @@ export function createCityMarkers(
     });
 
     wallMesh.instanceMatrix.needsUpdate = true;
-    // ⚠ Three.js InstancedMesh frustum culling 默认只看 geometry 的
-    // boundingSphere（几米半径，绕原点），不看 instance matrices。所以
-    // 当原点在视锥外（玩家镜头转向某些角度）时整组城市会被一起裁掉，
-    // 即使个别 instance 还在画面里——这就是用户反馈的"近的城市镜头一
-    // 转就消失再转回来又出现"。computeBoundingSphere 会 walk 所有 instance
-    // 位置算出真正包围 sphere，让 culling 跟实际视锥对得上。
+    // ⚠ Three.js InstancedMesh frustum culling 有持续性 bug：computeBoundingSphere
+    // 算出的 sphere 是包整组 instance 的大圆，但镜头某些倾斜角度下整组仍被
+    // 误裁。安全做法：直接关掉 frustumCulled — 整组 city wall 实例数 < 30,
+    // 渲染开销可忽略，比间歇消失体验好。
     wallMesh.computeBoundingSphere();
+    wallMesh.frustumCulled = false;
     group.add(wallMesh);
   });
 
