@@ -96,8 +96,14 @@ for (let chunkRow = 0; chunkRow < chunkRows; chunkRow += 1) {
 
     const minX = interpolate(-asset.world.width * 0.5, asset.world.width * 0.5, westT);
     const maxX = interpolate(-asset.world.width * 0.5, asset.world.width * 0.5, eastT);
-    const maxZ = interpolate(asset.world.depth * 0.5, -asset.world.depth * 0.5, northT);
-    const minZ = interpolate(asset.world.depth * 0.5, -asset.world.depth * 0.5, southT);
+    // 2026-05 修一个长期 latent bug：之前这里用 (+halfDepth, -halfDepth, t)
+    // 把"北 = +Z"。但 mapOrientation 契约是 "北 = -Z"，cityMarkers /
+    // hydrography / atlas 都按这个走。结果 chunks 在 world 里 N↔S mirror，
+    // 城市 / 河 placed 在地理正确的世界位置但底下 chunk 是反的 → 河谷
+    // 雕刻不对位 + 城建在错误高度 → 用户反馈"树飘 / 城市消失 / 河 fragmented"
+    // 都是这个 bug 的衍生。codex 找到的根因。
+    const minZ = interpolate(-asset.world.depth * 0.5, asset.world.depth * 0.5, northT);
+    const maxZ = interpolate(-asset.world.depth * 0.5, asset.world.depth * 0.5, southT);
 
     const heights = buildChunkChannel(
       asset.heights,

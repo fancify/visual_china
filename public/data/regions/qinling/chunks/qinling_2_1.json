@@ -6,7 +6,7 @@
   "lod": "L2",
   "name": "qinling-chunk-2-1",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-03T10:51:17.105Z",
+  "generatedAt": "2026-05-03T11:44:42.273Z",
   "bounds": {
     "west": 106.75,
     "east": 108.375,
@@ -20,8 +20,8 @@
   "worldBounds": {
     "minX": 0,
     "maxX": 45,
-    "minZ": 24,
-    "maxZ": 72
+    "minZ": -72,
+    "maxZ": -24
   },
   "grid": {
     "columns": 49,
