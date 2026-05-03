@@ -1,4 +1,6 @@
 import {
+  BoxGeometry,
+  BufferGeometry,
   ExtrudeGeometry,
   Group,
   InstancedMesh,
@@ -31,46 +33,21 @@ import { projectGeoToWorld } from "./mapOrientation.js";
 
 function makeWalledCompoundGeometry(
   outerSide: number,
-  innerSide: number,
+  _innerSide: number,
   height: number
-): ExtrudeGeometry {
-  const half = outerSide * 0.5;
-  const innerHalf = innerSide * 0.5;
-
-  // ExtrudeGeometry 默认在 XY plane 画 shape，沿 +Z 方向 extrude；
-  // 我们要让 "口" 平放在地面（XZ plane）、向上长高。所以画在 XY 平面，
-  // extrude 0..height，最后旋转 -PI/2 让 Z 轴变 Y 轴。
-  const shape = new Shape();
-  shape.moveTo(-half, -half);
-  shape.lineTo(half, -half);
-  shape.lineTo(half, half);
-  shape.lineTo(-half, half);
-  shape.lineTo(-half, -half);
-
-  const hole = new Path();
-  hole.moveTo(-innerHalf, -innerHalf);
-  hole.lineTo(innerHalf, -innerHalf);
-  hole.lineTo(innerHalf, innerHalf);
-  hole.lineTo(-innerHalf, innerHalf);
-  hole.lineTo(-innerHalf, -innerHalf);
-  shape.holes.push(hole);
-
-  const geom = new ExtrudeGeometry(shape, {
-    depth: height,
-    bevelEnabled: false,
-    curveSegments: 1
-  });
-  // rotateX(-PI/2) 把 (x, y, z) 映射成 (x, z, -y)。原本 z=0..height 的
-  // extrusion 旋转后变成 y=0..height（在地表之上向上长），原 shape 的
-  // y 维度（-outerHalf..+outerHalf）旋转后变 z（同范围），刚好是俯视的
-  // "口"字型。base 已经在 y=0，**不要**再 translate（codex d90c5e7 P1
-  // 抓到的：之前再 +height 把整圈墙抬高了一档，看上去是飘在地上）。
-  geom.rotateX(-Math.PI / 2);
+): BufferGeometry {
+  // 2026-05 用户反馈"看着是透明的"：之前是 ExtrudeGeometry 的 "口" 字
+  // 中空环 (4 面墙 + 顶开 + 底开)，低角度看穿到对面墙。换成实心 BoxGeometry
+  // 直接消除"穿透"假象。geometry y 范围 = -height/2..+height/2，translate
+  // 上来让 base 在 y=0、top 在 y=height，跟旧 ExtrudeGeometry 对齐 (instance
+  // matrix 不需要变).
+  const geom = new BoxGeometry(outerSide, height, outerSide);
+  geom.translate(0, height * 0.5, 0);
   return geom;
 }
 
 interface TierGeometry {
-  geom: ExtrudeGeometry;
+  geom: BufferGeometry;
   height: number;
 }
 
