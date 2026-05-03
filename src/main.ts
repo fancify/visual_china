@@ -2551,22 +2551,23 @@ function drawAtlasOverlay(
 
 interface RegionPlacemark {
   name: string;
-  world: { x: number; z: number };
+  lat: number;
+  lon: number;
   fontSize: number;
 }
 
-// 宏观地带标签：与 feature 系统并行，作为打开 atlas 时的"地理骨架"。
-// feature 标签是细节（渭河、长安），这些是脊柱（关中平原、秦岭主脊、蜀道走廊）。
+// 宏观地带标签：跟 feature 系统并行，atlas 打开时作为"地理骨架"。
+// 用 lat/lon 而不是 world.x/z，bounds 改了自动跟着重投影（refactor #63）。
+// 真实经纬度按对应地理中心估算：关中平原≈西安附近(34.5°N, 108.5°E)，
+// 秦岭主脊≈太白山(33.95°N, 107.78°E)，等等。
 const qinlingRegionPlacemarks: RegionPlacemark[] = [
-  // 字号按用户反馈"字体很小"统一 +8。fullscreen 模式 atlas 一眼看清。
-  // mapOrientation 北 = -Z（z 取负）。
-  { name: "关中平原", world: { x: 26, z: -80 }, fontSize: 26 },
-  { name: "渭河谷地", world: { x: -22, z: -76 }, fontSize: 22 },
-  { name: "秦岭主脊", world: { x: 6, z: -28 }, fontSize: 25 },
-  { name: "汉中盆地", world: { x: 26, z: -8 }, fontSize: 24 },
-  { name: "蜀道走廊", world: { x: -10, z: 28 }, fontSize: 22 },
-  { name: "四川盆地北缘", world: { x: -30, z: 64 }, fontSize: 22 },
-  { name: "成都平原", world: { x: -44, z: 104 }, fontSize: 24 }
+  { name: "关中平原",     lat: 34.50, lon: 108.30, fontSize: 26 },
+  { name: "渭河谷地",     lat: 34.60, lon: 106.20, fontSize: 22 },
+  { name: "秦岭主脊",     lat: 33.85, lon: 106.45, fontSize: 25 },
+  { name: "汉中盆地",     lat: 33.20, lon: 107.05, fontSize: 24 },
+  { name: "蜀道走廊",     lat: 32.55, lon: 106.05, fontSize: 22 },
+  { name: "四川盆地北缘", lat: 31.55, lon: 105.30, fontSize: 22 },
+  { name: "成都平原",     lat: 30.65, lon: 104.65, fontSize: 24 }
 ];
 
 function drawRegionPlacemarks(
@@ -2580,8 +2581,15 @@ function drawRegionPlacemarks(
   context.save();
   context.textAlign = "center";
   context.textBaseline = "middle";
+  // 用 terrainSampler 提供的 bounds + world 算每个 placemark 当前的世界 (x,z)，
+  // 然后投到 atlas 像素。bounds 改了，placemark 自动跟着移到正确地理位置。
+  const bounds = terrainSampler?.asset.bounds;
+  const world = terrainSampler?.asset.world;
   qinlingRegionPlacemarks.forEach((mark) => {
-    const point = projection.worldToCanvas({ x: mark.world.x, y: mark.world.z });
+    const wp = bounds && world
+      ? projectGeoToWorld({ lat: mark.lat, lon: mark.lon }, bounds, world)
+      : { x: 0, z: 0 };
+    const point = projection.worldToCanvas({ x: wp.x, y: wp.z });
     context.font = `700 ${mark.fontSize}px 'Noto Sans SC', 'PingFang SC', sans-serif`;
     const metrics = context.measureText(mark.name);
     const padX = 10;

@@ -20,10 +20,10 @@ export const qinlingModernHydrography = {
       relations: ["city-changan", "city-xianyang", "city-baoji-chencang"],
       geometry: {
         points: [
-          { x: 24, y: -72 },
-          { x: 48, y: -70 },
-          { x: 70, y: -69 },
-          { x: 90, y: -68 }
+          { lat: 34.4, lon: 106.98333 },
+          { lat: 34.35833, lon: 107.71667 },
+          { lat: 34.3375, lon: 108.38889 },
+          { lat: 34.31667, lon: 109 }
         ]
       }
     },
@@ -40,11 +40,11 @@ export const qinlingModernHydrography = {
       relations: ["city-hanzhong", "road-jinniu-jianmen"],
       geometry: {
         points: [
-          { x: -8, y: -3 },
-          { x: 14, y: -8 },
-          { x: 26, y: -9 },
-          { x: 42, y: -7 },
-          { x: 62, y: 0 }
+          { lat: 32.9625, lon: 106.00556 },
+          { lat: 33.06667, lon: 106.67778 },
+          { lat: 33.0875, lon: 107.04444 },
+          { lat: 33.04583, lon: 107.53333 },
+          { lat: 32.9, lon: 108.14444 }
         ]
       }
     },
@@ -60,10 +60,10 @@ export const qinlingModernHydrography = {
       relations: ["city-guangyuan", "city-zhaohua", "pass-jianmen"],
       geometry: {
         points: [
-          { x: -8, y: -3 },
-          { x: -12, y: 20 },
-          { x: -10, y: 28 },
-          { x: -8, y: 64 }
+          { lat: 32.9625, lon: 106.00556 },
+          { lat: 32.48333, lon: 105.88333 },
+          { lat: 32.31667, lon: 105.94444 },
+          { lat: 31.56667, lon: 106.00556 }
         ]
       }
     },
@@ -80,10 +80,10 @@ export const qinlingModernHydrography = {
       relations: ["road-baoxie", "military-shimen"],
       geometry: {
         points: [
-          { x: 24, y: -11 },
-          { x: 30, y: -18 },
-          { x: 34, y: -28 },
-          { x: 38, y: -39 }
+          { lat: 33.12917, lon: 106.98333 },
+          { lat: 33.275, lon: 107.16667 },
+          { lat: 33.48333, lon: 107.28889 },
+          { lat: 33.7125, lon: 107.41111 }
         ]
       }
     },
@@ -99,10 +99,10 @@ export const qinlingModernHydrography = {
       relations: ["road-baoxie"],
       geometry: {
         points: [
-          { x: 58, y: -70 },
-          { x: 51, y: -58 },
-          { x: 44, y: -48 },
-          { x: 38, y: -39 }
+          { lat: 34.35833, lon: 108.02222 },
+          { lat: 34.10833, lon: 107.80833 },
+          { lat: 33.9, lon: 107.59444 },
+          { lat: 33.7125, lon: 107.41111 }
         ]
       }
     },
@@ -121,12 +121,12 @@ export const qinlingModernHydrography = {
       // 终点 (-86, 92) 即都江堰真实坐标 (lat 30.987, lon 103.62) 的投影。
       geometry: {
         points: [
-          { x: -86, y: -2 },
-          { x: -88, y: 18 },
-          { x: -89, y: 38 },
-          { x: -88, y: 58 },
-          { x: -87, y: 76 },
-          { x: -86, y: 92 }
+          { lat: 32.94167, lon: 103.62222 },
+          { lat: 32.525, lon: 103.56111 },
+          { lat: 32.10833, lon: 103.53056 },
+          { lat: 31.69167, lon: 103.56111 },
+          { lat: 31.31667, lon: 103.59167 },
+          { lat: 30.98333, lon: 103.62222 }
         ]
       }
     },
@@ -146,10 +146,10 @@ export const qinlingModernHydrography = {
       // 起点跟 岷江上游终点 (-86, 92) 共享，保持视觉连贯。
       geometry: {
         points: [
-          { x: -86, y: 92 },
-          { x: -86, y: 100 },
-          { x: -84, y: 110 },
-          { x: -81, y: 119 }
+          { lat: 30.98333, lon: 103.62222 },
+          { lat: 30.81667, lon: 103.62222 },
+          { lat: 30.60833, lon: 103.68333 },
+          { lat: 30.42083, lon: 103.775 }
         ]
       }
     },
@@ -169,11 +169,11 @@ export const qinlingModernHydrography = {
       // 真实坐标 (-71.5, 107.5)。对应 都江堰内江-走马河-府河 的水道走向。
       geometry: {
         points: [
-          { x: -86, y: 92 },
-          { x: -84, y: 95 },
-          { x: -80, y: 99 },
-          { x: -76, y: 103 },
-          { x: -71.5, y: 107.5 }
+          { lat: 30.98333, lon: 103.62222 },
+          { lat: 30.92083, lon: 103.68333 },
+          { lat: 30.8375, lon: 103.80556 },
+          { lat: 30.75417, lon: 103.92778 },
+          { lat: 30.66042, lon: 104.06528 }
         ]
       }
     }
