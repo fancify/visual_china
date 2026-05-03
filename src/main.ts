@@ -2911,7 +2911,8 @@ function refreshHud(): void {
   const playerDz = Math.abs(player.position.z - lastDrawnPlayerZ);
   const playerMoved = playerDx > 0.6 || playerDz > 0.6;
   // hudDirty 路径（用户操作 toggle layer / 切季节等）一律重绘——保证内容
-  // 状态实时反映。timer 路径下只有玩家位移够大才重绘。
+  // 状态实时反映。timer 路径下只有玩家位移够大才重绘；atlas 全屏时玩家
+  // 还想看 dot 慢慢移动，所以全屏时 timer 也照画（已被外层 0.5s throttle）。
   if (hudDirty || playerMoved || atlasWorkbench.isFullscreen) {
     drawOverviewMap(terrainSampler.asset, player.position);
     lastDrawnPlayerX = player.position.x;
@@ -4115,12 +4116,10 @@ function frame(): void {
   update(deltaSeconds);
   updateFragmentVisuals(elapsedTime);
   hudRefreshTimer += deltaSeconds;
-  // refresh interval：atlas 全屏打开时玩家 dot/heading 三角是导航主要参考，
-  // 必须保持 0.15s 平滑；普通游戏视图下 mini-map 是辅助，0.5s 即可，避免
-  // overview 模式 fps 被 12ms canvas2d 重绘砸到 50。codex review of d30759b
-  // 抓到全屏 atlas 0.5s 间隔会让导航 dot 明显卡顿。
-  const hudRefreshInterval = atlasWorkbench.isFullscreen ? 0.15 : 0.5;
-  if (hudDirty || hudRefreshTimer >= hudRefreshInterval) {
+  // 用户："mini-map 全屏也改成 0.5s 一次"。统一 0.5s——atlas 全屏时
+  // 12ms canvas2d 重绘 × 6.6/s 是当前 atlas 卡顿的元凶（fps 砸到 ~50）。
+  // 玩家 dot 0.5s 一更新仍能用，dirty 路径（layer toggle / 手动刷）仍即时。
+  if (hudDirty || hudRefreshTimer >= 0.5) {
     refreshHud();
     hudRefreshTimer = 0;
     hudDirty = false;
