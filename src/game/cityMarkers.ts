@@ -37,6 +37,9 @@ function makeWalledCompoundGeometry(
   innerSide: number,
   height: number
 ): BufferGeometry {
+  const prepareForMerge = (geometry: BufferGeometry): BufferGeometry =>
+    geometry.index ? geometry.toNonIndexed() : geometry.clone();
+
   // 用户："应该是回字形"。回 = 外环城墙 + 内块城核 (两层 concentric)。
   // 之前 "口" (空心环) 看穿；纯实心 box 太单调。回 shape 同时解决这两个：
   //   - 外环: ExtrudeGeometry "口" 字 (中空，让外墙形态可见)
@@ -61,28 +64,31 @@ function makeWalledCompoundGeometry(
   hole.lineTo(-innerHalf, innerHalf);
   hole.lineTo(-innerHalf, -innerHalf);
   ringShape.holes.push(hole);
-  const ringGeom = new ExtrudeGeometry(ringShape, {
+  const ringGeom = prepareForMerge(new ExtrudeGeometry(ringShape, {
     depth: height,
     bevelEnabled: false,
     curveSegments: 1
-  });
+  }));
   ringGeom.rotateX(-Math.PI / 2);
-  // 旋转后 y 范围 = -height..0；translate 让 base=0, top=height
-  ringGeom.translate(0, height, 0);
+  // ExtrudeGeometry 原本沿 +Z 挤出 0..height；rotateX(-PI/2) 之后正好落到
+  // world Y 的 0..height，base 已经在 0，不能再 translate 一次。之前多加
+  // 了一个 height，导致汉中/城固整圈城墙统一悬空一个墙高。
 
   // 内核：实心 box, 比外墙稍矮 (0.7×) 让外墙仍是主体形态
   const coreSide = innerSide * 0.85;
   const coreHeight = height * 0.7;
-  const coreGeom = new BoxGeometry(coreSide, coreHeight, coreSide);
+  const coreGeom = prepareForMerge(new BoxGeometry(coreSide, coreHeight, coreSide));
   coreGeom.translate(0, coreHeight * 0.5, 0);
 
   // 合并成单 BufferGeometry. mergeGeometries 要求 attributes 一致；
-  // ExtrudeGeometry 默认有 position+normal+uv, BoxGeometry 也有，OK.
+  // ExtrudeGeometry / BoxGeometry 的 indexed 状态不一致时会 merge 失败，
+  // 运行时 silently 退回成只有外环的 hollow wall。统一 toNonIndexed。
   const merged = BufferGeometryUtils.mergeGeometries([ringGeom, coreGeom]);
   if (!merged) {
     // fallback 极少触发；保险起见直接退化到 ring 单形
     return ringGeom;
   }
+  merged.computeVertexNormals();
   return merged;
 }
 
@@ -182,7 +188,7 @@ export function createCityMarkers(
       const CHUNK_Y_OFFSET = 0.12;
       const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
 
-      // geom 已经从 base y=0 长到 y=height，所以放到 (x, terrainY, z) 即可。
+      // geom 现在保证 base y=0、top y=height，所以放到 (x, terrainY, z) 即可。
       dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(1, 1, 1);

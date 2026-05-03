@@ -58,7 +58,8 @@ export function createMoonTexture(size = 256): CanvasTexture {
   context.clearRect(0, 0, size, size);
   context.beginPath();
   context.arc(center, center, radius, 0, Math.PI * 2);
-  context.fillStyle = "rgba(232, 236, 224, 0.86)";
+  // 月盘主体必须是实心 alpha=1，否则星点会穿过 disc。
+  context.fillStyle = "rgba(232, 236, 224, 1)";
   context.fill();
 
   const markings: Array<[number, number, number, number]> = [
@@ -88,6 +89,7 @@ export function createMoonTexture(size = 256): CanvasTexture {
 export interface StarDomeData {
   positions: Float32Array;
   colors: Float32Array;
+  phases: Float32Array;
 }
 
 /**
@@ -106,6 +108,7 @@ export interface StarDomeData {
 export function createStarDome(count: number, radius: number): StarDomeData {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
+  const phases = new Float32Array(count);
 
   // LCG 伪随机：seed=137 写死保证可复现
   let seed = 137;
@@ -185,9 +188,10 @@ export function createStarDome(count: number, radius: number): StarDomeData {
     colors[index * 3] = r * brightness;
     colors[index * 3 + 1] = g * brightness;
     colors[index * 3 + 2] = b * brightness;
+    phases[index] = rand() * Math.PI * 2;
   }
 
-  return { positions, colors };
+  return { positions, colors, phases };
 }
 
 function normalize3(v: { x: number; y: number; z: number }) {

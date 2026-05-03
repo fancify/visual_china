@@ -12,6 +12,7 @@ import {
   Sprite,
   SpriteMaterial,
   Color,
+  Vector3,
   type CanvasTexture
 } from "three";
 
@@ -33,6 +34,10 @@ export interface SkyDomeHandle {
   sunDiscMaterial: SpriteMaterial;
   moonDisc: Sprite;
   moonDiscMaterial: SpriteMaterial;
+}
+
+interface StarTwinkleUniforms {
+  twinkleTime: { value: number };
 }
 
 /**
@@ -58,13 +63,32 @@ const SKY_VERTEX = /* glsl */ `
 const SKY_FRAGMENT = /* glsl */ `
   uniform vec3 zenithColor;
   uniform vec3 horizonColor;
+  uniform vec3 horizonCoolColor;
+  uniform vec3 sunWarmColor;
   uniform vec3 groundColor;
+  uniform vec3 sunDirection;
   uniform float horizonSoftness;
+  uniform float sunInfluence;
   varying vec3 vWorldPos;
   void main() {
     vec3 dir = normalize(vWorldPos);
+    vec2 horizonVec = vec2(dir.x, dir.z);
+    float horizonLen = length(horizonVec);
+    vec2 horizonDir = horizonLen > 1e-4 ? horizonVec / horizonLen : vec2(1.0, 0.0);
+    vec2 sunVec = vec2(sunDirection.x, sunDirection.z);
+    float sunLen = length(sunVec);
+    vec2 sunDir = sunLen > 1e-4 ? sunVec / sunLen : vec2(1.0, 0.0);
+    float sunAzimuth = dot(horizonDir, sunDir);
+    float sunSide = smoothstep(-0.2, 0.75, sunAzimuth);
+    float horizonBand = 1.0 - smoothstep(0.02, 0.32, abs(dir.y));
+    vec3 directionalHorizon = mix(horizonCoolColor, sunWarmColor, sunSide);
+    vec3 horizonTint = mix(
+      horizonColor,
+      directionalHorizon,
+      horizonBand * sunInfluence
+    );
     float t = smoothstep(-0.05, 0.65, dir.y);
-    vec3 sky = mix(horizonColor, zenithColor, t);
+    vec3 sky = mix(horizonTint, zenithColor, t);
     float groundMix = smoothstep(0.0, -0.18, dir.y);
     sky = mix(sky, groundColor, groundMix * horizonSoftness);
     gl_FragColor = vec4(sky, 1.0);
@@ -78,14 +102,53 @@ function makeSkyShellMaterial(): ShaderMaterial {
     uniforms: {
       zenithColor: { value: new Color(0x4d7d96) },
       horizonColor: { value: new Color(0xb6c4be) },
+      horizonCoolColor: { value: new Color(0x95a7bf) },
+      sunWarmColor: { value: new Color(0xf3a37c) },
       groundColor: { value: new Color(0x14201f) },
-      horizonSoftness: { value: 0.55 }
+      sunDirection: { value: new Vector3(1, 0, 0) },
+      horizonSoftness: { value: 0.55 },
+      sunInfluence: { value: 0 }
     },
     side: BackSide,
     depthTest: false,
     depthWrite: false,
     fog: false
   });
+}
+
+function installStarTwinkle(material: PointsMaterial): void {
+  const twinkleUniforms: StarTwinkleUniforms = {
+    twinkleTime: { value: 0 }
+  };
+  material.userData.twinkleUniforms = twinkleUniforms;
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.twinkleTime = twinkleUniforms.twinkleTime;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+attribute float phase;
+uniform float twinkleTime;
+varying float vTwinkle;`
+      )
+      .replace(
+        "#include <color_vertex>",
+        `#include <color_vertex>
+  vTwinkle = 0.55 + 0.45 * sin(twinkleTime * 1.6 + phase);`
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+varying float vTwinkle;`
+      )
+      .replace(
+        "vec4 diffuseColor = vec4( diffuse, opacity );",
+        "vec4 diffuseColor = vec4( diffuse * vTwinkle, opacity );"
+      );
+    material.userData.shader = shader;
+  };
+  material.customProgramCacheKey = () => "star-twinkle-v1";
 }
 
 export function createSkyDome(): SkyDomeHandle {
@@ -115,18 +178,23 @@ export function createSkyDome(): SkyDomeHandle {
     "color",
     new BufferAttribute(starDomeData.colors, 3)
   );
+  starDomeGeometry.setAttribute(
+    "phase",
+    new BufferAttribute(starDomeData.phases, 1)
+  );
   const starDomeMaterial = new PointsMaterial({
     vertexColors: true,
     size: 0.95,
     sizeAttenuation: true,
     transparent: true,
     opacity: 0,
-    depthTest: false,
+    depthTest: true,
     depthWrite: false,
     fog: false
   });
+  installStarTwinkle(starDomeMaterial);
   const starDome = new Points(starDomeGeometry, starDomeMaterial);
-  starDome.renderOrder = -999;
+  starDome.renderOrder = -997;
   group.add(starDome);
 
   const sunDiscMaterial = new SpriteMaterial({
@@ -142,15 +210,16 @@ export function createSkyDome(): SkyDomeHandle {
     fog: false
   });
   const sunDisc = new Sprite(sunDiscMaterial);
-  sunDisc.renderOrder = -998;
+  sunDisc.renderOrder = -996;
   group.add(sunDisc);
 
   const moonDiscMaterial = new SpriteMaterial({
     map: createMoonTexture(256),
     transparent: true,
     opacity: 0,
-    depthTest: false,
-    depthWrite: false,
+    alphaTest: 0.32,
+    depthTest: true,
+    depthWrite: true,
     fog: false
   });
   const moonDisc = new Sprite(moonDiscMaterial);
@@ -186,13 +255,28 @@ export function applySkyVisuals(
     skyHorizonColor: Color;
     skyZenithColor: Color;
     starOpacity: number;
+    sunDirection?: Vector3;
+    sunWarmColor?: Color;
+    horizonCoolColor?: Color;
+    groundColor?: Color;
+    sunInfluence?: number;
   }
 ): void {
-  const ground = options.skyColor.clone().multiplyScalar(0.18);
+  const ground = options.groundColor ?? options.skyColor.clone().multiplyScalar(0.18);
 
   handle.shellMaterial.uniforms.horizonColor.value.copy(options.skyHorizonColor);
   handle.shellMaterial.uniforms.zenithColor.value.copy(options.skyZenithColor);
+  handle.shellMaterial.uniforms.horizonCoolColor.value.copy(
+    options.horizonCoolColor ?? options.skyHorizonColor
+  );
+  handle.shellMaterial.uniforms.sunWarmColor.value.copy(
+    options.sunWarmColor ?? options.skyHorizonColor
+  );
+  if (options.sunDirection) {
+    handle.shellMaterial.uniforms.sunDirection.value.copy(options.sunDirection).normalize();
+  }
   handle.shellMaterial.uniforms.groundColor.value.copy(ground);
+  handle.shellMaterial.uniforms.sunInfluence.value = options.sunInfluence ?? 0;
   handle.starDomeMaterial.opacity = options.starOpacity;
   // 白天 starOpacity 接近 0，但 GPU 仍要处理 5000 个 point 的顶点+片元——
   // visible:false 让它整体跳过 draw call，省一笔白天的 GPU 浪费。
