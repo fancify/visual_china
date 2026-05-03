@@ -144,6 +144,7 @@ import {
 } from "./game/routeRibbon.js";
 import {
   buildWaterRibbonVertices,
+  buildWaterRibbonAlphas,
   buildRiverVegetationSamples,
   riverCorridorInfluenceAtPoint,
   selectRenderableWaterFeatures,
@@ -181,6 +182,7 @@ import {
 } from "./game/cityMarkers";
 import { realQinlingCities } from "./data/realCities.js";
 import type { RealCity } from "./data/realCities.js";
+import { qinlingRegionWorld } from "./data/qinlingRegion.js";
 import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
   evaluateStoryGuide,
@@ -1679,6 +1681,9 @@ function createWaterSurfaceRibbon(
     renderOrder: number;
     depthTest?: boolean;
     maxSegmentLength?: number;
+    fadeStartAlpha?: number;
+    fadeEndAlpha?: number;
+    fadeFraction?: number;
   }
 ): Mesh<BufferGeometry, MeshBasicMaterial> {
   const geometry = new BufferGeometry();
@@ -1694,21 +1699,63 @@ function createWaterSurfaceRibbon(
       3
     )
   );
+  // 河末端如果是在内陆 (不到 slice 边界)，就 fade 到透明 — 用户请求。
+  // alpha 数组按 buildWaterRibbonVertices 同样的 6-vert/quad 顺序铺。
+  const needsAlphaAttr =
+    (options.fadeStartAlpha ?? 1) < 1 || (options.fadeEndAlpha ?? 1) < 1;
+  if (needsAlphaAttr) {
+    geometry.setAttribute(
+      "aAlpha",
+      new BufferAttribute(
+        buildWaterRibbonAlphas(points, {
+          maxSegmentLength: options.maxSegmentLength,
+          fadeStartAlpha: options.fadeStartAlpha,
+          fadeEndAlpha: options.fadeEndAlpha,
+          fadeFraction: options.fadeFraction,
+          baseOpacity: 1.0
+        }),
+        1
+      )
+    );
+  }
 
-  const ribbon = new Mesh(
-    geometry,
-    new MeshBasicMaterial({
-      color: options.color,
-      transparent: true,
-      opacity: options.opacity,
-      side: DoubleSide,
-      depthWrite: false,
-      depthTest: options.depthTest ?? true,
-      // 不让 FogExp2 把远处水带雾化——之前用户反馈"水离得很近才出现"
-      // 就是因为水带在远处被场景 fog 吞了。
-      fog: false
-    })
-  );
+  const material = new MeshBasicMaterial({
+    color: options.color,
+    transparent: true,
+    opacity: options.opacity,
+    side: DoubleSide,
+    depthWrite: false,
+    depthTest: options.depthTest ?? true,
+    // 不让 FogExp2 把远处水带雾化——之前用户反馈"水离得很近才出现"
+    // 就是因为水带在远处被场景 fog 吞了。
+    fog: false
+  });
+  if (needsAlphaAttr) {
+    // 用 onBeforeCompile 注入 per-vertex alpha (MeshBasicMaterial 自带
+    // 不支持 vertex alpha)。透明 + alpha attribute 让河末端 fade 到 0。
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nattribute float aAlpha;\nvarying float vAlpha;"
+        )
+        .replace(
+          "#include <begin_vertex>",
+          "#include <begin_vertex>\nvAlpha = aAlpha;"
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nvarying float vAlpha;"
+        )
+        .replace(
+          "gl_FragColor = vec4( outgoingLight, diffuseColor.a );",
+          "gl_FragColor = vec4( outgoingLight, diffuseColor.a * vAlpha );"
+        );
+    };
+  }
+
+  const ribbon = new Mesh(geometry, material);
   ribbon.renderOrder = options.renderOrder;
 
   return ribbon;
@@ -1855,10 +1902,23 @@ function rebuildWaterSystemVisuals(): void {
 
   rebuildRiverVegetationVisuals(rivers);
 
+  // 判断 polyline 端点是不是"内陆" — 离 slice 边界 > 4 单元 (~9 km) 算内陆。
+  // 内陆端点需要 fade 到透明，让河看起来"渐渐消失"而不是被地图边硬切。
+  const SLICE_HALF_W = qinlingRegionWorld.width * 0.5;
+  const SLICE_HALF_D = qinlingRegionWorld.depth * 0.5;
+  const INLAND_BORDER_MARGIN = 4;
+  const isInlandPoint = (p: { x: number; y: number }) =>
+    Math.abs(p.x) < SLICE_HALF_W - INLAND_BORDER_MARGIN &&
+    Math.abs(p.y) < SLICE_HALF_D - INLAND_BORDER_MARGIN;
+
   rivers.forEach((river) => {
     const points = featureWorldPoints(river);
     const waterStyle = waterVisualStyle(river);
     const ribbonColor = river.displayPriority >= 9 ? 0x5cabc6 : 0x6fb6c5;
+
+    // 端点 fade：source / sink 在 slice 内陆 → fade 到透明
+    const startInland = points.length >= 2 && isInlandPoint(points[0]);
+    const endInland = points.length >= 2 && isInlandPoint(points[points.length - 1]);
 
     // 单层简单 ribbon：MeshBasic（不再 ShaderMaterial / 无 Fresnel /
     // 无涟漪 / 无中间反光白条）。polygonOffset 配合低 yOffset 让 ribbon
@@ -1872,18 +1932,25 @@ function rebuildWaterSystemVisuals(): void {
       color: ribbonColor,
       opacity: waterStyle.ribbonOpacity,
       renderOrder: 4,
-      maxSegmentLength: river.displayPriority >= 9 ? 0.9 : 1.5
+      maxSegmentLength: river.displayPriority >= 9 ? 0.9 : 1.5,
+      fadeStartAlpha: startInland ? 0 : 1,
+      fadeEndAlpha: endInland ? 0 : 1,
+      fadeFraction: 0.08
     });
-    // 高视角河流可见性 - 最终轮：ribbon 进 opaque pass（transparent:false
-    // + depthWrite:true）让 z-buffer 排序自动处理 cities/trees 遮挡。
-    // 之前透明路径下 polygonOffset 不够强，俯视依然被 terrain 占赢；
-    // opaque 路径走标准 depth pipeline 干净可靠。runtime 的"夜晚/雨天
-    // 调暗"通过 .color 直接乘 colorMultiplier 实现，等效但不用 opacity
-    // 通道（codex 93474de P2 抓到 transparent:false 时 opacity 不起作用）。
-    ribbon.material.transparent = false;
+    // 端点 fade 需要 transparent + alpha blending；其他时候 ribbon 走 opaque
+    // pass (transparent:false + depthWrite:true) 让 z-buffer 排序自动处理
+    // cities/trees 遮挡（codex 93474de P2 抓到 transparent:false 时 opacity
+    // 不起作用，所以 runtime 调暗用 .color 乘）。
+    if (!startInland && !endInland) {
+      ribbon.material.transparent = false;
+      ribbon.material.opacity = 1;
+    } else {
+      // fade 路径：transparent + depthWrite=true 保 Z 顺序
+      ribbon.material.transparent = true;
+      ribbon.material.opacity = 1;
+    }
     ribbon.material.depthTest = true;
     ribbon.material.depthWrite = true;
-    ribbon.material.opacity = 1;
     ribbon.material.polygonOffset = true;
     ribbon.material.polygonOffsetFactor = -2;
     ribbon.material.polygonOffsetUnits = -4;

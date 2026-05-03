@@ -119,7 +119,7 @@ function waterRibbonCrossSection(point, normal, halfWidth, y) {
 // 地形。地形 grid 大概 2 单元一格，maxSegmentLength=2 让 ribbon 跟
 // 着 grid 走（codex 之前抓不到的根因——ribbon 段中间 linear interp
 // 不跟 terrain bilinear interp 走，于是俯视角度被 terrain 覆盖看不见）。
-function densifyPolyline(points, maxSegmentLength) {
+export function densifyPolyline(points, maxSegmentLength) {
   if (points.length < 2) return points.slice();
   const result = [];
   for (let i = 0; i < points.length - 1; i += 1) {
@@ -219,6 +219,57 @@ export function buildWaterRibbonVertices(points, options) {
   }
 
   return new Float32Array(vertices);
+}
+
+// 配套的 per-vertex alpha 数组，跟 buildWaterRibbonVertices 的 vertex 顺序一致。
+// 用于把河末端 (inland source / sink) 渐淡到透明 — 用户：
+// "我希望河的末端如果是在内陆的话，就是做一个渐淡到透明的这么一个特效"
+// fadeStartAlpha / fadeEndAlpha: 起点/终点的 alpha (1.0=不透明, 0=透明)
+// fadeFraction: 在 polyline 头/尾多大比例做 fade (0.1 = 头尾各 10%)
+export function buildWaterRibbonAlphas(points, options) {
+  const fadeFraction = options.fadeFraction ?? 0.08;
+  const startAlpha = options.fadeStartAlpha ?? 1.0;
+  const endAlpha = options.fadeEndAlpha ?? 1.0;
+  const baseOpacity = options.baseOpacity ?? 1.0;
+  // 注意要跟 buildWaterRibbonVertices 用同样的 densify 参数，保证 section
+  // 数对齐 (顶点数 = (sections-1) * 6)
+  const densified = densifyPolyline(points, options.maxSegmentLength ?? 0.9);
+  const sectionCount = densified.length;
+  if (sectionCount < 2) return new Float32Array();
+  const fadePoints = Math.max(1, Math.round(sectionCount * fadeFraction));
+  // 每个 section 一个 alpha (中心), 然后顶点按 6 个 / quad 复制
+  const sectionAlpha = new Array(sectionCount);
+  for (let i = 0; i < sectionCount; i += 1) {
+    let a = baseOpacity;
+    // fade in from start
+    if (startAlpha < 1 && i < fadePoints) {
+      const t = i / fadePoints; // 0 → 1 across fade band
+      a = startAlpha + (baseOpacity - startAlpha) * t;
+    }
+    // fade out to end
+    if (endAlpha < 1 && i >= sectionCount - fadePoints) {
+      const t = (sectionCount - 1 - i) / fadePoints; // 1 at start of fade band → 0 at end
+      const tail = endAlpha + (baseOpacity - endAlpha) * t;
+      a = Math.min(a, tail);
+    }
+    sectionAlpha[i] = a;
+  }
+  // 同 buildWaterRibbonVertices 的 6-vertex-per-quad 顺序：
+  // start.left, start.right, end.left, start.right, end.right, end.left
+  // 共 (sectionCount - 1) * 6 个顶点
+  const out = new Float32Array((sectionCount - 1) * 6);
+  let cursor = 0;
+  for (let i = 0; i < sectionCount - 1; i += 1) {
+    const aS = sectionAlpha[i];
+    const aE = sectionAlpha[i + 1];
+    out[cursor++] = aS; // start.left
+    out[cursor++] = aS; // start.right
+    out[cursor++] = aE; // end.left
+    out[cursor++] = aS; // start.right
+    out[cursor++] = aE; // end.right
+    out[cursor++] = aE; // end.left
+  }
+  return out;
 }
 
 function clamp01(value) {

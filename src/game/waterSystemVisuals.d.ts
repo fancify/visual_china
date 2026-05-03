@@ -22,6 +22,27 @@ export function buildWaterRibbonVertices(
   }
 ): Float32Array;
 
+export function buildWaterRibbonAlphas(
+  points: Array<{ x: number; y: number }>,
+  options: {
+    /** 必须跟 buildWaterRibbonVertices 一致，保证顶点数对齐 */
+    maxSegmentLength?: number;
+    /** 起点 alpha (1 = 不透明，0 = 完全透明). 默认 1 */
+    fadeStartAlpha?: number;
+    /** 终点 alpha. 默认 1 */
+    fadeEndAlpha?: number;
+    /** fade 段在 polyline 头/尾占的比例. 默认 0.08 */
+    fadeFraction?: number;
+    /** 中段 alpha (默认 1) */
+    baseOpacity?: number;
+  }
+): Float32Array;
+
+export function densifyPolyline(
+  points: Array<{ x: number; y: number }>,
+  maxSegmentLength: number
+): Array<{ x: number; y: number }>;
+
 export function riverCorridorInfluenceAtPoint(
   x: number,
   z: number,

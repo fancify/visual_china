@@ -151,10 +151,23 @@ export function createCityMarkers(
         bounds,
         world
       );
-      // 用 triangular interp（跟 GPU PlaneGeometry 一致），避免雕刻河谷
-      // 边的城市被 bilinear vs triangle 高差埋进 mesh（用户："特定角度下，
-      // 城市看不见"）
-      const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
+      // 城市坐在 plateau 上：取自身 cell + 8 邻 cell 高度的 MAX，避免
+      // 城市坐标恰好落在雕刻河谷里被周围地形挡住（用户反馈"特定角度下，
+      // 城市看不见"，根因是城跟河 polyline 重合 → 雕刻 cell → 城市
+      // 位于 trench 底部、外面看不见）。MAX 把它抬到本地最高 vertex 高度。
+      const cellW = world.width / 24; // 大致一格 cell 宽度
+      const cellD = world.depth / 32;
+      let plateauY = -Infinity;
+      for (let dx = -1; dx <= 1; dx += 1) {
+        for (let dz = -1; dz <= 1; dz += 1) {
+          const sy = sampler.sampleSurfaceHeight(
+            worldPoint.x + dx * cellW * 0.5,
+            worldPoint.z + dz * cellD * 0.5
+          );
+          if (sy > plateauY) plateauY = sy;
+        }
+      }
+      const terrainY = plateauY;
 
       // geom 已经从 base y=0 长到 y=height，所以放到 (x, terrainY, z) 即可。
       dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
