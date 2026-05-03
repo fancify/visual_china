@@ -47,6 +47,16 @@ test("historical route anchor geography stays within qinling region bounds", () 
   }
 });
 
+test("baoxie road keeps the Liuba-centered historical middle section", () => {
+  const baoxieAnchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["baoxie-road"];
+  assert.equal(baoxieAnchors.length, 7);
+
+  const liuba = baoxieAnchors.find((anchor) => anchor.name.includes("留坝"));
+  assert.ok(liuba, "baoxie-road should include 留坝县 as a key middle anchor");
+  assert.ok(Math.abs(liuba.lat - 33.62) <= 0.02);
+  assert.ok(Math.abs(liuba.lon - 106.92) <= 0.02);
+});
+
 test("precomputed world anchors stay aligned with route points", () => {
   for (const route of qinlingRoutes) {
     const precomputed = qinlingRouteAnchors[route.id];
