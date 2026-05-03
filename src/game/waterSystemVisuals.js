@@ -157,13 +157,41 @@ export function buildWaterRibbonVertices(points, options) {
   //   地下导致俯视看不见——同时也是用户反馈"高视角时河流看不见"的
   //   根因）。
   const maxLift = 0.6;
+  // 第 1 遍：每个点采样 terrain Y + cross-slope lift，但不组装 cross section。
+  // 用户反馈"褒河 在山上一会儿高一会儿低"——root cause 是 DEM ~1.5km/sample
+  // 下采样把 ~200m 宽的河谷平均掉，polyline 点采到的不是河床而是"谷+山" 平均。
+  // 第 2 遍：单调下降平滑——找两端较高的那端当源头，沿流向把每段 Y 钳到
+  // ≤ 上段，让河水视觉上始终往下走、绝不"爬山"。微小往上反转保留容差。
+  const ySamples = points.map((point) => {
+    const yCenter = options.sampleHeight(point.x, point.y);
+    return yCenter;
+  });
+
+  // 决定流向：起点 / 终点谁海拔高谁是源头。
+  const sourceIsFirst = ySamples[0] >= ySamples[ySamples.length - 1];
+  // monotonic clamp：从源头开始，每段 y 不能高于前一段。
+  const tolerance = 0.05; // 容许微小波动（地形噪声），避免过度平直
+  if (sourceIsFirst) {
+    for (let i = 1; i < ySamples.length; i += 1) {
+      if (ySamples[i] > ySamples[i - 1] + tolerance) {
+        ySamples[i] = ySamples[i - 1];
+      }
+    }
+  } else {
+    for (let i = ySamples.length - 2; i >= 0; i -= 1) {
+      if (ySamples[i] > ySamples[i + 1] + tolerance) {
+        ySamples[i] = ySamples[i + 1];
+      }
+    }
+  }
+
   const sections = points.map((point, index) => {
     const normal = pointNormal(points, index);
     const leftX = point.x + normal.x * halfWidth;
     const leftZ = point.y + normal.y * halfWidth;
     const rightX = point.x - normal.x * halfWidth;
     const rightZ = point.y - normal.y * halfWidth;
-    const yCenter = options.sampleHeight(point.x, point.y);
+    const yCenter = ySamples[index];
     const yLeft = options.sampleHeight(leftX, leftZ);
     const yRight = options.sampleHeight(rightX, rightZ);
     const upslope = Math.max(yLeft, yRight);
