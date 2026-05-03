@@ -13,6 +13,7 @@ import {
   qinlingWorkspacePath,
   qinlingWorld
 } from "./qinling-dem-common.mjs";
+import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -63,6 +64,72 @@ function meanNeighborDifference(values, column, row, columns, rows) {
   return total / count - center;
 }
 
+// 2026-05 河谷雕刻：DEM 1.5km/sample 平均掉真实河谷 (~200m 宽)，渲染时河
+// polyline 经常"穿"进 mesh 山体。把每条河 polyline 在 build 期反向压进 DEM
+// 高度场——用 raised-cosine falloff，半径根据 rank 变化。
+//
+// 关键：carving 是在 normalize 之后做的，所以 depth 是游戏单位 (-2..9 范围内)
+// 而不是真实米数。每个 cell 取 min(current, riverHeight - depth*falloff)。
+const RIVER_CARVE_BY_RANK = {
+  1: { radiusCells: 2.0, depth: 0.55 }, // 主干 (渭/汉/嘉陵/岷)
+  2: { radiusCells: 1.5, depth: 0.32 }, // 一级支流
+  3: { radiusCells: 1.0, depth: 0.18 } // 二级支流 (褒/斜/外/内)
+};
+
+function carveRiverValleys(heights, gridColumns, gridRows, regionBounds, riverFeatures) {
+  const lonSpan = regionBounds.east - regionBounds.west;
+  const latSpan = regionBounds.north - regionBounds.south;
+  // 关键：必须从 pre-carve 高度采样 riverHeight。否则密 polyline (岷江 2273 点)
+  // 会反复在同一个 cell 上越挖越深 — 每个新 point 看到的是上个点已经挖过的低值。
+  const preCarveHeights = new Float32Array(heights);
+  const inSliceCount = { points: 0, features: 0 };
+
+  for (const feature of riverFeatures) {
+    const points = feature.geometry?.points;
+    if (!points || points.length < 2) continue;
+    if (typeof points[0].lat !== "number") continue; // 跳过 {x,y} 格式（不该发生）
+    const cfg = RIVER_CARVE_BY_RANK[feature.rank] ?? RIVER_CARVE_BY_RANK[3];
+    const r = cfg.radiusCells;
+
+    let featureCarved = false;
+
+    for (let i = 0; i < points.length; i += 1) {
+      const { lon, lat } = points[i];
+      // 反投到 grid (column, row): 北 = row 0
+      const colF = ((lon - regionBounds.west) / lonSpan) * (gridColumns - 1);
+      const rowF = ((regionBounds.north - lat) / latSpan) * (gridRows - 1);
+      if (colF < 0 || colF > gridColumns - 1 || rowF < 0 || rowF > gridRows - 1) continue;
+      const ix = Math.round(colF);
+      const iy = Math.round(rowF);
+      const riverHeight = preCarveHeights[iy * gridColumns + ix];
+
+      const minCol = Math.max(0, Math.floor(colF - r));
+      const maxCol = Math.min(gridColumns - 1, Math.ceil(colF + r));
+      const minRow = Math.max(0, Math.floor(rowF - r));
+      const maxRow = Math.min(gridRows - 1, Math.ceil(rowF + r));
+
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (let col = minCol; col <= maxCol; col += 1) {
+          const dist = Math.hypot(col - colF, row - rowF);
+          if (dist > r) continue;
+          // raised-cosine falloff: 中心 1, 边缘 0
+          const falloff = 0.5 * (1 + Math.cos((dist / r) * Math.PI));
+          const carvedTo = riverHeight - cfg.depth * falloff;
+          const idx = row * gridColumns + col;
+          if (heights[idx] > carvedTo) {
+            heights[idx] = carvedTo;
+            featureCarved = true;
+          }
+        }
+      }
+      inSliceCount.points += 1;
+    }
+    if (featureCarved) inSliceCount.features += 1;
+  }
+
+  return inSliceCount;
+}
+
 function smoothHeightField(values, columns, rows, { passes = 1, blend = 0.5 } = {}) {
   let current = values;
 
@@ -97,8 +164,12 @@ function normalizeHeights(rawHeights, minRawHeight, maxRawHeight) {
   const normalized = new Float32Array(rawHeights.length);
   let minHeight = Number.POSITIVE_INFINITY;
   let maxHeight = Number.NEGATIVE_INFINITY;
-  const visualMinHeight = -4;
-  const visualMaxHeight = 18;
+  // 2026-05 高度夸张降一半：原来 [-4, 18] = 22 unit dynamic range，
+  // 视觉上山尖太突兀；halved to [-2, 9] = 11 unit。
+  // 配合 river-valley carving (后面的 carveRiverValleys)，山要矮一点
+  // 河谷才能切得显眼而不破坏整体形状。
+  const visualMinHeight = -2;
+  const visualMaxHeight = 9;
 
   for (let index = 0; index < rawHeights.length; index += 1) {
     const value = rawHeights[index];
@@ -378,6 +449,22 @@ const smoothed = smoothHeightField(normalized, columns, rows, {
   blend: 0.5
 });
 normalized = smoothed;
+
+// 河谷雕刻——把每条已定义的河 polyline 反向压进 DEM。在 smooth 之后做，
+// 避免后续 smooth pass 把刚切的谷又抹平。再 smooth 一次会让谷壁过渡自然。
+const carveStats = carveRiverValleys(
+  normalized,
+  columns,
+  rows,
+  qinlingBounds,
+  qinlingModernHydrography.features
+);
+console.log(
+  `River-valley carve: ${carveStats.features}/${qinlingModernHydrography.features.length} features, ${carveStats.points} polyline points applied`
+);
+// 再做一遍 light smooth 把雕刻边缘过渡平滑掉，避免 1-cell 锯齿
+normalized = smoothHeightField(normalized, columns, rows, { passes: 1, blend: 0.35 });
+
 minHeight = Math.min(...normalized);
 maxHeight = Math.max(...normalized);
 
