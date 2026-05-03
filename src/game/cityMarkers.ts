@@ -151,7 +151,10 @@ export function createCityMarkers(
         bounds,
         world
       );
-      const terrainY = sampler.sampleHeight(worldPoint.x, worldPoint.z);
+      // 用 triangular interp（跟 GPU PlaneGeometry 一致），避免雕刻河谷
+      // 边的城市被 bilinear vs triangle 高差埋进 mesh（用户："特定角度下，
+      // 城市看不见"）
+      const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
 
       // geom 已经从 base y=0 长到 y=height，所以放到 (x, terrainY, z) 即可。
       dummy.position.set(worldPoint.x, terrainY, worldPoint.z);

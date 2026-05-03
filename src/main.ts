@@ -1689,7 +1689,7 @@ function createWaterSurfaceRibbon(
         width: options.width,
         yOffset: options.yOffset,
         maxSegmentLength: options.maxSegmentLength,
-        sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
+        sampleHeight: (x, z) => terrainSampler!.sampleSurfaceHeight(x, z)
       }),
       3
     )
@@ -1949,7 +1949,7 @@ function rebuildRouteVisuals(): void {
           buildRouteRibbonVertices(route.points, {
             width: qinlingRouteRibbonStyle.width,
             yOffset: qinlingRouteRibbonStyle.yOffset,
-            sampleHeight: (x, z) => terrainSampler!.sampleHeight(x, z)
+            sampleHeight: (x, z) => terrainSampler!.sampleSurfaceHeight(x, z)
           }),
           3
         )

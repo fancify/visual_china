@@ -509,6 +509,41 @@ export class TerrainSampler {
     return this.sampleChannel("heights", x, z);
   }
 
+  // 跟 Three.js PlaneGeometry 一致的 triangular interp。
+  // bilinear (sampleHeight 用的) 用 4 个 corner，但 GPU 渲染一个 cell 只用
+  // 它的 2 个三角形 (3 corner)。河谷雕刻把单 cell 强压低后，bilinear 跟
+  // triangular 在同一 (x,z) 可以差 0.3-0.8 单元 → trees 飘 / cities 沉。
+  // 树 / 城 / 牌位 / 任何想"贴在 mesh 表面"的物件应该用这个，不用 sampleHeight。
+  //
+  // PlaneGeometry 三角剖分（src 实测）：每 cell 对角线 (0,1)→(1,0)，
+  // 上三角 = a,b,d = (0,0)(0,1)(1,0)；下三角 = b,c,d = (0,1)(1,1)(1,0)。
+  sampleSurfaceHeight(x: number, z: number): number {
+    const data = this.asset.heights;
+    const { columns, rows } = this.asset.grid;
+    const halfWidth = this.asset.world.width * 0.5;
+    const halfDepth = this.asset.world.depth * 0.5;
+    const u = clamp((x + halfWidth) / this.asset.world.width, 0, 1);
+    const v = clamp((z + halfDepth) / this.asset.world.depth, 0, 1);
+    const gx = u * (columns - 1);
+    const gy = v * (rows - 1);
+    const x0 = Math.floor(gx);
+    const y0 = Math.floor(gy);
+    const x1 = Math.min(x0 + 1, columns - 1);
+    const y1 = Math.min(y0 + 1, rows - 1);
+    const tx = gx - x0;
+    const ty = gy - y0;
+    const A = data[y0 * columns + x0] ?? 0; // (0,0)
+    const B = data[y1 * columns + x0] ?? A; // (0,1)
+    const C = data[y1 * columns + x1] ?? A; // (1,1)
+    const D = data[y0 * columns + x1] ?? A; // (1,0)
+    if (tx + ty <= 1) {
+      // 上三角 a,b,d = (0,0)(0,1)(1,0)
+      return (1 - tx - ty) * A + ty * B + tx * D;
+    }
+    // 下三角 b,c,d = (0,1)(1,1)(1,0)
+    return (1 - tx) * B + (tx + ty - 1) * C + (1 - ty) * D;
+  }
+
   sampleRiver(x: number, z: number): number {
     return this.sampleChannel("riverMask", x, z);
   }
