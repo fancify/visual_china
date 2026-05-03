@@ -1,6 +1,9 @@
 node_modules/
 dist/
 
+# Claude Code subagent worktrees — temporary, never committed.
+.claude/worktrees/
+
 # Raw DEM downloads and extracted source tiles are too large for Git.
 data/fabdem/
 data/etopo/
