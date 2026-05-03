@@ -4,7 +4,7 @@ import test from "node:test";
 import { qinlingRoutes, routeAffinityAt } from "../src/game/qinlingRoutes.js";
 
 test("Qinling route affinity uses historical-reference routes by default", () => {
-  const influence = routeAffinityAt({ x: 15.23, y: -36 });
+  const influence = routeAffinityAt({ x: 4.71, y: -34.56 });
 
   assert.ok(influence.affinity > 0.7);
   assert.equal(influence.nearestRoute?.id, "baoxie-road");

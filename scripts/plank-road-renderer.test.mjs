@@ -35,14 +35,14 @@ test("plank road densifies a polyline into evenly spaced deck planks and sparse 
   });
 
   assert.equal(handle.plankCount, 6);
-  assert.equal(handle.postCount, 6);
   assert.equal(handle.plankMesh.count, 6);
-  assert.equal(handle.postMesh.count, 6);
+  assert.equal("postCount" in handle, false);
+  assert.equal("postMesh" in handle, false);
 
   disposePlankRoad(handle);
 });
 
-test("plank road orients deck planks to the local route tangent and lifts them above terrain", () => {
+test("plank road orients deck planks to the local route tangent, stays near ground, and uses lighter wood", () => {
   const handle = buildPlankRoad({
     points: [
       { x: 0, y: 0 },
@@ -50,8 +50,7 @@ test("plank road orients deck planks to the local route tangent and lifts them a
       { x: 1.2, y: 1.2 }
     ],
     sampler: makeSampler((x, z) => x * 0.25 + z * 0.5),
-    plankSpacing: 0.4,
-    liftAboveGround: 0.18
+    plankSpacing: 0.4
   });
 
   const firstForward = forwardVectorFromInstance(handle.plankMesh, 0);
@@ -67,8 +66,10 @@ test("plank road orients deck planks to the local route tangent and lifts them a
   handle.plankMesh.getMatrixAt(2, matrix);
   matrix.decompose(position, quaternion, scale);
 
-  const expectedLift = position.x * 0.25 + position.z * 0.5 + 0.18;
+  const expectedLift = position.x * 0.25 + position.z * 0.5 + 0.02;
   assert.ok(Math.abs(position.y - expectedLift) < 1e-6);
+  assert.ok(position.y - (position.x * 0.25 + position.z * 0.5) < 0.05);
+  assert.equal(handle.plankMesh.material.color.getHex(), 0xb89372);
 
   disposePlankRoad(handle);
 });
