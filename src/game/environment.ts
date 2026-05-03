@@ -266,11 +266,9 @@ export class EnvironmentController {
 
   update(deltaSeconds: number): EnvironmentState {
     const previousTime = this.state.timeOfDay;
-    // 用户："时间变化我觉得可以放慢 5 倍"。0.18 → 0.036 让游戏 1 小时
-    // 对应现实约 28s（之前是 5.5s）。同时减少 terrainColorSignature 触发
-    // 频率（每 game-hour 才换 bucket，跟 floor(time * 1)），把每 1.85s 的
-    // 440ms terrain recolor 节流到每 27s 一次。
-    const nextTime = previousTime + deltaSeconds * 0.036;
+    // 用户要求："改半小时一天"——24 game-hour ÷ 1800s = 0.01333
+    // game-hour/realSec。1 game-hour ≈ 75s real，比 BotW 还慢一点。
+    const nextTime = previousTime + deltaSeconds * 0.01333;
     this.state.timeOfDay = nextTime >= 24 ? nextTime - 24 : nextTime;
 
     if (nextTime >= 24) {
