@@ -39,7 +39,9 @@ import {
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { ColorGradeShader } from "./game/colorGradeShader";
 import {
   knowledgeFragments as defaultKnowledgeFragments,
   type KnowledgeFragment
@@ -417,6 +419,10 @@ const bloomPass = new UnrealBloomPass(
   0.92
 );
 bloomComposer.addPass(bloomPass);
+// 千里江山图 split-toning：阴影偏冷青、高光偏暖金，对应青绿山水审美。
+// 在 OutputPass 之前做，操作 linear 色。
+const colorGradePass = new ShaderPass(ColorGradeShader);
+bloomComposer.addPass(colorGradePass);
 bloomComposer.addPass(new OutputPass());
 
 const ambientLight = new AmbientLight(0xf2dfba, 1.65);
