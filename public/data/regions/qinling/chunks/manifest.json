@@ -12,15 +12,15 @@
       "file": "qinling_0_0.json",
       "bounds": {
         "west": 103.5,
-        "east": 104.875,
+        "east": 105.125,
         "north": 35.4,
         "south": 34.4
       },
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     },
     {
@@ -29,16 +29,16 @@
       "y": 0,
       "file": "qinling_1_0.json",
       "bounds": {
-        "west": 104.875,
-        "east": 106.25,
+        "west": 105.125,
+        "east": 106.75,
         "north": 35.4,
         "south": 34.4
       },
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     },
     {
@@ -47,16 +47,16 @@
       "y": 0,
       "file": "qinling_2_0.json",
       "bounds": {
-        "west": 106.25,
-        "east": 107.625,
+        "west": 106.75,
+        "east": 108.375,
         "north": 35.4,
         "south": 34.4
       },
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     },
     {
@@ -65,16 +65,16 @@
       "y": 0,
       "file": "qinling_3_0.json",
       "bounds": {
-        "west": 107.625,
-        "east": 109,
+        "west": 108.375,
+        "east": 110,
         "north": 35.4,
         "south": 34.4
       },
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": -120,
-        "maxZ": -72
+        "minZ": 72,
+        "maxZ": 120
       }
     },
     {
@@ -84,15 +84,15 @@
       "file": "qinling_0_1.json",
       "bounds": {
         "west": 103.5,
-        "east": 104.875,
+        "east": 105.125,
         "north": 34.4,
         "south": 33.4
       },
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -101,16 +101,16 @@
       "y": 1,
       "file": "qinling_1_1.json",
       "bounds": {
-        "west": 104.875,
-        "east": 106.25,
+        "west": 105.125,
+        "east": 106.75,
         "north": 34.4,
         "south": 33.4
       },
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -119,16 +119,16 @@
       "y": 1,
       "file": "qinling_2_1.json",
       "bounds": {
-        "west": 106.25,
-        "east": 107.625,
+        "west": 106.75,
+        "east": 108.375,
         "north": 34.4,
         "south": 33.4
       },
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -137,16 +137,16 @@
       "y": 1,
       "file": "qinling_3_1.json",
       "bounds": {
-        "west": 107.625,
-        "east": 109,
+        "west": 108.375,
+        "east": 110,
         "north": 34.4,
         "south": 33.4
       },
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": -72,
-        "maxZ": -24
+        "minZ": 24,
+        "maxZ": 72
       }
     },
     {
@@ -156,7 +156,7 @@
       "file": "qinling_0_2.json",
       "bounds": {
         "west": 103.5,
-        "east": 104.875,
+        "east": 105.125,
         "north": 33.4,
         "south": 32.4
       },
@@ -173,8 +173,8 @@
       "y": 2,
       "file": "qinling_1_2.json",
       "bounds": {
-        "west": 104.875,
-        "east": 106.25,
+        "west": 105.125,
+        "east": 106.75,
         "north": 33.4,
         "south": 32.4
       },
@@ -191,8 +191,8 @@
       "y": 2,
       "file": "qinling_2_2.json",
       "bounds": {
-        "west": 106.25,
-        "east": 107.625,
+        "west": 106.75,
+        "east": 108.375,
         "north": 33.4,
         "south": 32.4
       },
@@ -209,8 +209,8 @@
       "y": 2,
       "file": "qinling_3_2.json",
       "bounds": {
-        "west": 107.625,
-        "east": 109,
+        "west": 108.375,
+        "east": 110,
         "north": 33.4,
         "south": 32.4
       },
@@ -228,15 +228,15 @@
       "file": "qinling_0_3.json",
       "bounds": {
         "west": 103.5,
-        "east": 104.875,
+        "east": 105.125,
         "north": 32.4,
         "south": 31.4
       },
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -245,16 +245,16 @@
       "y": 3,
       "file": "qinling_1_3.json",
       "bounds": {
-        "west": 104.875,
-        "east": 106.25,
+        "west": 105.125,
+        "east": 106.75,
         "north": 32.4,
         "south": 31.4
       },
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -263,16 +263,16 @@
       "y": 3,
       "file": "qinling_2_3.json",
       "bounds": {
-        "west": 106.25,
-        "east": 107.625,
+        "west": 106.75,
+        "east": 108.375,
         "north": 32.4,
         "south": 31.4
       },
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -281,16 +281,16 @@
       "y": 3,
       "file": "qinling_3_3.json",
       "bounds": {
-        "west": 107.625,
-        "east": 109,
+        "west": 108.375,
+        "east": 110,
         "north": 32.4,
         "south": 31.4
       },
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": 24,
-        "maxZ": 72
+        "minZ": -72,
+        "maxZ": -24
       }
     },
     {
@@ -300,15 +300,15 @@
       "file": "qinling_0_4.json",
       "bounds": {
         "west": 103.5,
-        "east": 104.875,
+        "east": 105.125,
         "north": 31.4,
         "south": 30.4
       },
       "worldBounds": {
         "minX": -90,
         "maxX": -45,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     },
     {
@@ -317,16 +317,16 @@
       "y": 4,
       "file": "qinling_1_4.json",
       "bounds": {
-        "west": 104.875,
-        "east": 106.25,
+        "west": 105.125,
+        "east": 106.75,
         "north": 31.4,
         "south": 30.4
       },
       "worldBounds": {
         "minX": -45,
         "maxX": 0,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     },
     {
@@ -335,16 +335,16 @@
       "y": 4,
       "file": "qinling_2_4.json",
       "bounds": {
-        "west": 106.25,
-        "east": 107.625,
+        "west": 106.75,
+        "east": 108.375,
         "north": 31.4,
         "south": 30.4
       },
       "worldBounds": {
         "minX": 0,
         "maxX": 45,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     },
     {
@@ -353,16 +353,16 @@
       "y": 4,
       "file": "qinling_3_4.json",
       "bounds": {
-        "west": 107.625,
-        "east": 109,
+        "west": 108.375,
+        "east": 110,
         "north": 31.4,
         "south": 30.4
       },
       "worldBounds": {
         "minX": 45,
         "maxX": 90,
-        "minZ": 72,
-        "maxZ": 120
+        "minZ": -120,
+        "maxZ": -72
       }
     }
   ]

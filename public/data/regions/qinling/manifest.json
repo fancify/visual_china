@@ -7,10 +7,10 @@
   "coordinatePolicy": "strict-geographic",
   "parentWorldId": "china-mainland",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-01T12:33:46.345Z",
+  "generatedAt": "2026-05-03T06:32:03.394Z",
   "bounds": {
     "west": 103.5,
-    "east": 109,
+    "east": 110,
     "south": 30.4,
     "north": 35.4
   },
