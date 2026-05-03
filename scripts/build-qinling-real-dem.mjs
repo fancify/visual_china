@@ -114,9 +114,9 @@ function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBoun
     const points = densifyForCarving(rawPoints);
     const cfg = RIVER_CARVE_BY_RANK[feature.rank] ?? RIVER_CARVE_BY_RANK[3];
     const r = cfg.radiusCells;
-    // riverMask paint：核心 cell mask=1.0，边缘 mask=0；让 terrain shader
-    // 在 fragment 直接画蓝色而不需要单独 ribbon mesh (用户重构方向)
-    const maskRadius = r * 0.6; // 河"宽"比 carve "谷底"更窄
+    // riverMask paint：用户反馈河太宽 (城市被泡)，从 r*0.6 收到 r*0.2
+    // (~1/3 宽度)；falloff 用 (1-t)^3 让边缘更锐利 (raised-cosine 太软)
+    const maskRadius = r * 0.2;
 
     let featureCarved = false;
 
@@ -148,11 +148,12 @@ function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBoun
             featureCarved = true;
           }
           // riverMask: 核心半径 (maskRadius) 内 mask=1，外圈到 r 渐淡到 0
+          // 用 (1-t)^3 power curve, 中段平、边缘急下，水边沿更锐利
           if (dist <= maskRadius) {
             riverMask[idx] = Math.max(riverMask[idx], 1.0);
           } else {
             const t = (dist - maskRadius) / (r - maskRadius);
-            const m = 0.5 * (1 + Math.cos(t * Math.PI));
+            const m = (1 - t) * (1 - t) * (1 - t);
             if (m > riverMask[idx]) riverMask[idx] = m;
           }
         }
