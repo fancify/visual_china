@@ -197,7 +197,8 @@ import { createCircleTexture } from "./game/proceduralTextures";
 import {
   attachTerrainShaderEnhancements,
   updateTerrainShaderAtmosphericFar,
-  updateTerrainShaderHeightFog
+  updateTerrainShaderHeightFog,
+  updateTerrainShaderHsl
 } from "./game/terrainShaderEnhancer";
 import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
 
@@ -3780,6 +3781,14 @@ function update(deltaSeconds: number): void {
     terrainMaterial,
     atmosphericFarRuntimeColor
   );
+  // 时间/季节/天气 HSL 调色：之前每 1.85s 触发全顶点 JS recolor (~440ms hitch)，
+  // 现在直接推 shader uniform，零 CPU 工作。
+  updateTerrainShaderHsl(
+    terrainMaterial,
+    visuals.terrainHueShift,
+    visuals.terrainSaturationMul,
+    visuals.terrainLightnessMul
+  );
   terrainChunkMeshes.forEach((chunk) => {
     if (!Array.isArray(chunk.mesh.material)) {
       updateTerrainShaderHeightFog(
@@ -3789,6 +3798,12 @@ function update(deltaSeconds: number): void {
       updateTerrainShaderAtmosphericFar(
         chunk.mesh.material as MeshPhongMaterial,
         atmosphericFarRuntimeColor
+      );
+      updateTerrainShaderHsl(
+        chunk.mesh.material as MeshPhongMaterial,
+        visuals.terrainHueShift,
+        visuals.terrainSaturationMul,
+        visuals.terrainLightnessMul
       );
     }
   });
@@ -3857,13 +3872,11 @@ function update(deltaSeconds: number): void {
   const terrainColorSignature = [
     currentMode,
     environmentController.state.season,
-    environmentController.state.weather,
-    // 时间 bucket：每 game-hour 一次，避免 terrain recolor 频繁触发 ~440ms
-    // hitch（之前 * 3 = 每 1/3 hour ≈ 1.85s real time，是肉眼可见卡顿源）。
-    // 配合 environment time 5x 放慢，平均 ~27s 才换一次 bucket。
-    Math.floor(environmentController.state.timeOfDay),
-    Math.round((visuals.terrainSaturationMul ?? 1) * 10),
-    Math.round((visuals.terrainLightnessMul ?? 1) * 10)
+    environmentController.state.weather
+    // time-of-day / saturation / lightness 全部移到 shader uniform 了，
+    // 这里完全不再触发 recolor。signature 只在 模式/季节/天气 切换时
+    // 才变——这三件事都是用户主动操作（K/L 键）或自动很慢（>30s/次），
+    // recolor hitch 完全消失。
   ].join(":");
 
   if (terrainColorSignature !== lastTerrainColorSignature) {
