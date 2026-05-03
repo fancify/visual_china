@@ -111,6 +111,9 @@ export function createChunkScenery(
   trees.count = treeMatrices.length;
   treeMatrices.forEach((matrix, index) => trees.setMatrixAt(index, matrix));
   trees.instanceMatrix.needsUpdate = true;
+  // 跟 cityMarkers 一样，必须 computeBoundingSphere 让 frustum culling 看
+  // instance 实际位置，否则镜头一转整 chunk 树就消失。
+  trees.computeBoundingSphere();
   trees.userData.sharedResources = true;
   group.add(trees);
 
