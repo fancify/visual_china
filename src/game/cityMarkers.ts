@@ -151,10 +151,15 @@ export function createCityMarkers(
         bounds,
         world
       );
-      // 用 triangular sampleSurfaceHeight 跟 GPU PlaneGeometry 渲染面对齐，
-      // 避免 bilinear vs triangle 高差导致城埋进 mesh。MAX-of-corners 反而
-      // 会把城拉到远处山顶高度然后浮空，撤掉。
-      const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
+      // 2026-05 codex 调查："特定角度看不见城市" 根因：city wall 用 region
+      // sampler 取 Y，但 chunk mesh 渲染时 setTerrainMeshWorldPosition 给
+      // 整个 chunk 加了 +0.12 yOffset (避免 chunk 流式加载视觉硬跳)。
+      // 城市 placed at Y = region_height，chunk 视觉表面在 Y = chunk_height
+      // + 0.12 ≈ region_height + 0.12 → wall base 卡在 chunk 表面以下
+      // ~0.12 unit，矮的 county wall (0.8 unit 高) 大半身 沉进 mesh。
+      // CHUNK_Y_OFFSET 跟 main.ts setTerrainMeshWorldPosition(...0.12) 同步。
+      const CHUNK_Y_OFFSET = 0.12;
+      const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
 
       // geom 已经从 base y=0 长到 y=height，所以放到 (x, terrainY, z) 即可。
       dummy.position.set(worldPoint.x, terrainY, worldPoint.z);

@@ -662,12 +662,16 @@ function updateCityLodFade(): void {
   // 也要享受 LOD（codex c039a4b P2 抓到）。所以放在 cityMarkersHandle
   // gate 之前。相机拉远（distance > 110）开始 fade，distance > 165 完全
   // 消失。复用共享 material，不动 instance 数。
-  const treeAlpha = 1 - MathUtils.smoothstep(distance, 110, 165);
+  // 2026-05 codex 调查：之前 fade 窗口 110-165 / 70-140 / 170-240 设得
+  // 太紧——qinlingCameraRig.maxDistance = 170 (按 O 键 overview)，camera
+  // 实测距离 172，正好踩到 treeAlpha=0 / countyAlpha=0 的死亡区。结果
+  // "按一下 O 键 → 树和小城瞬间消失，按 F 又出现"。fade 窗口必须把
+  // 170 安全地放在 "全亮" 半区里。
+  const treeAlpha = 1 - MathUtils.smoothstep(distance, 200, 280);
   sharedTreeMaterial.opacity = treeAlpha;
   sharedTreeMaterial.visible = treeAlpha > 0.01;
-  // 关隘石碑跟 prefecture 同档 fade：170-240，默认相机 118 全亮，
-  // overview 170 起点开始 fade。两个共享 material 一起调，sprite 单独循环。
-  const passAlpha = 1 - MathUtils.smoothstep(distance, 170, 240);
+  // 关隘石碑跟 prefecture 同档 fade。
+  const passAlpha = 1 - MathUtils.smoothstep(distance, 240, 320);
   passSteleMaterial.opacity = passAlpha;
   passSteleMaterial.visible = passAlpha > 0.01;
   passSteleCapMaterial.opacity = passAlpha;
@@ -677,8 +681,8 @@ function updateCityLodFade(): void {
     sprite.visible = passAlpha > 0.01;
   }
   if (!cityMarkersHandle) return;
-  const countyAlpha = 1 - MathUtils.smoothstep(distance, 70, 140);
-  const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 170, 240);
+  const countyAlpha = 1 - MathUtils.smoothstep(distance, 190, 260);
+  const prefectureAlpha = 1 - MathUtils.smoothstep(distance, 240, 320);
   const capitalAlpha = 1.0;
   cityMarkersHandle.tierMaterials.county.opacity = countyAlpha;
   cityMarkersHandle.tierMaterials.county.visible = countyAlpha > 0.01;
