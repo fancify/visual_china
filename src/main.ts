@@ -140,9 +140,10 @@ import {
   type RouteInfluence
 } from "./game/qinlingRoutes.js";
 import {
-  buildRouteRibbonVertices,
-  qinlingRouteRibbonStyle
-} from "./game/routeRibbon.js";
+  buildPlankRoadNetwork,
+  disposePlankRoad,
+  type PlankRoadHandle
+} from "./game/plankRoadRenderer";
 import {
   buildPassLandmarkMeshes,
   passLandmarkGeometries
@@ -651,6 +652,7 @@ const riverLabelSpritesByTier: { major: Sprite[]; tributary: Sprite[] } = {
   tributary: []
 };
 const routeLabelSprites: Sprite[] = [];
+let routePlankRoadHandle: PlankRoadHandle | null = null;
 
 /**
  * 距离视角分档 fade：camera 远了 county 先消失、再 prefecture 消失，
@@ -1944,6 +1946,11 @@ function rebuildWaterSystemVisuals(): void {
 }
 
 function rebuildRouteVisuals(): void {
+  if (routePlankRoadHandle) {
+    disposePlankRoad(routePlankRoadHandle);
+    routePlankRoadHandle = null;
+  }
+
   clearGroup(routeGroup);
   routeLabelSprites.length = 0;
 
@@ -1951,103 +1958,36 @@ function rebuildRouteVisuals(): void {
     return;
   }
 
-  qinlingRoutes
-    .filter((route) =>
+  const visibleRoutes = qinlingRoutes.filter(
+    (route) =>
       route.source?.verification === "external-vector" ||
       route.source?.verification === "verified" ||
       route.source?.verification === "historical-references"
-    )
-    .forEach((route) => {
-      if (route.labelPoint && route.label) {
-        const routeLabel = createTextSprite(route.label, "#f6d783");
-        routeLabel.scale.multiplyScalar(1.16);
-        routeLabel.position.set(
-          route.labelPoint.x,
-          terrainSampler!.sampleHeight(route.labelPoint.x, route.labelPoint.y) + 6.2,
-          route.labelPoint.y
-        );
-        routeLabel.renderOrder = 14;
-        routeGroup.add(routeLabel);
-        routeLabelSprites.push(routeLabel);
-      }
+  );
 
-      const ribbonGeometry = new BufferGeometry();
-      ribbonGeometry.setAttribute(
-        "position",
-        new BufferAttribute(
-          buildRouteRibbonVertices(route.points, {
-            width: qinlingRouteRibbonStyle.width,
-            yOffset: qinlingRouteRibbonStyle.yOffset,
-            sampleHeight: (x, z) => terrainSampler!.sampleSurfaceHeight(x, z)
-          }),
-          3
-        )
+  visibleRoutes.forEach((route) => {
+    if (route.labelPoint && route.label) {
+      const routeLabel = createTextSprite(route.label, "#f6d783");
+      routeLabel.scale.multiplyScalar(1.16);
+      routeLabel.position.set(
+        route.labelPoint.x,
+        terrainSampler!.sampleHeight(route.labelPoint.x, route.labelPoint.y) + 6.2,
+        route.labelPoint.y
       );
-      ribbonGeometry.computeVertexNormals();
+      routeLabel.renderOrder = 14;
+      routeGroup.add(routeLabel);
+      routeLabelSprites.push(routeLabel);
+    }
+  });
 
-      const ribbon = new Mesh(
-        ribbonGeometry,
-        new MeshBasicMaterial({
-          color: 0xe8c66f,
-          transparent: true,
-          opacity: qinlingRouteRibbonStyle.opacity,
-          side: DoubleSide,
-          depthWrite: false
-        })
-      );
-      ribbon.renderOrder = 11;
-      routeGroup.add(ribbon);
+  routePlankRoadHandle = buildPlankRoadNetwork(
+    visibleRoutes.map((route) => ({
+      points: route.points,
+      sampler: terrainSampler!
+    }))
+  );
 
-      const positions: number[] = [];
-
-      route.points.forEach((point) => {
-        positions.push(
-          point.x,
-          terrainSampler!.sampleHeight(point.x, point.y) + 0.72,
-          point.y
-        );
-      });
-
-      const geometry = new BufferGeometry();
-      geometry.setAttribute(
-        "position",
-        new BufferAttribute(new Float32Array(positions), 3)
-      );
-
-      const line = new Line(
-        geometry,
-        new LineBasicMaterial({
-          color: 0xf0ca72,
-          transparent: true,
-          opacity: 0.82,
-          linewidth: 2
-        })
-      );
-      line.renderOrder = 12;
-      routeGroup.add(line);
-
-      route.points.forEach((point, index) => {
-        if (index !== 0 && index !== route.points.length - 1 && index % 2 !== 0) {
-          return;
-        }
-
-        const marker = new Mesh(
-          new SphereGeometry(index === route.points.length - 1 ? 0.62 : 0.44, 10, 10),
-          new MeshBasicMaterial({
-            color: index === route.points.length - 1 ? 0xf7df8a : 0xd6a852,
-            transparent: true,
-            opacity: 0.9
-          })
-        );
-        marker.position.set(
-          point.x,
-          terrainSampler!.sampleHeight(point.x, point.y) + 1.08,
-          point.y
-        );
-        marker.renderOrder = 13;
-        routeGroup.add(marker);
-      });
-    });
+  routeGroup.add(routePlankRoadHandle.group);
 }
 
 function resizeAtlasCanvasToDisplaySize(canvas: HTMLCanvasElement): void {
