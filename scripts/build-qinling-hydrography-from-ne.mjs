@@ -127,6 +127,26 @@ function clipPolyline(line, bbox) {
   return out;
 }
 
+// 把 polyline 按目标间隔密化 — 在每对相邻点之间插入足够多 lerp 点，
+// 让相邻输出点不超过 maxDeg (≈度数；slice 比例 ~110km/度，0.018° ≈ 2km)。
+// 目的：让 (1) DEM carving 覆盖整条河, (2) ribbon 渲染不画长直线 (避免
+// "河走 47km 直线穿山"). 把这一步放在 build 而不是 runtime，省 runtime cost。
+function densifyPolylineLatLon(points, maxDeg = 0.018) {
+  if (points.length < 2) return points.slice();
+  const out = [points[0]];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const dist = Math.hypot(b.lat - a.lat, b.lon - a.lon);
+    const subdivisions = Math.max(1, Math.ceil(dist / maxDeg));
+    for (let j = 1; j <= subdivisions; j += 1) {
+      const t = j / subdivisions;
+      out.push({ lat: a.lat + (b.lat - a.lat) * t, lon: a.lon + (b.lon - a.lon) * t });
+    }
+  }
+  return out;
+}
+
 // 把端点距离 < tolerance 的子段缝起来。greedy: 反复找一条线，看能不能把
 // 任何一条剩余子段拼到它两端，能拼就拼，不能拼就把当前线放进结果换下一条。
 function joinPolylines(lines, tolerance) {
@@ -208,14 +228,65 @@ for (const river of data.rivers) {
   joined.sort((a, b) => b.length - a.length);
   // 按主流方向排序所有点 (修 greedy join 跳序问题)
   const primarySorted = sortByFlowDir(joined[0], meta.flowDir);
+  // 密化 (~2km 间隔)：保证 carving 覆盖整段、ribbon 不画长直线
+  const densified = densifyPolylineLatLon(
+    primarySorted.map(([lon, lat]) => ({ lat, lon })),
+    0.018
+  );
   result[meta.id] = {
     name: river.name,
     sourceScore: river.score,
     sourceBasin: river.basin,
     flowDir: meta.flowDir,
-    points: primarySorted.map(([lon, lat]) => ({ lat, lon })),
+    points: densified,
     extraPolylines: joined.slice(1).map((line) => line.map(([lon, lat]) => ({ lat, lon })))
   };
+}
+
+// === 通用 OSM 河流拼接器 ===
+// 把 OSM 同名 way 拼成单 polyline。flowDir + sort 修 greedy join 跳序。
+// densify 让 carving 覆盖整段。
+function stitchOsmRiverByName({
+  osm,
+  riverName,
+  corridor, // bbox or null
+  joinTolerance = 0.05,
+  flowDir = "lat-desc",
+  densifyTolDeg = 0.018,
+  minSegPts = 4
+}) {
+  const segs = osm.features
+    .filter((f) => f.name === riverName && f.geometry?.points?.length >= 2)
+    .map((f) =>
+      f.geometry.points.map((p) => {
+        const geo = unprojectWorldToGeo(p);
+        return [geo.lon, geo.lat];
+      })
+    )
+    .filter((line) =>
+      !corridor ||
+      line.some(
+        ([lon, lat]) =>
+          lon >= corridor.west &&
+          lon <= corridor.east &&
+          lat >= corridor.south &&
+          lat <= corridor.north
+      )
+    );
+  if (segs.length === 0) return null;
+  const clipped = [];
+  for (const line of segs) clipped.push(...clipPolyline(line, SLICE_BBOX));
+  if (clipped.length === 0) return null;
+  const joined = joinPolylines(clipped, joinTolerance);
+  joined.sort((a, b) => b.length - a.length);
+  const primary = joined[0];
+  if (primary.length < minSegPts) return null;
+  const sorted = sortByFlowDir(primary, flowDir);
+  const points = densifyPolylineLatLon(
+    sorted.map(([lon, lat]) => ({ lat, lon })),
+    densifyTolDeg
+  );
+  return { points, segCount: segs.length, joinedCount: joined.length };
 }
 
 // === OSM 上游岷江 (NE 10m 没收) ===
@@ -297,13 +368,60 @@ if (minPrimary.length > 0) {
     ...bridgeAndDownstream
   ];
   merged.sort((a, b) => b.lat - a.lat); // 北→南
+  // 密化 (~2km)：南端 hand-typed bridge 太稀，让 carving 覆盖 都江堰 → 成都 → 黄龙溪 整段
+  const densified = densifyPolylineLatLon(merged, 0.018);
   result["river-minjiang"] = {
     name: "岷江",
     sourceScore: 9,
     sourceBasin: "yangtze",
-    sourceData: "openstreetmap-overpass + manual bridge across 都江堰 dam, sorted N→S",
-    points: merged,
+    sourceData: "openstreetmap-overpass + manual bridge across 都江堰 dam, sorted N→S, densified ~2km",
+    points: densified,
     extraPolylines: minExtras.map((line) => line.map(([lon, lat]) => ({ lat, lon })))
+  };
+}
+
+// === OSM 拼接小支流 (褒河 + 内江) ===
+// hand-typed 4-5 控制点稀疏，atlas verification 也不通过。OSM 有真实
+// 矢量；拼出来同步 source 升级到 external-vector，让 atlas 默认 overview
+// 也能看到这些小溪。
+const SMALL_TRIB_OSM_TARGETS = [
+  {
+    id: "stream-baohe",
+    osmName: "褒河",
+    flowDir: "lat-desc", // 秦岭 N → 汉中 S 入 汉水
+    // 实测 OSM 褒河 在 lon 107.55-107.66 (不在我之前以为的 汉中 附近 106.5-107.3)
+    corridor: { west: 107.4, east: 107.8, south: 32.9, north: 34.1 }
+  },
+  {
+    id: "river-neijiang",
+    osmName: "内江",
+    flowDir: "lat-desc", // 都江堰 渠首 → 成都 经 内江 灌渠
+    corridor: { west: 103.4, east: 104.3, south: 30.5, north: 31.1 }
+  }
+];
+
+console.log("\n=== 小支流 OSM 拼接 ===");
+for (const target of SMALL_TRIB_OSM_TARGETS) {
+  const stitched = stitchOsmRiverByName({
+    osm,
+    riverName: target.osmName,
+    corridor: target.corridor,
+    flowDir: target.flowDir,
+    joinTolerance: 0.05
+  });
+  if (!stitched) {
+    console.log(`  ${target.osmName.padEnd(4)}  ⚠️  OSM 没有可用 polyline`);
+    continue;
+  }
+  console.log(`  ${target.osmName.padEnd(4)}  ${stitched.segCount} OSM seg → ${stitched.points.length} pts (joined ${stitched.joinedCount})`);
+  result[target.id] = {
+    name: target.osmName,
+    sourceScore: 5, // 小支流默认分
+    sourceBasin: "yangtze",
+    sourceData: "openstreetmap-overpass",
+    flowDir: target.flowDir,
+    points: stitched.points,
+    extraPolylines: []
   };
 }
 
