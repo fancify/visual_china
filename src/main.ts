@@ -36,6 +36,10 @@ import {
   Vector3,
   WebGLRenderer
 } from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import {
   knowledgeFragments as defaultKnowledgeFragments,
   type KnowledgeFragment
@@ -394,13 +398,26 @@ const camera = new PerspectiveCamera(
   800
 );
 
-// Bloom 试做（commit 8563f63 加了 EffectComposer + UnrealBloomPass + OutputPass）
-// 实测 sRGB / 线性色空间在 RenderPass → BloomPass → OutputPass 链路上有错配，
-// 不论 OutputPass 在不在、bloom strength 多低，整画面 midtone 都被推灰发白
-// （山地失彩、水面过曝）。Three.js EffectComposer 在 r163+ 改过 RT 编码，
-// 跟 outputColorSpace 的交互需要更精细的调试。先回退到 direct render，bloom
-// 留到下一次连同色彩分级 LUT 一起做（那时统一定 outputColorSpace + 全链路
-// linear pipeline 一次性解决）。
+// Bloom 第二次（refactor #64）：第一次（commit 8563f63→d2eafde）失败是因为
+// 把 OutputPass 误放在 bloom 后又跳到 canvas 时多走了一次 sRGB 编码，midtone
+// 被推灰。这次走 Three.js r178 的标准链：renderer 默认 SRGBColorSpace +
+// NoToneMapping，EffectComposer 内部 RT 默认 LinearSRGB，OutputPass 在末尾
+// 把 linear → sRGB 一次性写到 canvas。Bloom 在 linear 空间做 threshold。
+//
+// 保守参数：strength 0.22 / threshold 0.92 / radius 0.4——只让真正高亮的
+// 像素（雪冠、太阳盘、水面反光）发光，midtone 完全不动。
+const bloomComposer = new EffectComposer(renderer);
+bloomComposer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+bloomComposer.setSize(window.innerWidth, window.innerHeight);
+bloomComposer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new Vector2(window.innerWidth, window.innerHeight),
+  0.22,
+  0.40,
+  0.92
+);
+bloomComposer.addPass(bloomPass);
+bloomComposer.addPass(new OutputPass());
 
 const ambientLight = new AmbientLight(0xf2dfba, 1.65);
 scene.add(ambientLight);
@@ -3690,6 +3707,11 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // composer 必须跟 renderer 同步 size + bloom resolution，否则 RT 内
+  // framebuffer 还是旧尺寸，画面会拉伸或切片。
+  bloomComposer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+  bloomComposer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
 hud.closeJournalButton.addEventListener("click", () => {
@@ -4332,7 +4354,10 @@ function frame(): void {
     hudRefreshTimer = 0;
     hudDirty = false;
   }
-  renderer.render(scene, camera);
+  // 走 EffectComposer：RenderPass + UnrealBloomPass + OutputPass 链。
+  // 高亮像素（雪冠、太阳盘、水面）会有柔和辉光；midtone 被 threshold
+  // 0.92 排除掉，色彩不动。
+  bloomComposer.render();
   perfStats.endFrame(renderer);
   requestAnimationFrame(frame);
 }
