@@ -121,6 +121,55 @@ test("night sky keeps horizon darker than zenith and twilight warms the horizon 
   );
 });
 
+test("twilight keeps the cool-side horizon no brighter than the zenith while noon and midnight stay on their current ramps", async () => {
+  const { environment } = await loadGameModules();
+  const controller = new environment.EnvironmentController();
+
+  const sample = (timeOfDay) => {
+    controller.state.timeOfDay = timeOfDay;
+    const visuals = controller.computeVisuals();
+    return {
+      visuals,
+      coolLum: luminance(visuals.skyHorizonCoolColor),
+      horizonLum: luminance(visuals.skyHorizonColor),
+      zenithLum: luminance(visuals.skyZenithColor)
+    };
+  };
+
+  const dusk = sample(18.5);
+  assert.ok(dusk.visuals.twilightStrength > 0.7);
+  assert.ok(
+    dusk.coolLum <= dusk.zenithLum,
+    "dusk cool-side horizon should not outrun the zenith brightness"
+  );
+
+  const dawn = sample(5.5);
+  assert.ok(dawn.visuals.twilightStrength > 0.7);
+  assert.ok(
+    dawn.coolLum <= dawn.zenithLum,
+    "dawn cool-side horizon should not outrun the zenith brightness"
+  );
+
+  const noon = sample(12);
+  assert.equal(noon.visuals.twilightStrength, 0);
+  assert.ok(
+    Math.abs(noon.coolLum - noon.horizonLum) < 1e-9,
+    "noon cool-side horizon should stay identical to the base horizon ramp"
+  );
+  assert.ok(noon.coolLum > noon.zenithLum, "noon horizon should stay brighter than the zenith");
+
+  const midnight = sample(0);
+  assert.equal(midnight.visuals.twilightStrength, 0);
+  assert.ok(
+    Math.abs(midnight.coolLum - midnight.horizonLum) < 1e-9,
+    "midnight cool-side horizon should stay identical to the base horizon ramp"
+  );
+  assert.ok(
+    midnight.coolLum <= midnight.zenithLum,
+    "midnight horizon should stay darker than the zenith"
+  );
+});
+
 test("sky dome materials use moon occlusion depth, directional horizon uniforms, and star twinkle attributes", async () => {
   const restoreDocument = installCanvasStub();
   try {

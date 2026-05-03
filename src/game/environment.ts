@@ -389,7 +389,9 @@ export class EnvironmentController {
     const skyHorizonColor = nightHorizonBase.clone().lerp(dayHorizonBase, daylight);
     const skyHorizonCoolColor = skyHorizonColor
       .clone()
-      .lerp(new Color("#4d6284"), twilightStrength * 0.42);
+      // 背阳侧地平线只保留少量冷色，不再把亮 teal 带推到比 zenith 更亮，
+      // 否则 twilight 里远山、树和城墙轮廓会一起被洗掉。
+      .lerp(new Color("#4d6284"), twilightStrength * 0.18);
     const skySunWarmColor = skyHorizonColor
       .clone()
       .lerp(twilightColor, twilightStrength * 0.96);
