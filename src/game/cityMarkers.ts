@@ -1,6 +1,7 @@
 import {
   BoxGeometry,
   BufferGeometry,
+  CylinderGeometry,
   ExtrudeGeometry,
   Group,
   InstancedMesh,
@@ -20,37 +21,31 @@ import { projectGeoToWorld } from "./mapOrientation.js";
  * 在 3D 场景里把真实城市坐标摆出来。
  *
  * 造型 = "口"字型城墙 (extrude 一个带洞的方形 shape)：矮、贴地、no roof
- * prism。三档用尺寸差区分：
+ * prism。三档不仅尺寸不同，结构也分级：
+ *   capital（京城）= 外环 + 4 角楼 + 中央城楼
+ *   prefecture（州府）= 外环 + 4 角楼
+ *   county（县城）= 仅外环
+ *
+ * 三档尺寸：
  *   capital（京城）= 外 4.4 内 3.0、墙厚 0.7、高 1.4（最大）
  *   prefecture（州府）= 外 3.4 内 2.4、墙厚 0.5、高 1.1
  *   county（县城）= 外 2.4 内 1.6、墙厚 0.4、高 0.8（最矮）
  *
  * 用 InstancedMesh：每档 1 个 mesh，共 3 个 instanced mesh（之前 base+
- * roof 6 个减半）。28 个 instance，draw call 3。
+ * roof 6 个减半）。29 个 instance，draw call 3。
  *
- * 用户反馈："base + roof 太丑、太高，应该矮一点 + 像小城的样子，
- * 口字型或类似造型"——所以删掉 prism roof，让墙体本身代表城。
+ * 用户这轮明确要求："回" 是误读，应该改回 "口"。所以中心保持中空；
+ * 某些视角看穿中间是预期效果，不再加内核回填。
  */
 
-function makeWalledCompoundGeometry(
+function makeWalledRingGeometry(
   outerSide: number,
   innerSide: number,
   height: number
 ): BufferGeometry {
-  const prepareForMerge = (geometry: BufferGeometry): BufferGeometry =>
-    geometry.index ? geometry.toNonIndexed() : geometry.clone();
-
-  // 用户："应该是回字形"。回 = 外环城墙 + 内块城核 (两层 concentric)。
-  // 之前 "口" (空心环) 看穿；纯实心 box 太单调。回 shape 同时解决这两个：
-  //   - 外环: ExtrudeGeometry "口" 字 (中空，让外墙形态可见)
-  //   - 内核: BoxGeometry 实心 (填中间空洞，避免 see-through)
-  //   - 内核 height 更高 (× 1.4) 让视觉层级有"中央台/宫城"感
-  // 用 BufferGeometryUtils.mergeGeometries 把两段合一以保 InstancedMesh
-  // 单 mesh，不增 draw call.
   const half = outerSide * 0.5;
   const innerHalf = innerSide * 0.5;
 
-  // 外环：ExtrudeGeometry with hole
   const ringShape = new Shape();
   ringShape.moveTo(-half, -half);
   ringShape.lineTo(half, -half);
@@ -64,32 +59,71 @@ function makeWalledCompoundGeometry(
   hole.lineTo(-innerHalf, innerHalf);
   hole.lineTo(-innerHalf, -innerHalf);
   ringShape.holes.push(hole);
-  const ringGeom = prepareForMerge(new ExtrudeGeometry(ringShape, {
+  const ringGeom = new ExtrudeGeometry(ringShape, {
     depth: height,
     bevelEnabled: false,
     curveSegments: 1
-  }));
+  });
   ringGeom.rotateX(-Math.PI / 2);
-  // ExtrudeGeometry 原本沿 +Z 挤出 0..height；rotateX(-PI/2) 之后正好落到
-  // world Y 的 0..height，base 已经在 0，不能再 translate 一次。之前多加
-  // 了一个 height，导致汉中/城固整圈城墙统一悬空一个墙高。
+  ringGeom.computeVertexNormals();
+  return ringGeom;
+}
 
-  // 内核：实心 box, 比外墙稍矮 (0.7×) 让外墙仍是主体形态
-  const coreSide = innerSide * 0.85;
-  const coreHeight = height * 0.7;
-  const coreGeom = prepareForMerge(new BoxGeometry(coreSide, coreHeight, coreSide));
-  coreGeom.translate(0, coreHeight * 0.5, 0);
+function prepareForMerge(geometry: BufferGeometry): BufferGeometry {
+  return geometry.index ? geometry.toNonIndexed() : geometry.clone();
+}
 
-  // 合并成单 BufferGeometry. mergeGeometries 要求 attributes 一致；
-  // ExtrudeGeometry / BoxGeometry 的 indexed 状态不一致时会 merge 失败，
-  // 运行时 silently 退回成只有外环的 hollow wall。统一 toNonIndexed。
-  const merged = BufferGeometryUtils.mergeGeometries([ringGeom, coreGeom]);
+function makeTierWallGeometry(
+  outerSide: number,
+  innerSide: number,
+  height: number,
+  options: { cornerTowers: boolean; centralTower: boolean }
+): BufferGeometry {
+  const parts: BufferGeometry[] = [
+    prepareForMerge(makeWalledRingGeometry(outerSide, innerSide, height))
+  ];
+
+  if (options.cornerTowers) {
+    const towerSide = outerSide * 0.18;
+    const towerHeight = height * 1.2;
+    const towerY = towerHeight * 0.5;
+    const offset = outerSide * 0.5;
+    const corners: Array<[number, number]> = [
+      [-offset, -offset],
+      [offset, -offset],
+      [-offset, offset],
+      [offset, offset]
+    ];
+    corners.forEach(([x, z]) => {
+      const cornerGeom = prepareForMerge(new BoxGeometry(towerSide, towerHeight, towerSide));
+      cornerGeom.translate(x, towerY, z);
+      parts.push(cornerGeom);
+    });
+  }
+
+  if (options.centralTower) {
+    const towerGeom = prepareForMerge(
+      new CylinderGeometry(outerSide * 0.16, outerSide * 0.18, height * 1.5, 8)
+    );
+    towerGeom.translate(0, height * 0.75, 0);
+    parts.push(towerGeom);
+  }
+
+  const merged = BufferGeometryUtils.mergeGeometries(parts);
   if (!merged) {
-    // fallback 极少触发；保险起见直接退化到 ring 单形
-    return ringGeom;
+    return parts[0];
   }
   merged.computeVertexNormals();
   return merged;
+}
+
+function hashStr(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 interface TierGeometry {
@@ -99,15 +133,24 @@ interface TierGeometry {
 
 const TIER_GEOMETRY: Record<CityTier, TierGeometry> = {
   county: {
-    geom: makeWalledCompoundGeometry(2.4, 1.6, 0.8),
+    geom: makeTierWallGeometry(2.4, 1.6, 0.8, {
+      cornerTowers: false,
+      centralTower: false
+    }),
     height: 0.8
   },
   prefecture: {
-    geom: makeWalledCompoundGeometry(3.4, 2.4, 1.1),
+    geom: makeTierWallGeometry(3.4, 2.4, 1.1, {
+      cornerTowers: true,
+      centralTower: false
+    }),
     height: 1.1
   },
   capital: {
-    geom: makeWalledCompoundGeometry(4.4, 3.0, 1.4),
+    geom: makeTierWallGeometry(4.4, 3.0, 1.4, {
+      cornerTowers: true,
+      centralTower: true
+    }),
     height: 1.4
   }
 };
@@ -187,11 +230,14 @@ export function createCityMarkers(
       // CHUNK_Y_OFFSET 跟 main.ts setTerrainMeshWorldPosition(...0.12) 同步。
       const CHUNK_Y_OFFSET = 0.12;
       const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
+      const cityIdHash = hashStr(city.id);
+      const scaleVar = 0.92 + (cityIdHash % 100) / 1000;
+      const rotVar = ((cityIdHash >> 7) & 3) * (Math.PI / 2);
 
       // geom 现在保证 base y=0、top y=height，所以放到 (x, terrainY, z) 即可。
       dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(1, 1, 1);
+      dummy.rotation.set(0, rotVar, 0);
+      dummy.scale.set(scaleVar, scaleVar, scaleVar);
       dummy.updateMatrix();
       wallMesh.setMatrixAt(index, dummy.matrix);
     });
