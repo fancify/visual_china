@@ -154,10 +154,10 @@ export function modeColor(
     //   river 0.1-0.45 → 沿岸湿润 / 河边林木 (绿色微推)
     // 用户反馈"看不见河"：之前 saturation 0.34 + lerp 0.92 出来灰蓝跟
     // 绿地形 mix 后看不出。boost 到 vivid (sat 0.65 + lerp 1.0)。
-    if (river > 0.45) {
+    if (river > 0.7) {
       const waterColor = new Color().setHSL(0.55, 0.7, 0.5); // 鲜亮青蓝
-      // mask 0.45 → t=0; mask 1.0 → t=1.0 (纯水色)
-      const t = Math.min(1, (river - 0.45) / 0.55);
+      // mask 0.7 → t=0; mask 1.0 → t=1.0 (纯水色). 高阈值 = 锐利水边
+      const t = Math.min(1, (river - 0.7) / 0.3);
       color.lerp(waterColor, t);
     } else if (river > 0.1) {
       const riparianTint = new Color().setHSL(0.30, 0.55, 0.42);
