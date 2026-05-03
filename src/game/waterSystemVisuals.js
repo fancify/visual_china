@@ -157,43 +157,31 @@ export function buildWaterRibbonVertices(points, options) {
   //   地下导致俯视看不见——同时也是用户反馈"高视角时河流看不见"的
   //   根因）。
   const maxLift = 0.6;
-  // 用户反馈"褒河 在山上一会儿高一会儿低"——DEM ~1.5km/sample 下采样把
-  // ~200m 宽河谷平均掉，polyline 原始点可能落在 hillside 而非真正的河床。
-  // 修法：每个原始点在小范围内 snap 到局部最低（实际山谷底）。先做 monotonic
-  // clamp 实测 Y 钳到地形之下 → 河钻进山里，回退。
-  // valley snap 半径 1.6 单元（≈ 2.4 km）覆盖局部 cell 噪声，但不足以
-  // 把河"拽到"另一条河谷。8 个方向角 + 中心 = 9 个采样，取最低。
-  const SNAP_RADIUS = 1.6;
-  const SNAP_DIRECTIONS = 8;
-  const snapPointToValley = (point) => {
-    let bestX = point.x;
-    let bestZ = point.y;
-    let bestY = options.sampleHeight(point.x, point.y);
-    for (let i = 0; i < SNAP_DIRECTIONS; i += 1) {
-      const angle = (i / SNAP_DIRECTIONS) * Math.PI * 2;
-      const sx = point.x + Math.cos(angle) * SNAP_RADIUS;
-      const sz = point.y + Math.sin(angle) * SNAP_RADIUS;
-      const sy = options.sampleHeight(sx, sz);
-      if (sy < bestY) {
-        bestX = sx;
-        bestZ = sz;
-        bestY = sy;
-      }
+  // 2026-05 用户："这些河的来回折线是为啥"——
+  // 之前用 snapPointToValley 在 1.6 单元 radius 取最低（应对稀疏 hand-typed
+  // polyline + 未雕刻 DEM）。但现在 build-time DEM carving 已经保证河路径
+  // 是最低，snap 反而让相邻 ribbon 顶点抓不同碎石单元，Y 来回跳 → 锯齿。
+  // 改成直接 sampleHeight (bilinear interp)，再沿 polyline 方向做 5-tap
+  // 移动平均消掉残余 cell-aliasing 噪声。
+  const rawCenters = points.map((p) => options.sampleHeight(p.x, p.y));
+  const smoothedCenters = rawCenters.map((_, i) => {
+    let sum = 0;
+    let count = 0;
+    for (let k = -2; k <= 2; k += 1) {
+      const j = i + k;
+      if (j < 0 || j >= rawCenters.length) continue;
+      sum += rawCenters[j];
+      count += 1;
     }
-    return { x: bestX, y: bestZ, snappedY: bestY };
-  };
-
-  // 注意：sections 用的还是原始 point.x/point.y（保持折线弯曲），但
-  // yCenter 用 snap 出来的最低值——这样 ribbon 视觉上"沿原路径"但
-  // 高度跟着真山谷走，不再爬山。
+    return sum / count;
+  });
   const sections = points.map((point, index) => {
     const normal = pointNormal(points, index);
     const leftX = point.x + normal.x * halfWidth;
     const leftZ = point.y + normal.y * halfWidth;
     const rightX = point.x - normal.x * halfWidth;
     const rightZ = point.y - normal.y * halfWidth;
-    const snapped = snapPointToValley(point);
-    const yCenter = snapped.snappedY;
+    const yCenter = smoothedCenters[index];
     const yLeft = options.sampleHeight(leftX, leftZ);
     const yRight = options.sampleHeight(rightX, rightZ);
     const upslope = Math.max(yLeft, yRight);
