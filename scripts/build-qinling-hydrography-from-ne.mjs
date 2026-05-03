@@ -31,13 +31,18 @@ function unprojectWorldToGeo({ x, y }) {
 // 切片范围
 const SLICE_BBOX = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
 
-// NE name → 我们 game 的 river id 映射 + 主流方向
+// NE name → 我们 game 的 river id 映射 + 主流方向 + game metadata
 // flowDir: "lon-asc" = W→E (lon 递增), "lon-desc" = E→W, "lat-desc" = N→S, "lat-asc" = S→N
+// 凡是在 major-rivers.json 里有 polyline 进入 slice bbox 的，都列在这里。
+// 之前的 斜水 / 外江 因 NE/OSM 都没数据，dropped (用户："去掉目前的河，用新做的河来代替")。
 const NAME_TO_ID = {
-  "渭河":   { id: "river-weihe",        flowDir: "lon-asc"  },  // 黄土高原 W → 关中 E
-  "汉水":   { id: "river-hanjiang",     flowDir: "lon-asc"  },  // 汉中 W → 安康/丹江口 E
-  "嘉陵江": { id: "river-jialingjiang", flowDir: "lat-desc" },  // 凤县 N → 广元/重庆 S
-  "岷江":   { id: "river-minjiang",     flowDir: "lat-desc" }   // 松潘 N → 宜宾 S
+  "长江":   { id: "river-changjiang",   flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "长江" },
+  "黄河":   { id: "river-huanghe",      flowDir: "lon-asc",  rank: 1, basin: "黄河流域", displayName: "黄河" },
+  "渭河":   { id: "river-weihe",        flowDir: "lon-asc",  rank: 1, basin: "黄河流域", displayName: "渭河" },
+  "汉水":   { id: "river-hanjiang",     flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "汉水", aliases: ["汉江"] },
+  "嘉陵江": { id: "river-jialingjiang", flowDir: "lat-desc", rank: 1, basin: "长江流域", displayName: "嘉陵江" },
+  "岷江":   { id: "river-minjiang",     flowDir: "lat-desc", rank: 1, basin: "长江流域", displayName: "岷江" },
+  "沱江":   { id: "river-tuojiang",     flowDir: "lat-desc", rank: 2, basin: "长江流域", displayName: "沱江" }
 };
 
 // greedy join 不保证 traversal order — 子段被反向拼接时会跳点 (例如
@@ -235,6 +240,10 @@ for (const river of data.rivers) {
   );
   result[meta.id] = {
     name: river.name,
+    displayName: meta.displayName,
+    aliases: meta.aliases ?? [],
+    rank: meta.rank,
+    basin: meta.basin,
     sourceScore: river.score,
     sourceBasin: river.basin,
     flowDir: meta.flowDir,
@@ -252,7 +261,7 @@ function stitchOsmRiverByName({
   corridor, // bbox or null
   joinTolerance = 0.05,
   flowDir = "lat-desc",
-  densifyTolDeg = 0.018,
+  densifyTolDeg = 0.028,
   minSegPts = 4
 }) {
   const segs = osm.features
@@ -369,9 +378,23 @@ if (minPrimary.length > 0) {
   ];
   merged.sort((a, b) => b.lat - a.lat); // 北→南
   // 密化 (~2km)：南端 hand-typed bridge 太稀，让 carving 覆盖 都江堰 → 成都 → 黄龙溪 整段
-  const densified = densifyPolylineLatLon(merged, 0.018);
+  const densifiedRaw = densifyPolylineLatLon(merged, 0.028);
+  // 映秀镇 (31.07, 103.49) 桥点在 slice west bound (103.5) 外侧 0.01°，
+  // densify 完后有 18 个插值点也在 slice 外。clip 回 slice bbox 内。
+  const densified = densifiedRaw.filter(
+    (p) =>
+      p.lon >= SLICE_BBOX.west &&
+      p.lon <= SLICE_BBOX.east &&
+      p.lat >= SLICE_BBOX.south &&
+      p.lat <= SLICE_BBOX.north
+  );
   result["river-minjiang"] = {
     name: "岷江",
+    displayName: "岷江",
+    aliases: [],
+    rank: 1,
+    basin: "长江流域",
+    flowDir: "lat-desc",
     sourceScore: 9,
     sourceBasin: "yangtze",
     sourceData: "openstreetmap-overpass + manual bridge across 都江堰 dam, sorted N→S, densified ~2km",
@@ -388,6 +411,10 @@ const SMALL_TRIB_OSM_TARGETS = [
   {
     id: "stream-baohe",
     osmName: "褒河",
+    displayName: "褒水",
+    aliases: ["褒河"],
+    rank: 3,
+    basin: "汉江流域",
     flowDir: "lat-desc", // 秦岭 N → 汉中 S 入 汉水
     // 实测 OSM 褒河 在 lon 107.55-107.66 (不在我之前以为的 汉中 附近 106.5-107.3)
     corridor: { west: 107.4, east: 107.8, south: 32.9, north: 34.1 }
@@ -395,6 +422,10 @@ const SMALL_TRIB_OSM_TARGETS = [
   {
     id: "river-neijiang",
     osmName: "内江",
+    displayName: "内江",
+    aliases: [],
+    rank: 3,
+    basin: "都江堰灌渠",
     flowDir: "lat-desc", // 都江堰 渠首 → 成都 经 内江 灌渠
     corridor: { west: 103.4, east: 104.3, south: 30.5, north: 31.1 }
   }
@@ -416,10 +447,13 @@ for (const target of SMALL_TRIB_OSM_TARGETS) {
   console.log(`  ${target.osmName.padEnd(4)}  ${stitched.segCount} OSM seg → ${stitched.points.length} pts (joined ${stitched.joinedCount})`);
   result[target.id] = {
     name: target.osmName,
-    sourceScore: 5, // 小支流默认分
-    sourceBasin: "yangtze",
-    sourceData: "openstreetmap-overpass",
+    displayName: target.displayName,
+    aliases: target.aliases,
+    rank: target.rank,
+    basin: target.basin,
     flowDir: target.flowDir,
+    sourceScore: 5, // 小支流默认分
+    sourceData: "openstreetmap-overpass",
     points: stitched.points,
     extraPolylines: []
   };
