@@ -52,10 +52,16 @@ const RIVER_RUBRIC = [
   { id: "huaihe",      name: "淮河",       basin: "huai",      trunk: 1, area: 4, story: 5, neNames: ["Huai"], bboxFilter: [112, 31, 122, 35], note: "中国南北地理分界，大禹治水、宋金分界。" },
   { id: "haihe",       name: "海河",       basin: "hai",       trunk: 1, area: 3, story: 4, neNames: ["Hai"], bboxFilter: [114, 38, 119, 41], note: "京津门户，金中都/明清北京漕运。" },
   { id: "liaohe",      name: "辽河",       basin: "liao",      trunk: 1, area: 4, story: 3, neNames: ["Liao", "Xiliao"], note: "辽东母亲河，前燕/契丹辽朝/明清辽东。" },
+  { id: "luanhe",      name: "滦河",       basin: "hai",       trunk: 1, area: 3, story: 3, neNames: ["Luan"], note: "河北独立入海，承德-唐山，避暑山庄。" },
+  { id: "ertix",       name: "额尔齐斯河", basin: "northwest", trunk: 1, area: 4, story: 4, neNames: ["Ertix", "Ertis", "Irtysh"], note: "中国唯一注入北冰洋（鄂毕河上游），阿尔泰山。" },
+  { id: "ulungur",     name: "乌伦古河",   basin: "northwest", trunk: 1, area: 2, story: 2, neNames: ["Ulungur"], note: "新疆北疆，阿尔泰南。NE 可能未含。" },
+  { id: "heihe-ru",    name: "黑河/弱水",  basin: "northwest", trunk: 1, area: 3, story: 3, neNames: ["Hei He", "Edsen Gol", "Ruoshui"], note: "河西走廊，张骞凿空、居延塞。NE 可能未含。" },
+  { id: "shule",       name: "疏勒河",     basin: "northwest", trunk: 2, area: 2, story: 3, neNames: ["Shule"], note: "玉门-敦煌-阳关，丝路河西门户。NE 可能未含。" },
 
   // ===== 长江一级支流 =====
   { id: "jinsha",      name: "金沙江",     basin: "yangtze",   trunk: 2, area: 4, story: 3, neNames: ["Jinsha"], note: "长江上游正源段，攀枝花-宜宾。" },
   { id: "yalong",      name: "雅砻江",     basin: "yangtze",   trunk: 2, area: 3, story: 2, neNames: ["Yalong"], note: "川西第一大支，水电富集。" },
+  { id: "tuojiang",    name: "沱江",       basin: "yangtze",   trunk: 2, area: 3, story: 4, neNames: ["Tuo"], bboxFilter: [103, 28, 106, 31], note: "蜀地除岷江外第二轴，成都-泸州，抗战大后方运输。" },
   { id: "minjiang",    name: "岷江",       basin: "yangtze",   trunk: 2, area: 3, story: 5, neNames: ["Min"], bboxFilter: [102, 28, 105, 33], note: "都江堰 + 成都平原灌溉，秦汉天府之国根基。" },
   { id: "dadu",        name: "大渡河",     basin: "yangtze",   trunk: 2, area: 3, story: 3, neNames: ["Dadu"], note: "强渡大渡河（红军长征）。" },
   { id: "jialing",     name: "嘉陵江",     basin: "yangtze",   trunk: 2, area: 3, story: 4, neNames: ["Jialing"], note: "蜀道金牛-米仓道沿江，三国蜀汉补给线。" },
@@ -69,6 +75,8 @@ const RIVER_RUBRIC = [
   { id: "weihe",       name: "渭河",       basin: "yellow",    trunk: 2, area: 3, story: 5, neNames: ["Wei"], bboxFilter: [104, 33, 111, 36], note: "周秦汉唐都城轴线（咸阳-长安），关中平原。" },
   { id: "fenhe",       name: "汾河",       basin: "yellow",    trunk: 2, area: 3, story: 4, neNames: ["Fen"], note: "晋国/北朝/唐河东节度使，太原-临汾。" },
   { id: "qinhe",       name: "沁河",       basin: "yellow",    trunk: 2, area: 2, story: 3, neNames: ["Qin"], bboxFilter: [111, 34, 114, 37], note: "晋东南-豫北通道，元末沁水驿站。" },
+  { id: "luohe",       name: "洛河",       basin: "yellow",    trunk: 2, area: 3, story: 5, neNames: ["Luo"],  bboxFilter: [109, 33, 113, 35], note: "夏商周洛邑、东汉洛阳、隋唐东都，洛书。NE 可能未含。" },
+  { id: "huangshui",   name: "湟水",       basin: "yellow",    trunk: 2, area: 2, story: 3, neNames: ["Huangshui", "Huang Shui"], note: "西宁河，唐蕃古道。NE 可能未含。" },
 
   // ===== 珠江支流 =====
   { id: "beijiang",    name: "北江",       basin: "pearl",     trunk: 2, area: 3, story: 3, neNames: ["Bei"], bboxFilter: [112, 22, 115, 26], note: "粤北脊柱，南雄-韶关-广州古驿。" },
