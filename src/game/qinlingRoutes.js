@@ -67,6 +67,24 @@ export const qinlingRoutes = [
     description: "由汉中南下穿米仓山抵南江、巴中，是越大巴山进入川东北的要道。",
     labelPoint: qinlingRouteAnchors["micang-road"].labelPoint,
     points: qinlingRouteAnchors["micang-road"].points
+  },
+  {
+    id: "qishan-road",
+    name: "祁山道",
+    source: historicalRouteSource,
+    label: "祁山道",
+    description: "自汉中西折略阳、成县再绕祁山堡入天水，是诸葛亮北伐最具代表性的陇右迂回线。",
+    labelPoint: qinlingRouteAnchors["qishan-road"].labelPoint,
+    points: qinlingRouteAnchors["qishan-road"].points
+  },
+  {
+    id: "lizhi-road",
+    name: "荔枝道",
+    source: historicalRouteSource,
+    label: "荔枝道",
+    description: "自长安经西乡、镇巴南穿巴山直趋涪陵，是唐代著名的南向快递道。",
+    labelPoint: qinlingRouteAnchors["lizhi-road"].labelPoint,
+    points: qinlingRouteAnchors["lizhi-road"].points
   }
 ];
 

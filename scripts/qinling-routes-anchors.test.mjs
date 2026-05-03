@@ -14,7 +14,9 @@ const EXPECTED_ROUTE_IDS = [
   "tangluo-road",
   "ziwu-road",
   "jinniu-road",
-  "micang-road"
+  "micang-road",
+  "qishan-road",
+  "lizhi-road"
 ];
 
 test("historical qinling routes expose verified anchor-based metadata", () => {
@@ -28,21 +30,23 @@ test("historical qinling routes expose verified anchor-based metadata", () => {
   }
 });
 
-test("historical route anchor geography stays within qinling region bounds", () => {
+test("historical route anchor geography stays within qinling region bounds unless explicitly extending out of slice", () => {
   for (const [routeId, anchors] of Object.entries(QINLING_ROUTE_ANCHOR_GEOGRAPHY)) {
     assert.ok(anchors.length >= 4, `${routeId} should define at least four geographic anchors`);
 
     for (const anchor of anchors) {
-      assert.ok(
+      const isInBounds =
         anchor.lat >= qinlingRegionBounds.south &&
-          anchor.lat <= qinlingRegionBounds.north,
-        `${routeId}:${anchor.name} latitude ${anchor.lat} must stay within region bounds`
-      );
-      assert.ok(
+        anchor.lat <= qinlingRegionBounds.north &&
         anchor.lon >= qinlingRegionBounds.west &&
-          anchor.lon <= qinlingRegionBounds.east,
-        `${routeId}:${anchor.name} longitude ${anchor.lon} must stay within region bounds`
-      );
+        anchor.lon <= qinlingRegionBounds.east;
+
+      if (routeId === "lizhi-road" && anchor.name.includes("涪陵")) {
+        assert.equal(isInBounds, false, "lizhi-road should extend out of the current south slice");
+        continue;
+      }
+
+      assert.equal(isInBounds, true, `${routeId}:${anchor.name} should stay within region bounds`);
     }
   }
 });
@@ -55,6 +59,42 @@ test("baoxie road keeps the Liuba-centered historical middle section", () => {
   assert.ok(liuba, "baoxie-road should include 留坝县 as a key middle anchor");
   assert.ok(Math.abs(liuba.lat - 33.62) <= 0.02);
   assert.ok(Math.abs(liuba.lon - 106.92) <= 0.02);
+});
+
+test("qishan road keeps the western detour through Qishan fort before turning back to Hanzhong", () => {
+  const qishanAnchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["qishan-road"];
+  assert.equal(qishanAnchors.length, 8);
+
+  const qishanFort = qishanAnchors.find((anchor) => anchor.name.includes("祁山堡"));
+  assert.ok(qishanFort, "qishan-road should include 祁山堡");
+  assert.ok(Math.abs(qishanFort.lat - 34.43) <= 0.02);
+  assert.ok(Math.abs(qishanFort.lon - 104.43) <= 0.02);
+
+  const xiheIndex = qishanAnchors.findIndex((anchor) => anchor.name.includes("西和"));
+  const fortIndex = qishanAnchors.findIndex((anchor) => anchor.name.includes("祁山堡"));
+  const chengxianIndex = qishanAnchors.findIndex((anchor) => anchor.name.includes("成县"));
+  assert.equal(xiheIndex < fortIndex && fortIndex < chengxianIndex, true);
+});
+
+test("jinniu road includes Wulian and Zitong between Jianmen Pass and Mianyang", () => {
+  const jinniuAnchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["jinniu-road"];
+  assert.equal(jinniuAnchors.length, 11);
+
+  const names = jinniuAnchors.map((anchor) => anchor.name);
+  const jianmenIndex = names.findIndex((name) => name.includes("剑门关"));
+  const wulianIndex = names.findIndex((name) => name.includes("武连"));
+  const zitongIndex = names.findIndex((name) => name.includes("梓潼"));
+  const mianyangIndex = names.findIndex((name) => name.includes("绵阳"));
+
+  assert.equal(jianmenIndex < wulianIndex && wulianIndex < zitongIndex && zitongIndex < mianyangIndex, true);
+});
+
+test("lizhi road starts from Chang'an and extends beyond the current southern slice", () => {
+  const lizhiAnchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["lizhi-road"];
+  assert.equal(lizhiAnchors.length, 5);
+  assert.equal(lizhiAnchors[0]?.name.includes("西安"), true);
+  assert.equal(lizhiAnchors.at(-1)?.name.includes("涪陵"), true);
+  assert.ok(lizhiAnchors.at(-1).lat < qinlingRegionBounds.south);
 });
 
 test("precomputed world anchors stay aligned with route points", () => {

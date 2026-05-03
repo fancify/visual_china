@@ -194,8 +194,42 @@ export const realQinlingCities = [
 
 金牛道南出汉中后，必须穿越宁强境内的五丁峡（又称金牛峡）方能进入四川。五丁峡是嘉陵江切穿秦巴山脉所形成的深邃峡谷，峡壁垂直，古代在绝壁上架设栈道方可通行，传说秦惠王赠"五头石牛"诱蜀王开道即在此处，金牛道之名由此而来。`
   },
-  { id: "xihe", name: "西和", lat: 34.01, lon: 105.30, tier: "county", hint: "祁山道沿线" },
-  { id: "chengxian", name: "成县", lat: 33.74, lon: 105.73, tier: "county", hint: "祁山道沿线" },
+  {
+    id: "xihe",
+    name: "西和",
+    lat: 34.01,
+    lon: 105.30,
+    tier: "county",
+    hint: "祁山道沿线，西汉水谷地节点",
+    description: "西和位于西汉水上游谷地，是天水南下祁山、再转入陇南山间通道的中继节点，诸葛亮北伐出祁山时所依托的陇右走廊即经过这一带。"
+  },
+  {
+    id: "qishan",
+    name: "祁山",
+    lat: 34.43,
+    lon: 104.43,
+    tier: "county",
+    hint: "祁山堡遗址，诸葛亮屯兵处",
+    description: "祁山位于今礼县西北祁山堡一带，控扼西汉水与陇右通道转折处，是诸葛亮第一次与第四次北伐屯兵、对峙曹魏的核心地标。"
+  },
+  {
+    id: "chengxian",
+    name: "成县",
+    lat: 33.74,
+    lon: 105.73,
+    tier: "county",
+    hint: "祁山道中段",
+    description: "成县地处陇南盆谷向嘉陵江上游过渡地带，是祁山道由西和、礼县折向略阳与汉中的中段居民点和驿路节点。"
+  },
+  {
+    id: "baishui-river",
+    name: "白水江",
+    lat: 32.99,
+    lon: 105.49,
+    tier: "county",
+    hint: "嘉陵江西岸古驿",
+    description: "白水江口一带位于嘉陵江上游西岸，是陇南南下略阳、宁强与汉中的河谷驿站，古道长期依附白龙江与嘉陵江水系转运。"
+  },
   {
     id: "lixian",
     name: "礼县",
@@ -235,10 +269,43 @@ export const realQinlingCities = [
 
 景元四年（263 年），魏国三路大军伐蜀，钟会率主力约十万人沿金牛道南下，被姜维率蜀军死守剑阁，数月不能推进。钟会以为蜀汉难克，正欲退兵，邓艾另率精兵从阴平偷越不毛之地，翻越摩天岭，绕过剑阁后方直下江油、绵竹，蜀汉后主刘禅降魏，剑阁守军随即失去意义。李白《蜀道难》中"剑阁峥嵘而崔嵬，一夫当关，万夫莫开"即描绘此关。`
   },
-  { id: "wulian", name: "武连", lat: 31.83, lon: 105.30, tier: "county", hint: "金牛道蜀地段，剑阁与梓潼之间" },
-  { id: "zitong", name: "梓潼", lat: 31.65, lon: 105.18, tier: "county", hint: "金牛道蜀地段" },
+  {
+    id: "wulian",
+    name: "武连",
+    lat: 31.42,
+    lon: 105.20,
+    tier: "county",
+    hint: "金牛道驿站，剑阁与梓潼之间",
+    description: "武连位于剑门山南下后的丘陵过渡带，是金牛道由剑门关转入梓潼、绵阳方向时的重要驿站与换马节点。"
+  },
+  {
+    id: "zitong",
+    name: "梓潼",
+    lat: 31.64,
+    lon: 105.16,
+    tier: "county",
+    hint: "金牛道重镇，七曲山所在",
+    description: "梓潼地处剑阁南麓至绵阳平原的过渡区，七曲山文昌宫与古驿道遗存集中，是金牛道进入蜀腹前最重要的县级节点之一。"
+  },
   { id: "chenggu", name: "城固", lat: 33.16, lon: 107.34, tier: "county", hint: "汉中盆地东部，子午道汉中端" },
   { id: "nanjiang", name: "南江", lat: 32.36, lon: 106.84, tier: "county", hint: "米仓道腹心" },
-  { id: "zhenba", name: "镇巴", lat: 32.55, lon: 107.90, tier: "county", hint: "荔枝道汉中端" },
+  {
+    id: "zhenba",
+    name: "镇巴",
+    lat: 32.53,
+    lon: 107.90,
+    tier: "county",
+    hint: "荔枝道入南山中转",
+    description: "镇巴位于米仓山与大巴山之间的山间盆地，是汉中东南出山南下通往达州、涪陵方向的关键中转节点，唐代荔枝道南行即经此。"
+  },
+  {
+    id: "fuling",
+    name: "涪陵",
+    lat: 29.70,
+    lon: 107.39,
+    tier: "prefecture",
+    hint: "荔枝道南终点，今切片外预备节点",
+    description: "涪陵地处乌江与长江交汇处，是唐代荔枝道自关中南下进入三峡腹地的重要终点城市之一，当前虽在切片外，但保留为后续南扩锚点。"
+  },
   { id: "xixiang", name: "西乡", lat: 32.99, lon: 107.77, tier: "county", hint: "汉中盆地东段，子午道汉中端" }
 ];

@@ -114,7 +114,7 @@ function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBoun
     const cfg = RIVER_CARVE_BY_RANK[feature.rank] ?? RIVER_CARVE_BY_RANK[3];
     const r = cfg.radiusCells;
     // riverMask paint：只把最核心的一窄条保留成纯水面，外围快速退到湿岸。
-    const maskRadius = r * 0.1;
+    const maskRadius = r * 0.16;
 
     let featureCarved = false;
 
