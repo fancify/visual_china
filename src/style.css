@@ -1072,6 +1072,145 @@ canvas {
   background: rgba(241, 210, 137, 0.12);
 }
 
+/* ─── 坐骑 / 造型选择面板 ─── */
+/* 跟 city-detail-panel 同色系，但更宽（双列），居中浮在屏幕。 */
+.customization-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.96);
+  width: min(720px, 92vw);
+  max-height: 86vh;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease, transform 180ms ease;
+  background: #0a1213;
+  border: 1px solid rgba(242, 227, 178, 0.18);
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.customization-panel.open {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.customization-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 28px 28px 22px;
+  overflow: hidden;
+}
+.customization-head {
+  flex-shrink: 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(242, 227, 178, 0.1);
+}
+.customization-head h2 {
+  margin: 6px 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f6ecd4;
+}
+.customization-hint {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: rgba(241, 210, 137, 0.7);
+}
+.customization-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 18px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(241, 210, 137, 0.22) transparent;
+}
+.customization-body::-webkit-scrollbar {
+  width: 4px;
+}
+.customization-body::-webkit-scrollbar-thumb {
+  background: rgba(241, 210, 137, 0.22);
+  border-radius: 2px;
+}
+.customization-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.customization-col-title {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(241, 210, 137, 0.74);
+  padding-left: 2px;
+}
+.customization-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.customization-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid rgba(241, 210, 137, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #ede4cb;
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+.customization-card strong {
+  font-size: 15px;
+  letter-spacing: 0.03em;
+}
+.customization-card span {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(237, 230, 204, 0.7);
+}
+.customization-card:hover {
+  background: rgba(241, 210, 137, 0.08);
+  border-color: rgba(241, 210, 137, 0.32);
+  transform: translateY(-1px);
+}
+.customization-card.active {
+  background: rgba(241, 210, 137, 0.16);
+  border-color: rgba(241, 210, 137, 0.55);
+  color: #fff5d8;
+}
+.customization-foot {
+  flex-shrink: 0;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(242, 227, 178, 0.1);
+}
+.customization-foot button {
+  width: 100%;
+  border: 1px solid rgba(241, 210, 137, 0.24);
+  border-radius: 999px;
+  padding: 11px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5ecd3;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.customization-foot button:hover {
+  background: rgba(241, 210, 137, 0.12);
+}
+
 @media (max-width: 980px) {
   .mode-block,
   .controls-block,

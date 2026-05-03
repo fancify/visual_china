@@ -102,7 +102,17 @@ import {
   avatarHeadingForMovement,
   woodHorseLegPose
 } from "./game/playerAvatar.js";
-import { createPlayerAvatar } from "./game/playerAvatarMesh";
+import {
+  createPlayerAvatar,
+  rebuildPlayerAvatar
+} from "./game/playerAvatarMesh";
+import {
+  cycleAvatar,
+  cycleMount,
+  savePlayerCustomization,
+  type AvatarId,
+  type MountId
+} from "./game/playerCustomization.js";
 import {
   qinlingAtlasFeatures,
   qinlingAtlasLayers,
@@ -481,8 +491,28 @@ const ambientWaterStyle: ReturnType<typeof waterVisualStyle> = {
   depthTest: true
 };
 
-const { player, horseLegsByName } = createPlayerAvatar();
+const playerAvatarHandle = createPlayerAvatar();
+const player = playerAvatarHandle.player;
+// horseLegsByName 是个 reference，rebuild 时整体替换；包成 ref 让循环里始终读到最新。
+let mountLegsByName = playerAvatarHandle.mountLegsByName;
+let currentMountId: MountId = playerAvatarHandle.mountId;
+let currentAvatarId: AvatarId = playerAvatarHandle.avatarId;
+let customizationPanelOpen = false;
 scene.add(player);
+
+function applyCustomization(mountId: MountId, avatarId: AvatarId): void {
+  if (mountId === currentMountId && avatarId === currentAvatarId) {
+    return;
+  }
+  const { mountLegsByName: nextLegs } = rebuildPlayerAvatar(player, mountId, avatarId);
+  mountLegsByName = nextLegs;
+  currentMountId = mountId;
+  currentAvatarId = avatarId;
+  savePlayerCustomization({ mountId, avatarId });
+  if (customizationPanelOpen) {
+    hud.setCustomizationPanelOpen({ mountId, avatarId });
+  }
+}
 
 // 4 个 procedural texture helper（圆形光晕、月亮、星空点云、云朵）已迁到
 // src/game/proceduralTextures.ts —— main.ts 仅 import 需要的函数。
@@ -3436,8 +3466,14 @@ document.addEventListener("keydown", (event) => {
   // 路径，不受中文输入法 IME 影响。否则 macOS 中文用户按 Q/E/W/A/S/D 全部失效。
   const normalized = normalizeInputKey(event);
 
-  // ESC 优先级：先关 city detail panel，再关 atlas fullscreen——panel 是
-  // 用户最近一次主动开的覆盖层，应该最先响应取消（codex 084972c P3 抓到）。
+  // ESC 优先级：customization panel > city detail panel > atlas fullscreen。
+  // 都是用户主动开的覆盖层，越靠近"刚开"越先关（栈式直觉）。
+  if (normalized === "escape" && customizationPanelOpen) {
+    event.preventDefault();
+    customizationPanelOpen = false;
+    hud.setCustomizationPanelOpen(null);
+    return;
+  }
   if (normalized === "escape" && cityDetailPanelOpen) {
     event.preventDefault();
     cityDetailPanelOpen = false;
@@ -3484,6 +3520,38 @@ document.addEventListener("keydown", (event) => {
     });
     return;
   }
+  // P：开关坐骑/造型面板（power-user 走 [ ] - = 直接切，不必开面板）。
+  if (normalized === "p") {
+    event.preventDefault();
+    customizationPanelOpen = !customizationPanelOpen;
+    if (customizationPanelOpen) {
+      resetGameplayInput();
+      hud.setCustomizationPanelOpen({
+        mountId: currentMountId,
+        avatarId: currentAvatarId
+      });
+    } else {
+      hud.setCustomizationPanelOpen(null);
+    }
+    return;
+  }
+
+  // 切坐骑：[ 上一个，] 下一个
+  if (normalized === "[" || normalized === "]") {
+    event.preventDefault();
+    const next = cycleMount(currentMountId, normalized === "[" ? -1 : 1);
+    applyCustomization(next, currentAvatarId);
+    return;
+  }
+
+  // 切造型：- 上一个，= 下一个
+  if (normalized === "-" || normalized === "=") {
+    event.preventDefault();
+    const next = cycleAvatar(currentAvatarId, normalized === "-" ? -1 : 1);
+    applyCustomization(currentMountId, next);
+    return;
+  }
+
   // 纯相机 / 环境快捷键在 atlas 全屏时也允许使用：
   // 玩家可以一边看地图一边转身、切天气、切季节，不需要先关 atlas。
   if (normalized === "k") {
@@ -3625,6 +3693,19 @@ hud.closeCityDetailButton.addEventListener("click", () => {
   cityDetailPanelOpen = false;
   cityDetailOpenCityId = null;
   hud.setCityDetailPanelOpen(null);
+});
+
+hud.closeCustomizationButton.addEventListener("click", () => {
+  customizationPanelOpen = false;
+  hud.setCustomizationPanelOpen(null);
+});
+
+hud.onSelectMount((id) => {
+  applyCustomization(id, currentAvatarId);
+});
+
+hud.onSelectAvatar((id) => {
+  applyCustomization(currentMountId, id);
 });
 
 function handleAtlasLayerClick(event: MouseEvent): void {
@@ -4057,7 +4138,7 @@ function update(deltaSeconds: number): void {
     timeSeconds: clock.elapsedTime,
     movementIntensity: horseMovementIntensity
   });
-  horseLegsByName.forEach((leg, name) => {
+  mountLegsByName.forEach((leg, name) => {
     const rotation = legPose[name as keyof typeof legPose];
 
     if (rotation !== undefined) {

@@ -30,6 +30,12 @@ const KEY_CODE_MAP = {
   KeyF: "f",
   KeyI: "i",
   KeyJ: "j",
+  KeyP: "p",
+  // 坐骑 / 造型 切换：[ ] 切坐骑，- = 切造型。两组都用 event.code（IME-safe）。
+  BracketLeft: "[",
+  BracketRight: "]",
+  Minus: "-",
+  Equal: "=",
   ArrowUp: "arrowup",
   ArrowDown: "arrowdown",
   ArrowLeft: "arrowleft",
