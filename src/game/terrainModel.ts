@@ -149,15 +149,15 @@ export function modeColor(
     color = new Color().setHSL(hue, sat, lum);
 
     // 2026-05 重构：河面 / 河边一体化在 terrain shader 里画 (替代独立
-    // ribbon mesh，根除 z-buffer 冲突 / bilinear vs triangle Y 不匹配)。
-    // riverMask 现在分两段：
-    //   river > 0.6 → 主干水面 (cyan 实色，高 lerp)
-    //   river 0.1-0.6 → 沿岸湿润 / 河边林木 (绿色微推)
-    if (river > 0.6) {
-      // 主干水：偏冷青蓝，跟之前 ribbon 颜色 0x5cabc6 对齐
-      const waterColor = new Color().setHSL(0.52, 0.34, 0.52);
-      // mask 0.6 → t=0; mask 1.0 → t=0.92 (几乎纯蓝)
-      const t = Math.min(1, (river - 0.6) / 0.4) * 0.92;
+    // ribbon mesh，根除 z-buffer 冲突)。riverMask 现在分两段：
+    //   river > 0.45 → 主干水面 (vivid cyan)
+    //   river 0.1-0.45 → 沿岸湿润 / 河边林木 (绿色微推)
+    // 用户反馈"看不见河"：之前 saturation 0.34 + lerp 0.92 出来灰蓝跟
+    // 绿地形 mix 后看不出。boost 到 vivid (sat 0.65 + lerp 1.0)。
+    if (river > 0.45) {
+      const waterColor = new Color().setHSL(0.55, 0.7, 0.5); // 鲜亮青蓝
+      // mask 0.45 → t=0; mask 1.0 → t=1.0 (纯水色)
+      const t = Math.min(1, (river - 0.45) / 0.55);
       color.lerp(waterColor, t);
     } else if (river > 0.1) {
       const riparianTint = new Color().setHSL(0.30, 0.55, 0.42);
