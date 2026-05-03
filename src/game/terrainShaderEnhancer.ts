@@ -51,18 +51,22 @@ export interface TerrainShaderEnhancerOptions {
 }
 
 const defaults: TerrainShaderEnhancerOptions = {
-  heightFogStartY: -2,
-  heightFogEndY: 22,
+  // 用户反馈"看不到地形"——之前 startY=-2 让 几乎所有地形都吃 fog；
+  // 配合 maxStrength=0.55 在 dawn/dusk 把山色拉灰。改成 startY=8 + max
+  // 0.34，只让真正的山棱（>8 单元 = 主峰带）软化进天色。
+  heightFogStartY: 8,
+  heightFogEndY: 28,
   heightFogColor: undefined as unknown as Color, // 必须由调用方设置
-  heightFogMaxStrength: 0.55,
+  heightFogMaxStrength: 0.34,
   noiseStrength: 0.06,
   noiseFrequency: 0.18,
-  // 千里江山图 远山逐青：以 80 单元（约一个主峰直径）开始空气散射，180 完全融。
-  // farColor 默认是冷调 teal，runtime 用 environmentVisuals.skyHorizonColor 跟天色保持一致。
-  atmosphericNearDistance: 80,
-  atmosphericFarDistance: 180,
+  // 千里江山图 远山逐青：用户反馈 overview 视角"看不到地形"——atmospheric
+  // 把整图都拉灰。strength 设到 0 暂时关停效果验证；之后调回小值（0.12）
+  // 单独验证。
+  atmosphericNearDistance: 110,
+  atmosphericFarDistance: 260,
   atmosphericFarColor: undefined as unknown as Color,
-  atmosphericMaxStrength: 0.42,
+  atmosphericMaxStrength: 0,
   terrainHueShift: 0,
   terrainSaturationMul: 1,
   terrainLightnessMul: 1,
