@@ -71,9 +71,10 @@ function meanNeighborDifference(values, column, row, columns, rows) {
 // 关键：carving 是在 normalize 之后做的，所以 depth 是游戏单位 (-2..9 范围内)
 // 而不是真实米数。每个 cell 取 min(current, riverHeight - depth*falloff)。
 const RIVER_CARVE_BY_RANK = {
-  1: { radiusCells: 2.0, depth: 0.55 }, // 主干 (渭/汉/嘉陵/岷)
-  2: { radiusCells: 1.5, depth: 0.32 }, // 一级支流
-  3: { radiusCells: 1.0, depth: 0.18 } // 二级支流 (褒/斜/外/内)
+  // depth 同高度夸张同步 ×1.5 (0.55→0.83, 0.32→0.48, 0.18→0.27)
+  1: { radiusCells: 2.0, depth: 0.83 }, // 主干 (渭/汉/嘉陵/岷)
+  2: { radiusCells: 1.5, depth: 0.48 }, // 一级支流
+  3: { radiusCells: 1.0, depth: 0.27 } // 二级支流 (褒/斜/外/内)
 };
 
 function carveRiverValleys(heights, gridColumns, gridRows, regionBounds, riverFeatures) {
@@ -164,12 +165,11 @@ function normalizeHeights(rawHeights, minRawHeight, maxRawHeight) {
   const normalized = new Float32Array(rawHeights.length);
   let minHeight = Number.POSITIVE_INFINITY;
   let maxHeight = Number.NEGATIVE_INFINITY;
-  // 2026-05 高度夸张降一半：原来 [-4, 18] = 22 unit dynamic range，
-  // 视觉上山尖太突兀；halved to [-2, 9] = 11 unit。
-  // 配合 river-valley carving (后面的 carveRiverValleys)，山要矮一点
-  // 河谷才能切得显眼而不破坏整体形状。
-  const visualMinHeight = -2;
-  const visualMaxHeight = 9;
+  // 2026-05 高度调试历程：原 [-4, 18]=22 → halved [-2, 9]=11 太平。
+  // 用户反馈再 ×1.5 → [-3, 13.5]=16.5。介于原版和 halved 之间，山形仍
+  // 比原版温和，但比 halved 立体。河谷雕刻深度同比 ×1.5。
+  const visualMinHeight = -3;
+  const visualMaxHeight = 13.5;
 
   for (let index = 0; index < rawHeights.length; index += 1) {
     const value = rawHeights[index];
