@@ -2893,11 +2893,29 @@ function nearestUncollectedFragment():
   return best;
 }
 
+// 上次画 mini-map 时的玩家位置，用来判断"够远才重画"——unmoved 的镜头/玩家
+// 不应该每秒触发 ~12ms 的 canvas2d 重绘（用户："fps 动不动就跌很低"）。
+let lastDrawnPlayerX = Number.POSITIVE_INFINITY;
+let lastDrawnPlayerZ = Number.POSITIVE_INFINITY;
+
 function refreshHud(): void {
   if (!terrainSampler) {
     return;
   }
-  drawOverviewMap(terrainSampler.asset, player.position);
+  // 玩家位置阈值：mini-map 上 1 像素约对应 0.8 世界单位（180/220）。0.6
+  // 单元的位移就重绘，确保 dot 看上去贴着玩家。atlas 全屏期间走 0.15s
+  // 强制刷新（hudRefreshInterval 那条路径），不走这里——所以这个阈值只
+  // 影响游戏视图下的 mini-map 节流。
+  const playerDx = Math.abs(player.position.x - lastDrawnPlayerX);
+  const playerDz = Math.abs(player.position.z - lastDrawnPlayerZ);
+  const playerMoved = playerDx > 0.6 || playerDz > 0.6;
+  // hudDirty 路径（用户操作 toggle layer / 切季节等）一律重绘——保证内容
+  // 状态实时反映。timer 路径下只有玩家位移够大才重绘。
+  if (hudDirty || playerMoved || atlasWorkbench.isFullscreen) {
+    drawOverviewMap(terrainSampler.asset, player.position);
+    lastDrawnPlayerX = player.position.x;
+    lastDrawnPlayerZ = player.position.z;
+  }
   hud.setActiveMode(currentMode);
   const chunkSuffix = activeChunkId ? ` · 区块 ${activeChunkId}` : "";
   const routeInfluence = routeAffinityAt({
@@ -3840,7 +3858,10 @@ function update(deltaSeconds: number): void {
     currentMode,
     environmentController.state.season,
     environmentController.state.weather,
-    Math.floor(environmentController.state.timeOfDay * 3),
+    // 时间 bucket：每 game-hour 一次，避免 terrain recolor 频繁触发 ~440ms
+    // hitch（之前 * 3 = 每 1/3 hour ≈ 1.85s real time，是肉眼可见卡顿源）。
+    // 配合 environment time 5x 放慢，平均 ~27s 才换一次 bucket。
+    Math.floor(environmentController.state.timeOfDay),
     Math.round((visuals.terrainSaturationMul ?? 1) * 10),
     Math.round((visuals.terrainLightnessMul ?? 1) * 10)
   ].join(":");
