@@ -5,6 +5,7 @@ import test from "node:test";
 const asset = JSON.parse(
   fs.readFileSync("public/data/qinling-slice-dem.json", "utf8")
 );
+const terrainModelSource = fs.readFileSync("src/game/terrainModel.ts", "utf8");
 const regionManifest = JSON.parse(
   fs.readFileSync("public/data/regions/qinling/manifest.json", "utf8")
 );
@@ -51,6 +52,48 @@ function localReliefStats() {
   return {
     jump95: neighborJumps[Math.floor(neighborJumps.length * 0.95)],
     slope95: localSlopes[Math.floor(localSlopes.length * 0.95)]
+  };
+}
+
+function riverGorgeStats() {
+  const { grid, heights, riverMask } = asset;
+  const strongWaterCells = [];
+  const bankRise = [];
+  let visibleWaterCells = 0;
+
+  for (let row = 1; row < grid.rows - 1; row += 1) {
+    for (let column = 1; column < grid.columns - 1; column += 1) {
+      const index = row * grid.columns + column;
+      const river = riverMask[index];
+
+      if (river > 0.1) {
+        visibleWaterCells += 1;
+      }
+
+      if (river <= 0.85) {
+        continue;
+      }
+
+      strongWaterCells.push(index);
+      const center = heights[index];
+      const neighbors = [
+        heights[index - 1],
+        heights[index + 1],
+        heights[index - grid.columns],
+        heights[index + grid.columns]
+      ];
+      bankRise.push(Math.max(...neighbors) - center);
+    }
+  }
+
+  bankRise.sort((a, b) => a - b);
+
+  return {
+    visibleWaterCells,
+    strongWaterCells: strongWaterCells.length,
+    bankRise90: bankRise[Math.floor(bankRise.length * 0.9)] ?? 0,
+    bankRiseMean:
+      bankRise.reduce((total, value) => total + value, 0) / (bankRise.length || 1)
   };
 }
 
@@ -153,5 +196,40 @@ test("Qinling visual relief avoids needle-like mountain noise", () => {
   assert.ok(
     relief.slope95 <= 3.4,
     `95th percentile local slope should avoid needle-like ridges, got ${relief.slope95}`
+  );
+});
+
+test("Qinling river carving keeps a narrow water footprint with sharper gorge walls", () => {
+  const gorge = riverGorgeStats();
+
+  assert.ok(
+    gorge.strongWaterCells <= 1100,
+    `strong water footprint should stay narrow after mask tightening, got ${gorge.strongWaterCells} cells`
+  );
+  assert.ok(
+    gorge.visibleWaterCells <= 3200,
+    `river corridor should stay visually slimmer overall, got ${gorge.visibleWaterCells} cells above 0.1`
+  );
+  assert.ok(
+    gorge.bankRise90 >= 0.2,
+    `river-adjacent banks should read as sharper gorges, got p90 rise ${gorge.bankRise90.toFixed(3)}`
+  );
+});
+
+test("terrain river tint thresholds stay narrowed for crisp water edges", () => {
+  assert.match(
+    terrainModelSource,
+    /if\s*\(river\s*>\s*0\.85\)/,
+    "terrain water tint should only kick in on the strongest river mask core"
+  );
+  assert.match(
+    terrainModelSource,
+    /\(river\s*-\s*0\.85\)\s*\/\s*0\.15/,
+    "terrain water tint ramp should compress into the 0.85-1.0 mask band"
+  );
+  assert.match(
+    terrainModelSource,
+    /river\s*\*\s*0\.20/,
+    "riparian tint should stay weaker so river banks do not look mushy"
   );
 });
