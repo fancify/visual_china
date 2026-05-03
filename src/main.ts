@@ -108,6 +108,7 @@ import {
   avatarHeadingForMovement,
   woodHorseLegPose
 } from "./game/playerAvatar.js";
+import { computeAvatarTilt } from "./game/avatarTilt";
 import {
   createPlayerAvatar,
   rebuildPlayerAvatar
@@ -4194,6 +4195,14 @@ function update(deltaSeconds: number): void {
       leg.rotation.z = rotation;
     }
   });
+
+  const avatarTilt = computeAvatarTilt({
+    heading: player.rotation.y,
+    position: player.position,
+    sampler: terrainSampler
+  });
+  player.rotation.x = MathUtils.lerp(player.rotation.x, avatarTilt.pitch, 0.18);
+  player.rotation.z = MathUtils.lerp(player.rotation.z, avatarTilt.roll, 0.18);
 
   const ground = terrainSampler.sampleHeight(player.position.x, player.position.z);
   player.position.y = MathUtils.lerp(player.position.y, ground + 0.35, 0.16);
