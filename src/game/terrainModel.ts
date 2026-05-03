@@ -2,6 +2,8 @@ import { Color, MathUtils } from "three";
 
 import { TerrainSampler } from "./demSampler";
 import type { EnvironmentState, EnvironmentVisuals } from "./environment";
+import { biomeWeightsAt } from "./biomeZones";
+import { unprojectWorldToGeo } from "./mapOrientation.js";
 
 export function terrainHeightRange(sampler: TerrainSampler): {
   minHeight: number;
@@ -96,11 +98,20 @@ export function modeColor(
   const river = sampler.sampleRiver(x, z);
   const pass = sampler.samplePass(x, z);
   const settle = sampler.sampleSettlement(x, z);
+  const bounds = sampler.asset.bounds;
+  const biome =
+    bounds
+      ? biomeWeightsAt(unprojectWorldToGeo({ x, z }, bounds, sampler.asset.world))
+      : null;
 
   let color: Color;
 
   if (mode === "terrain") {
-    // Biome zonation by normalized elevation + slope，参照秦岭/中国
+    // 现在的地貌配色是双轴：height-band × climate-zone。
+    // 先按 normalized elevation + slope 算山地带，再叠加秦岭南北气候带调制。
+    // river / settlement tint 仍放在后面，优先级高于 biome modulation。
+    //
+    // Height-band zonation by normalized elevation + slope，参照秦岭/中国
     // 实际植被分布（不是臆想）：
     //   < 0.18 = 盆地 / 农田带（黄绿）
     //   0.18-0.45 = 暖温带阔叶混交林（中绿）
@@ -145,6 +156,12 @@ export function modeColor(
     hue = MathUtils.lerp(hue, 0.07, rockiness * 0.55);
     sat = MathUtils.lerp(sat, 0.10, rockiness * 0.5);
     lum = MathUtils.lerp(lum, lum * 0.92, rockiness * 0.25);
+
+    if (biome) {
+      hue = MathUtils.euclideanModulo(hue + biome.hueShift, 1);
+      sat = MathUtils.clamp(sat * biome.satScale, 0, 1);
+      lum = MathUtils.clamp(lum * biome.lumScale, 0, 1);
+    }
 
     color = new Color().setHSL(hue, sat, lum);
 
