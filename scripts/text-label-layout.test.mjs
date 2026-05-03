@@ -13,7 +13,7 @@ test("text sprite labels allocate wider canvases for longer Chinese names", () =
 });
 
 test("text sprite labels preserve padding so text is not clipped by the canvas edge", () => {
-  const layout = textSpriteLayout("褒斜谷意象");
+  const layout = textSpriteLayout("剑门蜀道");
 
   assert.ok(layout.text.x > layout.rect.x);
   assert.ok(layout.text.x < layout.rect.x + layout.rect.width);

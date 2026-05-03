@@ -4,6 +4,14 @@ import test from "node:test";
 
 import { geoToWorld } from "../src/game/geoProjection.js";
 
+const REMOVED_PLACEHOLDER_LANDMARKS = [
+  "长安意象",
+  "渭河平原",
+  "褒斜谷意象",
+  "汉中盆地",
+  "成都平原"
+];
+
 const asset = JSON.parse(
   fs.readFileSync("public/data/qinling-slice-dem.json", "utf8")
 );
@@ -44,17 +52,11 @@ test("Hanzhong basin POIs sit on the real Hanzhong lowland, not south mountain t
     asset.bounds,
     asset.world
   );
-  const basin = content.landmarks.find((landmark) => landmark.name === "汉中盆地");
   const hingeFragment = content.fragments.find((fragment) => fragment.id === "hanzhong-hinge");
   const hingeBeat = content.storyBeats.find((beat) => beat.id === "hanzhong-hinge");
 
-  assert.ok(basin, "汉中盆地 landmark must exist");
   assert.ok(hingeFragment, "hanzhong-hinge fragment must exist");
   assert.ok(hingeBeat, "hanzhong-hinge story beat must exist");
-  assert.ok(
-    distance({ x: positionToWorld(basin.position).x, z: positionToWorld(basin.position).y }, expectedHanzhong) < 8,
-    `汉中盆地 landmark is ${distance({ x: positionToWorld(basin.position).x, z: positionToWorld(basin.position).y }, expectedHanzhong).toFixed(2)} world units from the real Hanzhong basin`
-  );
   assert.ok(
     distance({ x: positionToWorld(hingeFragment.position).x, z: positionToWorld(hingeFragment.position).y }, expectedHanzhong) < 8,
     "hanzhong-hinge fragment should be near the real Hanzhong basin"
@@ -64,8 +66,12 @@ test("Hanzhong basin POIs sit on the real Hanzhong lowland, not south mountain t
     "hanzhong-hinge story target should be near the real Hanzhong basin"
   );
   assert.ok(
-    sampleHeightAtWorld({ x: positionToWorld(basin.position).x, z: positionToWorld(basin.position).y }) < asset.minHeight + (asset.maxHeight - asset.minHeight) * 0.18,
-    "汉中盆地 landmark should sample as a lowland basin"
+    sampleHeightAtWorld({ x: positionToWorld(hingeFragment.position).x, z: positionToWorld(hingeFragment.position).y }) < asset.minHeight + (asset.maxHeight - asset.minHeight) * 0.18,
+    "hanzhong-hinge fragment should sample as a lowland basin"
+  );
+  assert.ok(
+    sampleHeightAtWorld({ x: positionToWorld(hingeBeat.target).x, z: positionToWorld(hingeBeat.target).y }) < asset.minHeight + (asset.maxHeight - asset.minHeight) * 0.18,
+    "hanzhong-hinge story target should sample as a lowland basin"
   );
 });
 
@@ -95,21 +101,26 @@ test("Jianmen Pass and Chencang Road are explicit geographic landmarks", () => {
   );
 });
 
-test("Guanzhong start and Changan POIs use real east-side coordinates", () => {
+test("legacy placeholder landmarks are removed from Qinling POI content", () => {
+  const landmarkNames = new Set(content.landmarks.map((landmark) => landmark.name));
+
+  for (const landmarkName of REMOVED_PLACEHOLDER_LANDMARKS) {
+    assert.ok(
+      !landmarkNames.has(landmarkName),
+      `${landmarkName} placeholder landmark should be removed from content.json`
+    );
+  }
+});
+
+test("Guanzhong start and narrative fragment use real east-side coordinates", () => {
   const expectedChangan = geoToWorld(
     { lon: 108.94, lat: 34.34 },
     asset.bounds,
     asset.world
   );
-  const changan = content.landmarks.find((landmark) => landmark.name === "长安意象");
   const heartlandFragment = content.fragments.find((fragment) => fragment.id === "guanzhong-heartland");
 
-  assert.ok(changan, "长安意象 landmark must exist");
   assert.ok(heartlandFragment, "guanzhong-heartland fragment must exist");
-  assert.ok(
-    distance({ x: positionToWorld(changan.position).x, z: positionToWorld(changan.position).y }, expectedChangan) < 8,
-    "长安意象 should sit near the real Xi'an/Chang'an area, not the old hand-placed center"
-  );
   assert.ok(
     distance({ x: positionToWorld(content.routeStart).x, z: positionToWorld(content.routeStart).y }, expectedChangan) < 12,
     "routeStart should begin near the real Guanzhong capital area"
