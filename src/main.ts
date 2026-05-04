@@ -56,8 +56,17 @@ import {
   type ViewMode
 } from "./data/qinlingSlice";
 import {
-  AmbientAudioController
-} from "./game/ambientAudio";
+  createAmbientMixer,
+  type AmbientContext,
+  type AmbientMixer
+} from "./game/audio/ambientMixer";
+import {
+  createAudioRuntime,
+  setMasterMuted,
+  unlockOnUserGesture
+} from "./game/audio/audioContext";
+import { loadAllBuffers } from "./game/audio/audioManifest";
+import { createTriggerSystem } from "./game/audio/triggerSystem";
 import {
   cameraLookTargetForMode,
   cameraPositionForMode,
@@ -106,6 +115,10 @@ import {
   zoomAtlasMapAtPoint,
   type AtlasWorkbenchState
 } from "./game/atlasWorkbench.js";
+import {
+  computeLabelVisibility,
+  labelMaxRenderDistance
+} from "./game/labelVisibility.js";
 import { movementVectorFromInput } from "./game/navigation.js";
 import {
   avatarHeadingForMovement,
@@ -190,6 +203,7 @@ import {
 } from "./game/scenery";
 import {
   createWildlifeHandle,
+  computeWildlifePose,
   disposeWildlife,
   sharedWildlifeMaterials,
   updateWildlifeFrame,
@@ -206,12 +220,15 @@ import {
   findHoveredPoiFromIntersections
 } from "./game/poiHoverRuntime";
 import { gameHeightToRealMeters } from "./game/realElevation";
+import { biomeWeightsAt } from "./game/biomeZones.js";
 import {
   cityFromMarkerIntersection,
+  CITY_TIER_SPECS,
   createCityMarkers,
   disposeCityMarkers,
   type CityMarkersHandle
 } from "./game/cityMarkers";
+import { flattenedY, setCityFlattenZones } from "./game/cityFlattenZones.js";
 import { realQinlingCities } from "./data/realCities.js";
 import type { RealCity } from "./data/realCities.js";
 import { qinlingRegionWorld } from "./data/qinlingRegion.js";
@@ -267,7 +284,10 @@ const terrainAssetRequest = resolveTerrainAssetRequest(
   "/data/regions/qinling/manifest.json"
 );
 const environmentController = new EnvironmentController();
-const ambientAudio = new AmbientAudioController();
+const audioRuntime = createAudioRuntime();
+unlockOnUserGesture(audioRuntime);
+const ambientMixer = createAmbientMixer(audioRuntime);
+const triggerSystem = createTriggerSystem(audioRuntime);
 let landmarks: Landmark[] = defaultLandmarks.map((landmark) => ({
   ...landmark,
   position: landmark.position.clone()
@@ -410,6 +430,28 @@ if (perfStats.element.hidden === false) {
 // 旧版 DOM sky overlay（96 个 span 星星 + 3 个 div 云朵）已被 WebGL sky dome
 // 完全替代，DOM 层删除以减少 compositor 负担。
 const hud = createHud(appRoot, terrainAssetRequest, knowledgeFragments.length);
+const audioMuteButton = document.createElement("button");
+audioMuteButton.type = "button";
+audioMuteButton.className = "audio-mute-toggle";
+let audioMuted = safeReadAudioMuted();
+setMasterMuted(audioRuntime, audioMuted);
+audioMuteButton.textContent = audioMuted ? "🔇" : "🔊";
+audioMuteButton.ariaLabel = audioMuted ? "开启声音" : "静音";
+audioMuteButton.ariaPressed = String(audioMuted);
+audioMuteButton.title = audioMuted ? "开启声音" : "静音";
+audioMuteButton.addEventListener("click", () => {
+  audioMuted = !audioMuted;
+  setMasterMuted(audioRuntime, audioMuted);
+  safeWriteAudioMuted(audioMuted);
+  audioMuteButton.textContent = audioMuted ? "🔇" : "🔊";
+  audioMuteButton.ariaLabel = audioMuted ? "开启声音" : "静音";
+  audioMuteButton.ariaPressed = String(audioMuted);
+  audioMuteButton.title = audioMuted ? "开启声音" : "静音";
+});
+appRoot.appendChild(audioMuteButton);
+void loadAllBuffers(audioRuntime).then(({ loaded, failed }) => {
+  console.info(`[audio] ${loaded} loaded, ${failed} missing`);
+});
 const hoverRaycaster = new Raycaster();
 const hoverPointer = new Vector2();
 let hoverPointerActive = false;
@@ -446,6 +488,132 @@ const PROXIMITY_RADIUS_CITY_CAP = 5.0;
 
 interface RuntimePoiInfo extends PoiInfo {
   cityTier?: RealCity["tier"];
+}
+
+const FOOTSTEP_INTERVAL_MS = 450;
+const OX_MOO_INTERVAL_MS = 30000;
+const WATER_FOOTSTEP_THRESHOLD = 0.72;
+const CRANE_AUDIO_RADIUS = 8;
+const TEMPLE_POI_PATTERN = /(寺|塔|观|庙|佛阁|经幢)/;
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function ambientWeatherForState(weather: EnvironmentController["state"]["weather"]): AmbientContext["weather"] {
+  if (weather === "storm") {
+    return "storm";
+  }
+  if (weather === "rain") {
+    return "rain";
+  }
+  return "clear";
+}
+
+function deriveAmbientBiome(
+  x: number,
+  z: number,
+  sampler: TerrainSampler
+): AmbientContext["biome"] {
+  const height = sampler.sampleHeight(x, z);
+  const slope = sampler.sampleSlope(x, z);
+  const river = sampler.sampleRiver(x, z);
+  const zone = zoneNameAt(x, z, sampler);
+
+  if (height > 12 || slope > 0.42) {
+    return "highland";
+  }
+
+  if (zone.includes("盆地")) {
+    return "basin";
+  }
+
+  if (sampler.asset.bounds) {
+    const biome = biomeWeightsAt(
+      unprojectWorldToGeo({ x, z }, sampler.asset.bounds, sampler.asset.world)
+    ).biomeId;
+    if (biome === "subtropical-humid" || biome === "tropical-humid") {
+      return "subtropical";
+    }
+    if (biome === "warm-temperate-semiarid" || biome === "temperate-grassland") {
+      return "plain";
+    }
+  }
+
+  if (river < 0.12 && slope < 0.18 && height < 8) {
+    return "plain";
+  }
+
+  return "forest";
+}
+
+function sampleRiverProximity(
+  sampler: TerrainSampler,
+  position: Pick<Vector3, "x" | "z">
+): number {
+  return clamp01(sampler.sampleRiver(position.x, position.z));
+}
+
+function distanceToSegment2D(
+  pointX: number,
+  pointZ: number,
+  start: { x: number; y: number },
+  end: { x: number; y: number }
+): number {
+  const dx = end.x - start.x;
+  const dz = end.y - start.y;
+  if (dx === 0 && dz === 0) {
+    return Math.hypot(pointX - start.x, pointZ - start.y);
+  }
+  const t = clamp01(
+    ((pointX - start.x) * dx + (pointZ - start.y) * dz) / (dx * dx + dz * dz)
+  );
+  const nearestX = start.x + dx * t;
+  const nearestZ = start.y + dz * t;
+  return Math.hypot(pointX - nearestX, pointZ - nearestZ);
+}
+
+function sampleLargeRiverProximity(position: Pick<Vector3, "x" | "z">): number {
+  let bestDistance = Infinity;
+
+  for (const feature of visibleWaterFeatures) {
+    if (feature.terrainRole !== "main-river") {
+      continue;
+    }
+    const points =
+      feature.world && "points" in feature.world ? feature.world.points : null;
+    if (!points || points.length < 2) {
+      continue;
+    }
+    for (let index = 0; index < points.length - 1; index += 1) {
+      bestDistance = Math.min(
+        bestDistance,
+        distanceToSegment2D(position.x, position.z, points[index]!, points[index + 1]!)
+      );
+    }
+  }
+
+  if (!Number.isFinite(bestDistance)) {
+    return 0;
+  }
+
+  return 1 - MathUtils.smoothstep(bestDistance, 3, 16);
+}
+
+function safeReadAudioMuted(): boolean {
+  try {
+    return window.localStorage.getItem("audio_muted") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function safeWriteAudioMuted(muted: boolean): void {
+  try {
+    window.localStorage.setItem("audio_muted", muted ? "1" : "0");
+  } catch {
+    /* localStorage 不可写时只丢失偏好，不阻断游戏 */
+  }
 }
 
 const scene = new Scene();
@@ -706,6 +874,7 @@ const cityLabelSpritesByTier: { capital: Sprite[]; prefecture: Sprite[] } = {
 const countyLabelSpriteByCityId = new Map<string, Sprite>();
 // 关隘石碑名签 sprites，跟 prefecture tier 同档 fade（170-240）。
 const passLandmarkLabelSprites: Sprite[] = [];
+const allDistanceLimitedLabelSprites: Sprite[] = [];
 // 河流 / 古道 名签——之前没接 LOD，远距离仍漂浮；用户反馈"标签离得太远
 // 就不要显示了"，按 priority 分两档：
 //   river major (priority>=9, e.g. 渭河/汉水/嘉陵江)：跟 prefecture 同档 170-240
@@ -719,10 +888,63 @@ const routeLabelSprites: Sprite[] = [];
 let routePlankRoadHandle: PlankRoadHandle | null = null;
 let allHudPois: RuntimePoiInfo[] = [];
 const hudPoiBySourceKey = new Map<string, RuntimePoiInfo>();
+const discoveredPoiIds = new Set<string>();
+let lastProximityPoiId: string | null = null;
+let footstepPulseTimerMs = 0;
+let oxMooTimerMs = 0;
+
+function handlePoiEntryAudio(poi: RuntimePoiInfo): void {
+  if (!discoveredPoiIds.has(poi.id)) {
+    discoveredPoiIds.add(poi.id);
+    triggerSystem.fire("cultural_magic_chime", { volume: 0.5 });
+  }
+
+  if (poi.category === "scenic") {
+    if (Math.random() < 0.1) {
+      triggerSystem.fire("cultural_guqin_pluck", { volume: 0.42 });
+    }
+    if (Math.random() < 0.05) {
+      triggerSystem.fire("cultural_dizi_flute", { volume: 0.34 });
+    }
+  }
+
+  if (TEMPLE_POI_PATTERN.test(poi.name)) {
+    if (Math.random() < 0.3) {
+      triggerSystem.fire("cultural_temple_bell", { volume: 0.5 });
+    }
+    if (Math.random() < 0.1) {
+      triggerSystem.fire("cultural_wooden_fish", { volume: 0.42 });
+    }
+  }
+}
+
+function triggerNearbyCraneAudio(elapsedTime: number): void {
+  if (!wildlifeHandle) {
+    return;
+  }
+
+  const craneInstances = wildlifeHandle.instancesByKind.crane;
+  for (const crane of craneInstances) {
+    const pose = computeWildlifePose(crane, elapsedTime, crane.sampler);
+    const distance = Math.hypot(
+      pose.position.x - player.position.x,
+      pose.position.z - player.position.z
+    );
+    if (distance < CRANE_AUDIO_RADIUS) {
+      triggerSystem.fire("cultural_crane_call", { volume: 0.5 });
+      return;
+    }
+  }
+}
 
 function hideHoverCard(): void {
   hoverPointerActive = false;
   poiHoverHud.hide();
+}
+
+function trackDistanceLimitedLabelSprite(label: Sprite): void {
+  label.userData.maxLabelDistance = labelMaxRenderDistance(label.scale.y);
+  allDistanceLimitedLabelSprites.push(label);
 }
 
 function buildHudPoiId(prefix: string, name: string, worldX: number, worldZ: number): string {
@@ -813,6 +1035,14 @@ function syncPoiHoverHud(): void {
       source: update.source
     });
   }
+
+  if (proximityTarget?.id !== lastProximityPoiId) {
+    if (proximityTarget) {
+      handlePoiEntryAudio(proximityTarget);
+    }
+    lastProximityPoiId = proximityTarget?.id ?? null;
+  }
+
   poiHoverHud.setTarget(update.target, update.source);
 }
 
@@ -1103,6 +1333,22 @@ function updateCityLodFade(): void {
     scenicLabelSprites.forEach(occlude);
     ancientLabelSprites.forEach(occlude);
   }
+}
+
+function updateLabelVisibility(): void {
+  const visibility = computeLabelVisibility(
+    camera.position,
+    allDistanceLimitedLabelSprites
+  );
+
+  visibility.forEach((isWithinDistance, index) => {
+    const label = allDistanceLimitedLabelSprites[index];
+
+    if (!label?.parent || !label.visible) {
+      return;
+    }
+    label.visible = isWithinDistance;
+  });
 }
 
 function disposeCityLabelSprites(): void {
@@ -1438,6 +1684,7 @@ function rebuildLandmarkVisuals(): void {
       }
       landmarkGroup.add(label);
       passLandmarkLabelSprites.push(label);
+      trackDistanceLimitedLabelSprite(label);
       return;
     }
 
@@ -1524,6 +1771,7 @@ function rebuildScenicVisuals(): void {
     }
     scenicGroup.add(label);
     scenicLabelSprites.push(label);
+    trackDistanceLimitedLabelSprite(label);
   });
 }
 
@@ -1639,6 +1887,7 @@ function rebuildAncientVisuals(): void {
     }
     ancientGroup.add(label);
     ancientLabelSprites.push(label);
+    trackDistanceLimitedLabelSprite(label);
   });
 }
 
@@ -1687,6 +1936,7 @@ function rebuildFragmentVisuals(): void {
   });
 }
 
+allDistanceLimitedLabelSprites.length = 0;
 rebuildLandmarkVisuals();
 rebuildScenicVisuals();
 rebuildAncientVisuals();
@@ -3773,6 +4023,7 @@ document.addEventListener("keydown", (event) => {
     resetGameplayInput();
     atlasWorkbench = setAtlasFullscreen(atlasWorkbench, !atlasWorkbench.isFullscreen);
     refreshAtlasWorkbench();
+    triggerSystem.fire("ui_page_turn", { volume: 0.48 });
     return;
   }
 
@@ -3784,6 +4035,7 @@ document.addEventListener("keydown", (event) => {
   ) {
     event.preventDefault();
     poiHoverHud.toggleDetail();
+    triggerSystem.fire("ui_click", { volume: 0.52 });
     return;
   }
   // P：开关坐骑/造型面板（power-user 走 [ ] - = 直接切，不必开面板）。
@@ -3892,16 +4144,11 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-function enableAudio(): void {
-  ambientAudio.ensureStarted().catch((error: unknown) => {
-    console.error(error);
-  });
-}
-
-document.addEventListener("pointerdown", enableAudio, { once: true });
-document.addEventListener("keydown", enableAudio, { once: true });
-
 renderer.domElement.addEventListener("pointerdown", (event: PointerEvent) => {
+  const hoveredPoi = findHoveredPoi();
+  if (hoveredPoi) {
+    triggerSystem.fire("ui_hover", { volume: 0.4 });
+  }
   isDragging = true;
   dragOriginX = event.clientX;
   dragOriginY = event.clientY;
@@ -4070,12 +4317,14 @@ hud.openAtlasFullscreenButton.addEventListener("click", () => {
   atlasWorkbench = setAtlasFullscreen(atlasWorkbench, true);
   refreshAtlasWorkbench();
   hideHoverCard();
+  triggerSystem.fire("ui_page_turn", { volume: 0.48 });
 });
 
 hud.closeAtlasFullscreenButton.addEventListener("click", () => {
   atlasWorkbench = setAtlasFullscreen(atlasWorkbench, false);
   refreshAtlasWorkbench();
   hideHoverCard();
+  triggerSystem.fire("ui_page_turn", { volume: 0.48 });
 });
 
 hud.atlasLayerList.addEventListener("click", handleAtlasLayerClick);
@@ -4408,6 +4657,7 @@ function update(deltaSeconds: number): void {
   const baseSpeed = (keys.has("shift") ? 20 : 13.5) * travelSpeedMultiplier();
   const speed = baseSpeed * (slopePenalty + routeBonus) * offRouteCost;
   const isMoving = forwardInput !== 0 || rightInput !== 0;
+  const movementSpeed = isMoving ? speed : 0;
 
   if (isMoving) {
     cameraViewMode = "follow";
@@ -4452,6 +4702,36 @@ function update(deltaSeconds: number): void {
 
   const ground = terrainSampler.sampleHeight(player.position.x, player.position.z);
   player.position.y = MathUtils.lerp(player.position.y, ground + 0.35, 0.16);
+
+  if (movementSpeed > 0.5) {
+    footstepPulseTimerMs += deltaSeconds * 1000;
+    if (footstepPulseTimerMs >= FOOTSTEP_INTERVAL_MS) {
+      footstepPulseTimerMs = 0;
+      triggerSystem.footstepPulse({
+        inWater: terrainSampler.sampleRiver(player.position.x, player.position.z) > WATER_FOOTSTEP_THRESHOLD,
+        mounted:
+          currentMountId === "horse"
+            ? "horse"
+            : currentMountId === "ox"
+              ? "ox"
+              : null
+      });
+    }
+  } else {
+    footstepPulseTimerMs = 0;
+  }
+
+  if (currentMountId === "ox") {
+    oxMooTimerMs += deltaSeconds * 1000;
+    if (oxMooTimerMs >= OX_MOO_INTERVAL_MS) {
+      oxMooTimerMs = 0;
+      if (Math.random() < 0.4) {
+        triggerSystem.fire("mount_ox_moo", { volume: 0.58 });
+      }
+    }
+  } else {
+    oxMooTimerMs = 0;
+  }
 
   if (regionChunkManifest) {
     const nextChunkId =
@@ -4606,7 +4886,20 @@ function update(deltaSeconds: number): void {
     precipitationGeometry.attributes.position.needsUpdate = true;
   }
 
-  ambientAudio.update(environment, terrainSampler.sampleRiver(player.position.x, player.position.z));
+  const riverProximity = sampleRiverProximity(terrainSampler, player.position);
+  const largeRiverProximity = sampleLargeRiverProximity(player.position);
+  ambientMixer.tick(deltaSeconds * 1000);
+  ambientMixer.setContext({
+    biome: deriveAmbientBiome(player.position.x, player.position.z, terrainSampler),
+    isNight: environment.timeOfDay < 6 || environment.timeOfDay > 19,
+    weather: ambientWeatherForState(environment.weather),
+    altitudeBand:
+      player.position.y > 12 ? "high" : player.position.y > 4 ? "mid" : "low",
+    riverProximity,
+    largeRiverProximity
+  });
+  triggerSystem.setThunderActive(environment.weather === "storm");
+  triggerNearbyCraneAudio(clock.elapsedTime);
   syncPoiHoverHud();
   syncStoryGuideState();
 }
@@ -4631,6 +4924,7 @@ function frame(): void {
     hudRefreshTimer = 0;
     hudDirty = false;
   }
+  updateLabelVisibility();
   // 走 EffectComposer：RenderPass + UnrealBloomPass + OutputPass 链。
   // 高亮像素（雪冠、太阳盘、水面）会有柔和辉光；midtone 被 threshold
   // 0.92 排除掉，色彩不动。
@@ -4643,6 +4937,35 @@ function frame(): void {
 function applyTerrainFromSampler(sampler: TerrainSampler): void {
   disposeChunkTerrain();
   terrainSampler = sampler;
+  const visibleCities = sampler.asset.bounds
+    ? realQinlingCities.filter(
+        (city) =>
+          city.lat >= sampler.asset.bounds!.south &&
+          city.lat <= sampler.asset.bounds!.north &&
+          city.lon >= sampler.asset.bounds!.west &&
+          city.lon <= sampler.asset.bounds!.east
+      )
+    : [];
+  setCityFlattenZones(
+    sampler.asset.bounds
+      ? visibleCities.map((city) => {
+          const worldPoint = projectGeoToWorld(
+            { lat: city.lat, lon: city.lon },
+            sampler.asset.bounds!,
+            sampler.asset.world
+          );
+          return {
+            cityId: city.id,
+            centerX: worldPoint.x,
+            centerZ: worldPoint.z,
+            radius: CITY_TIER_SPECS[city.tier].outerSide * 0.65,
+            groundY: sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z)
+          };
+        })
+      : []
+  );
+  sampler.setHeightOverride((rawY, x, z) => flattenedY(rawY, x, z));
+  allDistanceLimitedLabelSprites.length = 0;
   resetStoryGuide();
   rebuildHudPoiCatalog();
   if (window.HUD_DEBUG) {
@@ -4685,13 +5008,6 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
     hideHoverCard();
   }
   if (sampler.asset.bounds) {
-    const visibleCities = realQinlingCities.filter(
-      (city) =>
-        city.lat >= sampler.asset.bounds!.south &&
-        city.lat <= sampler.asset.bounds!.north &&
-        city.lon >= sampler.asset.bounds!.west &&
-        city.lon <= sampler.asset.bounds!.east
-    );
     cityMarkersHandle = createCityMarkers(
       visibleCities,
       sampler.asset.bounds,
@@ -4725,6 +5041,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
         label.visible = false;
         cityMarkersGroup.add(label);
         countyLabelSpriteByCityId.set(city.id, label);
+        trackDistanceLimitedLabelSprite(label);
       });
 
     visibleCities
@@ -4748,6 +5065,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
         label.position.set(wp.x, groundY + tierTop, wp.z);
         label.renderOrder = 13;
         cityMarkersGroup.add(label);
+        trackDistanceLimitedLabelSprite(label);
         if (city.tier === "capital" || city.tier === "prefecture") {
           cityLabelSpritesByTier[city.tier].push(label);
         }

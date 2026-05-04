@@ -175,6 +175,29 @@ canvas {
   pointer-events: none;
 }
 
+.audio-mute-toggle {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(242, 227, 178, 0.18);
+  border-radius: 999px;
+  background: rgba(6, 12, 13, 0.56);
+  color: #efe7d1;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.24);
+}
+
+.audio-mute-toggle:hover {
+  background: rgba(17, 31, 33, 0.78);
+}
+
 .hud-hidden {
   display: none !important;
 }
