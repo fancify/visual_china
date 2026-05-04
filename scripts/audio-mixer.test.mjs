@@ -90,3 +90,36 @@ test("rain pushes down the base ambient layer and lifts rain ambience", () => {
   assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_rain_heavy")), 0.7);
   assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_wind_plain")), 0.1);
 });
+
+test("ambient mixer exposes active layers with current gain and trigger label", () => {
+  const { runtime } = createRuntime([
+    "ambient_forest_birds",
+    "ambient_stream_water",
+    "ambient_river_large"
+  ]);
+  const mixer = createAmbientMixer(runtime);
+
+  mixer.setContext({
+    biome: "forest",
+    isNight: false,
+    weather: "clear",
+    altitudeBand: "mid",
+    riverProximity: 0.8,
+    largeRiverProximity: 0
+  });
+  runtime.context.currentTime = 2;
+
+  assert.equal(typeof mixer.getActiveLayers, "function");
+  assert.deepEqual(mixer.getActiveLayers(), [
+    {
+      trackId: "ambient_forest_birds",
+      currentGain: 0.6,
+      triggerLabel: "biome=forest, day"
+    },
+    {
+      trackId: "ambient_stream_water",
+      currentGain: 0.48,
+      triggerLabel: "river-proximity=0.80"
+    }
+  ]);
+});

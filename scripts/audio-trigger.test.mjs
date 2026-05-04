@@ -48,3 +48,33 @@ test("footstep pulse on ox falls back to grass when no ox hoof buffer exists", (
 
   assert.equal(createdTrackIds(context).at(-1), "footstep_grass");
 });
+
+test("trigger system records recent fires with timestamps and reasons", () => {
+  const { runtime } = createRuntime([
+    "ui_hover",
+    "footstep_grass"
+  ]);
+  const triggers = createTriggerSystem(runtime);
+
+  runtime.context.currentTime = 10;
+  triggers.fire("ui_hover", { reason: "hover POI: 黄龙" });
+  runtime.context.currentTime = 13.25;
+  triggers.footstepPulse({
+    inWater: false,
+    mounted: null
+  });
+
+  assert.equal(typeof triggers.getRecentFires, "function");
+  assert.deepEqual(triggers.getRecentFires(2), [
+    {
+      id: "footstep_grass",
+      ts: 13.25,
+      reason: "footstep:grass"
+    },
+    {
+      id: "ui_hover",
+      ts: 10,
+      reason: "hover POI: 黄龙"
+    }
+  ]);
+});

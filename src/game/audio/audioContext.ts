@@ -17,11 +17,14 @@ function resolveAudioContextCtor(): typeof AudioContext {
   return ctor;
 }
 
+/** 整体输出音量。用户偏好"似有似无"，所以所有 ambient/one-shot 经此再衰一道。 */
+export const MASTER_GAIN_DEFAULT = 0.25;
+
 export function createAudioRuntime(): AudioRuntime {
   const AudioContextCtor = resolveAudioContextCtor();
   const context = new AudioContextCtor();
   const masterGain = context.createGain();
-  masterGain.gain.value = 1;
+  masterGain.gain.value = MASTER_GAIN_DEFAULT;
   masterGain.connect(context.destination);
 
   return {
@@ -52,6 +55,6 @@ export function unlockOnUserGesture(runtime: AudioRuntime): void {
 }
 
 export function setMasterMuted(runtime: AudioRuntime, muted: boolean): void {
-  const value = muted ? 0 : 1;
+  const value = muted ? 0 : MASTER_GAIN_DEFAULT;
   runtime.masterGain.gain.setValueAtTime(value, runtime.context.currentTime);
 }
