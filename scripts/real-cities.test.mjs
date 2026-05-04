@@ -14,7 +14,7 @@ const EXPECTED_NEW_CITY_IDS = [
   "wulian",
   "fuling",
   "tongguan",
-  "huashan",
+  // 华山从 realCities 移到 qinlingScenicLandmarks，现在按山岳渲染而非城市
   "chongqing",
   "luzhou",
   "yibin"

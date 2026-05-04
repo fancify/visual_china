@@ -92,15 +92,8 @@ export const realQinlingCities = [
     hint: "关中东大门，黄河-渭河-华山之间的锁钥",
     description: "潼关位于黄河、渭河与华山夹出的狭窄通道上，自古就是关中平原东出的第一锁钥。控制潼关，就能同时钳住关中东口与中原西入长安的主干道，因此历代都把这里视为'关中门户'。"
   },
-  {
-    id: "huashan",
-    name: "华山",
-    lat: 34.50,
-    lon: 110.07,
-    tier: "county",
-    hint: "西岳华山，关中东缘最突出的绝壁山体",
-    description: "华山位于关中平原东缘，北临渭河、南接秦岭余脉，是东出潼关前最醒目的山体地标。它既是五岳中的西岳，也是理解关中东缘地形收束感最直观的视觉锚点。"
-  },
+  // 华山从 realCities 移走 → qinlingAtlas.qinlingScenicLandmarks 里作为 alpine-peak
+  // 用山岳 symbol 渲染，不再走城市 marker 路径。它是西岳，不是城。
   {
     id: "tianshui",
     name: "天水",

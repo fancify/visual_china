@@ -203,6 +203,15 @@ export const qinlingScenicLandmarks = [
     role: "alpine-peak"
   },
   {
+    id: "scenic-huashan",
+    name: "华山",
+    lat: 34.50,
+    lon: 110.07,
+    summary: "西岳华山（2154 m），关中东缘绝壁五峰，五岳之一，自古以险闻名。",
+    symbol: scenicMountainSymbol,
+    role: "alpine-peak"
+  },
+  {
     id: "scenic-qingcheng-shan",
     name: "青城山",
     lat: 30.92,
