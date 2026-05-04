@@ -27,14 +27,14 @@ import { projectGeoToWorld } from "./mapOrientation.js";
  *   prefecture（州府）= 外 3.4 内 2.6、墙厚 0.4、高 0.7
  *   county（县城）= 外 2.4 内 1.6、墙厚 0.4、高 0.5（最矮）
  *
- * 用 InstancedMesh：每档 1 个 mesh，共 3 个 instanced mesh（之前 base+
- * roof 6 个减半）。29 个 instance，draw call 3。
+ * 用 InstancedMesh：每档 1 个城墙 mesh，再加 1 个共享 floor mesh。29 个
+ * instance，draw call 4。
  *
- * 用户这轮要求：三档主要靠城墙面积 + 中央建筑层级区分，不再用零碎屋舍
- * 堆住人感。county 保持中空，prefecture / capital 用不同屋顶轮廓一眼区分。
+ * 用户这轮要求：城墙四边闭合、prefecture / capital 抬高中央建筑，并在城内
+ * 铺一层土黄地，避免穿过墙缝看到底下真实地形。
  */
 
-export type GateSide = "north" | "south" | "east" | "west";
+type WallSide = "north" | "south" | "east" | "west";
 export type CentralBuildingType = "hip-roof-palace" | "xie-shan-hall" | null;
 
 export interface CityTierSpec {
@@ -44,7 +44,6 @@ export interface CityTierSpec {
   cornerTowers: boolean;
   centralBuilding: CentralBuildingType;
   houses: number;
-  gateOnSide: GateSide;
 }
 
 const HOUSE_BODY_SIZE = Object.freeze({
@@ -54,7 +53,8 @@ const HOUSE_BODY_SIZE = Object.freeze({
 });
 const HOUSE_ROOF_RADIUS = 0.22;
 const HOUSE_ROOF_HEIGHT = 0.18;
-const DEFAULT_GATE_WIDTH = 0.4;
+const CITY_FLOOR_INSET = 0.96;
+const CITY_FLOOR_HEIGHT = 0.04;
 
 export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
   county: {
@@ -63,8 +63,7 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
     height: 0.5,
     cornerTowers: false,
     centralBuilding: null,
-    houses: 0,
-    gateOnSide: "south"
+    houses: 0
   },
   prefecture: {
     outerSide: 3.4,
@@ -72,8 +71,7 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
     height: 0.7,
     cornerTowers: true,
     centralBuilding: "xie-shan-hall",
-    houses: 0,
-    gateOnSide: "south"
+    houses: 0
   },
   capital: {
     outerSide: 4.4,
@@ -81,8 +79,7 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
     height: 0.9,
     cornerTowers: true,
     centralBuilding: "hip-roof-palace",
-    houses: 0,
-    gateOnSide: "south"
+    houses: 0
   }
 };
 
@@ -161,17 +158,14 @@ function makeWalledRingGeometry(
   height: number,
   options: {
     houses?: number;
-    gateOnSide?: GateSide;
   } = {}
 ): BufferGeometry {
   const wallThickness = (outerSide - innerSide) * 0.5;
   const half = outerSide * 0.5;
   const wallCenter = half - wallThickness * 0.5;
-  const gateOnSide = options.gateOnSide;
-  const gateWidth = DEFAULT_GATE_WIDTH;
   const parts: BufferGeometry[] = [];
   const addWall = (
-    side: GateSide,
+    side: WallSide,
     x: number,
     z: number,
     length: number
@@ -191,33 +185,11 @@ function makeWalledRingGeometry(
       )
     );
   };
-  const addSideWalls = (side: GateSide): void => {
-    if (gateOnSide !== side) {
-      if (side === "north" || side === "south") {
-        addWall(side, 0, side === "north" ? wallCenter : -wallCenter, outerSide);
-      } else {
-        addWall(side, side === "east" ? wallCenter : -wallCenter, 0, outerSide);
-      }
-      return;
-    }
 
-    const segmentLength = (outerSide - gateWidth) * 0.5;
-    const segmentOffset = gateWidth * 0.5 + segmentLength * 0.5;
-    if (side === "north" || side === "south") {
-      const wallZ = side === "north" ? wallCenter : -wallCenter;
-      addWall(side, -segmentOffset, wallZ, segmentLength);
-      addWall(side, segmentOffset, wallZ, segmentLength);
-      return;
-    }
-    const wallX = side === "east" ? wallCenter : -wallCenter;
-    addWall(side, wallX, -segmentOffset, segmentLength);
-    addWall(side, wallX, segmentOffset, segmentLength);
-  };
-
-  addSideWalls("north");
-  addSideWalls("south");
-  addSideWalls("east");
-  addSideWalls("west");
+  addWall("north", 0, wallCenter, outerSide);
+  addWall("south", 0, -wallCenter, outerSide);
+  addWall("east", wallCenter, 0, outerSide);
+  addWall("west", -wallCenter, 0, outerSide);
 
   const houses = options.houses ?? 0;
   if (houses > 0) {
@@ -260,8 +232,7 @@ function makeTierWallGeometry(
   const parts: BufferGeometry[] = [
     prepareForMerge(
       makeWalledRingGeometry(spec.outerSide, spec.innerSide, spec.height, {
-        houses: spec.houses,
-        gateOnSide: spec.gateOnSide
+        houses: spec.houses
       })
     )
   ];
@@ -285,9 +256,9 @@ function makeTierWallGeometry(
   }
 
   if (spec.centralBuilding === "hip-roof-palace") {
-    parts.push(...buildHipRoofPalace(spec.outerSide * 0.6, spec.height * 1.6));
+    parts.push(...buildHipRoofPalace(spec.outerSide * 0.6, spec.height * 2.0));
   } else if (spec.centralBuilding === "xie-shan-hall") {
-    parts.push(...buildXieShanHall(spec.outerSide * 0.5, spec.height * 1.2));
+    parts.push(...buildXieShanHall(spec.outerSide * 0.5, spec.height * 1.5));
   }
 
   const merged = BufferGeometryUtils.mergeGeometries(parts);
@@ -327,8 +298,8 @@ const TIER_GEOMETRY: Record<CityTier, TierGeometry> = {
   }
 };
 
-// 城墙灰偏暖（夯土 / 砖石）。
-const WALL_COLOR = 0x8b8276;
+const WALL_COLOR = 0x6e6f6c;
+const FLOOR_COLOR = 0xb8975d;
 
 // 每档独立 material，让 LOD 距离淡入 / 淡出可以分档控制 opacity——
 // county 远了先 fade，prefecture 中距 fade，capital 始终可见。
@@ -346,13 +317,30 @@ function makeWallMaterial(): MeshPhongMaterial {
   });
 }
 
+function makeFloorMaterial(): MeshPhongMaterial {
+  return new MeshPhongMaterial({
+    color: FLOOR_COLOR,
+    flatShading: true,
+    shininess: 2
+  });
+}
+
+const CITY_FLOOR_GEOMETRY = (() => {
+  const geometry = prepareForMerge(new BoxGeometry(1, 1, 1));
+  geometry.translate(0, 0.5, 0);
+  geometry.computeVertexNormals();
+  return geometry;
+})();
+
 export interface CityMarkersHandle {
   group: Group;
   cities: RealCity[];
   byTier: Record<CityTier, RealCity[]>;
   tierMeshes: Partial<Record<CityTier, InstancedMesh>>;
+  floorMesh: InstancedMesh | null;
   /** 每档独立 material，外部按距离调 opacity 实现 LOD fade。 */
   tierMaterials: Record<CityTier, MeshPhongMaterial>;
+  floorMaterial: MeshPhongMaterial | null;
 }
 
 export function cityFromMarkerIntersection(
@@ -362,6 +350,10 @@ export function cityFromMarkerIntersection(
 ): RealCity | null {
   if (!(object instanceof InstancedMesh) || instanceId === undefined || instanceId < 0) {
     return null;
+  }
+
+  if (handle.floorMesh === object) {
+    return handle.cities[instanceId] ?? null;
   }
 
   const tierEntry = (Object.keys(handle.tierMeshes) as CityTier[]).find(
@@ -394,6 +386,8 @@ export function createCityMarkers(
 
   const dummy = new Object3D();
   const tierMeshes: Partial<Record<CityTier, InstancedMesh>> = {};
+  let floorMesh: InstancedMesh | null = null;
+  let floorMaterial: MeshPhongMaterial | null = null;
 
   const tierMaterials: Record<CityTier, MeshPhongMaterial> = {
     capital: makeWallMaterial(),
@@ -447,7 +441,43 @@ export function createCityMarkers(
     group.add(wallMesh);
   });
 
-  return { group, cities, byTier, tierMeshes, tierMaterials };
+  if (cities.length > 0) {
+    floorMaterial = makeFloorMaterial();
+    const nextFloorMesh = new InstancedMesh(CITY_FLOOR_GEOMETRY, floorMaterial, cities.length);
+    nextFloorMesh.name = "city-floors";
+
+    cities.forEach((city, index) => {
+      const worldPoint = projectGeoToWorld(
+        { lat: city.lat, lon: city.lon },
+        bounds,
+        world
+      );
+      const CHUNK_Y_OFFSET = 0.12;
+      const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
+      const cityIdHash = hashStr(city.id);
+      const scaleVar = 0.92 + (cityIdHash % 100) / 1000;
+      const rotVar = ((cityIdHash >> 7) & 3) * (Math.PI / 2);
+      const floorSide = CITY_TIER_SPECS[city.tier].innerSide * CITY_FLOOR_INSET;
+
+      dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
+      dummy.rotation.set(0, rotVar, 0);
+      dummy.scale.set(
+        floorSide * scaleVar,
+        CITY_FLOOR_HEIGHT * scaleVar,
+        floorSide * scaleVar
+      );
+      dummy.updateMatrix();
+      nextFloorMesh.setMatrixAt(index, dummy.matrix);
+    });
+
+    nextFloorMesh.instanceMatrix.needsUpdate = true;
+    nextFloorMesh.computeBoundingSphere();
+    nextFloorMesh.frustumCulled = false;
+    group.add(nextFloorMesh);
+    floorMesh = nextFloorMesh;
+  }
+
+  return { group, cities, byTier, tierMeshes, floorMesh, tierMaterials, floorMaterial };
 }
 
 export function disposeCityMarkers(handle: CityMarkersHandle): void {
@@ -459,4 +489,5 @@ export function disposeCityMarkers(handle: CityMarkersHandle): void {
     }
   });
   Object.values(handle.tierMaterials).forEach((m) => m.dispose());
+  handle.floorMaterial?.dispose();
 }
