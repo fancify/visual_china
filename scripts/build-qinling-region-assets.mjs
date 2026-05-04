@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { densityProfileForClass } from "../src/game/geoProjection.js";
+import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
 import {
   qinlingBounds,
   qinlingGeographicFootprintKm,
@@ -12,6 +13,7 @@ const root = process.cwd();
 const legacyAssetPath = path.join(root, "public", "data", "qinling-slice-dem.json");
 const regionRoot = path.join(root, "public", "data", "regions", "qinling");
 const chunksRoot = path.join(regionRoot, "chunks");
+const hydrographyRoot = path.join(regionRoot, "hydrography");
 
 const regionBounds = qinlingBounds;
 const geographicFootprintKm = qinlingGeographicFootprintKm;
@@ -61,7 +63,13 @@ const sliceFileName = "slice-l1.json";
 const sliceOutputPath = path.join(regionRoot, sliceFileName);
 
 await fs.mkdir(chunksRoot, { recursive: true });
+await fs.mkdir(hydrographyRoot, { recursive: true });
 await fs.writeFile(sliceOutputPath, `${JSON.stringify(sliceAsset, null, 2)}\n`, "utf8");
+await fs.writeFile(
+  path.join(hydrographyRoot, "modern.json"),
+  `${JSON.stringify(qinlingModernHydrography, null, 2)}\n`,
+  "utf8"
+);
 
 const chunkManifest = {
   regionId: "qinling",
