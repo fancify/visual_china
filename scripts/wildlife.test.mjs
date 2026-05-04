@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BufferGeometry, InstancedMesh } from "three";
+import { setCityFlattenZones } from "../src/game/cityFlattenZones.js";
 
 async function loadWildlifeModule() {
   try {
@@ -141,6 +142,45 @@ test("wildlife keeps mountain deer and river cranes in their intended habitats",
     );
   });
   assert.equal(dryCranes.length, 0, "dry chunks should not spawn cranes");
+});
+
+test("wildlife chunk builder skips city flatten zones entirely", async () => {
+  const wildlife = await loadWildlifeModule();
+  const samplers = buildChunkSamplers(24, (seed) =>
+    makeWildlifeSampler({
+      normalizedHeight: 0.18,
+      slope: 0.06,
+      river: 0.02,
+      worldBounds: { minX: seed * 40, maxX: seed * 40 + 36, minZ: 0, maxZ: 36 }
+    })
+  );
+
+  setCityFlattenZones([]);
+  const baseline = samplers.flatMap((sampler) =>
+    wildlife.buildWildlifeChunk(sampler, {
+      biomeId: "warm-temperate-humid",
+      vegetationDensity: 1
+    })
+  );
+
+  setCityFlattenZones(
+    samplers.map((sampler, index) => ({
+      cityId: `city-${index}`,
+      centerX: (sampler.asset.worldBounds.minX + sampler.asset.worldBounds.maxX) * 0.5,
+      centerZ: (sampler.asset.worldBounds.minZ + sampler.asset.worldBounds.maxZ) * 0.5,
+      radius: 40,
+      groundY: 0.18
+    }))
+  );
+  const flattened = samplers.flatMap((sampler) =>
+    wildlife.buildWildlifeChunk(sampler, {
+      biomeId: "warm-temperate-humid",
+      vegetationDensity: 1
+    })
+  );
+
+  assert.ok(baseline.length > 0, "baseline chunk set should still spawn wildlife");
+  assert.equal(flattened.length, 0);
 });
 
 test("wildlife handle uses one merged instanced mesh per kind", async () => {
