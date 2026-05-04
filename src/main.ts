@@ -67,6 +67,7 @@ import {
 } from "./game/audio/audioContext";
 import { loadAllBuffers } from "./game/audio/audioManifest";
 import { createTriggerSystem } from "./game/audio/triggerSystem";
+import { createAudioDebugHud } from "./game/audioDebugHud";
 import {
   cameraLookTargetForMode,
   cameraPositionForMode,
@@ -129,6 +130,7 @@ import {
   createPlayerAvatar,
   rebuildPlayerAvatar
 } from "./game/playerAvatarMesh";
+import { mountSpeedMultiplier } from "./game/mountRuntime.js";
 import {
   cycleAvatar,
   cycleMount,
@@ -449,6 +451,7 @@ audioMuteButton.addEventListener("click", () => {
   audioMuteButton.title = audioMuted ? "开启声音" : "静音";
 });
 appRoot.appendChild(audioMuteButton);
+const audioDebugHud = createAudioDebugHud(appRoot);
 void loadAllBuffers(audioRuntime).then(({ loaded, failed }) => {
   console.info(`[audio] ${loaded} loaded, ${failed} missing`);
 });
@@ -892,28 +895,44 @@ const discoveredPoiIds = new Set<string>();
 let lastProximityPoiId: string | null = null;
 let footstepPulseTimerMs = 0;
 let oxMooTimerMs = 0;
+let audioHudTimerMs = 0;
 
 function handlePoiEntryAudio(poi: RuntimePoiInfo): void {
   if (!discoveredPoiIds.has(poi.id)) {
     discoveredPoiIds.add(poi.id);
-    triggerSystem.fire("cultural_magic_chime", { volume: 0.5 });
+    triggerSystem.fire("cultural_magic_chime", {
+      volume: 0.5,
+      reason: `discovery: ${poi.name}`
+    });
   }
 
   if (poi.category === "scenic") {
     if (Math.random() < 0.1) {
-      triggerSystem.fire("cultural_guqin_pluck", { volume: 0.42 });
+      triggerSystem.fire("cultural_guqin_pluck", {
+        volume: 0.42,
+        reason: `scenic cue: ${poi.name} guqin`
+      });
     }
     if (Math.random() < 0.05) {
-      triggerSystem.fire("cultural_dizi_flute", { volume: 0.34 });
+      triggerSystem.fire("cultural_dizi_flute", {
+        volume: 0.34,
+        reason: `scenic cue: ${poi.name} dizi`
+      });
     }
   }
 
   if (TEMPLE_POI_PATTERN.test(poi.name)) {
     if (Math.random() < 0.3) {
-      triggerSystem.fire("cultural_temple_bell", { volume: 0.5 });
+      triggerSystem.fire("cultural_temple_bell", {
+        volume: 0.5,
+        reason: `temple cue: ${poi.name} bell`
+      });
     }
     if (Math.random() < 0.1) {
-      triggerSystem.fire("cultural_wooden_fish", { volume: 0.42 });
+      triggerSystem.fire("cultural_wooden_fish", {
+        volume: 0.42,
+        reason: `temple cue: ${poi.name} wooden fish`
+      });
     }
   }
 }
@@ -931,10 +950,22 @@ function triggerNearbyCraneAudio(elapsedTime: number): void {
       pose.position.z - player.position.z
     );
     if (distance < CRANE_AUDIO_RADIUS) {
-      triggerSystem.fire("cultural_crane_call", { volume: 0.5 });
+      triggerSystem.fire("cultural_crane_call", {
+        volume: 0.5,
+        reason: "wildlife: crane nearby"
+      });
       return;
     }
   }
+}
+
+function refreshAudioDebugHud(): void {
+  audioDebugHud.refresh({
+    activeLayers: ambientMixer.getActiveLayers(),
+    recentFires: triggerSystem.getRecentFires(5),
+    nowSec: audioRuntime.context.currentTime,
+    masterGainValue: audioRuntime.masterGain.gain.value
+  });
 }
 
 function hideHoverCard(): void {
@@ -4023,8 +4054,18 @@ document.addEventListener("keydown", (event) => {
     resetGameplayInput();
     atlasWorkbench = setAtlasFullscreen(atlasWorkbench, !atlasWorkbench.isFullscreen);
     refreshAtlasWorkbench();
-    triggerSystem.fire("ui_page_turn", { volume: 0.48 });
+    triggerSystem.fire("ui_page_turn", {
+      volume: 0.48,
+      reason: "atlas toggle"
+    });
     return;
+  }
+
+  if (normalized === "a" && !event.repeat && !isTextInputFocused()) {
+    audioDebugHud.toggle();
+    if (audioDebugHud.isVisible()) {
+      refreshAudioDebugHud();
+    }
   }
 
   if (
@@ -4035,7 +4076,10 @@ document.addEventListener("keydown", (event) => {
   ) {
     event.preventDefault();
     poiHoverHud.toggleDetail();
-    triggerSystem.fire("ui_click", { volume: 0.52 });
+    triggerSystem.fire("ui_click", {
+      volume: 0.52,
+      reason: "POI detail toggle"
+    });
     return;
   }
   // P：开关坐骑/造型面板（power-user 走 [ ] - = 直接切，不必开面板）。
@@ -4147,7 +4191,10 @@ document.addEventListener("visibilitychange", () => {
 renderer.domElement.addEventListener("pointerdown", (event: PointerEvent) => {
   const hoveredPoi = findHoveredPoi();
   if (hoveredPoi) {
-    triggerSystem.fire("ui_hover", { volume: 0.4 });
+    triggerSystem.fire("ui_hover", {
+      volume: 0.4,
+      reason: `hover POI: ${hoveredPoi.name}`
+    });
   }
   isDragging = true;
   dragOriginX = event.clientX;
@@ -4317,14 +4364,20 @@ hud.openAtlasFullscreenButton.addEventListener("click", () => {
   atlasWorkbench = setAtlasFullscreen(atlasWorkbench, true);
   refreshAtlasWorkbench();
   hideHoverCard();
-  triggerSystem.fire("ui_page_turn", { volume: 0.48 });
+  triggerSystem.fire("ui_page_turn", {
+    volume: 0.48,
+    reason: "atlas open"
+  });
 });
 
 hud.closeAtlasFullscreenButton.addEventListener("click", () => {
   atlasWorkbench = setAtlasFullscreen(atlasWorkbench, false);
   refreshAtlasWorkbench();
   hideHoverCard();
-  triggerSystem.fire("ui_page_turn", { volume: 0.48 });
+  triggerSystem.fire("ui_page_turn", {
+    volume: 0.48,
+    reason: "atlas close"
+  });
 });
 
 hud.atlasLayerList.addEventListener("click", handleAtlasLayerClick);
@@ -4654,7 +4707,10 @@ function update(deltaSeconds: number): void {
     routeInfluence.affinity * 0.28;
   const slopePenalty = MathUtils.lerp(1, 0.42, currentSlope);
   const offRouteCost = MathUtils.lerp(0.68, 1.08, routeInfluence.affinity);
-  const baseSpeed = (keys.has("shift") ? 20 : 13.5) * travelSpeedMultiplier();
+  const baseSpeed =
+    (keys.has("shift") ? 20 : 13.5) *
+    travelSpeedMultiplier() *
+    mountSpeedMultiplier(currentMountId);
   const speed = baseSpeed * (slopePenalty + routeBonus) * offRouteCost;
   const isMoving = forwardInput !== 0 || rightInput !== 0;
   const movementSpeed = isMoving ? speed : 0;
@@ -4726,7 +4782,10 @@ function update(deltaSeconds: number): void {
     if (oxMooTimerMs >= OX_MOO_INTERVAL_MS) {
       oxMooTimerMs = 0;
       if (Math.random() < 0.4) {
-        triggerSystem.fire("mount_ox_moo", { volume: 0.58 });
+        triggerSystem.fire("mount_ox_moo", {
+          volume: 0.58,
+          reason: "mount: ox moo"
+        });
       }
     }
   } else {
@@ -4923,6 +4982,13 @@ function frame(): void {
     refreshHud();
     hudRefreshTimer = 0;
     hudDirty = false;
+  }
+  audioHudTimerMs += deltaSeconds * 1000;
+  if (audioHudTimerMs >= 200) {
+    audioHudTimerMs = 0;
+    if (audioDebugHud.isVisible()) {
+      refreshAudioDebugHud();
+    }
   }
   updateLabelVisibility();
   // 走 EffectComposer：RenderPass + UnrealBloomPass + OutputPass 链。
