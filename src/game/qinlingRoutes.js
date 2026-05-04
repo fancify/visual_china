@@ -33,6 +33,15 @@ export const qinlingRoutes = [
     points: qinlingRouteAnchors["baoxie-road"].points
   },
   {
+    id: "guanzhong-corridor",
+    name: "关中走廊",
+    source: historicalRouteSource,
+    label: "关中走廊",
+    description: "沿渭河南岸串联关中各蜀道北口的横向干线。",
+    labelPoint: qinlingRouteAnchors["guanzhong-corridor"].labelPoint,
+    points: qinlingRouteAnchors["guanzhong-corridor"].points
+  },
+  {
     id: "tangluo-road",
     name: "傥骆道",
     source: historicalRouteSource,

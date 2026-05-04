@@ -206,11 +206,11 @@ export const realQinlingCities = [
   {
     id: "qishan",
     name: "祁山",
-    lat: 34.43,
-    lon: 104.43,
+    lat: 34.20,
+    lon: 105.41,
     tier: "county",
-    hint: "祁山堡遗址，诸葛亮屯兵处",
-    description: "祁山位于今礼县西北祁山堡一带，控扼西汉水与陇右通道转折处，是诸葛亮第一次与第四次北伐屯兵、对峙曹魏的核心地标。"
+    hint: "礼县祁山镇祁山堡，诸葛亮屯兵处",
+    description: "祁山取今礼县祁山镇祁山堡一带，位于西汉水北岸，控扼陇右通道与礼县谷地的转折处，是诸葛亮第一次与第四次北伐屯兵、对峙曹魏的核心地标。"
   },
   {
     id: "chengxian",
@@ -224,11 +224,11 @@ export const realQinlingCities = [
   {
     id: "baishui-river",
     name: "白水江",
-    lat: 32.99,
-    lon: 105.49,
+    lat: 33.47,
+    lon: 105.89,
     tier: "county",
-    hint: "嘉陵江西岸古驿",
-    description: "白水江口一带位于嘉陵江上游西岸，是陇南南下略阳、宁强与汉中的河谷驿站，古道长期依附白龙江与嘉陵江水系转运。"
+    hint: "略阳白水江镇，嘉陵江谷地古驿",
+    description: "白水江取今略阳县白水江镇一带的嘉陵江谷地节点，北承成县、徽县方向来路，南接略阳与汉中，是陇右入蜀山间通道的重要转折驿站。"
   },
   {
     id: "lixian",
@@ -272,8 +272,8 @@ export const realQinlingCities = [
   {
     id: "wulian",
     name: "武连",
-    lat: 31.42,
-    lon: 105.20,
+    lat: 31.85,
+    lon: 105.25,
     tier: "county",
     hint: "金牛道驿站，剑阁与梓潼之间",
     description: "武连位于剑门山南下后的丘陵过渡带，是金牛道由剑门关转入梓潼、绵阳方向时的重要驿站与换马节点。"
