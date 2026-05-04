@@ -287,12 +287,22 @@ function buildTouringLayerRawHeights(rawHeights) {
   return result;
 }
 
-const tilesDir = qinlingWorkspacePath("data", "fabdem", "qinling", "tiles");
+const primaryTilesDir = qinlingWorkspacePath("data", "fabdem", "china", "tiles");
+const fallbackTilesDir = qinlingWorkspacePath("data", "fabdem", "qinling", "tiles");
 const legacyOutputPath = qinlingWorkspacePath("public", "data", "qinling-slice-dem.json");
 
 async function findGeoTiffFiles(directory) {
   const result = [];
-  const entries = await fs.readdir(directory, { withFileTypes: true });
+  let entries;
+
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return result;
+    }
+    throw error;
+  }
 
   for (const entry of entries) {
     const entryPath = path.join(directory, entry.name);
@@ -310,8 +320,19 @@ async function findGeoTiffFiles(directory) {
   return result;
 }
 
-const tilePaths = (await findGeoTiffFiles(tilesDir))
-  .sort();
+const tilePathByName = new Map();
+
+for (const rootDir of [primaryTilesDir, fallbackTilesDir]) {
+  const rootTilePaths = (await findGeoTiffFiles(rootDir)).sort();
+  for (const tilePath of rootTilePaths) {
+    const tileName = path.basename(tilePath);
+    if (!tilePathByName.has(tileName)) {
+      tilePathByName.set(tileName, tilePath);
+    }
+  }
+}
+
+const tilePaths = Array.from(tilePathByName.values()).sort();
 const availableTileNames = new Set(tilePaths.map((tilePath) => path.basename(tilePath)));
 const requiredTileNames = [];
 
@@ -339,17 +360,56 @@ const missingRequiredTileNames = requiredTileNames.filter(
 );
 
 if (tilePaths.length === 0) {
-  throw new Error(`No Qinling GeoTIFF tiles found in ${tilesDir}. Run extract-qinling-fabdem first.`);
+  throw new Error(
+    `No Qinling GeoTIFF tiles found in ${primaryTilesDir} or ${fallbackTilesDir}. Run npm run china:fabdem:extract first.`
+  );
 }
 
 const columns = qinlingOutputGrid.columns;
 const rows = qinlingOutputGrid.rows;
 const rawHeights = new Float32Array(columns * rows);
 rawHeights.fill(Number.NaN);
+const missingRequiredMask = new Uint8Array(columns * rows);
 
 let sampledCellCount = 0;
 let minRawHeight = Number.POSITIVE_INFINITY;
 let maxRawHeight = Number.NEGATIVE_INFINITY;
+
+for (const tileName of missingRequiredTileNames) {
+  const tileMeta = parseFabdemTileName(tileName);
+  const overlap = tileMeta ? intersectBounds(tileMeta, qinlingBounds) : null;
+
+  if (!overlap) {
+    continue;
+  }
+
+  const columnStart = clamp(
+    Math.floor(((overlap.west - qinlingBounds.west) / (qinlingBounds.east - qinlingBounds.west)) * columns),
+    0,
+    columns - 1
+  );
+  const columnEnd = clamp(
+    Math.ceil(((overlap.east - qinlingBounds.west) / (qinlingBounds.east - qinlingBounds.west)) * columns),
+    1,
+    columns
+  );
+  const rowStart = clamp(
+    Math.floor(((qinlingBounds.north - overlap.north) / (qinlingBounds.north - qinlingBounds.south)) * rows),
+    0,
+    rows - 1
+  );
+  const rowEnd = clamp(
+    Math.ceil(((qinlingBounds.north - overlap.south) / (qinlingBounds.north - qinlingBounds.south)) * rows),
+    1,
+    rows
+  );
+
+  for (let row = rowStart; row < rowEnd; row += 1) {
+    for (let column = columnStart; column < columnEnd; column += 1) {
+      missingRequiredMask[indexAt(column, row, columns)] = 1;
+    }
+  }
+}
 
 for (const tilePath of tilePaths) {
   const tileName = path.basename(tilePath);
@@ -451,6 +511,9 @@ for (let pass = 0; pass < 4; pass += 1) {
       if (Number.isFinite(rawHeights[index])) {
         continue;
       }
+      if (missingRequiredMask[index] === 1) {
+        continue;
+      }
 
       let total = 0;
       let count = 0;
@@ -474,6 +537,11 @@ for (let pass = 0; pass < 4; pass += 1) {
 }
 
 for (let index = 0; index < rawHeights.length; index += 1) {
+  if (missingRequiredMask[index] === 1) {
+    rawHeights[index] = 0;
+    continue;
+  }
+
   if (!Number.isFinite(rawHeights[index])) {
     rawHeights[index] = minRawHeight;
   }
@@ -577,7 +645,7 @@ const asset = {
     `Raw sampled coverage before interpolation: ${(coverageRatio * 100).toFixed(2)}%.`,
     `Required FABDEM tiles: ${requiredTileNames.length}. Available required tiles: ${requiredTileNames.length - missingRequiredTileNames.length}.`,
     missingRequiredTileNames.length > 0
-      ? `Missing required tiles filled by neighbor interpolation: ${missingRequiredTileNames.join(", ")}.`
+      ? `Missing required tiles filled with 0 (flat fallback): ${missingRequiredTileNames.join(", ")}.`
       : "All required FABDEM tiles were available."
   ]
 };

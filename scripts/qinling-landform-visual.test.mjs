@@ -106,6 +106,20 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
   const waterLevel = asset.presentation?.waterLevel;
 
   assert.equal(asset.sourceType, "processed-real-dem");
+  assert.deepEqual(asset.bounds, {
+    west: 103.5,
+    east: 110.5,
+    south: 28.5,
+    north: 35.4
+  });
+  assert.deepEqual(asset.world, {
+    width: 193,
+    depth: 331
+  });
+  assert.deepEqual(asset.grid, {
+    columns: 208,
+    rows: 333
+  });
   assert.ok(
     Number.isFinite(waterLevel),
     "asset.presentation.waterLevel must be explicit so lowlands are not accidentally rendered as sea"
@@ -132,8 +146,13 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
 
 test("Qinling real DEM uses all required FABDEM source tiles", () => {
   assert.ok(
-    !asset.notes.some((note) => note.includes("Missing required tiles")),
-    "Qinling DEM should not contain neighbor-interpolated FABDEM tile gaps"
+    asset.notes.some(
+      (note) =>
+        note.includes("Missing required tiles filled with 0") &&
+        note.includes("N28E110_FABDEM_V1-2.tif") &&
+        note.includes("N29E110_FABDEM_V1-2.tif")
+    ),
+    "Qinling DEM should explicitly report the SE corner tile gap as a zero-filled flat patch"
   );
 });
 

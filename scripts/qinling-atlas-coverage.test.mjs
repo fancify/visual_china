@@ -29,6 +29,10 @@ test("Qinling 2D atlas contains named geography needed for the slice narrative",
   for (const name of qinlingAtlasRequiredNames) {
     assert.ok(featuresByName.has(name), `${name} must exist in the 2D atlas`);
   }
+
+  for (const name of ["潼关", "华山", "重庆", "涪陵", "泸州", "宜宾"]) {
+    assert.ok(featuresByName.has(name), `${name} should be visible after the east/south expansion`);
+  }
 });
 
 test("Qinling atlas features are renderable and carry gameplay-facing semantics", () => {
@@ -46,8 +50,8 @@ test("Qinling atlas features are renderable and carry gameplay-facing semantics"
       : feature.world.points ?? [feature.world];
 
     for (const point of points) {
-      assert.ok(point.x >= -90 && point.x <= 90, `${feature.name} x is in slice bounds`);
-      assert.ok(point.y >= -120 && point.y <= 120, `${feature.name} y is in slice bounds`);
+      assert.ok(point.x >= -96.5 && point.x <= 96.5, `${feature.name} x is in slice bounds`);
+      assert.ok(point.y >= -165.5 && point.y <= 165.5, `${feature.name} y is in slice bounds`);
     }
   }
 });

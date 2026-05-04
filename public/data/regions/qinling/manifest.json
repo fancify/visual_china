@@ -7,20 +7,20 @@
   "coordinatePolicy": "strict-geographic",
   "parentWorldId": "china-mainland",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-03T18:11:05.572Z",
+  "generatedAt": "2026-05-04T01:41:14.903Z",
   "bounds": {
     "west": 103.5,
-    "east": 110,
-    "south": 30.4,
+    "east": 110.5,
+    "south": 28.5,
     "north": 35.4
   },
   "world": {
-    "width": 180,
-    "depth": 240
+    "width": 193,
+    "depth": 331
   },
   "geographicFootprintKm": {
-    "width": 420,
-    "depth": 560
+    "width": 452,
+    "depth": 773
   },
   "scaleArchitecture": {
     "currentLayer": "L1-national-tour-local-pilot",
@@ -28,7 +28,7 @@
     "detailCorrectionMeters": 30,
     "sparseRegionMeters": 450,
     "runtimeSampleSpacingKm": {
-      "eastWest": 2.19,
+      "eastWest": 2.18,
       "northSouth": 2.33
     },
     "detailCorrectionZones": [
@@ -37,7 +37,7 @@
         "role": "basin-edge-readability",
         "bounds": {
           "west": 106.4,
-          "east": 109,
+          "east": 110.5,
           "south": 33.75,
           "north": 34.95
         }
@@ -57,8 +57,8 @@
         "role": "basin-transition-readability",
         "bounds": {
           "west": 103.5,
-          "east": 106.25,
-          "south": 30.4,
+          "east": 107.6,
+          "south": 28.5,
           "north": 32.35
         }
       },
@@ -87,15 +87,15 @@
       "id": "L1",
       "file": "slice-l1.json",
       "grid": {
-        "columns": 193,
-        "rows": 241
+        "columns": 208,
+        "rows": 333
       }
     }
   ],
   "chunking": {
     "enabled": true,
-    "chunkColumns": 4,
-    "chunkRows": 5,
+    "chunkColumns": 5,
+    "chunkRows": 7,
     "chunkManifest": "chunks/manifest.json"
   },
   "poiManifest": "poi/manifest.json"

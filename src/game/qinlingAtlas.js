@@ -1,12 +1,12 @@
 import { hydrographyFeatureToAtlasFeature } from "./hydrographyAtlas.js";
 import { qinlingModernHydrography } from "./qinlingHydrography.js";
+import { qinlingRegionBounds, qinlingRegionWorld } from "../data/qinlingRegion.js";
 import { realQinlingCities } from "../data/realCities.js";
 
 // Qinling region 投影常量（与 atlas / 3D / hydrography 共用）。
-// 跟 src/data/qinlingRegion.js + scripts/qinling-dem-common.mjs 同值。
-// 2026-05 east 109 → 110（refactor #63 之后，bounds 改是一行）。
-const QINLING_BOUNDS = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
-const QINLING_WORLD = { width: 180, depth: 240 };
+// 直接 import 运行期 source of truth，避免 atlas 漏改第三份常量。
+const QINLING_BOUNDS = qinlingRegionBounds;
+const QINLING_WORLD = qinlingRegionWorld;
 
 // 把真实城市 lat/lon 投到 atlas 世界坐标。北 = -Z 跟 mapOrientation 一致。
 // 输出 shape 跟 feature() factory 对齐：copy: { summary } 包装 summary。

@@ -12,7 +12,12 @@ const EXPECTED_NEW_CITY_IDS = [
   "zhenba",
   "zitong",
   "wulian",
-  "fuling"
+  "fuling",
+  "tongguan",
+  "huashan",
+  "chongqing",
+  "luzhou",
+  "yibin"
 ];
 
 test("new qinling real cities cover added Shu roads and keep one-line historical descriptions", () => {
@@ -24,7 +29,7 @@ test("new qinling real cities cover added Shu roads and keep one-line historical
   }
 });
 
-test("Fuling remains out of slice while the other newly added cities stay inside current bounds", () => {
+test("south/east expansion brings Fuling and the new Guanzhong-Sichuan cities into the current slice", () => {
   for (const cityId of EXPECTED_NEW_CITY_IDS) {
     const city = realQinlingCities.find((entry) => entry.id === cityId);
     assert.ok(city, `${cityId} should exist`);
@@ -35,10 +40,6 @@ test("Fuling remains out of slice while the other newly added cities stay inside
       city.lon >= qinlingRegionBounds.west &&
       city.lon <= qinlingRegionBounds.east;
 
-    if (cityId === "fuling") {
-      assert.equal(isInBounds, false);
-    } else {
-      assert.equal(isInBounds, true, `${cityId} should remain renderable inside the current slice`);
-    }
+    assert.equal(isInBounds, true, `${cityId} should be renderable inside the expanded slice`);
   }
 });

@@ -9,13 +9,13 @@ import {
 
 const qinlingBounds = {
   west: 103.5,
-  east: 109,
-  south: 30.4,
+  east: 110.5,
+  south: 28.5,
   north: 35.4
 };
 const qinlingWorld = {
-  width: 180,
-  depth: 240
+  width: 193,
+  depth: 331
 };
 
 function nearlyEqual(actual, expected) {
@@ -33,9 +33,9 @@ test("geographic and game coordinates use a strict linear reversible mapping", (
   );
   const roundTrip = worldToGeo(hanzhong, qinlingBounds, qinlingWorld);
 
-  nearlyEqual(hanzhong.x, 25.52727272727273);
-  // 新 mapOrientation：北 = -Z，所以 lat=33.07（中部偏北）→ 负 z 值。
-  nearlyEqual(hanzhong.z, -8.159999999999997);
+  nearlyEqual(hanzhong.x, 0.8271428571428663);
+  // 南扩到 28.5 后，汉中相对整个 slice 明显更靠北，z 负值会更大。
+  nearlyEqual(hanzhong.z, -53.72753623188408);
   nearlyEqual(roundTrip.lon, 107.03);
   nearlyEqual(roundTrip.lat, 33.07);
 });
