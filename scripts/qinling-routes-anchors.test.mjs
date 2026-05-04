@@ -64,6 +64,24 @@ test("baoxie road keeps the Liuba-centered historical middle section", () => {
   assert.ok(Math.abs(liuba.lon - 106.92) <= 0.02);
 });
 
+test("ziwu-road starts at Xi'an city, not at the canyon mouth", () => {
+  const anchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["ziwu-road"];
+  assert.equal(anchors.length, 7);
+  assert.equal(anchors[0].name, "西安");
+  assert.ok(Math.abs(anchors[0].lat - 34.27) < 0.05);
+  assert.ok(Math.abs(anchors[0].lon - 108.95) < 0.05);
+  assert.deepEqual(qinlingRouteAnchors["ziwu-road"].labelPoint, qinlingRouteAnchors["ziwu-road"].points[3]);
+});
+
+test("tangluo-road starts at Zhouzhi city, not at the valley mouth", () => {
+  const anchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["tangluo-road"];
+  assert.equal(anchors.length, 7);
+  assert.equal(anchors[0].name, "周至");
+  assert.ok(Math.abs(anchors[0].lat - 34.16) < 0.05);
+  assert.ok(Math.abs(anchors[0].lon - 108.22) < 0.05);
+  assert.deepEqual(qinlingRouteAnchors["tangluo-road"].labelPoint, qinlingRouteAnchors["tangluo-road"].points[3]);
+});
+
 test("qishan road keeps the western detour through Qishan fort before turning back to Hanzhong", () => {
   const qishanAnchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["qishan-road"];
   assert.equal(qishanAnchors.length, 7);
