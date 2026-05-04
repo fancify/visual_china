@@ -79,29 +79,24 @@ test("Hanzhong basin POIs sit on the real Hanzhong lowland, not south mountain t
   );
 });
 
-test("Jianmen Pass and Chencang Road are explicit geographic landmarks", () => {
+test("Jianmen Pass stays as the only pass landmark near the real Jianmen area", () => {
   const expectedJianmen = geoToWorld(
     { lon: 105.54, lat: 32.2 },
     asset.bounds,
     asset.world
   );
-  const expectedDasanguan = geoToWorld(
-    { lon: 106.98, lat: 34.16 },
-    asset.bounds,
-    asset.world
-  );
   const jianmen = content.landmarks.find((landmark) => landmark.name === "剑门关");
-  const chencang = content.landmarks.find((landmark) => landmark.name === "陈仓道");
+  const passLandmarks = content.landmarks.filter((landmark) => landmark.kind === "pass");
 
   assert.ok(jianmen, "剑门关 landmark must exist");
-  assert.ok(chencang, "陈仓道 landmark must exist");
+  assert.deepEqual(
+    passLandmarks.map((landmark) => landmark.name),
+    ["剑门关"],
+    "only 剑门关 should remain as a pass landmark"
+  );
   assert.ok(
     distance({ x: positionToWorld(jianmen.position).x, z: positionToWorld(jianmen.position).y }, expectedJianmen) < 9,
     "剑门关 should sit near the real Jianmen Pass area"
-  );
-  assert.ok(
-    distance({ x: positionToWorld(chencang.position).x, z: positionToWorld(chencang.position).y }, expectedDasanguan) < 12,
-    "陈仓道 label should anchor near the Dasanguan / Chencang crossing area"
   );
 });
 

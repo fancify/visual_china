@@ -1290,9 +1290,9 @@ function rebuildLandmarkVisuals(): void {
 
       const label = createTextSprite(landmark.name, "#efcf83");
       label.scale.multiplyScalar(1.18);
-      label.position.set(landmark.position.x, ground + 4.6, landmark.position.y);
+      label.position.set(landmark.position.x, ground + 1.38, landmark.position.y);
       label.userData.chunkId = chunkId;
-      label.userData.terrainYOffset = 4.6;
+      label.userData.terrainYOffset = 1.38;
       landmarkGroup.add(label);
       passLandmarkLabelSprites.push(label);
       return;
