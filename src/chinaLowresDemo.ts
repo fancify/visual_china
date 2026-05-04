@@ -16,7 +16,9 @@ import {
   WebGLRenderer
 } from "three";
 
+import { biomeWeightsAt, type BiomeWeights } from "./game/biomeZones";
 import { loadDemAsset, TerrainSampler, type DemAsset } from "./game/demSampler";
+import { unprojectWorldToGeo } from "./game/mapOrientation.js";
 
 const root = document.querySelector<HTMLDivElement>("#china-lowres-root");
 
@@ -42,7 +44,27 @@ interface ViewerState {
   pointerY: number;
 }
 
-function terrainColor(height: number, normalizedHeight: number, river: number): Color {
+function applyBiomeTint(color: Color, biome: BiomeWeights | null): Color {
+  if (!biome) {
+    return color;
+  }
+
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  hsl.h = MathUtils.euclideanModulo(hsl.h + biome.hueShift, 1);
+  hsl.s = MathUtils.clamp(hsl.s * biome.satScale, 0, 1);
+  hsl.l = MathUtils.clamp(hsl.l * biome.lumScale, 0, 1);
+  color.setHSL(hsl.h, hsl.s, hsl.l);
+
+  return color;
+}
+
+function terrainColor(
+  height: number,
+  normalizedHeight: number,
+  river: number,
+  biome: BiomeWeights | null
+): Color {
   if (height <= 0.001) {
     return new Color("#6f8f97");
   }
@@ -66,6 +88,8 @@ function terrainColor(height: number, normalizedHeight: number, river: number): 
     color = mountain.clone().lerp(snow, (normalizedHeight - 0.7) / 0.3);
   }
 
+  applyBiomeTint(color, biome);
+
   return color.lerp(waterHint, MathUtils.clamp(river * 0.22, 0, 0.22));
 }
 
@@ -81,6 +105,7 @@ function stylizedHeight(rawHeight: number, asset: DemAsset): number {
 
 function createChinaTerrain(asset: DemAsset): Mesh<PlaneGeometry, MeshPhongMaterial> {
   const sampler = new TerrainSampler(asset);
+  const bounds = asset.bounds;
   const geometry = new PlaneGeometry(
     asset.world.width,
     asset.world.depth,
@@ -97,6 +122,10 @@ function createChinaTerrain(asset: DemAsset): Mesh<PlaneGeometry, MeshPhongMater
     const x = positions.getX(index);
     const z = positions.getZ(index);
     const rawHeight = sampler.sampleHeight(x, z);
+    const biome =
+      bounds
+        ? biomeWeightsAt(unprojectWorldToGeo({ x, z }, bounds, asset.world))
+        : null;
     const normalizedHeight = MathUtils.clamp(
       (rawHeight - asset.minHeight) / (asset.maxHeight - asset.minHeight || 1),
       0,
@@ -104,7 +133,9 @@ function createChinaTerrain(asset: DemAsset): Mesh<PlaneGeometry, MeshPhongMater
     );
 
     positions.setY(index, stylizedHeight(rawHeight, asset));
-    color.copy(terrainColor(rawHeight, normalizedHeight, sampler.sampleRiver(x, z)));
+    color.copy(
+      terrainColor(rawHeight, normalizedHeight, sampler.sampleRiver(x, z), biome)
+    );
     colors.setXYZ(index, color.r, color.g, color.b);
   }
 
