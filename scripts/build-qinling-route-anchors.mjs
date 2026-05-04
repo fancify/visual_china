@@ -50,8 +50,9 @@ const ROUTE_DEFINITIONS = [
   },
   {
     id: "tangluo-road",
-    labelIndex: 2,
+    labelIndex: 3,
     anchors: [
+      { name: "周至", note: "傥骆道关中起点，周至县城南", lat: 34.16, lon: 108.22 },
       { name: "周至 骆谷北口", note: "西安西南周至县入山口", lat: 33.97, lon: 108.3 },
       { name: "黑河源", note: "傥骆道越岭前主脊段", lat: 33.8, lon: 108.0 },
       { name: "十八盘", note: "秦岭腹地连续盘折段", lat: 33.55, lon: 107.85 },
@@ -62,8 +63,9 @@ const ROUTE_DEFINITIONS = [
   },
   {
     id: "ziwu-road",
-    labelIndex: 2,
+    labelIndex: 3,
     anchors: [
+      { name: "西安", note: "子午道关中起点，长安城南门外", lat: 34.27, lon: 108.95 },
       { name: "长安 子午谷北口", note: "西安市长安区子午峪", lat: 33.97, lon: 108.85 },
       { name: "江口", note: "宁陕县江口镇古驿", lat: 33.55, lon: 108.55 },
       { name: "腰岭关", note: "宁陕县境内秦岭主脊关口", lat: 33.32, lon: 108.4 },

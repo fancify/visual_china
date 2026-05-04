@@ -28,6 +28,7 @@ export const QINLING_ROUTE_ANCHOR_GEOGRAPHY = {
     { name: "西安", note: "子午道北口，关中东段核心。", lat: 34.27, lon: 108.95 },
   ],
   "tangluo-road": [
+    { name: "周至", note: "傥骆道关中起点，周至县城南", lat: 34.16, lon: 108.22 },
     { name: "周至 骆谷北口", note: "西安西南周至县入山口", lat: 33.97, lon: 108.3 },
     { name: "黑河源", note: "傥骆道越岭前主脊段", lat: 33.8, lon: 108 },
     { name: "十八盘", note: "秦岭腹地连续盘折段", lat: 33.55, lon: 107.85 },
@@ -36,6 +37,7 @@ export const QINLING_ROUTE_ANCHOR_GEOGRAPHY = {
     { name: "汉中", note: "汉中盆地核心", lat: 33.07, lon: 107.03 },
   ],
   "ziwu-road": [
+    { name: "西安", note: "子午道关中起点，长安城南门外", lat: 34.27, lon: 108.95 },
     { name: "长安 子午谷北口", note: "西安市长安区子午峪", lat: 33.97, lon: 108.85 },
     { name: "江口", note: "宁陕县江口镇古驿", lat: 33.55, lon: 108.55 },
     { name: "腰岭关", note: "宁陕县境内秦岭主脊关口", lat: 33.32, lon: 108.4 },
@@ -139,6 +141,8 @@ export const qinlingRouteAnchors = {
   },
   "tangluo-road": {
     points: [
+      // 周至 (lat 34.16, lon 108.22) — 傥骆道关中起点，周至县城南
+      { x: 33.64, y: -106.02 },
       // 周至 骆谷北口 (lat 33.97, lon 108.3) — 西安西南周至县入山口
       { x: 35.84, y: -96.9 },
       // 黑河源 (lat 33.8, lon 108) — 傥骆道越岭前主脊段
@@ -157,6 +161,8 @@ export const qinlingRouteAnchors = {
   },
   "ziwu-road": {
     points: [
+      // 西安 (lat 34.27, lon 108.95) — 子午道关中起点，长安城南门外
+      { x: 53.76, y: -111.29 },
       // 长安 子午谷北口 (lat 33.97, lon 108.85) — 西安市长安区子午峪
       { x: 51.01, y: -96.9 },
       // 江口 (lat 33.55, lon 108.55) — 宁陕县江口镇古驿
