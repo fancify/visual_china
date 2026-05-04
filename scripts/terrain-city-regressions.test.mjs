@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  Quaternion,
   Raycaster,
   Vector3
 } from "three";
@@ -71,13 +73,16 @@ test("city wall geometry sits on the sampled ground instead of floating by one w
   );
 
   const expectedHeightsByMesh = new Map([
-    ["city-walls-capital", 0.9 * 1.6],
-    ["city-walls-prefecture", 0.7 * 1.2],
+    ["city-walls-capital", 0.9 * 2.0],
+    ["city-walls-prefecture", 0.7 * 1.5 * 0.9],
     ["city-walls-county", 0.5]
   ]);
   const vertexCountsByMesh = new Map();
 
   handle.group.children.forEach((child) => {
+    if (!child.name.startsWith("city-walls-")) {
+      return;
+    }
     child.geometry.computeBoundingBox();
     const expectedHeight = expectedHeightsByMesh.get(child.name);
     assert.ok(expectedHeight, `unexpected mesh ${child.name}`);
@@ -96,7 +101,7 @@ test("city wall geometry sits on the sampled ground instead of floating by one w
   );
 });
 
-test("county stays hollow while higher city tiers fill the center", () => {
+test("county wall stays hollow while higher city tiers keep central silhouettes", () => {
   const sampler = new TerrainSampler(regionAsset);
   const handle = createCityMarkers(
     realQinlingCities.filter((city) =>
@@ -112,6 +117,9 @@ test("county stays hollow while higher city tiers fill the center", () => {
   const direction = new Vector3(0, -1, 0);
 
   handle.group.children.forEach((child) => {
+    if (!child.name.startsWith("city-walls-")) {
+      return;
+    }
     const mesh = new Mesh(child.geometry, new MeshBasicMaterial());
     raycaster.set(origin, direction);
     const intersections = raycaster.intersectObject(mesh, false);
@@ -140,8 +148,7 @@ test("city tier specs use graded central buildings and no houses", () => {
         height: CITY_TIER_SPECS.capital.height,
         cornerTowers: CITY_TIER_SPECS.capital.cornerTowers,
         centralBuilding: CITY_TIER_SPECS.capital.centralBuilding,
-        houses: CITY_TIER_SPECS.capital.houses,
-        gateOnSide: CITY_TIER_SPECS.capital.gateOnSide
+        houses: CITY_TIER_SPECS.capital.houses
       },
       prefecture: {
         outerSide: CITY_TIER_SPECS.prefecture.outerSide,
@@ -149,8 +156,7 @@ test("city tier specs use graded central buildings and no houses", () => {
         height: CITY_TIER_SPECS.prefecture.height,
         cornerTowers: CITY_TIER_SPECS.prefecture.cornerTowers,
         centralBuilding: CITY_TIER_SPECS.prefecture.centralBuilding,
-        houses: CITY_TIER_SPECS.prefecture.houses,
-        gateOnSide: CITY_TIER_SPECS.prefecture.gateOnSide
+        houses: CITY_TIER_SPECS.prefecture.houses
       },
       county: {
         outerSide: CITY_TIER_SPECS.county.outerSide,
@@ -158,8 +164,7 @@ test("city tier specs use graded central buildings and no houses", () => {
         height: CITY_TIER_SPECS.county.height,
         cornerTowers: CITY_TIER_SPECS.county.cornerTowers,
         centralBuilding: CITY_TIER_SPECS.county.centralBuilding,
-        houses: CITY_TIER_SPECS.county.houses,
-        gateOnSide: CITY_TIER_SPECS.county.gateOnSide
+        houses: CITY_TIER_SPECS.county.houses
       }
     },
     {
@@ -169,8 +174,7 @@ test("city tier specs use graded central buildings and no houses", () => {
         height: 0.9,
         cornerTowers: true,
         centralBuilding: "hip-roof-palace",
-        houses: 0,
-        gateOnSide: "south"
+        houses: 0
       },
       prefecture: {
         outerSide: 3.4,
@@ -178,8 +182,7 @@ test("city tier specs use graded central buildings and no houses", () => {
         height: 0.7,
         cornerTowers: true,
         centralBuilding: "xie-shan-hall",
-        houses: 0,
-        gateOnSide: "south"
+        houses: 0
       },
       county: {
         outerSide: 2.4,
@@ -187,8 +190,7 @@ test("city tier specs use graded central buildings and no houses", () => {
         height: 0.5,
         cornerTowers: false,
         centralBuilding: null,
-        houses: 0,
-        gateOnSide: "south"
+        houses: 0
       }
     }
   );
@@ -213,6 +215,8 @@ test("capital central roofline stays taller than prefecture and county", () => {
   });
 
   assert.equal(maxYByMesh.get("city-walls-county"), 0.5);
+  assert.ok(Math.abs(maxYByMesh.get("city-walls-capital") - 0.9 * 2.0) < 1e-6);
+  assert.ok(Math.abs(maxYByMesh.get("city-walls-prefecture") - 0.7 * 1.5 * 0.9) < 1e-6);
   assert.ok(
     maxYByMesh.get("city-walls-capital") > maxYByMesh.get("city-walls-prefecture"),
     "capital should have the tallest central roofline"
@@ -238,6 +242,9 @@ test("corner towers use the narrowed footprint instead of dominating the walls",
   ]);
 
   handle.group.children.forEach((child) => {
+    if (!child.name.startsWith("city-walls-")) {
+      return;
+    }
     child.geometry.computeBoundingBox();
     const expectedHalfExtent = halfExtentByMesh.get(child.name);
     assert.ok(expectedHalfExtent, `unexpected mesh ${child.name}`);
@@ -245,6 +252,89 @@ test("corner towers use the narrowed footprint instead of dominating the walls",
     assert.ok(Math.abs(child.geometry.boundingBox.min.x + expectedHalfExtent) < 1e-6);
     assert.ok(Math.abs(child.geometry.boundingBox.max.z - expectedHalfExtent) < 1e-6);
     assert.ok(Math.abs(child.geometry.boundingBox.min.z + expectedHalfExtent) < 1e-6);
+  });
+});
+
+test("south wall stays continuous with no gate gap", () => {
+  const sampler = new TerrainSampler(regionAsset);
+  const handle = createCityMarkers(
+    realQinlingCities.filter((city) =>
+      city.id === "xian" || city.id === "hanzhong" || city.id === "chenggu"
+    ),
+    regionAsset.bounds,
+    regionAsset.world,
+    sampler
+  );
+
+  const raycaster = new Raycaster();
+  const direction = new Vector3(0, -1, 0);
+  const southWallCenterByMesh = new Map([
+    ["city-walls-capital", -(4.4 + 3.6) * 0.25],
+    ["city-walls-prefecture", -(3.4 + 2.6) * 0.25],
+    ["city-walls-county", -(2.4 + 1.6) * 0.25]
+  ]);
+
+  handle.group.children.forEach((child) => {
+    if (!child.name.startsWith("city-walls-")) {
+      return;
+    }
+    const southWallCenter = southWallCenterByMesh.get(child.name);
+    assert.ok(southWallCenter !== undefined, `unexpected mesh ${child.name}`);
+    const mesh = new Mesh(child.geometry, new MeshBasicMaterial());
+    raycaster.set(new Vector3(0, 4, southWallCenter), direction);
+    const intersections = raycaster.intersectObject(mesh, false);
+    assert.ok(intersections.length > 0, `${child.name} should keep the south wall closed`);
+  });
+});
+
+test("city markers use gray masonry walls and ochre floor plates", () => {
+  const sampler = new TerrainSampler(regionAsset);
+  const handle = createCityMarkers(
+    realQinlingCities.filter((city) =>
+      city.id === "xian" || city.id === "hanzhong" || city.id === "chenggu"
+    ),
+    regionAsset.bounds,
+    regionAsset.world,
+    sampler
+  );
+
+  Object.values(handle.tierMaterials).forEach((material) => {
+    assert.equal(material.color.getHex(), 0x6e6f6c);
+  });
+
+  const floorMesh = handle.group.children.find((child) => child.name === "city-floors");
+  assert.ok(floorMesh, "city floor instanced mesh should exist");
+  assert.equal(floorMesh.count, 3);
+  assert.equal(floorMesh.material.color.getHex(), 0xb8975d);
+});
+
+test("city floor mesh scales to almost the full inner courtyard", () => {
+  const visibleCities = realQinlingCities.filter((city) =>
+    city.id === "xian" || city.id === "hanzhong" || city.id === "chenggu"
+  );
+  const sampler = new TerrainSampler(regionAsset);
+  const handle = createCityMarkers(
+    visibleCities,
+    regionAsset.bounds,
+    regionAsset.world,
+    sampler
+  );
+
+  const floorMesh = handle.group.children.find((child) => child.name === "city-floors");
+  assert.ok(floorMesh, "city floor instanced mesh should exist");
+
+  const matrix = new Matrix4();
+  const position = new Vector3();
+  const rotation = new Quaternion();
+  const scale = new Vector3();
+
+  visibleCities.forEach((city, index) => {
+    floorMesh.getMatrixAt(index, matrix);
+    matrix.decompose(position, rotation, scale);
+    const expectedSide = CITY_TIER_SPECS[city.tier].innerSide * 0.96;
+    assert.ok(scale.x > expectedSide * 0.9 && scale.x < expectedSide * 1.05);
+    assert.ok(scale.z > expectedSide * 0.9 && scale.z < expectedSide * 1.05);
+    assert.ok(scale.y > 0.03 && scale.y < 0.05);
   });
 });
 
