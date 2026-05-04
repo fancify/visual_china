@@ -789,7 +789,9 @@ canvas {
 .hud-hover-card {
   position: absolute;
   z-index: 4;
-  width: min(280px, calc(100vw - 24px));
+  left: 18px;
+  bottom: 18px;
+  width: min(280px, calc(100vw - 36px));
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid rgba(241, 210, 137, 0.16);
@@ -803,10 +805,21 @@ canvas {
   display: none;
 }
 
-.hud-hover-card strong {
+.hud-hover-card-compact {
+  width: min(240px, calc(100vw - 36px));
+}
+
+.hud-hover-card-detail {
+  width: min(360px, calc(100vw - 36px));
+  padding: 16px 18px;
+}
+
+.hud-hover-card > strong,
+.hud-hover-card-title {
   display: block;
-  margin-top: 4px;
+  margin-top: 0;
   font-size: 16px;
+  font-weight: 700;
   color: #f5ecd3;
 }
 
@@ -815,6 +828,51 @@ canvas {
   font-size: 12px;
   line-height: 1.65;
   color: rgba(237, 230, 204, 0.82);
+}
+
+.hud-hover-card-elevation {
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(237, 230, 204, 0.86);
+}
+
+.hud-hover-card-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: rgba(241, 210, 137, 0.84);
+}
+
+.hud-hover-card-hint-detail {
+  margin-top: 10px;
+}
+
+.hud-hover-card-divider {
+  margin-top: 10px;
+  border-top: 1px solid rgba(241, 210, 137, 0.12);
+}
+
+.hud-hover-card-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 12px;
+  color: rgba(241, 210, 137, 0.74);
+}
+
+.hud-hover-card-row span {
+  letter-spacing: 0.08em;
+}
+
+.hud-hover-card-row strong {
+  margin: 0;
+  display: inline;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f5ecd3;
+  text-align: right;
 }
 
 .hud-hover-card-kicker,
