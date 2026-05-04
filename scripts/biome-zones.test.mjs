@@ -17,11 +17,15 @@ test("Qinling south samples as subtropical humid biome", () => {
   assert.ok(biome.vegetationDensity > 1.2);
 });
 
-test("Guanzhong north samples as warm-temperate humid biome", () => {
-  const biome = biomeWeightsAt({ lat: 34, lon: 108 });
+test("Guanzhong north sample keeps the warm-temperate humid preset", () => {
+  const biome = biomeWeightsAt({ lat: 34.7, lon: 108 });
 
   assert.equal(biome.biomeId, "warm-temperate-humid");
-  assert.ok(biome.vegetationDensity < 1.0);
+  assertClose(biome.hueShift, -0.012);
+  assertClose(biome.satScale, 0.92);
+  assertClose(biome.lumScale, 1.02);
+  assertClose(biome.vegetationDensity, 0.85);
+  assertClose(biome.treeHue, 0.24);
 });
 
 test("Qinling ridge transition blends south and north weights smoothly", () => {
@@ -48,9 +52,22 @@ test("nationwide sample maps Yangtze southland to subtropical humid", () => {
   const biome = biomeWeightsAt({ lat: 25, lon: 110 });
 
   assert.equal(biome.biomeId, "subtropical-humid");
-  assertClose(biome.hueShift, 0.028);
-  assertClose(biome.satScale, 1.16);
-  assertClose(biome.lumScale, 0.96);
+  assertClose(biome.hueShift, 0.06);
+  assertClose(biome.satScale, 1.3);
+  assertClose(biome.lumScale, 0.92);
+  assertClose(biome.vegetationDensity, 1.45);
+  assertClose(biome.treeHue, 0.33);
+});
+
+test("Chengdu sample uses the stronger subtropical humid palette inside the Qinling slice", () => {
+  const biome = biomeWeightsAt({ lat: 30.66, lon: 104.07 });
+
+  assert.equal(biome.biomeId, "subtropical-humid");
+  assertClose(biome.hueShift, 0.06);
+  assertClose(biome.satScale, 1.3);
+  assertClose(biome.lumScale, 0.92);
+  assertClose(biome.vegetationDensity, 1.45);
+  assertClose(biome.treeHue, 0.33);
 });
 
 test("nationwide sample maps Hainan to tropical humid", () => {
