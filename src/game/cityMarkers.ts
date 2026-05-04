@@ -17,10 +17,10 @@ import { projectGeoToWorld } from "./mapOrientation.js";
 /**
  * 在 3D 场景里把真实城市坐标摆出来。
  *
- * 造型 = "口"字型城墙 + 若干城内屋舍。三档不仅尺寸不同，结构也分级：
- *   capital（京城）= 外环 + 4 角楼 + 中央城楼 + 6 户屋舍
- *   prefecture（州府）= 外环 + 4 角楼 + 3 户屋舍
- *   county（县城）= 外环 + 2 户屋舍
+ * 造型 = "口"字型城墙 + 分级中央建筑。三档不仅尺寸不同，结构也分级：
+ *   capital（京城）= 外环 + 4 角楼 + 两层庑殿顶小楼
+ *   prefecture（州府）= 外环 + 4 角楼 + 单层歇山顶厅堂
+ *   county（县城）= 外环
  *
  * 三档尺寸：
  *   capital（京城）= 外 4.4 内 3.6、墙厚 0.4、高 0.9（最大）
@@ -30,18 +30,19 @@ import { projectGeoToWorld } from "./mapOrientation.js";
  * 用 InstancedMesh：每档 1 个 mesh，共 3 个 instanced mesh（之前 base+
  * roof 6 个减半）。29 个 instance，draw call 3。
  *
- * 用户这轮要求："要像城市，不是框"。所以仍保留中空院落，但加门洞和屋舍，
- * 让 silhouette 像有人居住的聚落，而不是单纯一圈墙。
+ * 用户这轮要求：三档主要靠城墙面积 + 中央建筑层级区分，不再用零碎屋舍
+ * 堆住人感。county 保持中空，prefecture / capital 用不同屋顶轮廓一眼区分。
  */
 
 export type GateSide = "north" | "south" | "east" | "west";
+export type CentralBuildingType = "hip-roof-palace" | "xie-shan-hall" | null;
 
 export interface CityTierSpec {
   outerSide: number;
   innerSide: number;
   height: number;
   cornerTowers: boolean;
-  centralTower: boolean;
+  centralBuilding: CentralBuildingType;
   houses: number;
   gateOnSide: GateSide;
 }
@@ -61,8 +62,8 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
     innerSide: 1.6,
     height: 0.5,
     cornerTowers: false,
-    centralTower: false,
-    houses: 2,
+    centralBuilding: null,
+    houses: 0,
     gateOnSide: "south"
   },
   prefecture: {
@@ -70,8 +71,8 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
     innerSide: 2.6,
     height: 0.7,
     cornerTowers: true,
-    centralTower: false,
-    houses: 3,
+    centralBuilding: "xie-shan-hall",
+    houses: 0,
     gateOnSide: "south"
   },
   capital: {
@@ -79,8 +80,8 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
     innerSide: 3.6,
     height: 0.9,
     cornerTowers: true,
-    centralTower: true,
-    houses: 6,
+    centralBuilding: "hip-roof-palace",
+    houses: 0,
     gateOnSide: "south"
   }
 };
@@ -111,17 +112,46 @@ function houseSlots(innerSide: number, count: number): Array<[number, number]> {
   return slots.slice(0, Math.max(0, count));
 }
 
-function buildCentralPalace(width: number, height: number): BufferGeometry[] {
-  const bodyHeight = height * 0.55;
-  const upperHeight = height * 0.2;
-  const roofDeckHeight = height * 0.05;
-  const roofRidgeHeight = height * 0.2;
+function buildHipRoofPalace(width: number, totalHeight: number): BufferGeometry[] {
+  const body1Height = totalHeight * 0.4;
+  const eave1Height = totalHeight * 0.04;
+  const body2Height = totalHeight * 0.3;
+  const roofHeight = totalHeight * 0.26;
+
+  const eave1Y = body1Height;
+  const body2Y = body1Height + eave1Height;
+  const roofY = body2Y + body2Height;
+
+  const roof = prepareForMerge(new ConeGeometry(width * 0.6, roofHeight, 4));
+  roof.rotateY(Math.PI / 4);
+  roof.translate(0, roofY + roofHeight * 0.5, 0);
+
+  return [
+    translatedBox(width, body1Height, width, 0, body1Height * 0.5, 0),
+    translatedBox(width * 1.1, eave1Height, width * 1.1, 0, eave1Y + eave1Height * 0.5, 0),
+    translatedBox(width * 0.78, body2Height, width * 0.78, 0, body2Y + body2Height * 0.5, 0),
+    roof
+  ];
+}
+
+function buildXieShanHall(width: number, totalHeight: number): BufferGeometry[] {
+  const bodyHeight = totalHeight * 0.55;
+  const eaveHeight = totalHeight * 0.05;
+  const roofHeight = totalHeight * 0.3;
+  const gableHeight = totalHeight * 0.1;
+
+  const eaveY = bodyHeight;
+  const roofY = eaveY + eaveHeight;
+
+  const roof = prepareForMerge(new ConeGeometry(width * 0.62, roofHeight, 4));
+  roof.rotateY(Math.PI / 4);
+  roof.translate(0, roofY + roofHeight * 0.5, 0);
 
   return [
     translatedBox(width, bodyHeight, width, 0, bodyHeight * 0.5, 0),
-    translatedBox(width * 0.85, upperHeight, width * 0.85, 0, height * 0.65, 0),
-    translatedBox(width * 1.1, roofDeckHeight, width * 1.1, 0, height * 0.78, 0),
-    translatedBox(width * 0.6, roofRidgeHeight, width * 1.05, 0, height * 0.92, 0)
+    translatedBox(width * 1.12, eaveHeight, width * 1.12, 0, eaveY + eaveHeight * 0.5, 0),
+    roof,
+    translatedBox(width * 0.7, gableHeight, width * 0.4, 0, roofY + roofHeight * 0.7, 0)
   ];
 }
 
@@ -237,7 +267,7 @@ function makeTierWallGeometry(
   ];
 
   if (spec.cornerTowers) {
-    const towerSide = spec.outerSide * 0.18;
+    const towerSide = spec.outerSide * 0.1;
     const towerHeight = spec.height * 1.2;
     const towerY = towerHeight * 0.5;
     const offset = spec.outerSide * 0.5;
@@ -254,10 +284,10 @@ function makeTierWallGeometry(
     });
   }
 
-  if (spec.centralTower) {
-    const palaceWidth = spec.outerSide * 0.7;
-    const palaceHeight = spec.height * 1.7;
-    parts.push(...buildCentralPalace(palaceWidth, palaceHeight));
+  if (spec.centralBuilding === "hip-roof-palace") {
+    parts.push(...buildHipRoofPalace(spec.outerSide * 0.6, spec.height * 1.6));
+  } else if (spec.centralBuilding === "xie-shan-hall") {
+    parts.push(...buildXieShanHall(spec.outerSide * 0.5, spec.height * 1.2));
   }
 
   const merged = BufferGeometryUtils.mergeGeometries(parts);
