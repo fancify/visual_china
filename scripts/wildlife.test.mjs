@@ -206,7 +206,29 @@ test("wildlife handle uses one merged instanced mesh per kind", async () => {
   wildlife.disposeWildlife(handle);
 });
 
-test("wildlife wander pose moves over time and stays inside wander radius while hugging terrain", async () => {
+function makeBehaviorInstance(kind, sampler, overrides = {}) {
+  return {
+    kind,
+    centerX: 6,
+    centerZ: -4,
+    phaseOffset: 0.35,
+    wanderRadius: 2.2,
+    speed: 0.18,
+    scale: 1,
+    rotationBias: 0,
+    sampler,
+    worldOffsetX: 0,
+    worldOffsetZ: 0,
+    cycleStartSec: 0,
+    idleDurSec: 8,
+    walkDurSec: 3,
+    walkAccumulatedSec: 0,
+    lastRotationY: 0.4,
+    ...overrides
+  };
+}
+
+test("wildlife idle pose stays fixed until its walk window begins", async () => {
   const wildlife = await loadWildlifeModule();
   const sampler = makeWildlifeSampler({
     normalizedHeight: 0.3,
@@ -214,32 +236,30 @@ test("wildlife wander pose moves over time and stays inside wander radius while 
     river: 0.02,
     worldBounds: { minX: 0, maxX: 36, minZ: 0, maxZ: 36 }
   });
-  const instance = {
-    kind: "deer",
-    centerX: 6,
-    centerZ: -4,
-    phaseOffset: 0.35,
-    wanderRadius: 2.2,
-    speed: 0.18,
-    scale: 1
-  };
+  const instance = makeBehaviorInstance("deer", sampler, {
+    idleDurSec: 10,
+    walkDurSec: 3
+  });
 
+  wildlife.advanceWildlifeInstanceState(instance, 0, 0);
   const pose0 = wildlife.computeWildlifePose(instance, 0, sampler);
-  const pose1 = wildlife.computeWildlifePose(instance, 1, sampler);
-  const pose5 = wildlife.computeWildlifePose(instance, 5, sampler);
+  wildlife.advanceWildlifeInstanceState(instance, 4, 4);
+  const pose4 = wildlife.computeWildlifePose(instance, 4, sampler);
+  wildlife.advanceWildlifeInstanceState(instance, 10.5, 0.5);
+  const poseWalk = wildlife.computeWildlifePose(instance, 10.5, sampler);
 
-  assert.notDeepEqual(
-    { x: pose0.position.x, z: pose0.position.z },
-    { x: pose1.position.x, z: pose1.position.z },
-    "wander pose should move between elapsed seconds 0 and 1"
+  assert.deepEqual(
+    { x: pose0.position.x, z: pose0.position.z, rotationY: pose0.rotationY },
+    { x: pose4.position.x, z: pose4.position.z, rotationY: pose4.rotationY },
+    "idle wildlife should hold the same position and facing"
   );
   assert.notDeepEqual(
-    { x: pose1.position.x, z: pose1.position.z },
-    { x: pose5.position.x, z: pose5.position.z },
-    "wander pose should continue moving over time"
+    { x: pose4.position.x, z: pose4.position.z },
+    { x: poseWalk.position.x, z: poseWalk.position.z },
+    "wildlife should start moving once its walk window begins"
   );
 
-  [pose0, pose1, pose5].forEach((pose) => {
+  [pose0, pose4, poseWalk].forEach((pose) => {
     const dx = pose.position.x - instance.centerX;
     const dz = pose.position.z - instance.centerZ;
     assert.ok(
@@ -256,4 +276,64 @@ test("wildlife wander pose moves over time and stays inside wander radius while 
       `wildlife grounding offset should stay tight to the surface, got y ${pose.position.y} for ground ${expectedGround}`
     );
   });
+});
+
+test("rabbit walking pose adds a hop arc above the terrain while advancing", async () => {
+  const wildlife = await loadWildlifeModule();
+  const sampler = makeWildlifeSampler({
+    normalizedHeight: 0.2,
+    slope: 0.02,
+    river: 0.01,
+    worldBounds: { minX: 0, maxX: 36, minZ: 0, maxZ: 36 }
+  });
+  const instance = makeBehaviorInstance("rabbit", sampler, {
+    centerX: 1,
+    centerZ: 2,
+    phaseOffset: 0,
+    wanderRadius: 1.5,
+    speed: 0.25,
+    idleDurSec: 0,
+    walkDurSec: 3
+  });
+
+  wildlife.advanceWildlifeInstanceState(instance, 0.25, 0.25);
+  const pose = wildlife.computeWildlifePose(instance, 0.25, sampler);
+  const hopHeight = pose.position.y - pose.groundY - 0.02;
+
+  assert.ok(hopHeight > 0, `rabbit hop should lift above ground, got ${hopHeight}`);
+  assert.ok(hopHeight <= 0.2, `rabbit hop should stay within the visual arc cap, got ${hopHeight}`);
+  assert.notDeepEqual(
+    { x: pose.position.x, z: pose.position.z },
+    { x: instance.centerX, z: instance.centerZ },
+    "rabbit walking pose should still advance in XZ while hopping"
+  );
+});
+
+test("wildlife cycle rollover re-randomizes idle and walk durations", async () => {
+  const wildlife = await loadWildlifeModule();
+  const sampler = makeWildlifeSampler({
+    normalizedHeight: 0.25,
+    slope: 0.03,
+    river: 0.02,
+    worldBounds: { minX: 0, maxX: 36, minZ: 0, maxZ: 36 }
+  });
+  const instance = makeBehaviorInstance("goat", sampler, {
+    cycleStartSec: 0,
+    idleDurSec: 1,
+    walkDurSec: 1,
+    walkAccumulatedSec: 0.8
+  });
+  const randomValues = [0.25, 0.75];
+  let randomIndex = 0;
+
+  wildlife.advanceWildlifeInstanceState(instance, 2.5, 0.5, () => {
+    const value = randomValues[randomIndex] ?? randomValues.at(-1);
+    randomIndex += 1;
+    return value;
+  });
+
+  assert.equal(instance.cycleStartSec, 2.5);
+  assert.equal(instance.idleDurSec, 7.5);
+  assert.equal(instance.walkDurSec, 3.5);
+  assert.equal(instance.walkAccumulatedSec, 0.8);
 });

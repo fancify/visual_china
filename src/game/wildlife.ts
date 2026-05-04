@@ -46,6 +46,11 @@ export interface WildlifeInstance {
   sampler: TerrainSampler;
   worldOffsetX: number;
   worldOffsetZ: number;
+  cycleStartSec: number;
+  idleDurSec: number;
+  walkDurSec: number;
+  walkAccumulatedSec: number;
+  lastRotationY: number;
 }
 
 export interface WildlifePose {
@@ -57,12 +62,19 @@ export interface WildlifePose {
   localZ: number;
 }
 
+type WildlifePoseInput = Omit<
+  WildlifeInstance,
+  "sampler" | "worldOffsetX" | "worldOffsetZ" | "rotationBias"
+> &
+  Partial<Pick<WildlifeInstance, "sampler" | "worldOffsetX" | "worldOffsetZ" | "rotationBias">>;
+
 export interface WildlifeHandle {
   group: Group;
   totalInstances: number;
   perKindCounts: Record<WildlifeKind, number>;
   instancesByKind: Record<WildlifeKind, WildlifeInstance[]>;
   meshesByKind: Record<WildlifeKind, InstancedMesh>;
+  lastElapsedSeconds: number;
 }
 
 const WILDLIFE_KINDS: WildlifeKind[] = ["deer", "goat", "rabbit", "crane"];
@@ -72,6 +84,14 @@ const SPAWN_CHANCE_PER_CHUNK = 0.4;
 const MULTI_CHANCE = 0.15;
 const WILDLIFE_GROUND_OFFSET = 0.02;
 const WANDER_NOISE_FREQUENCY = 0.8;
+const WILDLIFE_SILHOUETTE_SCALE = 2;
+const WILDLIFE_IDLE_MIN_SEC = 5;
+const WILDLIFE_IDLE_RANGE_SEC = 10;
+const WILDLIFE_WALK_MIN_SEC = 2;
+const WILDLIFE_WALK_RANGE_SEC = 2;
+const RABBIT_HOP_FREQUENCY = 2;
+const RABBIT_HOP_HEIGHT = 0.18;
+const RABBIT_HOP_MOTION_WINDOW = 0.72;
 
 function pseudoRandom(seed: number): number {
   const value = Math.sin(seed * 12.9898) * 43758.5453;
@@ -162,8 +182,19 @@ function mergeParts(parts: BufferGeometry[]): BufferGeometry {
   return merged;
 }
 
+function finalizeSilhouette(parts: BufferGeometry[]): BufferGeometry {
+  const geometry = mergeParts(parts);
+  geometry.scale(
+    WILDLIFE_SILHOUETTE_SCALE,
+    WILDLIFE_SILHOUETTE_SCALE,
+    WILDLIFE_SILHOUETTE_SCALE
+  );
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function buildDeerSilhouette(): BufferGeometry {
-  return mergeParts([
+  return finalizeSilhouette([
     translatedBox(0.22, 0.22, 0.55, 0, 0.34, 0),
     translatedBox(0.12, 0.16, 0.14, 0, 0.44, 0.26),
     translatedSphere(0.09, 0, 0.45, 0.39, 1, 0.9, 1.15),
@@ -178,7 +209,7 @@ function buildDeerSilhouette(): BufferGeometry {
 }
 
 function buildGoatSilhouette(): BufferGeometry {
-  return mergeParts([
+  return finalizeSilhouette([
     translatedBox(0.2, 0.2, 0.42, 0, 0.29, 0),
     translatedSphere(0.1, 0, 0.38, 0.28, 0.95, 0.9, 1.05),
     translatedBox(0.05, 0.24, 0.05, -0.07, 0.12, -0.12),
@@ -192,7 +223,7 @@ function buildGoatSilhouette(): BufferGeometry {
 }
 
 function buildRabbitSilhouette(): BufferGeometry {
-  return mergeParts([
+  return finalizeSilhouette([
     translatedSphere(0.16, 0, 0.17, 0, 1.05, 0.92, 1.32),
     translatedSphere(0.1, 0, 0.21, 0.2, 1, 0.95, 1.05),
     translatedBox(0.05, 0.12, 0.05, -0.08, 0.06, -0.06),
@@ -206,7 +237,7 @@ function buildRabbitSilhouette(): BufferGeometry {
 }
 
 function buildCraneSilhouette(): BufferGeometry {
-  return mergeParts([
+  return finalizeSilhouette([
     translatedBox(0.14, 0.12, 0.34, 0, 0.66, 0),
     translatedBox(0.024, 0.72, 0.024, -0.04, 0.36, -0.03),
     translatedBox(0.024, 0.72, 0.024, 0.04, 0.36, 0.03),
@@ -356,6 +387,58 @@ function speedForKind(kind: WildlifeKind, seed: number): number {
   }
 }
 
+function randomIdleDuration(randomSource: () => number = Math.random): number {
+  return WILDLIFE_IDLE_MIN_SEC + randomSource() * WILDLIFE_IDLE_RANGE_SEC;
+}
+
+function randomWalkDuration(randomSource: () => number = Math.random): number {
+  return WILDLIFE_WALK_MIN_SEC + randomSource() * WILDLIFE_WALK_RANGE_SEC;
+}
+
+function isWildlifeWalking(instance: WildlifePoseInput, elapsedSeconds: number): boolean {
+  return elapsedSeconds - instance.cycleStartSec >= instance.idleDurSec;
+}
+
+function rabbitMovementSeconds(walkAccumulatedSec: number): number {
+  const hopPhase = walkAccumulatedSec * RABBIT_HOP_FREQUENCY;
+  const hopIndex = Math.floor(hopPhase);
+  const hopFraction = hopPhase - hopIndex;
+  const normalized = Math.min(hopFraction / RABBIT_HOP_MOTION_WINDOW, 1);
+  const eased = normalized * normalized * (3 - 2 * normalized);
+
+  return (hopIndex + eased) / RABBIT_HOP_FREQUENCY;
+}
+
+function movementSecondsForKind(kind: WildlifeKind, walkAccumulatedSec: number): number {
+  if (kind === "rabbit") {
+    return rabbitMovementSeconds(walkAccumulatedSec);
+  }
+  return walkAccumulatedSec;
+}
+
+function hopHeightForInstance(instance: WildlifePoseInput, elapsedSeconds: number): number {
+  if (instance.kind !== "rabbit" || !isWildlifeWalking(instance, elapsedSeconds)) {
+    return 0;
+  }
+
+  const hopPhase = instance.walkAccumulatedSec * RABBIT_HOP_FREQUENCY;
+  const hopFraction = hopPhase - Math.floor(hopPhase);
+  return Math.sin(hopFraction * Math.PI) * RABBIT_HOP_HEIGHT;
+}
+
+function wildlifeLocalPosition(
+  instance: WildlifePoseInput,
+  movementSeconds: number
+): { localX: number; localZ: number; phase: number } {
+  const phase = movementSeconds * instance.speed + instance.phaseOffset;
+  return {
+    phase,
+    localX: instance.centerX + Math.cos(phase) * instance.wanderRadius,
+    localZ:
+      instance.centerZ + Math.sin(phase * WANDER_NOISE_FREQUENCY) * instance.wanderRadius
+  };
+}
+
 function samplerWorldOffset(sampler: TerrainSampler): { x: number; z: number } {
   const worldBounds = sampler.asset.worldBounds;
   if (!worldBounds) {
@@ -484,13 +567,41 @@ function wildlifeInstanceFromSpawn(
     rotationBias: 0,
     sampler,
     worldOffsetX: offset.x,
-    worldOffsetZ: offset.z
+    worldOffsetZ: offset.z,
+    cycleStartSec: 0,
+    idleDurSec: randomIdleDuration(),
+    walkDurSec: randomWalkDuration(),
+    walkAccumulatedSec: 0,
+    lastRotationY: spawn.rotationY
   };
 }
 
+export function advanceWildlifeInstanceState(
+  instance: WildlifeInstance,
+  elapsedSeconds: number,
+  deltaSeconds: number,
+  randomSource: () => number = Math.random
+): void {
+  const safeDelta = Math.max(0, deltaSeconds);
+  const previousElapsed = Math.max(instance.cycleStartSec, elapsedSeconds - safeDelta);
+  const walkStart = instance.cycleStartSec + instance.idleDurSec;
+  const cycleEnd = walkStart + instance.walkDurSec;
+  const walkingOverlapStart = Math.max(previousElapsed, walkStart);
+  const walkingOverlapEnd = Math.min(elapsedSeconds, cycleEnd);
+
+  if (walkingOverlapEnd > walkingOverlapStart) {
+    instance.walkAccumulatedSec += walkingOverlapEnd - walkingOverlapStart;
+  }
+
+  if (elapsedSeconds >= cycleEnd) {
+    instance.cycleStartSec = elapsedSeconds;
+    instance.idleDurSec = randomIdleDuration(randomSource);
+    instance.walkDurSec = randomWalkDuration(randomSource);
+  }
+}
+
 export function computeWildlifePose(
-  instance: Omit<WildlifeInstance, "sampler" | "worldOffsetX" | "worldOffsetZ" | "rotationBias"> &
-    Partial<Pick<WildlifeInstance, "sampler" | "worldOffsetX" | "worldOffsetZ" | "rotationBias">>,
+  instance: WildlifePoseInput,
   elapsedSeconds: number,
   samplerOverride?: TerrainSampler
 ): WildlifePose {
@@ -499,25 +610,33 @@ export function computeWildlifePose(
     throw new Error("computeWildlifePose requires a terrain sampler.");
   }
 
-  const phase = elapsedSeconds * instance.speed + instance.phaseOffset;
-  const localX = instance.centerX + Math.cos(phase) * instance.wanderRadius;
-  const localZ =
-    instance.centerZ + Math.sin(phase * WANDER_NOISE_FREQUENCY) * instance.wanderRadius;
-  const tangentX = -Math.sin(phase) * instance.wanderRadius * instance.speed;
-  const tangentZ =
-    Math.cos(phase * WANDER_NOISE_FREQUENCY) *
-    instance.wanderRadius *
-    WANDER_NOISE_FREQUENCY *
-    instance.speed;
+  const movementSeconds = movementSecondsForKind(instance.kind, instance.walkAccumulatedSec);
+  const { localX, localZ } = wildlifeLocalPosition(instance, movementSeconds);
   const groundY = sampler.sampleSurfaceHeight(localX, localZ);
+  const walkingNow = isWildlifeWalking(instance, elapsedSeconds);
+  let rotationY = instance.lastRotationY ?? 0;
+
+  if (walkingNow) {
+    const previousMovementSeconds = movementSecondsForKind(
+      instance.kind,
+      Math.max(0, instance.walkAccumulatedSec - 0.03)
+    );
+    const previousPosition = wildlifeLocalPosition(instance, previousMovementSeconds);
+    const dx = localX - previousPosition.localX;
+    const dz = localZ - previousPosition.localZ;
+    if (Math.hypot(dx, dz) > 1e-5) {
+      rotationY = Math.atan2(dx, dz) + (instance.rotationBias ?? 0);
+      instance.lastRotationY = rotationY;
+    }
+  }
 
   return {
     position: {
       x: localX + (instance.worldOffsetX ?? 0),
-      y: groundY + WILDLIFE_GROUND_OFFSET,
+      y: groundY + WILDLIFE_GROUND_OFFSET + hopHeightForInstance(instance, elapsedSeconds),
       z: localZ + (instance.worldOffsetZ ?? 0)
     },
-    rotationY: Math.atan2(tangentX, tangentZ) + (instance.rotationBias ?? 0),
+    rotationY,
     scale: instance.scale,
     groundY,
     localX,
@@ -568,7 +687,8 @@ export function createWildlifeHandle(samplers: TerrainSampler[]): WildlifeHandle
     totalInstances: WILDLIFE_KINDS.reduce((sum, kind) => sum + perKindCounts[kind], 0),
     perKindCounts,
     instancesByKind,
-    meshesByKind
+    meshesByKind,
+    lastElapsedSeconds: 0
   };
 
   updateWildlifeFrame(handle, 0);
@@ -580,6 +700,7 @@ export function updateWildlifeFrame(
   elapsedSeconds: number
 ): void {
   const dummy = new Object3D();
+  const deltaSeconds = Math.max(0, elapsedSeconds - handle.lastElapsedSeconds);
 
   WILDLIFE_KINDS.forEach((kind) => {
     const mesh = handle.meshesByKind[kind];
@@ -587,12 +708,15 @@ export function updateWildlifeFrame(
     mesh.count = instances.length;
 
     instances.forEach((instance, index) => {
+      advanceWildlifeInstanceState(instance, elapsedSeconds, deltaSeconds);
       const pose = computeWildlifePose(instance, elapsedSeconds);
       mesh.setMatrixAt(index, applyPoseToDummy(dummy, pose));
     });
 
     mesh.instanceMatrix.needsUpdate = true;
   });
+
+  handle.lastElapsedSeconds = elapsedSeconds;
 }
 
 export function disposeWildlife(handle: WildlifeHandle): void {
