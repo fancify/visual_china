@@ -27,3 +27,8 @@ atlas-snapshot.md
 
 tmp/
 .claude/
+
+# SFX raw downloads + transcoded ogg files; manifest is the source of truth.
+# 跑 `node scripts/download-sfx.mjs` 重新生成。
+public/sfx/*/*.opus
+public/sfx/*/*.ogg

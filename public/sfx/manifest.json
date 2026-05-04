@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "license_note": "All sounds sourced from freesound.org. Track per-entry license in `license` field. CC-BY entries require attribution; see README for credits.",
+  "encoding": {
+    "format": "opus",
+    "container": "ogg",
+    "channels": "mono",
+    "sample_rate": 48000,
+    "bitrate_target_kbps": 96
+  },
+  "tracks": [
+    {
+      "id": "ambient_forest_birds",
+      "category": "ambient",
+      "kind": "loop",
+      "name": "Forest birds + breeze",
+      "trigger_hint": "山地白昼",
+      "source_url": "https://cdn.freesound.org/previews/850/850507_8908475-hq.mp3",
+      "credit_page": "https://freesound.org/people/GammaGool/sounds/850507/",
+      "license": "to-verify",
+      "size_bytes": 725687
+    },
+    {
+      "id": "ambient_mountain_wind",
+      "category": "ambient",
+      "kind": "loop",
+      "name": "Mountain wind howl",
+      "trigger_hint": "高海拔 h>0.6",
+      "source_url": "https://cdn.freesound.org/previews/615/615440_13628360-hq.mp3",
+      "credit_page": "https://freesound.org/people/InChristAlone/sounds/615440/",
+      "license": "to-verify",
+      "size_bytes": 366725
+    },
+    {
+      "id": "ambient_stream_water",
+      "category": "ambient",
+      "kind": "loop",
+      "name": "Small stream flowing",
+      "trigger_hint": "近距河流 (≤ 2u)",
+      "source_url": "https://cdn.freesound.org/previews/846/846435_1856262-hq.mp3",
+      "credit_page": "https://freesound.org/people/NikoletB/sounds/846435/",
+      "license": "to-verify",
+      "size_bytes": 219358
+    },
+    {
+      "id": "ambient_river_large",
+      "category": "ambient",
+      "kind": "loop",
+      "name": "Large river / 长江 ambient",
+      "trigger_hint": "大江近距 (rivers F>1500)",
+      "source_url": "https://cdn.freesound.org/previews/735/735315_15845859-hq.mp3",
+      "credit_page": "https://freesound.org/people/viv1186/sounds/735315/",
+      "license": "to-verify",
+      "size_bytes": 553886
+    },
+    {
+      "id": "ambient_insects_night",
+      "category": "ambient",
+      "kind": "loop",
+      "name": "Insects / cicadas night",
+      "trigger_hint": "夜晚 + 低海拔（subtropical-humid）",
+      "source_url": "https://cdn.freesound.org/previews/268/268964_2895986-hq.mp3",
+      "credit_page": "https://freesound.org/people/harryScary/sounds/268964/",
+      "license": "to-verify",
+      "size_bytes": 431955
+    },
+    {
+      "id": "ambient_wind_plain",
+      "category": "ambient",
+      "kind": "loop",
+      "name": "Plain wind through grass",
+      "trigger_hint": "关中/盆地平原",
+      "source_url": "https://cdn.freesound.org/previews/744/744628_19258-hq.mp3",
+      "credit_page": "https://freesound.org/people/wertstahl/sounds/744628/",
+      "license": "to-verify",
+      "size_bytes": 1749857
+    },
+    {
+      "id": "ambient_rain_heavy",
+      "category": "ambient",
+      "kind": "loop",
+      "name": "Heavy rain",
+      "trigger_hint": "weather=rain",
+      "source_url": "https://cdn.freesound.org/previews/378/378052_2341984-hq.mp3",
+      "credit_page": "https://freesound.org/people/bajko/sounds/378052/",
+      "license": "to-verify",
+      "size_bytes": 811023
+    },
+    {
+      "id": "ambient_thunder_distant",
+      "category": "ambient",
+      "kind": "one-shot",
+      "name": "Distant thunder",
+      "trigger_hint": "weather=storm 间隔触发",
+      "source_url": "https://cdn.freesound.org/previews/158/158692_179538-hq.mp3",
+      "credit_page": "https://freesound.org/people/RutgerMuller/sounds/158692/",
+      "license": "cc0",
+      "size_bytes": 940145
+    },
+    {
+      "id": "footstep_grass",
+      "category": "footsteps",
+      "kind": "loop-or-cycle",
+      "name": "Grass footsteps",
+      "trigger_hint": "步行（默认）",
+      "source_url": "https://cdn.freesound.org/previews/321/321445_5437135-hq.mp3",
+      "credit_page": "https://freesound.org/people/deleted_user_5437135/sounds/321445/",
+      "license": "to-verify",
+      "size_bytes": 226351
+    },
+    {
+      "id": "footstep_water_wading",
+      "category": "footsteps",
+      "kind": "loop-or-cycle",
+      "name": "Water wading",
+      "trigger_hint": "过水",
+      "source_url": "https://cdn.freesound.org/previews/342/342932_5800259-hq.mp3",
+      "credit_page": "https://freesound.org/people/ryansitz/sounds/342932/",
+      "license": "to-verify",
+      "size_bytes": 344980
+    },
+    {
+      "id": "cultural_guqin_pluck",
+      "category": "cultural",
+      "kind": "one-shot",
+      "name": "Guqin pluck note",
+      "trigger_hint": "进名胜 POI 时低概率（10%）",
+      "source_url": "https://cdn.freesound.org/previews/161/161908_43-hq.mp3",
+      "credit_page": "https://freesound.org/people/xserra/sounds/161908/",
+      "license": "to-verify",
+      "size_bytes": 935862
+    },
+    {
+      "id": "cultural_dizi_flute",
+      "category": "cultural",
+      "kind": "one-shot",
+      "name": "Chinese flute (dizi)",
+      "trigger_hint": "黄昏过渡 / 进山林时偶尔",
+      "source_url": "https://cdn.freesound.org/previews/339/339341_197130-hq.mp3",
+      "credit_page": "https://freesound.org/people/CarlosCarty/sounds/339341/",
+      "license": "to-verify",
+      "size_bytes": 209661
+    },
+    {
+      "id": "cultural_temple_bell",
+      "category": "cultural",
+      "kind": "one-shot",
+      "name": "Temple bell ring",
+      "trigger_hint": "古寺/塔附近 + 黄昏 / 黎明",
+      "source_url": "https://cdn.freesound.org/previews/518/518706_8031303-hq.mp3",
+      "credit_page": "https://freesound.org/people/SamuelGremaud/sounds/518706/",
+      "license": "to-verify",
+      "size_bytes": 453224
+    },
+    {
+      "id": "cultural_wooden_fish",
+      "category": "cultural",
+      "kind": "one-shot",
+      "name": "Wooden fish (木鱼)",
+      "trigger_hint": "进入古寺",
+      "source_url": "https://cdn.freesound.org/previews/607/607215_541139-hq.mp3",
+      "credit_page": "https://freesound.org/people/jonopodmore/sounds/607215/",
+      "license": "to-verify",
+      "size_bytes": 17875
+    },
+    {
+      "id": "cultural_crane_call",
+      "category": "cultural",
+      "kind": "one-shot",
+      "name": "Crane bird call",
+      "trigger_hint": "wildlife crane 实例附近 spawn 时",
+      "source_url": "https://cdn.freesound.org/previews/816/816426_321967-hq.mp3",
+      "credit_page": "https://freesound.org/people/Robinhood76/sounds/816426/",
+      "license": "to-verify",
+      "size_bytes": 21776
+    },
+    {
+      "id": "cultural_magic_chime",
+      "category": "cultural",
+      "kind": "one-shot",
+      "name": "Soft chime (发现 POI 提示)",
+      "trigger_hint": "走近未访问 POI 首次",
+      "source_url": "https://cdn.freesound.org/previews/794/794217_13973196-hq.mp3",
+      "credit_page": "https://freesound.org/people/Vrymaa/sounds/794217/",
+      "license": "to-verify",
+      "size_bytes": 487041
+    },
+    {
+      "id": "ui_hover",
+      "category": "ui",
+      "kind": "one-shot",
+      "name": "UI hover blip",
+      "trigger_hint": "HUD hover POI",
+      "source_url": "https://cdn.freesound.org/previews/573/573787_10912485-hq.mp3",
+      "credit_page": "https://freesound.org/people/EminYILDIRIM/sounds/573787/",
+      "license": "to-verify",
+      "size_bytes": 33603
+    },
+    {
+      "id": "ui_click",
+      "category": "ui",
+      "kind": "one-shot",
+      "name": "UI click",
+      "trigger_hint": "按 i / 切换菜单",
+      "source_url": "https://cdn.freesound.org/previews/538/538236_3366726-hq.mp3",
+      "credit_page": "https://freesound.org/people/DesignDean/sounds/538236/",
+      "license": "to-verify",
+      "size_bytes": 457611
+    },
+    {
+      "id": "ui_page_turn",
+      "category": "ui",
+      "kind": "one-shot",
+      "name": "Page turn (atlas open)",
+      "trigger_hint": "全屏 atlas 切换",
+      "source_url": "https://cdn.freesound.org/previews/382/382651_4297074-hq.mp3",
+      "credit_page": "https://freesound.org/people/bbrocer/sounds/382651/",
+      "license": "to-verify",
+      "size_bytes": 62508
+    },
+    {
+      "id": "mount_ox_moo",
+      "category": "mount",
+      "kind": "one-shot",
+      "name": "Ox / cow moo",
+      "trigger_hint": "骑牛时偶尔（30s 概率）",
+      "source_url": "https://cdn.freesound.org/previews/163/163727_1661766-hq.mp3",
+      "credit_page": "https://freesound.org/people/felix.blume/sounds/163727/",
+      "license": "to-verify",
+      "size_bytes": 168648
+    },
+    {
+      "id": "mount_horse_hoof",
+      "category": "mount",
+      "kind": "loop-or-cycle",
+      "name": "Horse hoof gallop",
+      "trigger_hint": "骑马代脚步",
+      "source_url": "https://cdn.freesound.org/previews/479/479691_2524442-hq.mp3",
+      "credit_page": "https://freesound.org/people/craigsmith/sounds/479691/",
+      "license": "to-verify",
+      "size_bytes": 92830
+    }
+  ]
+}
