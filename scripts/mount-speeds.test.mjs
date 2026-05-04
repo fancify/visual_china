@@ -34,12 +34,39 @@ test("mount speed multipliers reflect each mount's intended travel feel", async 
     "mountSpeedMultiplier should be exported for runtime speed tests"
   );
 
-  assert.equal(mountSpeedMultiplier("none"), 1);
+  const orderedMounts = [
+    "none",
+    "ox",
+    "pig",
+    "donkey",
+    "boar",
+    "sheep",
+    "chicken",
+    "fox",
+    "horse",
+    "cloud"
+  ];
+  const speeds = orderedMounts.map((mountId) => mountSpeedMultiplier(mountId));
+
+  assert.equal(speeds.length, 10, "all 10 mounts should expose a speed multiplier");
+  assert.equal(mountSpeedMultiplier("none"), 0.5);
   assert.equal(mountSpeedMultiplier("ox"), 0.6);
-  assert.equal(mountSpeedMultiplier("horse"), 1.2);
-  assert.equal(mountSpeedMultiplier("fox"), 1.1);
-  assert.equal(mountSpeedMultiplier("pig"), 0.8);
+  assert.equal(mountSpeedMultiplier("pig"), 0.7);
+  assert.equal(mountSpeedMultiplier("donkey"), 0.85);
   assert.equal(mountSpeedMultiplier("boar"), 0.9);
-  assert.equal(mountSpeedMultiplier("chicken"), 1);
-  assert.equal(mountSpeedMultiplier("cloud"), 3.5);
+  assert.equal(mountSpeedMultiplier("sheep"), 1);
+  assert.equal(mountSpeedMultiplier("chicken"), 1.1);
+  assert.equal(mountSpeedMultiplier("fox"), 1.2);
+  assert.equal(mountSpeedMultiplier("horse"), 1.6);
+  assert.equal(mountSpeedMultiplier("cloud"), 4);
+
+  for (let index = 1; index < speeds.length; index += 1) {
+    assert.ok(
+      speeds[index - 1] < speeds[index],
+      `mount speeds should strictly increase in the intended order, got ${orderedMounts[index - 1]}=${speeds[index - 1]} and ${orderedMounts[index]}=${speeds[index]}`
+    );
+  }
+
+  assert.equal(Math.min(...speeds), mountSpeedMultiplier("none"));
+  assert.equal(Math.max(...speeds), mountSpeedMultiplier("cloud"));
 });
