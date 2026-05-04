@@ -8,12 +8,13 @@ import {
 
 test("compact HUD keeps only essential panels open by default", () => {
   assert.equal(compactHudPanelConfig.mode.visible, false);
-  assert.equal(compactHudPanelConfig.status.visible, false);
+  assert.equal(compactHudPanelConfig.status.visible, true);
   assert.equal(compactHudPanelConfig.journal.visible, false);
   assert.equal(compactHudPanelConfig.overview.visible, true);
   assert.equal(compactHudPanelConfig.controls.visible, true);
   assert.equal(compactHudPanelConfig.overview.openByDefault, false);
   assert.equal(compactHudPanelConfig.controls.openByDefault, false);
+  assert.equal(compactHudPanelConfig.status.openByDefault, true);
 });
 
 test("natural exploration HUD does not pin journey or story lines", () => {

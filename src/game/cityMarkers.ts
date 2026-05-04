@@ -1,14 +1,12 @@
 import {
   BoxGeometry,
   BufferGeometry,
+  ConeGeometry,
   CylinderGeometry,
-  ExtrudeGeometry,
   Group,
   InstancedMesh,
   MeshPhongMaterial,
-  Object3D,
-  Path,
-  Shape
+  Object3D
 } from "three";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
@@ -20,11 +18,10 @@ import { projectGeoToWorld } from "./mapOrientation.js";
 /**
  * 在 3D 场景里把真实城市坐标摆出来。
  *
- * 造型 = "口"字型城墙 (extrude 一个带洞的方形 shape)：矮、贴地、no roof
- * prism。三档不仅尺寸不同，结构也分级：
- *   capital（京城）= 外环 + 4 角楼 + 中央城楼
- *   prefecture（州府）= 外环 + 4 角楼
- *   county（县城）= 仅外环
+ * 造型 = "口"字型城墙 + 若干城内屋舍。三档不仅尺寸不同，结构也分级：
+ *   capital（京城）= 外环 + 4 角楼 + 中央城楼 + 6 户屋舍
+ *   prefecture（州府）= 外环 + 4 角楼 + 3 户屋舍
+ *   county（县城）= 外环 + 2 户屋舍
  *
  * 三档尺寸：
  *   capital（京城）= 外 4.4 内 3.0、墙厚 0.7、高 1.4（最大）
@@ -34,39 +31,180 @@ import { projectGeoToWorld } from "./mapOrientation.js";
  * 用 InstancedMesh：每档 1 个 mesh，共 3 个 instanced mesh（之前 base+
  * roof 6 个减半）。29 个 instance，draw call 3。
  *
- * 用户这轮明确要求："回" 是误读，应该改回 "口"。所以中心保持中空；
- * 某些视角看穿中间是预期效果，不再加内核回填。
+ * 用户这轮要求："要像城市，不是框"。所以仍保留中空院落，但加门洞和屋舍，
+ * 让 silhouette 像有人居住的聚落，而不是单纯一圈墙。
  */
+
+export type GateSide = "north" | "south" | "east" | "west";
+
+export interface CityTierSpec {
+  outerSide: number;
+  innerSide: number;
+  height: number;
+  cornerTowers: boolean;
+  centralTower: boolean;
+  houses: number;
+  gateOnSide: GateSide;
+}
+
+const HOUSE_BODY_SIZE = Object.freeze({
+  x: 0.3,
+  y: 0.4,
+  z: 0.3
+});
+const HOUSE_ROOF_RADIUS = 0.22;
+const HOUSE_ROOF_HEIGHT = 0.18;
+const DEFAULT_GATE_WIDTH = 0.4;
+
+export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
+  county: {
+    outerSide: 2.4,
+    innerSide: 1.6,
+    height: 0.8,
+    cornerTowers: false,
+    centralTower: false,
+    houses: 2,
+    gateOnSide: "south"
+  },
+  prefecture: {
+    outerSide: 3.4,
+    innerSide: 2.4,
+    height: 1.1,
+    cornerTowers: true,
+    centralTower: false,
+    houses: 3,
+    gateOnSide: "south"
+  },
+  capital: {
+    outerSide: 4.4,
+    innerSide: 3.0,
+    height: 1.4,
+    cornerTowers: true,
+    centralTower: true,
+    houses: 6,
+    gateOnSide: "south"
+  }
+};
+
+function translatedBox(
+  width: number,
+  height: number,
+  depth: number,
+  x: number,
+  y: number,
+  z: number
+): BufferGeometry {
+  const geometry = prepareForMerge(new BoxGeometry(width, height, depth));
+  geometry.translate(x, y, z);
+  return geometry;
+}
+
+function houseSlots(innerSide: number, count: number): Array<[number, number]> {
+  const spread = Math.max(innerSide * 0.28, 0.26);
+  const slots: Array<[number, number]> = [
+    [-spread, -spread * 0.68],
+    [spread, -spread * 0.68],
+    [-spread * 0.9, spread * 0.6],
+    [spread * 0.9, spread * 0.6],
+    [-spread * 0.2, spread * 1.08],
+    [spread * 0.2, spread * 1.08]
+  ];
+  return slots.slice(0, Math.max(0, count));
+}
 
 function makeWalledRingGeometry(
   outerSide: number,
   innerSide: number,
-  height: number
+  height: number,
+  options: {
+    houses?: number;
+    gateOnSide?: GateSide;
+  } = {}
 ): BufferGeometry {
+  const wallThickness = (outerSide - innerSide) * 0.5;
   const half = outerSide * 0.5;
-  const innerHalf = innerSide * 0.5;
+  const wallCenter = half - wallThickness * 0.5;
+  const gateOnSide = options.gateOnSide;
+  const gateWidth = DEFAULT_GATE_WIDTH;
+  const parts: BufferGeometry[] = [];
+  const addWall = (
+    side: GateSide,
+    x: number,
+    z: number,
+    length: number
+  ): void => {
+    if (length <= 0.001) {
+      return;
+    }
+    const isNorthSouth = side === "north" || side === "south";
+    parts.push(
+      translatedBox(
+        isNorthSouth ? length : wallThickness,
+        height,
+        isNorthSouth ? wallThickness : length,
+        x,
+        height * 0.5,
+        z
+      )
+    );
+  };
+  const addSideWalls = (side: GateSide): void => {
+    if (gateOnSide !== side) {
+      if (side === "north" || side === "south") {
+        addWall(side, 0, side === "north" ? wallCenter : -wallCenter, outerSide);
+      } else {
+        addWall(side, side === "east" ? wallCenter : -wallCenter, 0, outerSide);
+      }
+      return;
+    }
 
-  const ringShape = new Shape();
-  ringShape.moveTo(-half, -half);
-  ringShape.lineTo(half, -half);
-  ringShape.lineTo(half, half);
-  ringShape.lineTo(-half, half);
-  ringShape.lineTo(-half, -half);
-  const hole = new Path();
-  hole.moveTo(-innerHalf, -innerHalf);
-  hole.lineTo(innerHalf, -innerHalf);
-  hole.lineTo(innerHalf, innerHalf);
-  hole.lineTo(-innerHalf, innerHalf);
-  hole.lineTo(-innerHalf, -innerHalf);
-  ringShape.holes.push(hole);
-  const ringGeom = new ExtrudeGeometry(ringShape, {
-    depth: height,
-    bevelEnabled: false,
-    curveSegments: 1
-  });
-  ringGeom.rotateX(-Math.PI / 2);
-  ringGeom.computeVertexNormals();
-  return ringGeom;
+    const segmentLength = (outerSide - gateWidth) * 0.5;
+    const segmentOffset = gateWidth * 0.5 + segmentLength * 0.5;
+    if (side === "north" || side === "south") {
+      const wallZ = side === "north" ? wallCenter : -wallCenter;
+      addWall(side, -segmentOffset, wallZ, segmentLength);
+      addWall(side, segmentOffset, wallZ, segmentLength);
+      return;
+    }
+    const wallX = side === "east" ? wallCenter : -wallCenter;
+    addWall(side, wallX, -segmentOffset, segmentLength);
+    addWall(side, wallX, segmentOffset, segmentLength);
+  };
+
+  addSideWalls("north");
+  addSideWalls("south");
+  addSideWalls("east");
+  addSideWalls("west");
+
+  const houses = options.houses ?? 0;
+  if (houses > 0) {
+    const slots = houseSlots(innerSide, houses);
+    slots.forEach(([x, z]) => {
+      parts.push(
+        translatedBox(
+          HOUSE_BODY_SIZE.x,
+          HOUSE_BODY_SIZE.y,
+          HOUSE_BODY_SIZE.z,
+          x,
+          HOUSE_BODY_SIZE.y * 0.5,
+          z
+        )
+      );
+      const roof = prepareForMerge(
+        new ConeGeometry(HOUSE_ROOF_RADIUS, HOUSE_ROOF_HEIGHT, 4)
+      );
+      roof.rotateY(Math.PI / 4);
+      roof.translate(x, HOUSE_BODY_SIZE.y + HOUSE_ROOF_HEIGHT * 0.5, z);
+      parts.push(roof);
+    });
+  }
+
+  const merged = BufferGeometryUtils.mergeGeometries(parts);
+  if (!merged) {
+    return parts[0]!;
+  }
+  merged.computeVertexNormals();
+  return merged;
 }
 
 function prepareForMerge(geometry: BufferGeometry): BufferGeometry {
@@ -74,20 +212,22 @@ function prepareForMerge(geometry: BufferGeometry): BufferGeometry {
 }
 
 function makeTierWallGeometry(
-  outerSide: number,
-  innerSide: number,
-  height: number,
-  options: { cornerTowers: boolean; centralTower: boolean }
+  spec: CityTierSpec
 ): BufferGeometry {
   const parts: BufferGeometry[] = [
-    prepareForMerge(makeWalledRingGeometry(outerSide, innerSide, height))
+    prepareForMerge(
+      makeWalledRingGeometry(spec.outerSide, spec.innerSide, spec.height, {
+        houses: spec.houses,
+        gateOnSide: spec.gateOnSide
+      })
+    )
   ];
 
-  if (options.cornerTowers) {
-    const towerSide = outerSide * 0.18;
-    const towerHeight = height * 1.2;
+  if (spec.cornerTowers) {
+    const towerSide = spec.outerSide * 0.18;
+    const towerHeight = spec.height * 1.2;
     const towerY = towerHeight * 0.5;
-    const offset = outerSide * 0.5;
+    const offset = spec.outerSide * 0.5;
     const corners: Array<[number, number]> = [
       [-offset, -offset],
       [offset, -offset],
@@ -101,11 +241,16 @@ function makeTierWallGeometry(
     });
   }
 
-  if (options.centralTower) {
+  if (spec.centralTower) {
     const towerGeom = prepareForMerge(
-      new CylinderGeometry(outerSide * 0.16, outerSide * 0.18, height * 1.5, 8)
+      new CylinderGeometry(
+        spec.outerSide * 0.16,
+        spec.outerSide * 0.18,
+        spec.height * 1.5,
+        8
+      )
     );
-    towerGeom.translate(0, height * 0.75, 0);
+    towerGeom.translate(0, spec.height * 0.75, 0);
     parts.push(towerGeom);
   }
 
@@ -133,25 +278,16 @@ interface TierGeometry {
 
 const TIER_GEOMETRY: Record<CityTier, TierGeometry> = {
   county: {
-    geom: makeTierWallGeometry(2.4, 1.6, 0.8, {
-      cornerTowers: false,
-      centralTower: false
-    }),
-    height: 0.8
+    geom: makeTierWallGeometry(CITY_TIER_SPECS.county),
+    height: CITY_TIER_SPECS.county.height
   },
   prefecture: {
-    geom: makeTierWallGeometry(3.4, 2.4, 1.1, {
-      cornerTowers: true,
-      centralTower: false
-    }),
-    height: 1.1
+    geom: makeTierWallGeometry(CITY_TIER_SPECS.prefecture),
+    height: CITY_TIER_SPECS.prefecture.height
   },
   capital: {
-    geom: makeTierWallGeometry(4.4, 3.0, 1.4, {
-      cornerTowers: true,
-      centralTower: true
-    }),
-    height: 1.4
+    geom: makeTierWallGeometry(CITY_TIER_SPECS.capital),
+    height: CITY_TIER_SPECS.capital.height
   }
 };
 
@@ -177,8 +313,29 @@ function makeWallMaterial(): MeshPhongMaterial {
 export interface CityMarkersHandle {
   group: Group;
   cities: RealCity[];
+  byTier: Record<CityTier, RealCity[]>;
+  tierMeshes: Partial<Record<CityTier, InstancedMesh>>;
   /** 每档独立 material，外部按距离调 opacity 实现 LOD fade。 */
   tierMaterials: Record<CityTier, MeshPhongMaterial>;
+}
+
+export function cityFromMarkerIntersection(
+  handle: CityMarkersHandle,
+  object: Object3D,
+  instanceId: number | undefined
+): RealCity | null {
+  if (!(object instanceof InstancedMesh) || instanceId === undefined || instanceId < 0) {
+    return null;
+  }
+
+  const tierEntry = (Object.keys(handle.tierMeshes) as CityTier[]).find(
+    (tier) => handle.tierMeshes[tier] === object
+  );
+  if (!tierEntry) {
+    return null;
+  }
+
+  return handle.byTier[tierEntry][instanceId] ?? null;
 }
 
 export function createCityMarkers(
@@ -200,6 +357,7 @@ export function createCityMarkers(
   }
 
   const dummy = new Object3D();
+  const tierMeshes: Partial<Record<CityTier, InstancedMesh>> = {};
 
   const tierMaterials: Record<CityTier, MeshPhongMaterial> = {
     capital: makeWallMaterial(),
@@ -214,6 +372,7 @@ export function createCityMarkers(
     const tierGeom = TIER_GEOMETRY[tier];
     const wallMesh = new InstancedMesh(tierGeom.geom, tierMaterials[tier], tierCities.length);
     wallMesh.name = `city-walls-${tier}`;
+    tierMeshes[tier] = wallMesh;
 
     tierCities.forEach((city, index) => {
       const worldPoint = projectGeoToWorld(
@@ -252,7 +411,7 @@ export function createCityMarkers(
     group.add(wallMesh);
   });
 
-  return { group, cities, tierMaterials };
+  return { group, cities, byTier, tierMeshes, tierMaterials };
 }
 
 export function disposeCityMarkers(handle: CityMarkersHandle): void {

@@ -11,8 +11,15 @@ import {
 
 import { configureChunkTerrainFrustum } from "../src/game/terrainMeshFrustum.js";
 import { TerrainSampler } from "../src/game/demSampler.ts";
-import { createCityMarkers } from "../src/game/cityMarkers.ts";
+import {
+  CITY_TIER_SPECS,
+  createCityMarkers
+} from "../src/game/cityMarkers.ts";
 import { realQinlingCities } from "../src/data/realCities.js";
+import {
+  buildCityHoverCardHtml,
+  findStoryBeatForZone
+} from "../src/game/cityHoverHud.ts";
 
 const regionManifest = JSON.parse(
   await readFile("public/data/regions/qinling/manifest.json", "utf8")
@@ -107,4 +114,69 @@ test("county and prefecture city walls keep a hollow center", () => {
       `${child.name} should stay hollow at the center when viewed from above`
     );
   });
+});
+
+test("city tier specs add houses and one gate per tier", () => {
+  assert.deepEqual(
+    {
+      capital: {
+        houses: CITY_TIER_SPECS.capital.houses,
+        gateOnSide: CITY_TIER_SPECS.capital.gateOnSide
+      },
+      prefecture: {
+        houses: CITY_TIER_SPECS.prefecture.houses,
+        gateOnSide: CITY_TIER_SPECS.prefecture.gateOnSide
+      },
+      county: {
+        houses: CITY_TIER_SPECS.county.houses,
+        gateOnSide: CITY_TIER_SPECS.county.gateOnSide
+      }
+    },
+    {
+      capital: { houses: 6, gateOnSide: "south" },
+      prefecture: { houses: 3, gateOnSide: "south" },
+      county: { houses: 2, gateOnSide: "south" }
+    }
+  );
+});
+
+test("city hover card includes city facts and matching story beat", () => {
+  const city = realQinlingCities.find((entry) => entry.id === "xian");
+  assert.ok(city, "xian city fixture should exist");
+
+  const beat = findStoryBeatForZone(
+    [
+      {
+        id: "guanzhong-departure",
+        title: "关中起行",
+        guidance: "先感受腹地的开阔，再向山前推进。",
+        completionLine: "done",
+        target: { x: 0, y: 0 }
+      },
+      {
+        id: "mountain-pass",
+        title: "穿过锁口",
+        guidance: "去找那条真正能过山的缝。",
+        completionLine: "done",
+        target: { x: 0, y: 0 }
+      }
+    ],
+    "关中平原",
+    (beatEntry) =>
+      beatEntry.id === "guanzhong-departure" ? "关中平原" : "秦岭山口带"
+  );
+
+  const html = buildCityHoverCardHtml({
+    city,
+    elevation: 12.4,
+    zone: "关中平原",
+    beat
+  });
+
+  assert.match(html, /西安/);
+  assert.match(html, /capital/);
+  assert.match(html, /34\.2700/);
+  assert.match(html, /108\.9500/);
+  assert.match(html, /关中起行/);
+  assert.match(html, /先感受腹地的开阔/);
 });
