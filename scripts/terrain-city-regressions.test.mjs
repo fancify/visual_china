@@ -71,9 +71,9 @@ test("city wall geometry sits on the sampled ground instead of floating by one w
   );
 
   const expectedHeightsByMesh = new Map([
-    ["city-walls-capital", 0.9 * 1.7 * 1.02],
+    ["city-walls-capital", 0.9 * 1.6],
     ["city-walls-prefecture", 0.7 * 1.2],
-    ["city-walls-county", 0.4 + 0.18]
+    ["city-walls-county", 0.5]
   ]);
   const vertexCountsByMesh = new Map();
 
@@ -87,8 +87,8 @@ test("city wall geometry sits on the sampled ground instead of floating by one w
   });
 
   assert.ok(
-    vertexCountsByMesh.get("city-walls-capital") > vertexCountsByMesh.get("city-walls-prefecture"),
-    "capital should have more geometry detail than prefecture"
+    vertexCountsByMesh.get("city-walls-capital") >= vertexCountsByMesh.get("city-walls-prefecture"),
+    "capital should keep at least as much geometry detail as prefecture"
   );
   assert.ok(
     vertexCountsByMesh.get("city-walls-prefecture") > vertexCountsByMesh.get("city-walls-county"),
@@ -96,10 +96,12 @@ test("city wall geometry sits on the sampled ground instead of floating by one w
   );
 });
 
-test("county and prefecture city walls keep a hollow center", () => {
+test("county stays hollow while higher city tiers fill the center", () => {
   const sampler = new TerrainSampler(regionAsset);
   const handle = createCityMarkers(
-    realQinlingCities.filter((city) => city.id === "hanzhong" || city.id === "chenggu"),
+    realQinlingCities.filter((city) =>
+      city.id === "xian" || city.id === "hanzhong" || city.id === "chenggu"
+    ),
     regionAsset.bounds,
     regionAsset.world,
     sampler
@@ -113,21 +115,31 @@ test("county and prefecture city walls keep a hollow center", () => {
     const mesh = new Mesh(child.geometry, new MeshBasicMaterial());
     raycaster.set(origin, direction);
     const intersections = raycaster.intersectObject(mesh, false);
-    assert.equal(
-      intersections.length,
-      0,
-      `${child.name} should stay hollow at the center when viewed from above`
+    if (child.name === "city-walls-county") {
+      assert.equal(
+        intersections.length,
+        0,
+        `${child.name} should stay hollow at the center when viewed from above`
+      );
+      return;
+    }
+
+    assert.ok(
+      intersections.length > 0,
+      `${child.name} should add a central building silhouette when viewed from above`
     );
   });
 });
 
-test("city tier specs add houses and one gate per tier", () => {
+test("city tier specs use graded central buildings and no houses", () => {
   assert.deepEqual(
     {
       capital: {
         outerSide: CITY_TIER_SPECS.capital.outerSide,
         innerSide: CITY_TIER_SPECS.capital.innerSide,
         height: CITY_TIER_SPECS.capital.height,
+        cornerTowers: CITY_TIER_SPECS.capital.cornerTowers,
+        centralBuilding: CITY_TIER_SPECS.capital.centralBuilding,
         houses: CITY_TIER_SPECS.capital.houses,
         gateOnSide: CITY_TIER_SPECS.capital.gateOnSide
       },
@@ -135,6 +147,8 @@ test("city tier specs add houses and one gate per tier", () => {
         outerSide: CITY_TIER_SPECS.prefecture.outerSide,
         innerSide: CITY_TIER_SPECS.prefecture.innerSide,
         height: CITY_TIER_SPECS.prefecture.height,
+        cornerTowers: CITY_TIER_SPECS.prefecture.cornerTowers,
+        centralBuilding: CITY_TIER_SPECS.prefecture.centralBuilding,
         houses: CITY_TIER_SPECS.prefecture.houses,
         gateOnSide: CITY_TIER_SPECS.prefecture.gateOnSide
       },
@@ -142,6 +156,8 @@ test("city tier specs add houses and one gate per tier", () => {
         outerSide: CITY_TIER_SPECS.county.outerSide,
         innerSide: CITY_TIER_SPECS.county.innerSide,
         height: CITY_TIER_SPECS.county.height,
+        cornerTowers: CITY_TIER_SPECS.county.cornerTowers,
+        centralBuilding: CITY_TIER_SPECS.county.centralBuilding,
         houses: CITY_TIER_SPECS.county.houses,
         gateOnSide: CITY_TIER_SPECS.county.gateOnSide
       }
@@ -151,25 +167,85 @@ test("city tier specs add houses and one gate per tier", () => {
         outerSide: 4.4,
         innerSide: 3.6,
         height: 0.9,
-        houses: 6,
+        cornerTowers: true,
+        centralBuilding: "hip-roof-palace",
+        houses: 0,
         gateOnSide: "south"
       },
       prefecture: {
         outerSide: 3.4,
         innerSide: 2.6,
         height: 0.7,
-        houses: 3,
+        cornerTowers: true,
+        centralBuilding: "xie-shan-hall",
+        houses: 0,
         gateOnSide: "south"
       },
       county: {
         outerSide: 2.4,
         innerSide: 1.6,
         height: 0.5,
-        houses: 2,
+        cornerTowers: false,
+        centralBuilding: null,
+        houses: 0,
         gateOnSide: "south"
       }
     }
   );
+});
+
+test("capital central roofline stays taller than prefecture and county", () => {
+  const sampler = new TerrainSampler(regionAsset);
+  const handle = createCityMarkers(
+    realQinlingCities.filter((city) =>
+      city.id === "xian" || city.id === "hanzhong" || city.id === "chenggu"
+    ),
+    regionAsset.bounds,
+    regionAsset.world,
+    sampler
+  );
+
+  const maxYByMesh = new Map();
+
+  handle.group.children.forEach((child) => {
+    child.geometry.computeBoundingBox();
+    maxYByMesh.set(child.name, child.geometry.boundingBox.max.y);
+  });
+
+  assert.equal(maxYByMesh.get("city-walls-county"), 0.5);
+  assert.ok(
+    maxYByMesh.get("city-walls-capital") > maxYByMesh.get("city-walls-prefecture"),
+    "capital should have the tallest central roofline"
+  );
+  assert.ok(
+    maxYByMesh.get("city-walls-prefecture") > maxYByMesh.get("city-walls-county"),
+    "prefecture should still stand taller than the empty county ring"
+  );
+});
+
+test("corner towers use the narrowed footprint instead of dominating the walls", () => {
+  const sampler = new TerrainSampler(regionAsset);
+  const handle = createCityMarkers(
+    realQinlingCities.filter((city) => city.id === "xian" || city.id === "hanzhong"),
+    regionAsset.bounds,
+    regionAsset.world,
+    sampler
+  );
+
+  const halfExtentByMesh = new Map([
+    ["city-walls-capital", 4.4 * 0.5 + 4.4 * 0.1 * 0.5],
+    ["city-walls-prefecture", 3.4 * 0.5 + 3.4 * 0.1 * 0.5]
+  ]);
+
+  handle.group.children.forEach((child) => {
+    child.geometry.computeBoundingBox();
+    const expectedHalfExtent = halfExtentByMesh.get(child.name);
+    assert.ok(expectedHalfExtent, `unexpected mesh ${child.name}`);
+    assert.ok(Math.abs(child.geometry.boundingBox.max.x - expectedHalfExtent) < 1e-6);
+    assert.ok(Math.abs(child.geometry.boundingBox.min.x + expectedHalfExtent) < 1e-6);
+    assert.ok(Math.abs(child.geometry.boundingBox.max.z - expectedHalfExtent) < 1e-6);
+    assert.ok(Math.abs(child.geometry.boundingBox.min.z + expectedHalfExtent) < 1e-6);
+  });
 });
 
 test("city hover card includes city facts and matching story beat", () => {
