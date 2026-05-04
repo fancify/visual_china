@@ -4,14 +4,16 @@ import test from "node:test";
 import { qinlingRoutes, routeAffinityAt } from "../src/game/qinlingRoutes.js";
 
 test("Qinling route affinity uses historical-reference routes by default", () => {
-  const influence = routeAffinityAt({ x: 4.71, y: -34.56 });
+  // 留坝县 (lat 33.62, lon 106.92) — 褒斜道中段，slice 扩后的实际坐标
+  const influence = routeAffinityAt({ x: -2.21, y: -80.11 });
 
   assert.ok(influence.affinity > 0.7);
   assert.equal(influence.nearestRoute?.id, "baoxie-road");
 });
 
 test("Qinling historical routes stay available when explicitly including unverified routes", () => {
-  const influence = routeAffinityAt({ x: -24.65, y: 27.84 }, 11, {
+  // 昭化（古葭萌） (lat 32.32, lon 105.86) — 金牛道中段，slice 扩后的实际坐标
+  const influence = routeAffinityAt({ x: -31.43, y: -17.75 }, 11, {
     includeUnverifiedRoutes: true
   });
 
