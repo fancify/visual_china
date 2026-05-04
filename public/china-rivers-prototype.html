@@ -45,7 +45,8 @@
   <h1>千里江山图 · 全国主干河湖原型 v3</h1>
   <div class="subtitle">
     数据：Natural Earth 10m rivers + lakes (public domain) · 选择：手工评分（干支级别 + 历史意义）
-    · 匹配按 NE name 严格相等 + bbox 消歧 · NE 收不进的小湖（洱海/滇池/天池）用 fallback disk
+    · 匹配按 NE name 严格相等 + bbox 消歧 · 地表底色：nationwide biome underpaint
+    · NE 收不进的小湖（洱海/滇池/天池）用 fallback disk
   </div>
   <canvas id="map" width="980" height="780"></canvas>
   <div class="meta">
@@ -66,13 +67,174 @@
     <div id="rubric-table-wrap"></div>
   </div>
 
-  <script>
+  <script type="module">
+    import { BIOME_ZONE_DATA } from "/data/biome-zones.js";
+
     const BOUNDS = { west: 73, east: 135, south: 18, north: 54 };
     const W = 980, H = 780;
     function project(lon, lat) {
       const x = (lon - BOUNDS.west) / (BOUNDS.east - BOUNDS.west) * W;
       const y = (1 - (lat - BOUNDS.south) / (BOUNDS.north - BOUNDS.south)) * H;
       return { x, y };
+    }
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+    function smoothstep(edge0, edge1, value) {
+      if (value <= edge0) return 0;
+      if (value >= edge1) return 1;
+      const t = (value - edge0) / (edge1 - edge0 || 1);
+      return t * t * (3 - 2 * t);
+    }
+    function smoothBlend(value, start, end) {
+      return smoothstep(start, end, value);
+    }
+    function axisWindow(value, min, max, feather) {
+      if (value <= min - feather || value >= max + feather) return 0;
+      const enter = feather <= 0 ? (value >= min ? 1 : 0) : smoothBlend(value, min - feather, min);
+      const exit = feather <= 0 ? (value <= max ? 1 : 0) : 1 - smoothBlend(value, max, max + feather);
+      return Math.min(enter, exit);
+    }
+    function regionWeight(coord, region) {
+      return axisWindow(coord.lon, region.west, region.east, region.feather) *
+        axisWindow(coord.lat, region.south, region.north, region.feather);
+    }
+    function dominantBiomeId(weights) {
+      return weights.reduce((best, entry) => entry.weight > best.weight ? entry : best).biomeId;
+    }
+    function blendByWeights(weights) {
+      const biome = {
+        biomeId: dominantBiomeId(weights),
+        hueShift: 0,
+        satScale: 0,
+        lumScale: 0,
+        vegetationDensity: 0,
+        treeHue: 0
+      };
+      ["hueShift", "satScale", "lumScale", "vegetationDensity", "treeHue"].forEach((property) => {
+        biome[property] = weights.reduce((sum, entry) => {
+          return sum + BIOME_ZONE_DATA.presets[entry.biomeId][property] * entry.weight;
+        }, 0);
+      });
+      return biome;
+    }
+    function isInsideQinlingSlice(coord) {
+      const slice = BIOME_ZONE_DATA.qinlingSlice;
+      return coord.lon >= slice.west && coord.lon <= slice.east &&
+        coord.lat >= slice.south && coord.lat <= slice.north;
+    }
+    function phase1Biome(coord) {
+      const southToNorth = smoothBlend(
+        coord.lat,
+        BIOME_ZONE_DATA.phase1.southToNorth.start,
+        BIOME_ZONE_DATA.phase1.southToNorth.end
+      );
+      const northToSemiarid = smoothBlend(
+        coord.lat,
+        BIOME_ZONE_DATA.phase1.northToSemiarid.start,
+        BIOME_ZONE_DATA.phase1.northToSemiarid.end
+      );
+      const southWeight = (1 - southToNorth) * (1 - northToSemiarid);
+      const humidWeight = southToNorth * (1 - northToSemiarid);
+      const semiaridWeight = northToSemiarid;
+      return blendByWeights([
+        { biomeId: "subtropical-humid", weight: southWeight },
+        { biomeId: "warm-temperate-humid", weight: humidWeight },
+        { biomeId: "warm-temperate-semiarid", weight: semiaridWeight }
+      ]);
+    }
+    function fallbackBiomeId(coord) {
+      if (coord.lat < 22) return "tropical-humid";
+      if (coord.lat >= 28 && coord.lat <= 37 && coord.lon >= 78 && coord.lon <= 103) {
+        return "alpine-meadow";
+      }
+      if (coord.lon < 95) return "arid-desert";
+      if (coord.lat > 42 && coord.lon > 118) return "northeast-cold-humid";
+      if (coord.lat >= 39 && coord.lat <= 46 && coord.lon >= 100 && coord.lon <= 118) {
+        return "temperate-grassland";
+      }
+      if (coord.lat < 34) return "subtropical-humid";
+      return "warm-temperate-humid";
+    }
+    function biomeWeightsAt(coord) {
+      if (isInsideQinlingSlice(coord)) {
+        return phase1Biome(coord);
+      }
+      const rawWeights = BIOME_ZONE_DATA.nationwideZones
+        .map((zone) => ({
+          biomeId: zone.biomeId,
+          weight: zone.regions.reduce((maxWeight, region) => {
+            return Math.max(maxWeight, regionWeight(coord, region));
+          }, 0)
+        }))
+        .filter((entry) => entry.weight > 0.0001);
+      if (rawWeights.length === 0) {
+        return blendByWeights([{ biomeId: fallbackBiomeId(coord), weight: 1 }]);
+      }
+      const total = rawWeights.reduce((sum, entry) => sum + entry.weight, 0);
+      return blendByWeights(rawWeights.map((entry) => ({
+        biomeId: entry.biomeId,
+        weight: entry.weight / total
+      })));
+    }
+    function hslToRgb(h, s, l) {
+      const hue2rgb = (p, q, t) => {
+        let x = t;
+        if (x < 0) x += 1;
+        if (x > 1) x -= 1;
+        if (x < 1 / 6) return p + (q - p) * 6 * x;
+        if (x < 1 / 2) return q;
+        if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+        return p;
+      };
+      if (s === 0) {
+        const gray = Math.round(l * 255);
+        return [gray, gray, gray];
+      }
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      return [
+        Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+        Math.round(hue2rgb(p, q, h) * 255),
+        Math.round(hue2rgb(p, q, h - 1 / 3) * 255)
+      ];
+    }
+    function biomeBackdropRgba(coord) {
+      const biome = biomeWeightsAt(coord);
+      const northness = (coord.lat - BOUNDS.south) / (BOUNDS.north - BOUNDS.south);
+      const continental = clamp((108 - coord.lon) / 32, 0, 1);
+      const humidity = clamp((biome.vegetationDensity - 0.18) / 1.3, 0, 1);
+      const hue = ((0.17 + northness * 0.035 + biome.hueShift) % 1 + 1) % 1;
+      const sat = clamp((0.2 + humidity * 0.12 - continental * 0.03) * biome.satScale, 0, 1);
+      const lum = clamp((0.36 + northness * 0.08 - continental * 0.05) * biome.lumScale, 0, 1);
+      const [r, g, b] = hslToRgb(hue, sat, lum);
+      return [r, g, b, Math.round(110 + humidity * 42)];
+    }
+    function paintBiomeBackdrop(ctx) {
+      const image = ctx.createImageData(W, H);
+      const pixels = image.data;
+      const lonSpan = BOUNDS.east - BOUNDS.west;
+      const latSpan = BOUNDS.north - BOUNDS.south;
+      for (let y = 0; y < H; y += 1) {
+        const lat = BOUNDS.north - (y / Math.max(1, H - 1)) * latSpan;
+        for (let x = 0; x < W; x += 1) {
+          const lon = BOUNDS.west + (x / Math.max(1, W - 1)) * lonSpan;
+          const [r, g, b, a] = biomeBackdropRgba({ lon, lat });
+          const offset = (y * W + x) * 4;
+          pixels[offset] = r;
+          pixels[offset + 1] = g;
+          pixels[offset + 2] = b;
+          pixels[offset + 3] = a;
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+
+      const haze = ctx.createLinearGradient(0, 0, 0, H);
+      haze.addColorStop(0, "rgba(7, 18, 28, 0.18)");
+      haze.addColorStop(0.55, "rgba(10, 16, 18, 0.08)");
+      haze.addColorStop(1, "rgba(8, 12, 10, 0.12)");
+      ctx.fillStyle = haze;
+      ctx.fillRect(0, 0, W, H);
     }
     const COLOR = {
       yangtze: "#5fb8c9", yellow: "#5b8ec9", pearl: "#5fb47a",
@@ -102,6 +264,8 @@
       fetch('/data/china/major-lakes.json').then(r => r.json())
     ]).then(([data, lakeData]) => {
       const ctx = document.getElementById('map').getContext('2d');
+
+      paintBiomeBackdrop(ctx);
 
       // 经纬网格
       ctx.strokeStyle = "rgba(120, 200, 200, 0.06)";

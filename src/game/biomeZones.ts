@@ -1,13 +1,22 @@
 import { MathUtils } from "three";
 
+// `public/china-rivers-prototype.html` 需要直接 import 这份浏览器原生 module，
+// 所以 zone data 放在 public/；这里用同一份运行时数据，避免维护两张表。
+// @ts-expect-error public runtime module is intentionally shared with the static prototype page.
+import biomeZoneDataRaw from "../../public/data/biome-zones.js";
 import type { GeoPoint as GeographicCoordinate } from "./mapOrientation.js";
 
 export type { GeographicCoordinate };
 
 export type BiomeId =
   | "subtropical-humid"
+  | "tropical-humid"
   | "warm-temperate-humid"
-  | "warm-temperate-semiarid";
+  | "warm-temperate-semiarid"
+  | "northeast-cold-humid"
+  | "temperate-grassland"
+  | "arid-desert"
+  | "alpine-meadow";
 
 export interface BiomeWeights {
   biomeId: BiomeId;
@@ -23,29 +32,53 @@ export interface BiomeWeights {
   treeHue: number;
 }
 
-const BIOME_PRESETS: Record<BiomeId, Omit<BiomeWeights, "biomeId">> = {
-  "subtropical-humid": {
-    hueShift: 0.028,
-    satScale: 1.16,
-    lumScale: 0.96,
-    vegetationDensity: 1.3,
-    treeHue: 0.31
-  },
-  "warm-temperate-humid": {
-    hueShift: -0.012,
-    satScale: 0.92,
-    lumScale: 1.02,
-    vegetationDensity: 0.85,
-    treeHue: 0.24
-  },
-  "warm-temperate-semiarid": {
-    hueShift: -0.045,
-    satScale: 0.76,
-    lumScale: 1.08,
-    vegetationDensity: 0.45,
-    treeHue: 0.18
-  }
-};
+interface BiomePreset extends Omit<BiomeWeights, "biomeId"> {}
+
+interface SmoothRange {
+  start: number;
+  end: number;
+}
+
+interface QinlingSliceBounds {
+  west: number;
+  east: number;
+  south: number;
+  north: number;
+}
+
+interface NationwideRegion {
+  name: string;
+  west: number;
+  east: number;
+  south: number;
+  north: number;
+  feather: number;
+}
+
+interface NationwideZone {
+  biomeId: Exclude<BiomeId, "warm-temperate-semiarid">;
+  regions: NationwideRegion[];
+}
+
+interface BiomeZoneData {
+  qinlingSlice: QinlingSliceBounds;
+  phase1: {
+    southToNorth: SmoothRange;
+    northToSemiarid: SmoothRange;
+  };
+  presets: Record<BiomeId, BiomePreset>;
+  nationwideZones: NationwideZone[];
+}
+
+const BIOME_ZONE_DATA = biomeZoneDataRaw as BiomeZoneData;
+const BIOME_PRESETS = BIOME_ZONE_DATA.presets;
+const BIOME_PROPERTIES: Array<keyof Omit<BiomeWeights, "biomeId">> = [
+  "hueShift",
+  "satScale",
+  "lumScale",
+  "vegetationDensity",
+  "treeHue"
+];
 
 function smoothBlend(value: number, start: number, end: number): number {
   if (value <= start) {
@@ -57,19 +90,6 @@ function smoothBlend(value: number, start: number, end: number): number {
   }
 
   return MathUtils.smoothstep(value, start, end);
-}
-
-function blendProperty(
-  southWeight: number,
-  humidWeight: number,
-  semiaridWeight: number,
-  property: keyof Omit<BiomeWeights, "biomeId">
-): number {
-  return (
-    BIOME_PRESETS["subtropical-humid"][property] * southWeight +
-    BIOME_PRESETS["warm-temperate-humid"][property] * humidWeight +
-    BIOME_PRESETS["warm-temperate-semiarid"][property] * semiaridWeight
-  );
 }
 
 function dominantBiomeId(weights: Array<{ biomeId: BiomeId; weight: number }>): BiomeId {
@@ -84,39 +104,151 @@ function dominantBiomeId(weights: Array<{ biomeId: BiomeId; weight: number }>): 
   return dominant.biomeId;
 }
 
-/**
- * 当前 Qinling slice 的 Phase 1 只做纬度驱动：
- * - lat < 33.0：秦岭以南 / 四川盆地北缘，亚热带湿润深绿
- * - 33.0..34.5：秦岭主脊过渡带，soft blend 避免切出硬线
- * - 34.5 附近往北：关中暖温带黄绿
- * - 34.9..35.75：再向北渐入黄土边缘的偏黄半干旱
- *
- * 经度在当前切片内变化远小于南北差异，Phase 1 先忽略 lon；接口保留完整
- * GeographicCoordinate，Phase 2 可直接接全国更复杂 polygon / climate mask。
- */
-export function biomeWeightsAt(coord: GeographicCoordinate): BiomeWeights {
-  const southToNorth = smoothBlend(coord.lat, 33.0, 34.5);
-  const northToSemiarid = smoothBlend(coord.lat, 34.9, 35.75);
+function blendByWeights(weights: Array<{ biomeId: BiomeId; weight: number }>): BiomeWeights {
+  const biome = {
+    biomeId: dominantBiomeId(weights),
+    hueShift: 0,
+    satScale: 0,
+    lumScale: 0,
+    vegetationDensity: 0,
+    treeHue: 0
+  } satisfies BiomeWeights;
+
+  for (const property of BIOME_PROPERTIES) {
+    biome[property] = weights.reduce((sum, entry) => {
+      return sum + BIOME_PRESETS[entry.biomeId][property] * entry.weight;
+    }, 0);
+  }
+
+  return biome;
+}
+
+function isInsideSlice(coord: GeographicCoordinate, slice: QinlingSliceBounds): boolean {
+  return (
+    coord.lon >= slice.west &&
+    coord.lon <= slice.east &&
+    coord.lat >= slice.south &&
+    coord.lat <= slice.north
+  );
+}
+
+function phase1Weights(coord: GeographicCoordinate): BiomeWeights {
+  const southToNorth = smoothBlend(
+    coord.lat,
+    BIOME_ZONE_DATA.phase1.southToNorth.start,
+    BIOME_ZONE_DATA.phase1.southToNorth.end
+  );
+  const northToSemiarid = smoothBlend(
+    coord.lat,
+    BIOME_ZONE_DATA.phase1.northToSemiarid.start,
+    BIOME_ZONE_DATA.phase1.northToSemiarid.end
+  );
 
   const southWeight = (1 - southToNorth) * (1 - northToSemiarid);
   const humidWeight = southToNorth * (1 - northToSemiarid);
   const semiaridWeight = northToSemiarid;
 
-  return {
-    biomeId: dominantBiomeId([
-      { biomeId: "subtropical-humid", weight: southWeight },
-      { biomeId: "warm-temperate-humid", weight: humidWeight },
-      { biomeId: "warm-temperate-semiarid", weight: semiaridWeight }
-    ]),
-    hueShift: blendProperty(southWeight, humidWeight, semiaridWeight, "hueShift"),
-    satScale: blendProperty(southWeight, humidWeight, semiaridWeight, "satScale"),
-    lumScale: blendProperty(southWeight, humidWeight, semiaridWeight, "lumScale"),
-    vegetationDensity: blendProperty(
-      southWeight,
-      humidWeight,
-      semiaridWeight,
-      "vegetationDensity"
-    ),
-    treeHue: blendProperty(southWeight, humidWeight, semiaridWeight, "treeHue")
-  };
+  return blendByWeights([
+    { biomeId: "subtropical-humid", weight: southWeight },
+    { biomeId: "warm-temperate-humid", weight: humidWeight },
+    { biomeId: "warm-temperate-semiarid", weight: semiaridWeight }
+  ]);
+}
+
+function axisWindow(value: number, min: number, max: number, feather: number): number {
+  if (value <= min - feather || value >= max + feather) {
+    return 0;
+  }
+
+  const enter =
+    feather <= 0
+      ? value >= min
+        ? 1
+        : 0
+      : smoothBlend(value, min - feather, min);
+  const exit =
+    feather <= 0
+      ? value <= max
+        ? 1
+        : 0
+      : 1 - smoothBlend(value, max, max + feather);
+
+  return Math.min(enter, exit);
+}
+
+function regionWeight(coord: GeographicCoordinate, region: NationwideRegion): number {
+  return (
+    axisWindow(coord.lon, region.west, region.east, region.feather) *
+    axisWindow(coord.lat, region.south, region.north, region.feather)
+  );
+}
+
+function normalizedNationwideWeights(
+  coord: GeographicCoordinate
+): Array<{ biomeId: BiomeId; weight: number }> {
+  const rawWeights = BIOME_ZONE_DATA.nationwideZones
+    .map((zone) => ({
+      biomeId: zone.biomeId,
+      weight: zone.regions.reduce((maxWeight, region) => {
+        return Math.max(maxWeight, regionWeight(coord, region));
+      }, 0)
+    }))
+    .filter((entry) => entry.weight > 0.0001) as Array<{ biomeId: BiomeId; weight: number }>;
+
+  if (rawWeights.length === 0) {
+    return [{ biomeId: fallbackBiomeId(coord), weight: 1 }];
+  }
+
+  const totalWeight = rawWeights.reduce((sum, entry) => sum + entry.weight, 0);
+
+  return rawWeights.map((entry) => ({
+    biomeId: entry.biomeId,
+    weight: entry.weight / totalWeight
+  }));
+}
+
+function fallbackBiomeId(coord: GeographicCoordinate): BiomeId {
+  if (coord.lat < 22) {
+    return "tropical-humid";
+  }
+
+  if (
+    coord.lat >= 28 &&
+    coord.lat <= 37 &&
+    coord.lon >= 78 &&
+    coord.lon <= 103
+  ) {
+    return "alpine-meadow";
+  }
+
+  if (coord.lon < 95) {
+    return "arid-desert";
+  }
+
+  if (coord.lat > 42 && coord.lon > 118) {
+    return "northeast-cold-humid";
+  }
+
+  if (coord.lat >= 39 && coord.lat <= 46 && coord.lon >= 100 && coord.lon <= 118) {
+    return "temperate-grassland";
+  }
+
+  if (coord.lat < 34) {
+    return "subtropical-humid";
+  }
+
+  return "warm-temperate-humid";
+}
+
+/**
+ * Phase 2:
+ * - Qinling slice 内保持 Phase 1 行为不变，仍然只用纬度 soft blend。
+ * - slice 外按全国简化 ecoregion rectangle/polygon 规则走，并在边界处做 smoothstep。
+ */
+export function biomeWeightsAt(coord: GeographicCoordinate): BiomeWeights {
+  if (isInsideSlice(coord, BIOME_ZONE_DATA.qinlingSlice)) {
+    return phase1Weights(coord);
+  }
+
+  return blendByWeights(normalizedNationwideWeights(coord));
 }
