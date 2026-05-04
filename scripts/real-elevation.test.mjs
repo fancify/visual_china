@@ -32,12 +32,18 @@ test("gameHeightToRealMeters falls back to the default real peak when metadata i
 });
 
 test("gameHeightToRealMeters keeps current qinling gameplay heights in a plausible real-world range", () => {
+  const realPeakMeters = regionAsset.presentation?.realPeakMeters;
+
   assert.equal(gameHeightToRealMeters(regionAsset.minHeight, regionAsset), 0);
-  assert.equal(gameHeightToRealMeters(regionAsset.maxHeight, regionAsset), 3700);
+  assert.ok(
+    realPeakMeters >= 4500 && realPeakMeters <= 5000,
+    `expected current qinling asset to expose a high-elevation real peak, got ${realPeakMeters}m`
+  );
+  assert.equal(gameHeightToRealMeters(regionAsset.maxHeight, regionAsset), realPeakMeters);
 
   const zitongLikeHeightMeters = gameHeightToRealMeters(-1.44, regionAsset);
   assert.ok(
-    zitongLikeHeightMeters >= 300 && zitongLikeHeightMeters <= 500,
+    zitongLikeHeightMeters >= 450 && zitongLikeHeightMeters <= 550,
     `expected -1.44 gameplay height to map near low-hill elevation, got ${zitongLikeHeightMeters}m`
   );
 });

@@ -6,7 +6,7 @@
   "lod": "L2",
   "name": "qinling-chunk-4-6",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-04T02:32:50.182Z",
+  "generatedAt": "2026-05-04T04:46:20.077Z",
   "bounds": {
     "west": 109.1,
     "east": 110.5,
@@ -32,6 +32,7 @@
   "presentation": {
     "waterLevel": -5.5,
     "underpaintLevel": -6.2,
+    "realPeakMeters": 4930,
     "visualIntent": "Readable Guanzhong/Hanzhong/Sichuan basin lowlands with Qinling as a wall, not a sea-surrounded mountain island.",
     "globalMinHeight": -3,
     "globalMaxHeight": 12.729

@@ -1181,23 +1181,23 @@ const scenicMaterials = {
 
 // 考古（ancient）层独立 geometry / material 集合。
 const ancientGeometries = {
-  // 三星堆：方形夯土基座 (3.0 x 3.0 x 0.6) + 青铜立人柱（细圆柱顶端有横梁）。
-  bronzePodium: new BoxGeometry(3.0, 0.6, 3.0),
-  bronzePillar: new CylinderGeometry(0.18, 0.22, 2.6, 6),
-  bronzeCrossbar: new BoxGeometry(0.95, 0.18, 0.18),
+  // 三星堆：方形夯土基座 (0.8 x 0.8 x 0.16) + 青铜立人柱（细圆柱顶端有横梁）。
+  bronzePodium: new BoxGeometry(0.8, 0.16, 0.8),
+  bronzePillar: new CylinderGeometry(0.05, 0.06, 0.7, 6),
+  bronzeCrossbar: new BoxGeometry(0.30, 0.06, 0.06),
   // 金沙：方形低台 + 太阳神鸟金箔（薄金色圆盘，立在台上）。
-  jinshaPodium: new BoxGeometry(2.6, 0.45, 2.6),
-  sunBirdDisk: new CylinderGeometry(0.95, 0.95, 0.06, 24),
+  jinshaPodium: new BoxGeometry(0.7, 0.12, 0.7),
+  sunBirdDisk: new CylinderGeometry(0.25, 0.25, 0.02, 24),
   // 大地湾 / 半坡 共用：F901 仰韶大房址——圆形夯土平台 + 4 根复原柱础。
-  yangshaoPlatform: new CylinderGeometry(2.8, 3.0, 0.32, 18),
-  yangshaoPost: new CylinderGeometry(0.16, 0.18, 1.4, 6),
+  yangshaoPlatform: new CylinderGeometry(0.75, 0.80, 0.10, 18),
+  yangshaoPost: new CylinderGeometry(0.05, 0.06, 0.4, 6),
   // 兵马俑：阵列 1 排 6 兵俑（5 cylinder + 头球）+ 2 块带边土坑边缘。
-  terracottaSoldier: new CylinderGeometry(0.16, 0.20, 1.0, 6),
-  terracottaHead: new SphereGeometry(0.16, 6, 6),
-  terracottaPit: new BoxGeometry(4.6, 0.18, 1.4),
-  // 秦始皇陵：高耸的封土山（76 m → 缩成 6 单元高）+ 顶端小石碑指向陵园。
-  qinMausoleumMound: new ConeGeometry(4.4, 6.0, 12),
-  qinMausoleumStele: new BoxGeometry(0.5, 1.4, 0.18)
+  terracottaSoldier: new CylinderGeometry(0.05, 0.06, 0.3, 6),
+  terracottaHead: new SphereGeometry(0.05, 6, 6),
+  terracottaPit: new BoxGeometry(1.25, 0.06, 0.40),
+  // 秦始皇陵：紧凑封土山（76 m → 缩成 1.5 单元高）+ 顶端小石碑指向陵园。
+  qinMausoleumMound: new ConeGeometry(1.10, 1.5, 12),
+  qinMausoleumStele: new BoxGeometry(0.14, 0.40, 0.05)
 };
 
 const ancientMaterials = {
@@ -1435,57 +1435,57 @@ function rebuildAncientVisuals(): void {
 
     if (site.role === "shu-bronze-altar") {
       // 三星堆：方形夯土基座 + 青铜立人柱（圆柱 + 顶端横梁意象纵目面具）。
-      addPiece(new Mesh(ancientGeometries.bronzePodium, ancientMaterials.earthFoundation), 0.30);
-      addPiece(new Mesh(ancientGeometries.bronzePillar, ancientMaterials.bronzeRelic), 1.90);
-      addPiece(new Mesh(ancientGeometries.bronzeCrossbar, ancientMaterials.bronzeRelic), 3.10);
-      labelHeight = 4.5;
+      addPiece(new Mesh(ancientGeometries.bronzePodium, ancientMaterials.earthFoundation), 0.08);
+      addPiece(new Mesh(ancientGeometries.bronzePillar, ancientMaterials.bronzeRelic), 0.52);
+      addPiece(new Mesh(ancientGeometries.bronzeCrossbar, ancientMaterials.bronzeRelic), 0.85);
+      labelHeight = 1.2;
     } else if (site.role === "shu-sun-bird") {
       // 金沙：低台 + 太阳神鸟金箔（薄圆盘竖立摆放）。
-      addPiece(new Mesh(ancientGeometries.jinshaPodium, ancientMaterials.earthFoundation), 0.225);
+      addPiece(new Mesh(ancientGeometries.jinshaPodium, ancientMaterials.earthFoundation), 0.06);
       const disk = new Mesh(ancientGeometries.sunBirdDisk, ancientMaterials.goldRelic);
       disk.rotation.x = Math.PI / 2; // 竖起来
-      addPiece(disk, 1.45);
-      labelHeight = 3.2;
+      addPiece(disk, 0.39);
+      labelHeight = 0.9;
     } else if (site.role === "yangshao-dwelling") {
       // 大地湾 / 半坡 共用：圆形夯土平台 + 4 根复原柱础呈方阵。
-      addPiece(new Mesh(ancientGeometries.yangshaoPlatform, ancientMaterials.rammedEarth), 0.16);
+      addPiece(new Mesh(ancientGeometries.yangshaoPlatform, ancientMaterials.rammedEarth), 0.05);
       const postOffsets: Array<[number, number]> = [
-        [-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]
+        [-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]
       ];
       postOffsets.forEach(([dx, dz]) => {
-        addPiece(new Mesh(ancientGeometries.yangshaoPost, ancientMaterials.woodPost), 1.02, dx, dz);
+        addPiece(new Mesh(ancientGeometries.yangshaoPost, ancientMaterials.woodPost), 0.30, dx, dz);
       });
-      labelHeight = 2.6;
+      labelHeight = 0.75;
     } else if (site.role === "qin-terracotta-army") {
-      // 兵马俑：长条土坑（4.6m 长，朝东西方向）+ 6 排兵阵列。
-      addPiece(new Mesh(ancientGeometries.terracottaPit, ancientMaterials.earthFoundation), 0.09);
-      // 6 个兵俑成一排，沿 x 方向间距 0.7。每个兵 = 圆柱身 + 球头。
+      // 兵马俑：紧凑长条土坑（朝东西方向）+ 6 个兵俑的一排阵列。
+      addPiece(new Mesh(ancientGeometries.terracottaPit, ancientMaterials.earthFoundation), 0.03);
+      // 6 个兵俑成一排，沿 x 方向紧凑排布。每个兵 = 圆柱身 + 球头。
       for (let i = 0; i < 6; i += 1) {
-        const dx = -1.75 + i * 0.7;
+        const dx = -0.525 + i * 0.21;
         addPiece(
           new Mesh(ancientGeometries.terracottaSoldier, ancientMaterials.terracottaClay),
-          0.65,
+          0.18,
           dx,
           0
         );
         addPiece(
           new Mesh(ancientGeometries.terracottaHead, ancientMaterials.terracottaClay),
-          1.30,
+          0.38,
           dx,
           0
         );
       }
-      labelHeight = 2.3;
+      labelHeight = 0.7;
     } else if (site.role === "qin-imperial-mausoleum") {
-      // 秦始皇陵：4.4 半径 × 6m 高的封土山 + 顶端小石碑代表陵园朝向。
-      addPiece(new Mesh(ancientGeometries.qinMausoleumMound, ancientMaterials.qinEarth), 3.0);
+      // 秦始皇陵：紧凑封土山 + 顶端小石碑代表陵园朝向。
+      addPiece(new Mesh(ancientGeometries.qinMausoleumMound, ancientMaterials.qinEarth), 0.75);
       addPiece(
         new Mesh(ancientGeometries.qinMausoleumStele, ancientMaterials.bronzeRelic),
-        6.7,
+        1.70,
         0,
         0
       );
-      labelHeight = 8.4;
+      labelHeight = 2.25;
     }
 
     // 考古 label 用米白色，跟 scenic 的青金色稍区分；走 prefecture LOD。
