@@ -715,6 +715,13 @@ canvas {
   color: rgba(255, 168, 146, 0.92);
 }
 
+.title-environment {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(241, 210, 137, 0.62);
+  letter-spacing: 0.04em;
+}
+
 .mode-block {
   position: absolute;
   right: 18px;

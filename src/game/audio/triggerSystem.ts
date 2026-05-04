@@ -1,8 +1,20 @@
 import type { AudioRuntime } from "./audioContext";
 
+export interface FireRecord {
+  id: string;
+  /** AudioContext.currentTime 戳 */
+  ts: number;
+  /** 调用 fire 时的 reason 描述 */
+  reason: string;
+}
+
 export interface TriggerSystem {
   /** 立即播一次某 id（带可选音量、随机偏调）。被 throttle / category cooldown 拦截则忽略。 */
-  fire(id: string, opts?: { volume?: number; pitchSemitones?: number }): void;
+  fire(
+    id: string,
+    opts?: { volume?: number; pitchSemitones?: number; reason?: string }
+  ): void;
+  getRecentFires(limit?: number): FireRecord[];
   /** 注册周期性 thunder 间隔 trigger（weather=storm 时） */
   setThunderActive(active: boolean): void;
   /** 玩家步伐 phase tick → 触发 footstep */
@@ -15,6 +27,7 @@ export interface TriggerSystem {
 type PlaybackOptions = {
   volume?: number;
   pitchSemitones?: number;
+  reason?: string;
 };
 
 const UI_COOLDOWN_MS = 50;
@@ -24,6 +37,7 @@ const THUNDER_MIN_MS = 18000;
 const THUNDER_MAX_MS = 35000;
 const OX_MOO_MIN_MS = 25000;
 const OX_MOO_MAX_MS = 40000;
+const FIRE_HISTORY_LIMIT = 20;
 
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -84,6 +98,7 @@ function tagTrack(node: object, trackId: string): void {
 
 export function createTriggerSystem(runtime: AudioRuntime): TriggerSystem {
   const cooldownUntil = new Map<string, number>();
+  const fireHistory: FireRecord[] = [];
   let thunderActive = false;
   let thunderTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -109,6 +124,17 @@ export function createTriggerSystem(runtime: AudioRuntime): TriggerSystem {
     source.start();
   }
 
+  function recordFire(id: string, reason?: string): void {
+    fireHistory.push({
+      id,
+      ts: runtime.context.currentTime,
+      reason: reason ?? id
+    });
+    if (fireHistory.length > FIRE_HISTORY_LIMIT) {
+      fireHistory.splice(0, fireHistory.length - FIRE_HISTORY_LIMIT);
+    }
+  }
+
   function tryFire(
     id: string,
     opts: PlaybackOptions = {},
@@ -126,6 +152,7 @@ export function createTriggerSystem(runtime: AudioRuntime): TriggerSystem {
     }
 
     playOneShot(id, opts);
+    recordFire(id, opts.reason);
   }
 
   function clearThunderTimer(): void {
@@ -142,7 +169,11 @@ export function createTriggerSystem(runtime: AudioRuntime): TriggerSystem {
     }
     thunderTimer = setTimeout(() => {
       thunderTimer = null;
-      tryFire("ambient_thunder_distant", { volume: 0.88 }, true);
+      tryFire(
+        "ambient_thunder_distant",
+        { volume: 0.88, reason: "weather:storm thunder" },
+        true
+      );
       scheduleThunder();
     }, randomBetween(THUNDER_MIN_MS, THUNDER_MAX_MS));
   }
@@ -150,6 +181,9 @@ export function createTriggerSystem(runtime: AudioRuntime): TriggerSystem {
   return {
     fire(id: string, opts?: PlaybackOptions) {
       tryFire(id, opts);
+    },
+    getRecentFires(limit = FIRE_HISTORY_LIMIT) {
+      return fireHistory.slice(-limit).reverse();
     },
     setThunderActive(active: boolean) {
       if (thunderActive === active) {
@@ -165,15 +199,20 @@ export function createTriggerSystem(runtime: AudioRuntime): TriggerSystem {
     footstepPulse(opts) {
       let id = "footstep_grass";
       let pitchSemitones = Math.random() * 2 - 1;
+      let reason = "footstep:grass";
 
       if (opts.mounted === "horse" && runtime.buffers.has("mount_horse_hoof")) {
         id = "mount_horse_hoof";
         pitchSemitones = Math.random() * 0.6 - 0.3;
+        reason = "footstep:horse-hoof";
       } else if (opts.inWater && runtime.buffers.has("footstep_water_wading")) {
         id = "footstep_water_wading";
+        reason = "footstep:water";
       }
 
-      tryFire(id, { volume: 0.72, pitchSemitones }, true);
+      // 脚步只是底层质感，不该是焦点。整体经过 masterGain(0.25) 之后再过这道
+      // 0.34 → 实际 ~0.085 的有效响度，"只听得到不显眼"。
+      tryFire(id, { volume: 0.34, pitchSemitones, reason }, true);
     }
   };
 }
