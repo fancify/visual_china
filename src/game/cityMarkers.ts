@@ -1,6 +1,8 @@
 import {
   BoxGeometry,
+  BufferAttribute,
   BufferGeometry,
+  Color,
   ConeGeometry,
   Group,
   InstancedMesh,
@@ -20,22 +22,26 @@ import { projectGeoToWorld } from "./mapOrientation.js";
  * 造型 = "口"字型城墙 + 分级中央建筑。三档不仅尺寸不同，结构也分级：
  *   capital（京城）= 外环 + 4 角楼 + 两层庑殿顶小楼
  *   prefecture（州府）= 外环 + 4 角楼 + 单层歇山顶厅堂
- *   county（县城）= 外环
+ *   county（县城）= 外环 + 小硬山顶屋
  *
  * 三档尺寸：
- *   capital（京城）= 外 4.4 内 3.6、墙厚 0.4、高 0.9（最大）
- *   prefecture（州府）= 外 3.4 内 2.6、墙厚 0.4、高 0.7
- *   county（县城）= 外 2.4 内 1.6、墙厚 0.4、高 0.5（最矮）
+ *   capital（京城）= 外 4.4 内 3.6、墙厚 0.4、高 0.6（最大）
+ *   prefecture（州府）= 外 3.4 内 2.6、墙厚 0.4、高 0.47
+ *   county（县城）= 外 2.4 内 1.6、墙厚 0.4、高 0.33（最矮）
  *
  * 用 InstancedMesh：每档 1 个城墙 mesh，再加 1 个共享 floor mesh。29 个
  * instance，draw call 4。
  *
- * 用户这轮要求：城墙四边闭合、prefecture / capital 抬高中央建筑，并在城内
- * 铺一层土黄地，避免穿过墙缝看到底下真实地形。
+ * 用户这轮要求：城墙 / 角楼 / 地板统一夯土色，中央建筑做红墙灰瓦，并在城内
+ * 铺一层夯土地，避免穿过墙缝看到底下真实地形。
  */
 
 type WallSide = "north" | "south" | "east" | "west";
-export type CentralBuildingType = "hip-roof-palace" | "xie-shan-hall" | null;
+export type CentralBuildingType =
+  | "hip-roof-palace"
+  | "xie-shan-hall"
+  | "hard-mountain-hut"
+  | null;
 
 export interface CityTierSpec {
   outerSide: number;
@@ -53,22 +59,26 @@ const HOUSE_BODY_SIZE = Object.freeze({
 });
 const HOUSE_ROOF_RADIUS = 0.22;
 const HOUSE_ROOF_HEIGHT = 0.18;
-const CITY_FLOOR_INSET = 0.96;
-const CITY_FLOOR_HEIGHT = 0.04;
+const CITY_FLOOR_INSET = 1.02;
+const CITY_FLOOR_HEIGHT = 0.06;
+const CITY_FLOOR_LIFT = 0.03;
+const COLOR_RAMMED_EARTH = 0xa8927a;
+const COLOR_PALACE_RED = 0xa53a2c;
+const COLOR_TILE_GREY = 0x4f5253;
 
 export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
   county: {
     outerSide: 2.4,
     innerSide: 1.6,
-    height: 0.5,
+    height: 0.33,
     cornerTowers: false,
-    centralBuilding: null,
+    centralBuilding: "hard-mountain-hut",
     houses: 0
   },
   prefecture: {
     outerSide: 3.4,
     innerSide: 2.6,
-    height: 0.7,
+    height: 0.47,
     cornerTowers: true,
     centralBuilding: "xie-shan-hall",
     houses: 0
@@ -76,7 +86,7 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
   capital: {
     outerSide: 4.4,
     innerSide: 3.6,
-    height: 0.9,
+    height: 0.6,
     cornerTowers: true,
     centralBuilding: "hip-roof-palace",
     houses: 0
@@ -93,6 +103,19 @@ function translatedBox(
 ): BufferGeometry {
   const geometry = prepareForMerge(new BoxGeometry(width, height, depth));
   geometry.translate(x, y, z);
+  return geometry;
+}
+
+function applyVertexColor(geometry: BufferGeometry, hex: number): BufferGeometry {
+  const color = new Color(hex);
+  const positions = geometry.getAttribute("position");
+  const colors = new Float32Array(positions.count * 3);
+  for (let index = 0; index < positions.count; index += 1) {
+    colors[index * 3] = color.r;
+    colors[index * 3 + 1] = color.g;
+    colors[index * 3 + 2] = color.b;
+  }
+  geometry.setAttribute("color", new BufferAttribute(colors, 3));
   return geometry;
 }
 
@@ -119,36 +142,78 @@ function buildHipRoofPalace(width: number, totalHeight: number): BufferGeometry[
   const body2Y = body1Height + eave1Height;
   const roofY = body2Y + body2Height;
 
-  const roof = prepareForMerge(new ConeGeometry(width * 0.6, roofHeight, 4));
+  // 4-segment cone 旋转 45° 后，轴向半延伸只有 radius / sqrt(2)，
+  // 这里把 radius 提到接近 width，确保庑殿顶能完整盖过下方红墙并留出出檐。
+  const roof = prepareForMerge(new ConeGeometry(width * 1.05, roofHeight, 4));
   roof.rotateY(Math.PI / 4);
   roof.translate(0, roofY + roofHeight * 0.5, 0);
 
   return [
-    translatedBox(width, body1Height, width, 0, body1Height * 0.5, 0),
-    translatedBox(width * 1.1, eave1Height, width * 1.1, 0, eave1Y + eave1Height * 0.5, 0),
-    translatedBox(width * 0.78, body2Height, width * 0.78, 0, body2Y + body2Height * 0.5, 0),
-    roof
+    applyVertexColor(
+      translatedBox(width, body1Height, width, 0, body1Height * 0.5, 0),
+      COLOR_PALACE_RED
+    ),
+    applyVertexColor(
+      translatedBox(width * 1.25, eave1Height, width * 1.25, 0, eave1Y + eave1Height * 0.5, 0),
+      COLOR_TILE_GREY
+    ),
+    applyVertexColor(
+      translatedBox(width * 0.78, body2Height, width * 0.78, 0, body2Y + body2Height * 0.5, 0),
+      COLOR_PALACE_RED
+    ),
+    applyVertexColor(roof, COLOR_TILE_GREY)
   ];
 }
 
 function buildXieShanHall(width: number, totalHeight: number): BufferGeometry[] {
-  const bodyHeight = totalHeight * 0.55;
-  const eaveHeight = totalHeight * 0.05;
-  const roofHeight = totalHeight * 0.3;
-  const gableHeight = totalHeight * 0.1;
+  // 歇山厅堂原比例最高点只有 0.9 * totalHeight。这里把各段按 0.9 归一，
+  // 让传入的 totalHeight 直接等于成品绝对高度，便于按规格精确控制。
+  const normalizedHeight = totalHeight / 0.9;
+  const bodyHeight = normalizedHeight * 0.55;
+  const eaveHeight = normalizedHeight * 0.05;
+  const roofHeight = normalizedHeight * 0.3;
 
   const eaveY = bodyHeight;
   const roofY = eaveY + eaveHeight;
 
-  const roof = prepareForMerge(new ConeGeometry(width * 0.62, roofHeight, 4));
+  const roof = prepareForMerge(new ConeGeometry(width * 1.05, roofHeight, 4));
   roof.rotateY(Math.PI / 4);
   roof.translate(0, roofY + roofHeight * 0.5, 0);
 
   return [
-    translatedBox(width, bodyHeight, width, 0, bodyHeight * 0.5, 0),
-    translatedBox(width * 1.12, eaveHeight, width * 1.12, 0, eaveY + eaveHeight * 0.5, 0),
-    roof,
-    translatedBox(width * 0.7, gableHeight, width * 0.4, 0, roofY + roofHeight * 0.7, 0)
+    applyVertexColor(
+      translatedBox(width, bodyHeight, width, 0, bodyHeight * 0.5, 0),
+      COLOR_PALACE_RED
+    ),
+    applyVertexColor(
+      translatedBox(width * 1.25, eaveHeight, width * 1.25, 0, eaveY + eaveHeight * 0.5, 0),
+      COLOR_TILE_GREY
+    ),
+    applyVertexColor(roof, COLOR_TILE_GREY)
+  ];
+}
+
+function buildHardMountainHut(
+  width: number,
+  depth: number,
+  totalHeight: number
+): BufferGeometry[] {
+  const bodyHeight = totalHeight * 0.6;
+  const roofHeight = totalHeight * 0.4;
+
+  // 沿用现有 4-segment 屋顶语言，但把基础半径提到 width 级别后再压 z，
+  // 让硬山顶在 x / z 两向都能稳定压过下方红墙，保持三档一致的出檐语言。
+  const roof = prepareForMerge(new ConeGeometry(width * 1.0, roofHeight, 4));
+  roof.rotateY(Math.PI / 4);
+  roof.scale(1, 1, depth / width);
+  roof.translate(0, bodyHeight + roofHeight * 0.5, 0);
+
+  return [
+    applyVertexColor(
+      translatedBox(width, bodyHeight, depth, 0, bodyHeight * 0.5, 0),
+      COLOR_PALACE_RED
+    ),
+    applyVertexColor(roof, COLOR_TILE_GREY)
   ];
 }
 
@@ -230,10 +295,13 @@ function makeTierWallGeometry(
   spec: CityTierSpec
 ): BufferGeometry {
   const parts: BufferGeometry[] = [
-    prepareForMerge(
-      makeWalledRingGeometry(spec.outerSide, spec.innerSide, spec.height, {
-        houses: spec.houses
-      })
+    applyVertexColor(
+      prepareForMerge(
+        makeWalledRingGeometry(spec.outerSide, spec.innerSide, spec.height, {
+          houses: spec.houses
+        })
+      ),
+      COLOR_RAMMED_EARTH
     )
   ];
 
@@ -251,14 +319,16 @@ function makeTierWallGeometry(
     corners.forEach(([x, z]) => {
       const cornerGeom = prepareForMerge(new BoxGeometry(towerSide, towerHeight, towerSide));
       cornerGeom.translate(x, towerY, z);
-      parts.push(cornerGeom);
+      parts.push(applyVertexColor(cornerGeom, COLOR_RAMMED_EARTH));
     });
   }
 
   if (spec.centralBuilding === "hip-roof-palace") {
-    parts.push(...buildHipRoofPalace(spec.outerSide * 0.6, spec.height * 2.0));
+    parts.push(...buildHipRoofPalace(spec.outerSide * 0.6, 2.7));
   } else if (spec.centralBuilding === "xie-shan-hall") {
-    parts.push(...buildXieShanHall(spec.outerSide * 0.5, spec.height * 1.5));
+    parts.push(...buildXieShanHall(spec.outerSide * 0.5, 1.575));
+  } else if (spec.centralBuilding === "hard-mountain-hut") {
+    parts.push(...buildHardMountainHut(spec.outerSide * 0.35, spec.outerSide * 0.22, 0.6));
   }
 
   const merged = BufferGeometryUtils.mergeGeometries(parts);
@@ -298,17 +368,15 @@ const TIER_GEOMETRY: Record<CityTier, TierGeometry> = {
   }
 };
 
-const WALL_COLOR = 0x6e6f6c;
-const FLOOR_COLOR = 0xb8975d;
-
 // 每档独立 material，让 LOD 距离淡入 / 淡出可以分档控制 opacity——
 // county 远了先 fade，prefecture 中距 fade，capital 始终可见。
 function makeWallMaterial(): MeshPhongMaterial {
   return new MeshPhongMaterial({
-    color: WALL_COLOR,
+    color: 0xffffff,
     flatShading: true,
     shininess: 6,
     transparent: true,
+    vertexColors: true,
     // 注意：solid wall 必须 depthWrite=true，否则同一实例内 4 面墙互相
     // 看穿（用户："建筑透视有点问题，像透明的"）。仅在 fade 透明阶段
     // 不该写 depth，但材质级别没法区分 fading vs solid。trade-off：保留
@@ -319,7 +387,7 @@ function makeWallMaterial(): MeshPhongMaterial {
 
 function makeFloorMaterial(): MeshPhongMaterial {
   return new MeshPhongMaterial({
-    color: FLOOR_COLOR,
+    color: COLOR_RAMMED_EARTH,
     flatShading: true,
     shininess: 2
   });
@@ -459,7 +527,7 @@ export function createCityMarkers(
       const rotVar = ((cityIdHash >> 7) & 3) * (Math.PI / 2);
       const floorSide = CITY_TIER_SPECS[city.tier].innerSide * CITY_FLOOR_INSET;
 
-      dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
+      dummy.position.set(worldPoint.x, terrainY + CITY_FLOOR_LIFT, worldPoint.z);
       dummy.rotation.set(0, rotVar, 0);
       dummy.scale.set(
         floorSide * scaleVar,
