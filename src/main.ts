@@ -70,6 +70,8 @@ import {
   seasonLabel,
   weatherLabel,
   formatTimeOfDay,
+  skyBodyHorizonFade,
+  sunDiscScaleForAltitude,
   type EnvironmentVisuals
 } from "./game/environment";
 import { northNeedleAngleRadians } from "./game/compass.js";
@@ -187,12 +189,22 @@ import {
   sharedTreeMaterial
 } from "./game/scenery";
 import {
-  buildPoiHoverCardHtml,
-  buildCityHoverCardHtml,
-  findStoryBeatForZone,
-  type HoverPoi,
-  type HoverPoiCategory
+  createWildlifeHandle,
+  disposeWildlife,
+  sharedWildlifeMaterials,
+  updateWildlifeFrame,
+  type WildlifeHandle
+} from "./game/wildlife";
+import {
+  createCityHoverHud,
+  findNearestProximityPoi,
+  resolveHudTargetSource,
+  type PoiInfo
 } from "./game/cityHoverHud";
+import {
+  attachHoverPoiMetadata,
+  findHoveredPoiFromIntersections
+} from "./game/poiHoverRuntime";
 import { gameHeightToRealMeters } from "./game/realElevation";
 import {
   cityFromMarkerIntersection,
@@ -203,7 +215,7 @@ import {
 import { realQinlingCities } from "./data/realCities.js";
 import type { RealCity } from "./data/realCities.js";
 import { qinlingRegionWorld } from "./data/qinlingRegion.js";
-import { projectGeoToWorld } from "./game/mapOrientation.js";
+import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
   evaluateStoryGuide,
   formatStoryGuideLine,
@@ -225,6 +237,7 @@ import {
 import { isSpriteOccludedByTerrain } from "./game/labelOcclusion";
 import { textSpriteLayout } from "./game/textLabel.js";
 import { createPerfStats, isDevModeEnabled } from "./game/perfStats";
+import { createPerfMonitor } from "./game/perfMonitor";
 import {
   applySkyVisuals,
   createCloudLayer,
@@ -275,6 +288,7 @@ const landmarkChunkIds = new Map<string, string | null>();
 const terrainChunkMeshes = new Map<string, TerrainMeshHandle>();
 const chunkLoadPromises = new Map<string, Promise<void>>();
 const runtimeBudget = qinlingRuntimeBudget;
+const CHUNK_FADE_DURATION = 1.2;
 // 区域 experience profile（从 manifest 读取）。决定 baseSpeed / cameraDistance /
 // scenery 密度的缩放系数。null 时按 1 处理。
 let experienceProfile: ExperienceProfile | null = null;
@@ -386,6 +400,9 @@ renderer.setClearColor(0x081213);
 appRoot.appendChild(renderer.domElement);
 
 const perfStats = createPerfStats({ enabled: isDevModeEnabled() });
+const perfMonitor = createPerfMonitor({
+  getActiveChunkCount: () => visibleChunkIds.size
+});
 if (perfStats.element.hidden === false) {
   document.body.appendChild(perfStats.element);
 }
@@ -393,18 +410,42 @@ if (perfStats.element.hidden === false) {
 // 旧版 DOM sky overlay（96 个 span 星星 + 3 个 div 云朵）已被 WebGL sky dome
 // 完全替代，DOM 层删除以减少 compositor 负担。
 const hud = createHud(appRoot, terrainAssetRequest, knowledgeFragments.length);
-const hoverCard = document.createElement("div");
-hoverCard.id = "hud-hover-card";
-hoverCard.className = "hud-hover-card hud-hover-card-hidden";
-appRoot.appendChild(hoverCard);
 const hoverRaycaster = new Raycaster();
 const hoverPointer = new Vector2();
-let hoveredHoverCardKey: string | null = null;
+let hoverPointerActive = false;
 
-interface HoverPoiMetadata {
-  key: string;
-  poi: HoverPoi;
-  category: HoverPoiCategory;
+declare global {
+  interface Window {
+    HUD_DEBUG?: boolean;
+  }
+}
+
+if (typeof window.HUD_DEBUG !== "boolean") {
+  try {
+    window.HUD_DEBUG = window.localStorage.getItem("HUD_DEBUG") === "1";
+  } catch {
+    window.HUD_DEBUG = false;
+  }
+}
+
+function hudDebugWarn(message: string, details?: unknown): void {
+  if (!window.HUD_DEBUG) {
+    return;
+  }
+  if (details === undefined) {
+    console.warn("[HUD-DEBUG]", message);
+    return;
+  }
+  console.warn("[HUD-DEBUG]", message, details);
+}
+
+const PROXIMITY_RADIUS_DEFAULT = 3.5;
+const PROXIMITY_RADIUS_CITY_COUNTY = 3.0;
+const PROXIMITY_RADIUS_CITY_PREF = 4.0;
+const PROXIMITY_RADIUS_CITY_CAP = 5.0;
+
+interface RuntimePoiInfo extends PoiInfo {
+  cityTier?: RealCity["tier"];
 }
 
 const scene = new Scene();
@@ -521,6 +562,9 @@ const ambientWaterStyle: ReturnType<typeof waterVisualStyle> = {
 
 const playerAvatarHandle = createPlayerAvatar();
 const player = playerAvatarHandle.player;
+const poiHoverHud = createCityHoverHud(appRoot, {
+  getPlayerWorldPosition: () => ({ x: player.position.x, z: player.position.z })
+});
 // horseLegsByName 是个 reference，rebuild 时整体替换；包成 ref 让循环里始终读到最新。
 let mountLegsByName = playerAvatarHandle.mountLegsByName;
 let currentMountId: MountId = playerAvatarHandle.mountId;
@@ -625,6 +669,11 @@ scene.add(waterSystemGroup);
 const riverVegetationGroup = new Group();
 scene.add(riverVegetationGroup);
 
+const wildlifeGroup = new Group();
+scene.add(wildlifeGroup);
+let wildlifeHandle: WildlifeHandle | null = null;
+let wildlifeVisibleChunkKey = "";
+
 const routeGroup = new Group();
 scene.add(routeGroup);
 
@@ -668,171 +717,234 @@ const riverLabelSpritesByTier: { major: Sprite[]; tributary: Sprite[] } = {
 };
 const routeLabelSprites: Sprite[] = [];
 let routePlankRoadHandle: PlankRoadHandle | null = null;
+let allHudPois: RuntimePoiInfo[] = [];
+const hudPoiBySourceKey = new Map<string, RuntimePoiInfo>();
 
 function hideHoverCard(): void {
-  hoveredHoverCardKey = null;
-  hoverCard.classList.add("hud-hover-card-hidden");
+  hoverPointerActive = false;
+  poiHoverHud.hide();
 }
 
-function isHoverPoiMetadata(value: unknown): value is HoverPoiMetadata {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
+function buildHudPoiId(prefix: string, name: string, worldX: number, worldZ: number): string {
+  return `${prefix}:${name}:${Math.round(worldX * 100)}:${Math.round(worldZ * 100)}`;
+}
 
-  const candidate = value as Partial<HoverPoiMetadata>;
+function poiSourceKey(category: RuntimePoiInfo["category"], sourceId: string): string {
+  return `${category}:${sourceId}`;
+}
+
+function isPoiHudSuppressed(): boolean {
   return (
-    typeof candidate.key === "string" &&
-    (candidate.category === "scenic" || candidate.category === "ancient") &&
-    !!candidate.poi &&
-    typeof candidate.poi.id === "string" &&
-    typeof candidate.poi.name === "string" &&
-    typeof candidate.poi.lat === "number" &&
-    typeof candidate.poi.lon === "number" &&
-    typeof candidate.poi.summary === "string"
-  );
-}
-
-function attachHoverPoiMetadata(
-  object: Object3D,
-  poi: HoverPoi,
-  category: HoverPoiCategory
-): void {
-  object.userData.hoverPoi = {
-    key: `${category}:${poi.id}`,
-    poi,
-    category
-  } satisfies HoverPoiMetadata;
-}
-
-function hoverPoiMetadataFromObject(object: Object3D): HoverPoiMetadata | null {
-  return isHoverPoiMetadata(object.userData.hoverPoi) ? object.userData.hoverPoi : null;
-}
-
-function positionHoverCard(clientX: number, clientY: number): void {
-  const appRect = appRoot.getBoundingClientRect();
-  const cardWidth = hoverCard.offsetWidth || 296;
-  const cardHeight = hoverCard.offsetHeight || 196;
-  const left = Math.min(
-    Math.max(12, clientX - appRect.left + 18),
-    Math.max(12, appRect.width - cardWidth - 12)
-  );
-  const top = Math.min(
-    Math.max(12, clientY - appRect.top + 18),
-    Math.max(12, appRect.height - cardHeight - 12)
-  );
-  hoverCard.style.left = `${left}px`;
-  hoverCard.style.top = `${top}px`;
-}
-
-function updateCityHoverCard(event: PointerEvent): void {
-  if (
-    !terrainSampler ||
-    isDragging ||
     atlasWorkbench.isFullscreen ||
     cityDetailPanelOpen ||
     journalOpen ||
     customizationPanelOpen
-  ) {
-    hideHoverCard();
-    return;
-  }
-  const sampler = terrainSampler;
+  );
+}
 
-  const canvasRect = renderer.domElement.getBoundingClientRect();
-  if (canvasRect.width <= 0 || canvasRect.height <= 0) {
-    hideHoverCard();
-    return;
+function poiProximityRadius(poi: RuntimePoiInfo): number {
+  if (poi.category !== "city") {
+    return PROXIMITY_RADIUS_DEFAULT;
   }
 
-  hoverPointer.x = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
-  hoverPointer.y = -(((event.clientY - canvasRect.top) / canvasRect.height) * 2 - 1);
+  if (poi.cityTier === "capital") {
+    return PROXIMITY_RADIUS_CITY_CAP;
+  }
+  if (poi.cityTier === "prefecture") {
+    return PROXIMITY_RADIUS_CITY_PREF;
+  }
+  return PROXIMITY_RADIUS_CITY_COUNTY;
+}
+
+function findHoveredPoi(): RuntimePoiInfo | null {
+  if (!terrainSampler || !hoverPointerActive || isDragging || isPoiHudSuppressed()) {
+    return null;
+  }
+
   hoverRaycaster.setFromCamera(hoverPointer, camera);
 
   const hoverTargets = [
     ...(cityMarkersHandle?.group.children ?? []),
+    ...landmarkGroup.children,
     ...scenicGroup.children,
     ...ancientGroup.children
   ];
   const intersections = hoverRaycaster.intersectObjects(hoverTargets, false);
-
-  if (!sampler.asset.bounds) {
-    hideHoverCard();
-    return;
-  }
-
-  let nextHoverCard: { key: string; html: string } | null = null;
-
-  for (const intersection of intersections) {
-    const hoverPoi = hoverPoiMetadataFromObject(intersection.object);
-    if (hoverPoi) {
-      const worldPoint = projectGeoToWorld(
-        { lat: hoverPoi.poi.lat, lon: hoverPoi.poi.lon },
-        sampler.asset.bounds,
-        sampler.asset.world
-      );
-      const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
-      const elevationMeters = gameHeightToRealMeters(elevation, sampler.asset);
-      const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
-      nextHoverCard = {
-        key: hoverPoi.key,
-        html: buildPoiHoverCardHtml({
-          poi: hoverPoi.poi,
-          category: hoverPoi.category,
-          elevationMeters,
-          zone
-        })
-      };
-      break;
-    }
-
+  const hoveredPoi = findHoveredPoiFromIntersections(intersections, (object, instanceId) => {
     const nextCity = cityMarkersHandle
-      ? cityFromMarkerIntersection(
-          cityMarkersHandle,
-          intersection.object,
-          intersection.instanceId
-        )
+      ? cityFromMarkerIntersection(cityMarkersHandle, object, instanceId)
       : null;
     if (!nextCity) {
-      continue;
+      return null;
     }
+    return hudPoiBySourceKey.get(poiSourceKey("city", nextCity.id)) ?? null;
+  }) as RuntimePoiInfo | null;
 
-    const worldPoint = projectGeoToWorld(
-      { lat: nextCity.lat, lon: nextCity.lon },
-      sampler.asset.bounds,
-      sampler.asset.world
-    );
-    const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
-    const elevationMeters = gameHeightToRealMeters(elevation, sampler.asset);
-    const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
-    const beat = findStoryBeatForZone(
-      storyBeats,
-      zone,
-      (storyBeat) => zoneNameAt(storyBeat.target.x, storyBeat.target.y, sampler)
-    );
-    nextHoverCard = {
-      key: `city:${nextCity.id}`,
-      html: buildCityHoverCardHtml({
-        city: nextCity,
-        elevationMeters,
-        zone,
-        beat
-      })
-    };
-    break;
+  if (window.HUD_DEBUG) {
+    hudDebugWarn("findHoveredPoi", {
+      hoverTargets: hoverTargets.length,
+      intersections: intersections.length,
+      targetId: hoveredPoi?.id ?? null
+    });
   }
 
-  if (!nextHoverCard) {
-    hideHoverCard();
+  return hoveredPoi;
+}
+
+function syncPoiHoverHud(): void {
+  if (!terrainSampler || isPoiHudSuppressed()) {
+    poiHoverHud.hide();
     return;
   }
 
-  if (hoveredHoverCardKey !== nextHoverCard.key || hoverCard.innerHTML !== nextHoverCard.html) {
-    hoverCard.innerHTML = nextHoverCard.html;
-    hoveredHoverCardKey = nextHoverCard.key;
+  const hoverTarget = findHoveredPoi();
+  const proximityTarget = findNearestProximityPoi(
+    player.position.x,
+    player.position.z,
+    allHudPois,
+    poiProximityRadius
+  ) as RuntimePoiInfo | null;
+  const update = resolveHudTargetSource(hoverTarget, proximityTarget);
+  if (window.HUD_DEBUG) {
+    hudDebugWarn("syncPoiHoverHud", {
+      hoverTargetId: hoverTarget?.id ?? null,
+      proximityTargetId: proximityTarget?.id ?? null,
+      resolvedTargetId: update.target?.id ?? null,
+      source: update.source
+    });
+  }
+  poiHoverHud.setTarget(update.target, update.source);
+}
+
+function rebuildHudPoiCatalog(): void {
+  if (!terrainSampler?.asset.bounds) {
+    allHudPois = [];
+    hudPoiBySourceKey.clear();
+    return;
   }
 
-  positionHoverCard(event.clientX, event.clientY);
-  hoverCard.classList.remove("hud-hover-card-hidden");
+  const sampler = terrainSampler;
+  const bounds = sampler.asset.bounds!;
+  const world = sampler.asset.world;
+  const nextPois: RuntimePoiInfo[] = [];
+  hudPoiBySourceKey.clear();
+
+  realQinlingCities
+    .filter(
+      (city) =>
+        city.lat >= bounds.south &&
+        city.lat <= bounds.north &&
+        city.lon >= bounds.west &&
+        city.lon <= bounds.east
+    )
+    .forEach((city) => {
+      const worldPoint = projectGeoToWorld({ lat: city.lat, lon: city.lon }, bounds, world);
+      const elevation = gameHeightToRealMeters(
+        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z),
+        sampler.asset
+      );
+      const poi: RuntimePoiInfo = {
+        id: buildHudPoiId("city", city.name, worldPoint.x, worldPoint.z),
+        name: city.name,
+        category: "city",
+        worldX: worldPoint.x,
+        worldZ: worldPoint.z,
+        elevation,
+        realLat: city.lat,
+        realLon: city.lon,
+        description: city.description ?? city.hint,
+        cityTier: city.tier
+      };
+      nextPois.push(poi);
+      hudPoiBySourceKey.set(poiSourceKey("city", city.id), poi);
+    });
+
+  qinlingScenicLandmarks
+    .filter(
+      (spot) =>
+        spot.lat >= bounds.south &&
+        spot.lat <= bounds.north &&
+        spot.lon >= bounds.west &&
+        spot.lon <= bounds.east
+    )
+    .forEach((spot) => {
+      const worldPoint = projectGeoToWorld({ lat: spot.lat, lon: spot.lon }, bounds, world);
+      const elevation = gameHeightToRealMeters(
+        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z),
+        sampler.asset
+      );
+      const poi: RuntimePoiInfo = {
+        id: buildHudPoiId("scenic", spot.name, worldPoint.x, worldPoint.z),
+        name: spot.name,
+        category: "scenic",
+        worldX: worldPoint.x,
+        worldZ: worldPoint.z,
+        elevation,
+        realLat: spot.lat,
+        realLon: spot.lon,
+        description: spot.summary
+      };
+      nextPois.push(poi);
+      hudPoiBySourceKey.set(poiSourceKey("scenic", spot.id), poi);
+    });
+
+  qinlingAncientSites
+    .filter(
+      (site) =>
+        site.lat >= bounds.south &&
+        site.lat <= bounds.north &&
+        site.lon >= bounds.west &&
+        site.lon <= bounds.east
+    )
+    .forEach((site) => {
+      const worldPoint = projectGeoToWorld({ lat: site.lat, lon: site.lon }, bounds, world);
+      const elevation = gameHeightToRealMeters(
+        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z),
+        sampler.asset
+      );
+      const poi: RuntimePoiInfo = {
+        id: buildHudPoiId("ancient", site.name, worldPoint.x, worldPoint.z),
+        name: site.name,
+        category: "ancient",
+        worldX: worldPoint.x,
+        worldZ: worldPoint.z,
+        elevation,
+        realLat: site.lat,
+        realLon: site.lon,
+        description: site.summary
+      };
+      nextPois.push(poi);
+      hudPoiBySourceKey.set(poiSourceKey("ancient", site.id), poi);
+    });
+
+  landmarks
+    .filter((landmark) => landmark.kind === "pass")
+    .forEach((landmark) => {
+      const geo = unprojectWorldToGeo(
+        { x: landmark.position.x, z: landmark.position.y },
+        bounds,
+        world
+      );
+      const elevation = gameHeightToRealMeters(
+        sampler.sampleSurfaceHeight(landmark.position.x, landmark.position.y),
+        sampler.asset
+      );
+      const poi: RuntimePoiInfo = {
+        id: buildHudPoiId("pass", landmark.name, landmark.position.x, landmark.position.y),
+        name: landmark.name,
+        category: "pass",
+        worldX: landmark.position.x,
+        worldZ: landmark.position.y,
+        elevation,
+        realLat: geo.lat,
+        realLon: geo.lon,
+        description: landmark.description
+      };
+      nextPois.push(poi);
+      hudPoiBySourceKey.set(poiSourceKey("pass", landmark.name), poi);
+    });
+
+  allHudPois = nextPois;
 }
 
 /**
@@ -866,6 +978,10 @@ function updateCityLodFade(): void {
   const treeAlpha = 1 - MathUtils.smoothstep(distance, 200, 280);
   sharedTreeMaterial.opacity = treeAlpha;
   sharedTreeMaterial.visible = treeAlpha > 0.01;
+  sharedWildlifeMaterials.forEach((material) => {
+    material.opacity = treeAlpha;
+    material.visible = treeAlpha > 0.01;
+  });
   // 关隘石碑跟 prefecture 同档 fade。
   const passAlpha = 1 - MathUtils.smoothstep(distance, 240, 320);
   passSteleMaterial.opacity = passAlpha;
@@ -1262,10 +1378,21 @@ function rebuildLandmarkVisuals(): void {
   landmarkChunkIds.clear();
   passLandmarkLabelSprites.length = 0;
 
+  if (window.HUD_DEBUG) {
+    hudDebugWarn("rebuildLandmarkVisuals", {
+      landmarkCount: landmarks.length,
+      hudPoiCatalogSize: hudPoiBySourceKey.size
+    });
+  }
+
   landmarks.forEach((landmark) => {
     if (isLegacyOverlappingCityLandmark(landmark)) {
       return;
     }
+    const hudPoi =
+      landmark.kind === "pass"
+        ? hudPoiBySourceKey.get(poiSourceKey("pass", landmark.name)) ?? null
+        : null;
     const chunkId = regionChunkManifest
       ? findChunkForPosition(regionChunkManifest, landmark.position)?.id ?? null
       : null;
@@ -1285,6 +1412,14 @@ function rebuildLandmarkVisuals(): void {
           accent: passSteleCapMaterial
         }
       }).forEach((piece) => {
+        if (hudPoi) {
+          attachHoverPoiMetadata(piece, hudPoi);
+        } else if (window.HUD_DEBUG) {
+          hudDebugWarn("pass landmark missing HUD metadata", {
+            name: landmark.name,
+            sourceKey: poiSourceKey("pass", landmark.name)
+          });
+        }
         landmarkGroup.add(piece);
       });
 
@@ -1293,6 +1428,14 @@ function rebuildLandmarkVisuals(): void {
       label.position.set(landmark.position.x, ground + 1.38, landmark.position.y);
       label.userData.chunkId = chunkId;
       label.userData.terrainYOffset = 1.38;
+      if (hudPoi) {
+        attachHoverPoiMetadata(label, hudPoi);
+      } else if (window.HUD_DEBUG) {
+        hudDebugWarn("pass landmark label missing HUD metadata", {
+          name: landmark.name,
+          sourceKey: poiSourceKey("pass", landmark.name)
+        });
+      }
       landmarkGroup.add(label);
       passLandmarkLabelSprites.push(label);
       return;
@@ -1353,6 +1496,7 @@ function rebuildScenicVisuals(): void {
     const chunkId = regionChunkManifest
       ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
       : null;
+    const hudPoi = hudPoiBySourceKey.get(poiSourceKey("scenic", spot.id));
 
     buildScenicPoiMeshes({
       chunkId,
@@ -1361,7 +1505,9 @@ function rebuildScenicVisuals(): void {
       position,
       role: spot.role
     }).forEach((mesh) => {
-      attachHoverPoiMetadata(mesh, spot, "scenic");
+      if (hudPoi) {
+        attachHoverPoiMetadata(mesh, hudPoi);
+      }
       scenicGroup.add(mesh);
     });
 
@@ -1373,7 +1519,9 @@ function rebuildScenicVisuals(): void {
     label.position.set(wp.x, groundY + labelHeight, wp.z);
     label.userData.terrainYOffset = labelHeight;
     label.userData.chunkId = chunkId;
-    attachHoverPoiMetadata(label, spot, "scenic");
+    if (hudPoi) {
+      attachHoverPoiMetadata(label, hudPoi);
+    }
     scenicGroup.add(label);
     scenicLabelSprites.push(label);
   });
@@ -1406,6 +1554,7 @@ function rebuildAncientVisuals(): void {
     );
     const groundY = terrainSampler!.sampleHeight(wp.x, wp.z);
     const position = new Vector2(wp.x, wp.z);
+    const hudPoi = hudPoiBySourceKey.get(poiSourceKey("ancient", site.id));
 
     const addPiece = (mesh: Mesh, yOffset: number, dx = 0, dz = 0): void => {
       mesh.position.set(wp.x + dx, groundY + yOffset, wp.z + dz);
@@ -1414,7 +1563,9 @@ function rebuildAncientVisuals(): void {
       mesh.userData.chunkId = regionChunkManifest
         ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
         : null;
-      attachHoverPoiMetadata(mesh, site, "ancient");
+      if (hudPoi) {
+        attachHoverPoiMetadata(mesh, hudPoi);
+      }
       ancientGroup.add(mesh);
     };
 
@@ -1483,7 +1634,9 @@ function rebuildAncientVisuals(): void {
     label.userData.chunkId = regionChunkManifest
       ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
       : null;
-    attachHoverPoiMetadata(label, site, "ancient");
+    if (hudPoi) {
+      attachHoverPoiMetadata(label, hudPoi);
+    }
     ancientGroup.add(label);
     ancientLabelSprites.push(label);
   });
@@ -1554,7 +1707,9 @@ const skyDomeGroup = skyDome.group;
 const skyShell = skyDome.shell;
 const starDomeMaterial = skyDome.starDomeMaterial;
 const sunSkyDisc = skyDome.sunDisc;
+const sunSkyDiscMaterial = skyDome.sunDiscMaterial;
 const moonSkyDisc = skyDome.moonDisc;
+const moonSkyDiscMaterial = skyDome.moonDiscMaterial;
 const cloudGroup = cloudLayer.group;
 const cloudSprites = cloudLayer.sprites;
 const precipitation = precipitationLayer.points;
@@ -1648,6 +1803,52 @@ function refreshChunkScenery(visuals: EnvironmentVisuals): void {
   });
 }
 
+function disposeWildlifeVisuals(): void {
+  if (!wildlifeHandle) {
+    wildlifeVisibleChunkKey = "";
+    return;
+  }
+
+  wildlifeGroup.remove(wildlifeHandle.group);
+  disposeWildlife(wildlifeHandle);
+  wildlifeHandle = null;
+  wildlifeVisibleChunkKey = "";
+}
+
+function rebuildWildlifeVisuals(force = false): void {
+  const eligibleChunks = Array.from(terrainChunkMeshes.entries())
+    .filter(([, terrainChunk]) => {
+      if (!terrainChunk.mesh.visible) {
+        return false;
+      }
+
+      const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
+      if (fadeStart === undefined) {
+        return true;
+      }
+
+      return clock.elapsedTime - fadeStart >= CHUNK_FADE_DURATION * 0.8;
+    })
+    .sort(([chunkIdA], [chunkIdB]) => chunkIdA.localeCompare(chunkIdB));
+  const chunkKey = eligibleChunks.map(([chunkId]) => chunkId).join(",");
+
+  if (!force && chunkKey === wildlifeVisibleChunkKey) {
+    return;
+  }
+
+  disposeWildlifeVisuals();
+  wildlifeVisibleChunkKey = chunkKey;
+
+  if (eligibleChunks.length === 0) {
+    return;
+  }
+
+  wildlifeHandle = createWildlifeHandle(
+    eligibleChunks.map(([, terrainChunk]) => terrainChunk.sampler)
+  );
+  wildlifeGroup.add(wildlifeHandle.group);
+}
+
 function resetStoryGuide(): void {
   completedStoryBeatIds.clear();
   storyGuideInitialized = false;
@@ -1673,8 +1874,8 @@ function showToast(text: string): void {
   }, 3400);
 }
 
-// proximity 触发：玩家走到真实城市附近时记录最近的一座，按 I 弹出
-// 详情。范围 12 单元（≈ 城墙外圈一圈步行距离）。
+// county 标签仍沿用"靠近城市时显名"这条逻辑，但现在阈值跟 HUD proximity
+// 半径统一，避免玩家还没看到 FUD 就先看到 [I] / 标签提示。
 // 节流：每帧 30 个城市的距离计算 + 投影是真实开销，玩家走路速度也不
 // 需要 60Hz 检测。每 8 帧（~7-8Hz）跑一次足够，肉眼无延迟感。
 let nearbyRealCity: RealCity | null = null;
@@ -1696,7 +1897,7 @@ function updateNearbyRealCityCore(): void {
   const px = player.position.x;
   const pz = player.position.z;
   let closest: RealCity | null = null;
-  let closestDistance = 12;
+  let closestDistance = Infinity;
   for (const city of realQinlingCities) {
     if (
       city.lat < bounds.south ||
@@ -1708,7 +1909,13 @@ function updateNearbyRealCityCore(): void {
     }
     const wp = projectGeoToWorld({ lat: city.lat, lon: city.lon }, bounds, world);
     const distance = Math.hypot(wp.x - px, wp.z - pz);
-    if (distance < closestDistance) {
+    const radius =
+      city.tier === "capital"
+        ? PROXIMITY_RADIUS_CITY_CAP
+        : city.tier === "prefecture"
+          ? PROXIMITY_RADIUS_CITY_PREF
+          : PROXIMITY_RADIUS_CITY_COUNTY;
+    if (distance <= radius && distance < closestDistance) {
       closestDistance = distance;
       closest = city;
     }
@@ -1721,7 +1928,6 @@ function updateNearbyRealCityCore(): void {
     }
     nearbyRealCity = closest;
     if (closest) {
-      showToast(`[I] 了解 ${closest.name}`);
       // reveal county label as the player approaches
       if (closest.tier === "county") {
         const sprite = countyLabelSpriteByCityId.get(closest.id);
@@ -3340,7 +3546,6 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
 // 1.2 秒走完。scenery（树）等 chunk fade 结束后再亮起来，避免地形还在
 // 半透明时树已经满 opacity 漂在空气里（codex fb57c87 P2）。
 function updateChunkFadeIn(): void {
-  const fadeDuration = 1.2;
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (!terrainChunk.mesh.visible) return;
     const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
@@ -3351,18 +3556,19 @@ function updateChunkFadeIn(): void {
       return;
     }
     const elapsed = clock.elapsedTime - fadeStart;
-    if (elapsed >= fadeDuration) {
+    if (elapsed >= CHUNK_FADE_DURATION) {
       material.opacity = 1;
       delete terrainChunk.mesh.userData.fadeStart;
       if (terrainChunk.scenery) terrainChunk.scenery.visible = true;
       return;
     }
-    material.opacity = MathUtils.clamp(elapsed / fadeDuration, 0, 1);
+    material.opacity = MathUtils.clamp(elapsed / CHUNK_FADE_DURATION, 0, 1);
     // scenery 在 fade 80% 之后再开始 visible，让树跟在 terrain 后面"长出来"。
     if (terrainChunk.scenery) {
-      terrainChunk.scenery.visible = elapsed >= fadeDuration * 0.8;
+      terrainChunk.scenery.visible = elapsed >= CHUNK_FADE_DURATION * 0.8;
     }
   });
+  rebuildWildlifeVisuals();
 }
 
 async function syncChunkTerrainWindow(nextVisibleChunkIds: Set<string>): Promise<void> {
@@ -3395,6 +3601,7 @@ async function syncChunkTerrainWindow(nextVisibleChunkIds: Set<string>): Promise
 
     terrainChunk.mesh.visible = nextVisibleChunkIds.has(chunkId);
   });
+  rebuildWildlifeVisuals(true);
 }
 
 function disposeChunkTerrain(): void {
@@ -3407,6 +3614,7 @@ function disposeChunkTerrain(): void {
   });
   terrainChunkMeshes.clear();
   chunkLoadPromises.clear();
+  disposeWildlifeVisuals();
 }
 
 function updateVisibleChunkState(nextChunkId: string | null): void {
@@ -3516,6 +3724,20 @@ function resetGameplayInput(): void {
   hideHoverCard();
 }
 
+function isTextInputFocused(): boolean {
+  const activeElement = document.activeElement;
+  if (!activeElement) {
+    return false;
+  }
+
+  return (
+    activeElement instanceof HTMLInputElement ||
+    activeElement instanceof HTMLTextAreaElement ||
+    activeElement instanceof HTMLSelectElement ||
+    (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+  );
+}
+
 document.addEventListener("keydown", (event) => {
   // 用 normalizeInputKey(event) 而不是 event.key.toLowerCase()——它走 event.code
   // 路径，不受中文输入法 IME 影响。否则 macOS 中文用户按 Q/E/W/A/S/D 全部失效。
@@ -3554,28 +3776,14 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  // I（info）: 走到城市跟前按 I 弹出详情面板（替换原 toast）。
-  // atlas 全屏时不响应 I——panel 会被 atlas 罩住，按下去看似无效但状态
-  // 已变（codex 084972c P2）。
-  if (normalized === "i" && nearbyRealCity && !atlasWorkbench.isFullscreen) {
+  if (
+    normalized === "i" &&
+    !isTextInputFocused() &&
+    !atlasWorkbench.isFullscreen &&
+    poiHoverHud.getCurrentState() !== "hidden"
+  ) {
     event.preventDefault();
-    const city = nearbyRealCity;
-    if (cityDetailPanelOpen && cityDetailOpenCityId === city.id) {
-      // 同一个城市的面板已开，不重复
-      return;
-    }
-    cityDetailPanelOpen = true;
-    cityDetailOpenCityId = city.id;
-    hud.setCityDetailPanelOpen({
-      id: city.id,
-      name: city.name,
-      tier: city.tier,
-      lat: city.lat,
-      lon: city.lon,
-      hint: city.hint,
-      description: city.description
-    });
-    hideHoverCard();
+    poiHoverHud.toggleDetail();
     return;
   }
   // P：开关坐骑/造型面板（power-user 走 [ ] - = 直接切，不必开面板）。
@@ -3702,7 +3910,18 @@ renderer.domElement.addEventListener("pointerdown", (event: PointerEvent) => {
 });
 
 renderer.domElement.addEventListener("pointermove", (event: PointerEvent) => {
-  updateCityHoverCard(event);
+  const canvasRect = renderer.domElement.getBoundingClientRect();
+  if (canvasRect.width > 0 && canvasRect.height > 0) {
+    hoverPointer.x = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
+    hoverPointer.y = -(((event.clientY - canvasRect.top) / canvasRect.height) * 2 - 1);
+    hoverPointerActive = true;
+    if (window.HUD_DEBUG) {
+      hudDebugWarn("pointermove hoverPointer", {
+        x: Number(hoverPointer.x.toFixed(3)),
+        y: Number(hoverPointer.y.toFixed(3))
+      });
+    }
+  }
 
   if (!isDragging) {
     return;
@@ -3728,7 +3947,7 @@ renderer.domElement.addEventListener("pointerup", (event: PointerEvent) => {
 
 renderer.domElement.addEventListener("pointerleave", () => {
   isDragging = false;
-  hideHoverCard();
+  hoverPointerActive = false;
 });
 
 renderer.domElement.addEventListener("wheel", (event: WheelEvent) => {
@@ -4026,6 +4245,8 @@ function update(deltaSeconds: number): void {
   moonLight.color.copy(visuals.moonColor);
   moonLight.intensity = visuals.moonOpacity * 0.92;
   moonLight.position.copy(visuals.moonDirection);
+  sunSkyDiscMaterial.color.copy(visuals.sunColor);
+  moonSkyDiscMaterial.color.copy(visuals.moonColor);
   rim.color.copy(visuals.rimColor);
   rim.intensity = visuals.rimIntensity;
   renderer.setClearColor(visuals.skyColor);
@@ -4039,7 +4260,8 @@ function update(deltaSeconds: number): void {
     starOpacity: visuals.starOpacity,
     sunDirection: visuals.sunDirection,
     sunWarmColor: visuals.skySunWarmColor,
-    sunInfluence: visuals.skySunInfluence
+    sunInfluence: visuals.skySunInfluence,
+    moonPhase: visuals.moonPhase
   });
   const starTwinkleUniforms = starDomeMaterial.userData.twinkleUniforms as
     | { twinkleTime: { value: number } }
@@ -4101,20 +4323,11 @@ function update(deltaSeconds: number): void {
     body: "moon",
     radius: skyDomePolicy.radius * skyBodyStyle.moon.radiusMultiplier
   });
-  // sun/moon 地平线 fade：fade 窗口必须覆盖"日轮的半径"才不会让太阳还有
-  // 大半个露在天上时就消失。日轮在天穹上的视半角 ≈ atan(spriteRadius /
-  // skyRadius)。skyRadius 360、sun scale 46-70、moon scale 走 minScale/
-  // maxScale（约 36-58）。取保守 ±0.10 rad 窗口，覆盖 sun 半径并留余量。
-  const skyBodyHorizonFadeWindow = 0.10;
-  const sunScaleAtCurrent = 46 + Math.max(0, sunDomeVector.altitude) * 24;
+  const sunScaleAtCurrent = sunDiscScaleForAltitude(sunDomeVector.altitude);
   sunSkyDisc.position.set(sunDomeVector.x, sunDomeVector.y, sunDomeVector.z);
   sunSkyDisc.scale.setScalar(sunScaleAtCurrent);
-  const sunHorizonFade = MathUtils.smoothstep(
-    sunDomeVector.altitude,
-    -skyBodyHorizonFadeWindow,
-    skyBodyHorizonFadeWindow
-  );
-  sunSkyDisc.material.opacity = visuals.sunDiscOpacity * sunHorizonFade;
+  const sunHorizonFade = skyBodyHorizonFade(sunDomeVector.altitude);
+  sunSkyDiscMaterial.opacity = visuals.sunDiscOpacity * sunHorizonFade;
   moonSkyDisc.position.set(moonDomeVector.x, moonDomeVector.y, moonDomeVector.z);
   moonSkyDisc.scale.setScalar(
     MathUtils.lerp(
@@ -4123,12 +4336,8 @@ function update(deltaSeconds: number): void {
       Math.max(0, moonDomeVector.altitude)
     )
   );
-  const moonHorizonFade = MathUtils.smoothstep(
-    moonDomeVector.altitude,
-    -skyBodyHorizonFadeWindow,
-    skyBodyHorizonFadeWindow
-  );
-  moonSkyDisc.material.opacity = visuals.moonOpacity * moonHorizonFade;
+  const moonHorizonFade = skyBodyHorizonFade(moonDomeVector.altitude);
+  moonSkyDiscMaterial.opacity = visuals.moonOpacity * moonHorizonFade;
   applyAmbientWaterSurfaceVisuals(visuals);
   applyWaterEnvironmentVisuals(visuals);
   waterSurface.setTime(clock.elapsedTime);
@@ -4398,15 +4607,20 @@ function update(deltaSeconds: number): void {
   }
 
   ambientAudio.update(environment, terrainSampler.sampleRiver(player.position.x, player.position.z));
+  syncPoiHoverHud();
   syncStoryGuideState();
 }
 
 function frame(): void {
   perfStats.beginFrame();
+  const frameStartMs = performance.now();
   const deltaSeconds = Math.min(clock.getDelta(), 0.05);
   const elapsedTime = clock.elapsedTime;
 
   update(deltaSeconds);
+  if (wildlifeHandle) {
+    updateWildlifeFrame(wildlifeHandle, elapsedTime);
+  }
   updateFragmentVisuals(elapsedTime);
   hudRefreshTimer += deltaSeconds;
   // 静态底图缓存（drawAtlasMapCanvas 内）让 mini-map / 全屏 atlas 重绘成本
@@ -4422,6 +4636,7 @@ function frame(): void {
   // 0.92 排除掉，色彩不动。
   bloomComposer.render();
   perfStats.endFrame(renderer);
+  perfMonitor.observe(renderer, performance.now() - frameStartMs);
   requestAnimationFrame(frame);
 }
 
@@ -4429,6 +4644,14 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   disposeChunkTerrain();
   terrainSampler = sampler;
   resetStoryGuide();
+  rebuildHudPoiCatalog();
+  if (window.HUD_DEBUG) {
+    hudDebugWarn("applyTerrainFromSampler catalog rebuilt", {
+      poiCount: allHudPois.length,
+      cityMarkersBeforeRebuild: cityMarkersHandle?.group.children.length ?? 0
+    });
+  }
+  rebuildLandmarkVisuals();
   // scenic / ancient POI 需要 sampler.bounds + sampleHeight 才能落地；init
   // 里如果先 rebuild 再设 terrainSampler，会直接 early return 变成空组。
   // 把这两组重建收口到 terrain apply 之后，避免 atlas 有点位但 3D 首帧没有。
