@@ -66,6 +66,10 @@ import {
   unlockOnUserGesture
 } from "./game/audio/audioContext";
 import { loadAllBuffers } from "./game/audio/audioManifest";
+import {
+  createSparseScheduler,
+  DEFAULT_SPARSE_RULES
+} from "./game/audio/sparseScheduler";
 import { createTriggerSystem } from "./game/audio/triggerSystem";
 import { createAudioDebugHud } from "./game/audioDebugHud";
 import {
@@ -290,6 +294,7 @@ const audioRuntime = createAudioRuntime();
 unlockOnUserGesture(audioRuntime);
 const ambientMixer = createAmbientMixer(audioRuntime);
 const triggerSystem = createTriggerSystem(audioRuntime);
+const sparseScheduler = createSparseScheduler(triggerSystem, DEFAULT_SPARSE_RULES);
 let landmarks: Landmark[] = defaultLandmarks.map((landmark) => ({
   ...landmark,
   position: landmark.position.clone()
@@ -605,9 +610,15 @@ function sampleLargeRiverProximity(position: Pick<Vector3, "x" | "z">): number {
 
 function safeReadAudioMuted(): boolean {
   try {
-    return window.localStorage.getItem("audio_muted") === "1";
+    const stored = window.localStorage.getItem("audio_muted");
+    // 当前 freesound 抓的样本质量参差，默认静音；用户偏好"似有似无"+
+    // 高质量音源未到位之前，先以无声为底，等精修完再让用户主动 unmute。
+    if (stored === null) {
+      return true;
+    }
+    return stored === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -738,17 +749,26 @@ const poiHoverHud = createCityHoverHud(appRoot, {
 });
 // horseLegsByName 是个 reference，rebuild 时整体替换；包成 ref 让循环里始终读到最新。
 let mountLegsByName = playerAvatarHandle.mountLegsByName;
+let avatarWalkLegsByName = playerAvatarHandle.avatarWalkLegsByName;
+let avatarWalkArmsByName = playerAvatarHandle.avatarWalkArmsByName;
 let currentMountId: MountId = playerAvatarHandle.mountId;
 let currentAvatarId: AvatarId = playerAvatarHandle.avatarId;
 let customizationPanelOpen = false;
+let avatarWalkPhase = 0;
 scene.add(player);
 
 function applyCustomization(mountId: MountId, avatarId: AvatarId): void {
   if (mountId === currentMountId && avatarId === currentAvatarId) {
     return;
   }
-  const { mountLegsByName: nextLegs } = rebuildPlayerAvatar(player, mountId, avatarId);
+  const {
+    mountLegsByName: nextLegs,
+    avatarWalkLegsByName: nextAvatarWalkLegs,
+    avatarWalkArmsByName: nextAvatarWalkArms
+  } = rebuildPlayerAvatar(player, mountId, avatarId);
   mountLegsByName = nextLegs;
+  avatarWalkLegsByName = nextAvatarWalkLegs;
+  avatarWalkArmsByName = nextAvatarWalkArms;
   currentMountId = mountId;
   currentAvatarId = avatarId;
   savePlayerCustomization({ mountId, avatarId });
@@ -4144,9 +4164,11 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (normalized === "f") {
+    // F = follow reset，"主人公肩后视角"——再次压近，落到 minDistance+2 = 9，
+    // 接近第三人称跟随的 chest cam。
     cameraViewMode = "follow";
-    cameraDistance = qinlingCameraRig.minDistance + 10;
-    cameraElevation = 0.52;
+    cameraDistance = qinlingCameraRig.minDistance + 2;
+    cameraElevation = 0.34;
     return;
   }
 
@@ -4747,6 +4769,30 @@ function update(deltaSeconds: number): void {
       leg.rotation.z = rotation;
     }
   });
+  avatarWalkPhase += movementSpeed * deltaSeconds * 0.9;
+  const avatarLimbPhase = avatarWalkPhase * 3.2;
+  const avatarLegSwing = Math.sin(avatarLimbPhase) * 0.4 * horseMovementIntensity;
+  avatarWalkLegsByName.forEach((leg, name) => {
+    leg.rotation.z =
+      name === "avatar-walk-left-leg"
+        ? 0.08 + avatarLegSwing
+        : -0.08 - avatarLegSwing;
+  });
+  const avatarArmSwing = Math.sin(avatarLimbPhase) * 0.6 * horseMovementIntensity;
+  avatarWalkArmsByName.forEach((arm, name) => {
+    const baseRotation = name === "avatar-walk-left-arm" ? -0.15 : 0.15;
+    const targetRotation =
+      movementSpeed < 0.5
+        ? baseRotation
+        : name === "avatar-walk-left-arm"
+          ? baseRotation - avatarArmSwing
+          : baseRotation + avatarArmSwing;
+    arm.rotation.z = MathUtils.lerp(
+      arm.rotation.z,
+      targetRotation,
+      movementSpeed < 0.5 ? 0.18 : 0.32
+    );
+  });
 
   const avatarTilt = computeAvatarTilt({
     heading: player.rotation.y,
@@ -4947,8 +4993,7 @@ function update(deltaSeconds: number): void {
 
   const riverProximity = sampleRiverProximity(terrainSampler, player.position);
   const largeRiverProximity = sampleLargeRiverProximity(player.position);
-  ambientMixer.tick(deltaSeconds * 1000);
-  ambientMixer.setContext({
+  const ambientContext: AmbientContext = {
     biome: deriveAmbientBiome(player.position.x, player.position.z, terrainSampler),
     isNight: environment.timeOfDay < 6 || environment.timeOfDay > 19,
     weather: ambientWeatherForState(environment.weather),
@@ -4956,7 +5001,11 @@ function update(deltaSeconds: number): void {
       player.position.y > 12 ? "high" : player.position.y > 4 ? "mid" : "low",
     riverProximity,
     largeRiverProximity
-  });
+  };
+  ambientMixer.setContext(ambientContext);
+  ambientMixer.tick(deltaSeconds * 1000);
+  sparseScheduler.setContext(ambientContext);
+  sparseScheduler.tick(deltaSeconds * 1000);
   triggerSystem.setThunderActive(environment.weather === "storm");
   triggerNearbyCraneAudio(clock.elapsedTime);
   syncPoiHoverHud();
