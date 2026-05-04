@@ -9,7 +9,7 @@ import {
 } from "three";
 
 /**
- * 5 种骑手 avatar（含 default = 旧 wood-horse rider）。
+ * 6 种骑手 avatar（含 default = 旧 wood-horse rider）。
  *
  * avatar 局部坐标系：以 saddle 顶面为 y=0，朝向 +X 方向（跟 mount 一致）。
  * main.ts 把 avatar group 整体放到 mount.saddleHeight + saddleX 上方即可。
@@ -17,7 +17,13 @@ import {
  * 每个 avatar 高 ~1.5–1.7m（含帽子），半径 ~0.4m，避免穿模到坐骑两侧。
  */
 
-export type AvatarId = "default" | "wenren" | "wujiang" | "youxia" | "nongfu";
+export type AvatarId =
+  | "default"
+  | "wenren"
+  | "wujiang"
+  | "youxia"
+  | "nongfu"
+  | "monk";
 
 export interface AvatarDefinition {
   id: AvatarId;
@@ -30,7 +36,8 @@ export const AVATAR_DEFINITIONS: AvatarDefinition[] = [
   { id: "wenren", name: "文人", description: "灰蓝长袍 + 幞头，背书袋。" },
   { id: "wujiang", name: "武将", description: "红袍方甲 + 兜鍪，腰悬利剑。" },
   { id: "youxia", name: "游侠", description: "深褐短打 + 斗笠，背行囊。" },
-  { id: "nongfu", name: "农夫", description: "浅黄短衣 + 草帽，肩扛锄。" }
+  { id: "nongfu", name: "农夫", description: "浅黄短衣 + 草帽，肩扛锄。" },
+  { id: "monk", name: "僧人", description: "杏黄僧袍 + 光头 + 颈挂佛珠。" }
 ];
 
 export interface AvatarHandle {
@@ -93,9 +100,11 @@ function buildSeatedTorso(
   // 手臂：双手前伸（握缰）
   const armGeometry = new CylinderGeometry(0.07, 0.08, 0.5, 5);
   const armLeft = new Mesh(armGeometry, materials.garment);
+  armLeft.name = "avatar-arm-left";
   armLeft.position.set(0.28, 0.6, 0.22);
   armLeft.rotation.set(0, 0, Math.PI / 2 - 0.5);
   const armRight = new Mesh(armGeometry, materials.garment);
+  armRight.name = "avatar-arm-right";
   armRight.position.set(0.28, 0.6, -0.22);
   armRight.rotation.set(0, 0, Math.PI / 2 - 0.5);
   group.add(armLeft, armRight);
@@ -344,12 +353,89 @@ function buildNongfuAvatar(): AvatarHandle {
   return { avatar: group };
 }
 
+/** 僧人：杏黄僧袍 + 光头 + 腰带 + 佛珠 + 左肩偏袒披布 */
+function buildMonkAvatar(): AvatarHandle {
+  const materials: BodyMaterials = {
+    skin: new MeshPhongMaterial({
+      color: 0xeed4b6,
+      shininess: 50
+    }),
+    garment: new MeshPhongMaterial({
+      color: 0xb37a3a,
+      flatShading: true,
+      shininess: 10
+    }),
+    hat: new MeshPhongMaterial({
+      color: 0xb37a3a,
+      flatShading: true,
+      shininess: 10
+    }),
+    accent: new MeshPhongMaterial({
+      color: 0x6e2a20,
+      flatShading: true,
+      shininess: 12
+    })
+  };
+  const beadMaterial = new MeshPhongMaterial({
+    color: 0x4a2e22,
+    flatShading: true,
+    shininess: 18
+  });
+
+  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.58, 0.76, 0.44] });
+
+  const robe = new Mesh(new ConeGeometry(0.62, 0.92, 7), materials.garment);
+  robe.position.set(0.04, 0.04, 0);
+  group.add(robe);
+
+  const belt = new Mesh(new BoxGeometry(0.6, 0.08, 0.44), materials.accent);
+  belt.position.set(0.02, 0.36, 0);
+  group.add(belt);
+
+  // 左肩偏袒：肩头布料更高，并向胸前斜披一块。
+  const shoulderWrap = new Mesh(new BoxGeometry(0.24, 0.34, 0.2), materials.garment);
+  shoulderWrap.position.set(0.08, 0.92, 0.26);
+  shoulderWrap.rotation.z = 0.16;
+  group.add(shoulderWrap);
+
+  const chestDrape = new Mesh(new BoxGeometry(0.14, 0.5, 0.16), materials.garment);
+  chestDrape.position.set(0.2, 0.66, 0.18);
+  chestDrape.rotation.set(0.18, 0.08, 0.34);
+  group.add(chestDrape);
+
+  const scalpCrown = new Mesh(new SphereGeometry(0.09, 10, 10), materials.skin);
+  scalpCrown.position.set(0.05, headY + 0.28, 0);
+  group.add(scalpCrown);
+
+  const beadGeometry = new SphereGeometry(0.055, 8, 8);
+  const beadOffsets = [
+    { x: -0.08, y: headY + 0.08, z: 0.18 },
+    { x: -0.01, y: headY - 0.02, z: 0.26 },
+    { x: 0.08, y: headY - 0.11, z: 0.23 },
+    { x: 0.16, y: headY - 0.16, z: 0.14 },
+    { x: 0.19, y: headY - 0.19, z: 0 },
+    { x: 0.16, y: headY - 0.16, z: -0.14 },
+    { x: 0.08, y: headY - 0.11, z: -0.23 },
+    { x: -0.01, y: headY - 0.02, z: -0.26 },
+    { x: -0.08, y: headY + 0.08, z: -0.18 }
+  ];
+
+  beadOffsets.forEach((offset) => {
+    const bead = new Mesh(beadGeometry, beadMaterial);
+    bead.position.set(offset.x, offset.y, offset.z);
+    group.add(bead);
+  });
+
+  return { avatar: group };
+}
+
 const AVATAR_BUILDERS: Record<AvatarId, () => AvatarHandle> = {
   default: buildDefaultAvatar,
   wenren: buildWenrenAvatar,
   wujiang: buildWujiangAvatar,
   youxia: buildYouxiaAvatar,
-  nongfu: buildNongfuAvatar
+  nongfu: buildNongfuAvatar,
+  monk: buildMonkAvatar
 };
 
 export function createAvatar(id: AvatarId): AvatarHandle {

@@ -57,11 +57,11 @@ async function loadPlayerAvatarModules() {
   return { playerAvatarMesh, playerCustomization, mounts };
 }
 
-test("player root scales rider and mount down to two-thirds and cloud sits in the seventh slot", async () => {
+test("player root scales rider and mount down to two-thirds and mount cycling includes on-foot mode first", async () => {
   const { playerAvatarMesh, playerCustomization, mounts } =
     await loadPlayerAvatarModules();
-  const { createPlayerAvatar } = playerAvatarMesh;
-  const { cycleMount } = playerCustomization;
+  const { createPlayerAvatar, rebuildPlayerAvatar } = playerAvatarMesh;
+  const { cycleAvatar, cycleMount, listAvatars } = playerCustomization;
   const { MOUNT_DEFINITIONS } = mounts;
 
   const handle = createPlayerAvatar();
@@ -70,7 +70,24 @@ test("player root scales rider and mount down to two-thirds and cloud sits in th
   assert.equal(handle.player.scale.z, 2 / 3);
   assert.ok(handle.player.children.length >= 2, "player should still assemble mount and avatar children");
 
-  assert.equal(MOUNT_DEFINITIONS[6]?.id, "cloud");
-  assert.equal(cycleMount("pig", 1), "cloud");
-  assert.equal(cycleMount("cloud", 1), "chicken");
+  assert.equal(MOUNT_DEFINITIONS[0]?.id, "none");
+  assert.equal(MOUNT_DEFINITIONS[1]?.id, "horse");
+  assert.equal(MOUNT_DEFINITIONS[2]?.id, "ox");
+  assert.equal(cycleMount("horse", -1), "none");
+  assert.equal(cycleMount("horse", 1), "ox");
+  assert.equal(listAvatars().length, 6);
+  assert.equal(listAvatars()[5]?.id, "monk");
+  assert.equal(cycleAvatar("nongfu", 1), "monk");
+  assert.equal(cycleAvatar("monk", 1), "default");
+
+  const rebuilt = rebuildPlayerAvatar(handle.player, "none", "default");
+  assert.equal(rebuilt.mountLegsByName.size, 0, "on-foot mode should not expose mount leg meshes");
+  assert.ok(
+    handle.player.getObjectByName("avatar-walk-left-leg"),
+    "on-foot mode should add a left walking leg to the avatar rig"
+  );
+  assert.ok(
+    handle.player.getObjectByName("avatar-walk-right-leg"),
+    "on-foot mode should add a right walking leg to the avatar rig"
+  );
 });
