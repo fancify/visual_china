@@ -10,10 +10,11 @@ import {
   Object3D
 } from "three";
 
-import { biomeWeightsAt } from "./biomeZones";
+import { applySeasonalAdjustment, biomeWeightsAt } from "./biomeZones";
 import { TerrainSampler } from "./demSampler";
 import { unprojectWorldToGeo } from "./mapOrientation.js";
 import type { RuntimePerformanceBudget } from "./performanceBudget";
+import type { SeasonalBlend } from "./biomeZones";
 
 // 共享 geometry / material：scenery 在每个 chunk 加载时被频繁创建/卸载，
 // 共享资源避免重复 GPU 上传和材质实例数膨胀。transparent + 默认 opacity:1
@@ -51,7 +52,8 @@ function normalizedHeight(height: number, sampler: TerrainSampler): number {
 
 export function createChunkScenery(
   sampler: TerrainSampler,
-  budget: RuntimePerformanceBudget["scenery"]
+  budget: RuntimePerformanceBudget["scenery"],
+  seasonalBlend?: SeasonalBlend
 ): Group {
   const group = new Group();
   const dummy = new Object3D();
@@ -97,10 +99,14 @@ export function createChunkScenery(
       // 是农田 + 村落，长树合理。
       const forestBand = Math.max(0, 1 - Math.abs(h - 0.46) / 0.34);
       const lowlandGreen = Math.max(0, 1 - h / 0.44) * Math.max(0, 1 - slope / 0.72);
-      const biome =
+      const biomeBase =
         bounds
           ? biomeWeightsAt(unprojectWorldToGeo({ x, z }, bounds, sampler.asset.world))
           : null;
+      const biome =
+        biomeBase && seasonalBlend
+          ? applySeasonalAdjustment(biomeBase, seasonalBlend)
+          : biomeBase;
       const baseVegetationChance =
         0.12 + river * 0.22 + forestBand * 0.24 + lowlandGreen * 0.16;
       const vegetationChance = Math.min(

@@ -118,4 +118,35 @@ export const BIOME_ZONE_DATA = Object.freeze({
   ]
 });
 
+export const SEASONAL_PALETTE = Object.freeze({
+  spring: {
+    hueShift: 0,
+    satScale: 0.95,
+    lumScale: 1.1,
+    vegDensity: 1.05,
+    treeHueShift: 0.005
+  },
+  summer: {
+    hueShift: 0,
+    satScale: 1,
+    lumScale: 1,
+    vegDensity: 1,
+    treeHueShift: 0
+  },
+  autumn: {
+    hueShift: -0.1,
+    satScale: 1.1,
+    lumScale: 1,
+    vegDensity: 0.85,
+    treeHueShift: -0.08
+  },
+  winter: {
+    hueShift: -0.05,
+    satScale: 0.55,
+    lumScale: 1.2,
+    vegDensity: 0.3,
+    treeHueShift: -0.04
+  }
+});
+
 export default BIOME_ZONE_DATA;
