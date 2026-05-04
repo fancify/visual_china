@@ -9,17 +9,28 @@ async function loadMountModule() {
   const tempRoot = path.resolve(".codex-temp-tests");
   await mkdir(tempRoot, { recursive: true });
   const tempDir = await mkdtemp(path.join(tempRoot, "mount-pig-"));
-  const sourcePath = path.resolve("src/game/mounts.ts");
-  const source = await readFile(sourcePath, "utf8");
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ES2022,
-      target: ts.ScriptTarget.ES2022
-    },
-    fileName: "mounts.ts"
-  });
+  const sourceFiles = [
+    "src/game/mounts.ts",
+    "src/game/mounts/mountCloud.ts"
+  ];
 
-  await writeFile(path.join(tempDir, "mounts.js"), output.outputText, "utf8");
+  for (const sourceFile of sourceFiles) {
+    const sourcePath = path.resolve(sourceFile);
+    const source = await readFile(sourcePath, "utf8");
+    const output = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ES2022,
+        target: ts.ScriptTarget.ES2022
+      },
+      fileName: path.basename(sourcePath)
+    });
+    const targetRelativePath = sourceFile
+      .replace(/^src\/game\//, "")
+      .replace(/\.ts$/, ".js");
+    const targetPath = path.join(tempDir, targetRelativePath);
+    await mkdir(path.dirname(targetPath), { recursive: true });
+    await writeFile(targetPath, output.outputText, "utf8");
+  }
 
   const moduleUrl = new URL(`file://${path.join(tempDir, "mounts.js")}`).href;
   const mounts = await import(`${moduleUrl}?v=${Date.now()}`);

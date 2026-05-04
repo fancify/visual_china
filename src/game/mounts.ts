@@ -9,9 +9,13 @@ import {
   TorusGeometry,
   Vector3
 } from "three";
+import {
+  buildCloudMountGeometry,
+  CLOUD_MOUNT_COLOR
+} from "./mounts/mountCloud.js";
 
 /**
- * 8 种坐骑（mount）。
+ * 9 种坐骑（mount）。
  *
  * 设计目标：
  * - 都用 low-poly Three primitives，零外部 asset
@@ -27,6 +31,7 @@ export type MountId =
   | "donkey"
   | "fox"
   | "pig"
+  | "cloud"
   | "chicken"
   | "boar";
 
@@ -45,6 +50,7 @@ export const MOUNT_DEFINITIONS: MountDefinition[] = [
   { id: "donkey", name: "毛驴", description: "灰身长耳，轻便代步。" },
   { id: "fox", name: "灵狐", description: "橙红长尾，山林灵兽。" },
   { id: "pig", name: "家猪", description: "粉灰肉色，乡土田园伙伴。" },
+  { id: "cloud", name: "筋斗云", description: "祥云悬空，腾云疾行。" },
   { id: "chicken", name: "灵鸡", description: "双足金羽，骑感独特。" },
   { id: "boar", name: "野猪", description: "獠牙竖耳，山林彪悍。" }
 ];
@@ -786,6 +792,47 @@ function buildBoar(): MountHandle {
   };
 }
 
+function buildCloud(): MountHandle {
+  const cloudMaterial = new MeshPhongMaterial({
+    color: CLOUD_MOUNT_COLOR,
+    emissive: 0xb8b2cd,
+    emissiveIntensity: 0.72,
+    flatShading: true,
+    shininess: 12
+  });
+  const swirlMaterial = new MeshPhongMaterial({
+    color: 0xf6f0fb,
+    emissive: 0xc5bed8,
+    emissiveIntensity: 0.55,
+    flatShading: true,
+    shininess: 18
+  });
+
+  const body = new Mesh(buildCloudMountGeometry(), cloudMaterial);
+  body.name = "mount-cloud-body";
+  body.position.y = 0.68;
+
+  const swirlLeft = new Mesh(new BoxGeometry(0.22, 0.06, 0.18), swirlMaterial);
+  swirlLeft.position.set(0.18, 1.0, 0.2);
+  swirlLeft.rotation.z = 0.28;
+  const swirlCenter = new Mesh(new BoxGeometry(0.26, 0.06, 0.2), swirlMaterial);
+  swirlCenter.position.set(0.0, 1.05, 0.0);
+  const swirlRight = new Mesh(new BoxGeometry(0.22, 0.06, 0.18), swirlMaterial);
+  swirlRight.position.set(-0.16, 0.99, -0.18);
+  swirlRight.rotation.z = -0.22;
+
+  const mount = new Group();
+  mount.name = "mount-cloud";
+  mount.add(body, swirlLeft, swirlCenter, swirlRight);
+
+  return {
+    mount,
+    legsByName: new Map(),
+    saddleHeight: 1.02,
+    saddleX: 0
+  };
+}
+
 function buildChicken(): MountHandle {
   const featherMaterial = new MeshPhongMaterial({
     color: 0xc04935,
@@ -918,6 +965,7 @@ const MOUNT_BUILDERS: Record<MountId, () => MountHandle> = {
   donkey: buildDonkey,
   fox: buildFox,
   pig: buildPig,
+  cloud: buildCloud,
   chicken: buildChicken,
   boar: buildBoar
 };
