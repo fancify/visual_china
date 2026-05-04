@@ -516,6 +516,8 @@ if (coverageRatio < 0.1) {
   );
 }
 
+const realPeakMeters = Math.max(0, Math.round(maxRawHeight));
+
 for (let pass = 0; pass < 4; pass += 1) {
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
@@ -654,6 +656,7 @@ const asset = {
   presentation: {
     waterLevel: Number((minHeight - 2.5).toFixed(3)),
     underpaintLevel: Number((minHeight - 3.2).toFixed(3)),
+    realPeakMeters,
     visualIntent: "Readable Guanzhong/Hanzhong/Sichuan basin lowlands with Qinling as a wall, not a sea-surrounded mountain island."
   },
   heights: Array.from(normalized, (value) => Number(value.toFixed(3))),
