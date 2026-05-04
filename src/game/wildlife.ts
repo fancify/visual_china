@@ -223,16 +223,13 @@ function buildGoatSilhouette(): BufferGeometry {
 }
 
 function buildRabbitSilhouette(): BufferGeometry {
+  // 兔子简化：身体一个圆球（不分头身，不出腿，避免"小凸起"碎片），加两只耳
+  // 朵和短尾，剪影里仍能识别是兔子。
   return finalizeSilhouette([
-    translatedSphere(0.16, 0, 0.17, 0, 1.05, 0.92, 1.32),
-    translatedSphere(0.1, 0, 0.21, 0.2, 1, 0.95, 1.05),
-    translatedBox(0.05, 0.12, 0.05, -0.08, 0.06, -0.06),
-    translatedBox(0.05, 0.12, 0.05, 0.08, 0.06, -0.06),
-    translatedBox(0.05, 0.11, 0.05, -0.08, 0.055, 0.08),
-    translatedBox(0.05, 0.11, 0.05, 0.08, 0.055, 0.08),
-    translatedCone(0.024, 0.22, -0.03, 0.42, 0.24),
-    translatedCone(0.024, 0.22, 0.03, 0.42, 0.24),
-    translatedSphere(0.04, 0, 0.14, -0.17)
+    translatedSphere(0.22, 0, 0.18, 0, 1.0, 0.95, 1.1),
+    translatedCone(0.024, 0.22, -0.04, 0.42, 0.04),
+    translatedCone(0.024, 0.22, 0.04, 0.42, 0.04),
+    translatedSphere(0.05, 0, 0.18, -0.2)
   ]);
 }
 
