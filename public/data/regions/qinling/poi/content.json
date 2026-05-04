@@ -79,16 +79,6 @@
   ],
   "landmarks": [
     {
-      "name": "陈仓道",
-      "kind": "pass",
-      "subKind": "gorge-pass",
-      "position": {
-        "lat": 34.16,
-        "lon": 106.97997
-      },
-      "description": "从陈仓、大散关一带折入秦岭的西线通道，山地把路线压成可控锁口。"
-    },
-    {
       "name": "太白主脊",
       "kind": "mountain",
       "position": {
@@ -115,16 +105,6 @@
         "lon": 105.53989
       },
       "description": "广元剑阁一带的入蜀锁口，两侧山势夹峙，让通道变成关隘。"
-    },
-    {
-      "name": "剑门蜀道",
-      "kind": "pass",
-      "subKind": "gorge-pass",
-      "position": {
-        "lat": 32.25417,
-        "lon": 105.7
-      },
-      "description": "汉中南下入蜀的关键路线，第二次把行军面压缩成少数节点。"
     }
   ],
   "fragments": [

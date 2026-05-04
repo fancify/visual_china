@@ -47,9 +47,10 @@ test("qinling pass landmarks carry explicit subKind classifications", async () =
       .map((landmark) => [landmark.name, landmark.subKind])
   );
 
+  assert.deepEqual([...passSubKinds.keys()], ["剑门关"]);
   assert.equal(passSubKinds.get("剑门关"), "major-pass");
-  assert.equal(passSubKinds.get("陈仓道"), "gorge-pass");
-  assert.equal(passSubKinds.get("剑门蜀道"), "gorge-pass");
+  assert.equal(passSubKinds.get("陈仓道"), undefined);
+  assert.equal(passSubKinds.get("剑门蜀道"), undefined);
   assert.equal(passSubKinds.get("褒斜谷意象"), undefined);
 });
 
@@ -89,13 +90,16 @@ test("pass landmark helper builds distinct major and gorge silhouettes", async (
   const majorHeight = worldTop(majorMeshes);
   const gorgeHeight = worldTop(gorgeMeshes);
   assert.ok(
-    majorHeight > gorgeHeight,
-    `major-pass should stand taller than gorge-pass, got ${majorHeight} <= ${gorgeHeight}`
+    majorHeight >= 0.98 && majorHeight <= 1.06,
+    `major-pass height should shrink to about 1.0u (0.3x), got ${majorHeight}`
   );
-  assert.ok(majorHeight >= 3.4, `major-pass height should be around 3.5u, got ${majorHeight}`);
   assert.ok(
     gorgeHeight >= 2.5 && gorgeHeight <= 2.8,
     `gorge-pass height should stay near the old stele scale, got ${gorgeHeight}`
+  );
+  assert.ok(
+    majorHeight < gorgeHeight,
+    `major-pass should now be visibly shorter than gorge-pass, got ${majorHeight} >= ${gorgeHeight}`
   );
 
   majorMeshes.forEach((mesh) => {

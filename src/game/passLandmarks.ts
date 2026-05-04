@@ -26,10 +26,10 @@ export const passLandmarkGeometries = {
   steleBase: new BoxGeometry(0.95, 0.32, 0.4),
   steleCap: new BoxGeometry(0.85, 0.18, 0.32),
   majorPass: {
-    base: new BoxGeometry(2.4, 0.4, 1.4),
-    lowerWallSide: new BoxGeometry(0.72, 1.15, 1.2),
-    upperTower: new BoxGeometry(1.55, 1.2, 0.96),
-    eaveCorner: new ConeGeometry(0.18, 0.52, 4)
+    base: new BoxGeometry(0.72, 0.12, 0.42),
+    lowerWallSide: new BoxGeometry(0.22, 0.35, 0.36),
+    upperTower: new BoxGeometry(0.46, 0.36, 0.29),
+    eaveCorner: new ConeGeometry(0.06, 0.16, 4)
   },
   gorgePass: {
     centerTower: new BoxGeometry(1.0, 1.3, 0.82),
@@ -69,52 +69,52 @@ function passLandmarkPieceSpecs(subKind: PassLandmarkSubKind): PassLandmarkPiece
         geometry: passLandmarkGeometries.majorPass.base,
         material: "accent",
         name: "pass-major-base",
-        offset: [0, 0.2, 0]
+        offset: [0, 0.06, 0]
       },
       {
         geometry: passLandmarkGeometries.majorPass.lowerWallSide,
         material: "accent",
         name: "pass-major-lower-wall-west",
-        offset: [-0.64, 0.98, 0]
+        offset: [-0.192, 0.294, 0]
       },
       {
         geometry: passLandmarkGeometries.majorPass.lowerWallSide,
         material: "accent",
         name: "pass-major-lower-wall-east",
-        offset: [0.64, 0.98, 0]
+        offset: [0.192, 0.294, 0]
       },
       {
         geometry: passLandmarkGeometries.majorPass.upperTower,
         material: "body",
         name: "pass-major-upper-tower",
-        offset: [0, 2.15, 0]
+        offset: [0, 0.645, 0]
       },
       {
         geometry: passLandmarkGeometries.majorPass.eaveCorner,
         material: "body",
         name: "pass-major-eave-nw",
-        offset: [-0.63, 3.16, -0.34],
+        offset: [-0.189, 0.948, -0.102],
         rotation: [0.18, Math.PI * 0.25, -0.16]
       },
       {
         geometry: passLandmarkGeometries.majorPass.eaveCorner,
         material: "body",
         name: "pass-major-eave-ne",
-        offset: [0.63, 3.16, -0.34],
+        offset: [0.189, 0.948, -0.102],
         rotation: [0.18, Math.PI * 0.25, 0.16]
       },
       {
         geometry: passLandmarkGeometries.majorPass.eaveCorner,
         material: "body",
         name: "pass-major-eave-sw",
-        offset: [-0.63, 3.16, 0.34],
+        offset: [-0.189, 0.948, 0.102],
         rotation: [-0.18, Math.PI * 0.25, -0.16]
       },
       {
         geometry: passLandmarkGeometries.majorPass.eaveCorner,
         material: "body",
         name: "pass-major-eave-se",
-        offset: [0.63, 3.16, 0.34],
+        offset: [0.189, 0.948, 0.102],
         rotation: [-0.18, Math.PI * 0.25, 0.16]
       }
     ];
