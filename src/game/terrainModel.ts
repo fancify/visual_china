@@ -2,7 +2,7 @@ import { Color, MathUtils } from "three";
 
 import { TerrainSampler } from "./demSampler";
 import type { EnvironmentState, EnvironmentVisuals } from "./environment";
-import { biomeWeightsAt } from "./biomeZones";
+import { applySeasonalAdjustment, biomeWeightsAt } from "./biomeZones";
 import { unprojectWorldToGeo } from "./mapOrientation.js";
 
 export function terrainHeightRange(sampler: TerrainSampler): {
@@ -101,7 +101,10 @@ export function modeColor(
   const bounds = sampler.asset.bounds;
   const biome =
     bounds
-      ? biomeWeightsAt(unprojectWorldToGeo({ x, z }, bounds, sampler.asset.world))
+      ? applySeasonalAdjustment(
+          biomeWeightsAt(unprojectWorldToGeo({ x, z }, bounds, sampler.asset.world)),
+          environmentVisuals.seasonalBlend
+        )
       : null;
 
   let color: Color;
@@ -229,14 +232,17 @@ export function modeColor(
     color.setHSL(hsl.h, hsl.s, hsl.l);
   }
 
-  const { minHeight, maxHeight } = terrainHeightRange(sampler);
-
-  if (mode === "terrain" && environmentState.season === "winter" && height > minHeight + (maxHeight - minHeight) * 0.52) {
-    color.lerp(new Color("#f5f7fb"), 0.22 + h * 0.25);
+  const winterWeight = environmentVisuals.seasonalBlend.winter;
+  if (mode === "terrain" && winterWeight > 0.05) {
+    const snowAmount = MathUtils.smoothstep(h, 0.6, 0.95) * winterWeight;
+    if (snowAmount > 0) {
+      color.lerp(new Color(0xfafafa), snowAmount * 0.7);
+    }
   }
 
-  if (mode === "terrain" && environmentState.season === "autumn" && settle > 0.45) {
-    color.lerp(new Color("#c89252"), 0.08);
+  const autumnWeight = environmentVisuals.seasonalBlend.autumn;
+  if (mode === "terrain" && autumnWeight > 0.05 && settle > 0.45) {
+    color.lerp(new Color("#c89252"), 0.08 * autumnWeight);
   }
 
   return color;

@@ -2,8 +2,8 @@ import { MathUtils } from "three";
 
 // `public/china-rivers-prototype.html` 需要直接 import 这份浏览器原生 module，
 // 所以 zone data 放在 public/；这里用同一份运行时数据，避免维护两张表。
-// @ts-expect-error public runtime module is intentionally shared with the static prototype page.
-import biomeZoneDataRaw from "../../public/data/biome-zones.js";
+// @ts-ignore public runtime module is intentionally shared with the static prototype page.
+import biomeZoneDataRaw, { SEASONAL_PALETTE as seasonalPaletteRaw } from "../../public/data/biome-zones.js";
 import type { GeoPoint as GeographicCoordinate } from "./mapOrientation.js";
 
 export type { GeographicCoordinate };
@@ -32,7 +32,22 @@ export interface BiomeWeights {
   treeHue: number;
 }
 
+export interface SeasonalBlend {
+  spring: number;
+  summer: number;
+  autumn: number;
+  winter: number;
+}
+
 interface BiomePreset extends Omit<BiomeWeights, "biomeId"> {}
+
+interface SeasonalPaletteEntry {
+  hueShift: number;
+  satScale: number;
+  lumScale: number;
+  vegDensity: number;
+  treeHueShift: number;
+}
 
 interface SmoothRange {
   start: number;
@@ -72,6 +87,10 @@ interface BiomeZoneData {
 
 const BIOME_ZONE_DATA = biomeZoneDataRaw as BiomeZoneData;
 const BIOME_PRESETS = BIOME_ZONE_DATA.presets;
+const SEASONAL_PALETTE = seasonalPaletteRaw as Record<
+  keyof SeasonalBlend,
+  SeasonalPaletteEntry
+>;
 const BIOME_PROPERTIES: Array<keyof Omit<BiomeWeights, "biomeId">> = [
   "hueShift",
   "satScale",
@@ -238,6 +257,45 @@ function fallbackBiomeId(coord: GeographicCoordinate): BiomeId {
   }
 
   return "warm-temperate-humid";
+}
+
+function blendedSeasonalPalette(seasonalBlend: SeasonalBlend): SeasonalPaletteEntry {
+  return (Object.keys(SEASONAL_PALETTE) as Array<keyof SeasonalBlend>).reduce(
+    (blended, season) => {
+      const weight = seasonalBlend[season];
+      const palette = SEASONAL_PALETTE[season];
+
+      blended.hueShift += palette.hueShift * weight;
+      blended.satScale += palette.satScale * weight;
+      blended.lumScale += palette.lumScale * weight;
+      blended.vegDensity += palette.vegDensity * weight;
+      blended.treeHueShift += palette.treeHueShift * weight;
+      return blended;
+    },
+    {
+      hueShift: 0,
+      satScale: 0,
+      lumScale: 0,
+      vegDensity: 0,
+      treeHueShift: 0
+    } satisfies SeasonalPaletteEntry
+  );
+}
+
+export function applySeasonalAdjustment(
+  baseWeights: BiomeWeights,
+  seasonalBlend: SeasonalBlend
+): BiomeWeights {
+  const palette = blendedSeasonalPalette(seasonalBlend);
+
+  return {
+    ...baseWeights,
+    hueShift: baseWeights.hueShift + palette.hueShift,
+    satScale: baseWeights.satScale * palette.satScale,
+    lumScale: baseWeights.lumScale * palette.lumScale,
+    vegetationDensity: baseWeights.vegetationDensity * palette.vegDensity,
+    treeHue: MathUtils.euclideanModulo(baseWeights.treeHue + palette.treeHueShift, 1)
+  };
 }
 
 /**

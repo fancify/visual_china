@@ -1517,6 +1517,7 @@ let journalOpen = false;
 let cityDetailPanelOpen = false;
 let cityDetailOpenCityId: string | null = null;
 let lastTerrainColorSignature = "";
+let lastScenerySeasonSignature = "";
 let lastVisuals: EnvironmentVisuals | null = null;
 let hudRefreshTimer = 0;
 let hudDirty = true;
@@ -1567,6 +1568,28 @@ function updateTerrainColors(visuals: EnvironmentVisuals): void {
       environmentController.state,
       visuals
     );
+  });
+}
+
+function refreshChunkScenery(visuals: EnvironmentVisuals): void {
+  const budget = scaledSceneryBudget();
+
+  terrainChunkMeshes.forEach((terrainChunk) => {
+    const wasVisible = terrainChunk.scenery?.visible ?? false;
+
+    if (terrainChunk.scenery) {
+      terrainChunk.mesh.remove(terrainChunk.scenery);
+      disposeScenery(terrainChunk.scenery);
+    }
+
+    const scenery = createChunkScenery(
+      terrainChunk.sampler,
+      budget,
+      visuals.seasonalBlend
+    );
+    scenery.visible = wasVisible;
+    terrainChunk.scenery = scenery;
+    terrainChunk.mesh.add(scenery);
   });
 }
 
@@ -3212,7 +3235,8 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         setTerrainMeshSurfaceVisible(terrainChunk, false);
         const scenery = createChunkScenery(
           chunkSampler,
-          scaledSceneryBudget()
+          scaledSceneryBudget(),
+          lastVisuals?.seasonalBlend ?? environmentController.computeVisuals().seasonalBlend
         );
         const center = chunkCenterFromBounds(chunk.worldBounds);
         setTerrainMeshWorldPosition(terrainChunk, center.x, center.y, 0.12);
@@ -4074,6 +4098,11 @@ function update(deltaSeconds: number): void {
   if (terrainColorSignature !== lastTerrainColorSignature) {
     lastTerrainColorSignature = terrainColorSignature;
     updateTerrainColors(visuals);
+  }
+
+  if (environmentController.state.season !== lastScenerySeasonSignature) {
+    lastScenerySeasonSignature = environmentController.state.season;
+    refreshChunkScenery(visuals);
   }
 
   const { forward: forwardInput, right: rightInput } = movementAxesFromKeys(keys);

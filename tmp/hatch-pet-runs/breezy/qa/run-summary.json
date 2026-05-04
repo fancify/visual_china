@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "run_dir": "/Users/chen/Documents/GitHub/visual_china/tmp/hatch-pet-runs/breezy",
+  "spritesheet": "/Users/chen/Documents/GitHub/visual_china/tmp/hatch-pet-runs/breezy/final/spritesheet.webp",
+  "validation": "/Users/chen/Documents/GitHub/visual_china/tmp/hatch-pet-runs/breezy/final/validation.json",
+  "contact_sheet": "/Users/chen/Documents/GitHub/visual_china/tmp/hatch-pet-runs/breezy/qa/contact-sheet.png",
+  "review": "/Users/chen/Documents/GitHub/visual_china/tmp/hatch-pet-runs/breezy/qa/review.json",
+  "videos": null,
+  "package": "/Users/chen/.codex/pets/breezy"
+}

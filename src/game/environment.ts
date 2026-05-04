@@ -1,5 +1,6 @@
 import { Color, MathUtils, Vector3 } from "three";
 
+import type { SeasonalBlend } from "./biomeZones";
 import { celestialCycle } from "./celestial.js";
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
@@ -8,6 +9,7 @@ export type Weather = "clear" | "windy" | "rain" | "snow" | "mist";
 export interface EnvironmentState {
   timeOfDay: number;
   dayCount: number;
+  dayOfYear: number;
   season: Season;
   weather: Weather;
 }
@@ -50,6 +52,7 @@ export interface EnvironmentVisuals {
   terrainHueShift: number;
   terrainSaturationMul: number;
   terrainLightnessMul: number;
+  seasonalBlend: SeasonalBlend;
 }
 
 interface SeasonConfig {
@@ -78,6 +81,20 @@ interface WeatherConfig {
 
 const seasons: Season[] = ["spring", "summer", "autumn", "winter"];
 const weathers: Weather[] = ["clear", "windy", "rain", "snow", "mist"];
+const DAY_OF_YEAR_MAX = 365;
+const SEASON_BLEND_HALF_WINDOW = 16;
+const SEASON_BOUNDARIES = {
+  spring: 60,
+  summer: 152,
+  autumn: 244,
+  winter: 335
+} as const;
+const SEASON_CENTERS: Record<Season, number> = {
+  spring: 106,
+  summer: 198,
+  autumn: 289.5,
+  winter: 17.5
+};
 
 const seasonConfig: Record<Season, SeasonConfig> = {
   spring: {
@@ -191,6 +208,74 @@ export function weatherLabel(weather: Weather): string {
   return weatherConfig[weather].label;
 }
 
+function normalizedDayOfYear(dayOfYear: number): number {
+  return MathUtils.euclideanModulo(dayOfYear, DAY_OF_YEAR_MAX);
+}
+
+function circularBoundaryDelta(dayOfYear: number, boundary: number): number {
+  return (
+    MathUtils.euclideanModulo(dayOfYear - boundary + DAY_OF_YEAR_MAX * 0.5, DAY_OF_YEAR_MAX) -
+    DAY_OF_YEAR_MAX * 0.5
+  );
+}
+
+export function seasonAtDayOfYear(dayOfYear: number): Season {
+  const day = normalizedDayOfYear(dayOfYear);
+
+  if (day >= SEASON_BOUNDARIES.winter || day < SEASON_BOUNDARIES.spring) {
+    return "winter";
+  }
+
+  if (day < SEASON_BOUNDARIES.summer) {
+    return "spring";
+  }
+
+  if (day < SEASON_BOUNDARIES.autumn) {
+    return "summer";
+  }
+
+  return "autumn";
+}
+
+export function seasonalBlendAtDayOfYear(dayOfYear: number): SeasonalBlend {
+  const day = normalizedDayOfYear(dayOfYear);
+  const transitions: Array<{ boundary: number; from: Season; to: Season }> = [
+    { boundary: SEASON_BOUNDARIES.spring, from: "winter", to: "spring" },
+    { boundary: SEASON_BOUNDARIES.summer, from: "spring", to: "summer" },
+    { boundary: SEASON_BOUNDARIES.autumn, from: "summer", to: "autumn" },
+    { boundary: SEASON_BOUNDARIES.winter, from: "autumn", to: "winter" }
+  ];
+
+  for (const transition of transitions) {
+    const delta = circularBoundaryDelta(day, transition.boundary);
+
+    if (Math.abs(delta) <= SEASON_BLEND_HALF_WINDOW) {
+      const t = MathUtils.smoothstep(
+        delta,
+        -SEASON_BLEND_HALF_WINDOW,
+        SEASON_BLEND_HALF_WINDOW
+      );
+      const blend: SeasonalBlend = {
+        spring: 0,
+        summer: 0,
+        autumn: 0,
+        winter: 0
+      };
+      blend[transition.from] = 1 - t;
+      blend[transition.to] = t;
+      return blend;
+    }
+  }
+
+  const season = seasonAtDayOfYear(day);
+  return {
+    spring: season === "spring" ? 1 : 0,
+    summer: season === "summer" ? 1 : 0,
+    autumn: season === "autumn" ? 1 : 0,
+    winter: season === "winter" ? 1 : 0
+  };
+}
+
 export function formatTimeOfDay(timeOfDay: number): string {
   const hours = Math.floor(timeOfDay);
   const minutes = Math.floor((timeOfDay - hours) * 60);
@@ -240,10 +325,7 @@ function blendEffectiveWeather(
 }
 
 export class EnvironmentController {
-  private seasonIndex = 0;
-  private weatherIndex = 0;
   private weatherTimer = 0;
-  private seasonTimer = 0;
   private nextWeatherDelay = 45;
   // 平滑天气切换：保留"过渡前"和"过渡后"两个快照 + 一个 t（0→1，12 秒
   // 内走完）。所有 channel 用同一个 t lerp，避免不同 channel 范围不同导
@@ -258,13 +340,24 @@ export class EnvironmentController {
   private weatherTransitionT = 1;
   private weatherTransitionTarget: Weather = weathers[0];
   private static readonly WEATHER_TRANSITION_SECONDS = 12;
+  private static readonly DAY_OF_YEAR_ADVANCE_PER_SECOND = 0.5;
 
   state: EnvironmentState = {
     timeOfDay: 7.5,
     dayCount: 1,
-    season: seasons[0],
+    dayOfYear: 180,
+    season: "summer",
     weather: weathers[0]
   };
+
+  private syncSeasonFromDayOfYear(): void {
+    this.state.dayOfYear = normalizedDayOfYear(this.state.dayOfYear);
+    this.state.season = seasonAtDayOfYear(this.state.dayOfYear);
+
+    if (this.state.season === "winter" && this.state.weather === "rain") {
+      this.state.weather = "snow";
+    }
+  }
 
   update(deltaSeconds: number): EnvironmentState {
     const previousTime = this.state.timeOfDay;
@@ -277,18 +370,18 @@ export class EnvironmentController {
       this.state.dayCount += 1;
     }
 
+    this.state.dayOfYear = normalizedDayOfYear(
+      this.state.dayOfYear +
+        deltaSeconds * EnvironmentController.DAY_OF_YEAR_ADVANCE_PER_SECOND
+    );
+    this.syncSeasonFromDayOfYear();
+
     this.weatherTimer += deltaSeconds;
-    this.seasonTimer += deltaSeconds;
 
     if (this.weatherTimer >= this.nextWeatherDelay) {
       this.weatherTimer = 0;
       this.advanceWeather();
       this.nextWeatherDelay = 36 + Math.random() * 34;
-    }
-
-    if (this.seasonTimer >= 180) {
-      this.seasonTimer = 0;
-      this.advanceSeason();
     }
 
     // 同步过渡：t 在 12 秒内走完 0→1，所有 channel 用同一个 t lerp。
@@ -321,13 +414,9 @@ export class EnvironmentController {
   }
 
   advanceSeason(): void {
-    this.seasonIndex = (this.seasonIndex + 1) % seasons.length;
-    this.state.season = seasons[this.seasonIndex]!;
-
-    if (this.state.season === "winter" && this.state.weather === "rain") {
-      this.weatherIndex = weathers.indexOf("snow");
-      this.state.weather = "snow";
-    }
+    const nextSeason = seasons[(seasons.indexOf(this.state.season) + 1) % seasons.length]!;
+    this.state.dayOfYear = SEASON_CENTERS[nextSeason];
+    this.syncSeasonFromDayOfYear();
   }
 
   advanceWeather(): void {
@@ -341,10 +430,11 @@ export class EnvironmentController {
     const currentIndex = options.indexOf(this.state.weather);
     const nextIndex = (currentIndex + 1 + Math.floor(Math.random() * options.length)) % options.length;
     this.state.weather = options[nextIndex]!;
-    this.weatherIndex = weathers.indexOf(this.state.weather);
   }
 
   computeVisuals(): EnvironmentVisuals {
+    this.syncSeasonFromDayOfYear();
+    const seasonalBlend = seasonalBlendAtDayOfYear(this.state.dayOfYear);
     const season = seasonConfig[this.state.season];
     // 用 effectiveWeather 而不是 weatherConfig[state.weather]：保证天气
     // 切换时 sunCut/rain/snow/fogBoost/shimmer 都是平滑过渡的，雨/雾/云
@@ -387,18 +477,26 @@ export class EnvironmentController {
     );
     const twilightColor = new Color(season.twilight);
     const skyHorizonColor = nightHorizonBase.clone().lerp(dayHorizonBase, daylight);
-    const skyHorizonCoolColor = skyHorizonColor
-      .clone()
-      // 背阳侧地平线只保留少量冷色，不再把亮 teal 带推到比 zenith 更亮，
-      // 否则 twilight 里远山、树和城墙轮廓会一起被洗掉。
-      .lerp(new Color("#4d6284"), twilightStrength * 0.18);
-    const skySunWarmColor = skyHorizonColor
-      .clone()
-      .lerp(twilightColor, twilightStrength * 0.96);
+    // seasonal palette 默认切到夏季后，base horizon 的红量略低于旧春季默认，
+    // 需要把 twilight 暖色轻微灌回主 horizon ramp，才能保持 dusk 时地平线
+    // 比 zenith 更暖，也让 renderer clearColor / 远山边缘过渡更一致。
+    skyHorizonColor.lerp(twilightColor, twilightStrength * 0.2);
     const skyZenithColor = nightReadableSky
       .clone()
       .lerp(dayZenithBase, daylight)
       .lerp(new Color("#2c3a55"), twilightStrength * 0.7);
+    const skyHorizonCoolColor =
+      twilightStrength <= 0
+        ? skyHorizonColor.clone()
+        : skyZenithColor
+            .clone()
+            // 背阳侧冷边不该从更亮的 horizon ramp 派生，否则 twilight 时容易
+            // 比 zenith 还亮。只在 dawn/dusk 时从 zenith 色出发叠少量冷蓝。
+            .lerp(new Color("#4d6284"), twilightStrength * 0.08)
+            .multiplyScalar(MathUtils.lerp(1, 0.76, twilightStrength * 0.9));
+    const skySunWarmColor = skyHorizonColor
+      .clone()
+      .lerp(twilightColor, twilightStrength * 0.96);
     const skyGroundColor =
       daylight > 0.28
         ? skyHorizonColor.clone().multiplyScalar(0.18)
@@ -462,23 +560,19 @@ export class EnvironmentController {
       cloudOpacity: celestial.cloudOpacity,
       cloudDriftSpeed: celestial.cloudDriftSpeed,
       terrainHueShift:
-        this.state.season === "spring"
-          ? 0.015
-          : this.state.season === "summer"
-            ? 0.03
-            : this.state.season === "autumn"
-              ? -0.018
-              : -0.01,
+        seasonalBlend.spring * 0.015 +
+        seasonalBlend.summer * 0.03 +
+        seasonalBlend.autumn * -0.018 +
+        seasonalBlend.winter * -0.01,
       // terrain mult 改成基于 effectiveWeather 的连续混合，让天气过渡也
       // 平滑——硬开关会让山色一帧跳一次。
       // 基线 = season-based。雨/雪/雾按各自强度往各自的目标拉。
       terrainSaturationMul: (() => {
         const seasonBase =
-          this.state.season === "summer"
-            ? 1.08
-            : this.state.season === "winter"
-              ? 0.82
-              : 1;
+          seasonalBlend.spring * 1 +
+          seasonalBlend.summer * 1.08 +
+          seasonalBlend.autumn * 1 +
+          seasonalBlend.winter * 0.82;
         const mistFactor = MathUtils.clamp(weather.fogBoost / 0.0021, 0, 1);
         let mul = MathUtils.lerp(seasonBase, 0.8, mistFactor * 0.6);
         mul = MathUtils.lerp(mul, 0.72, MathUtils.clamp(weather.snow, 0, 1) * 0.7);
@@ -492,7 +586,8 @@ export class EnvironmentController {
         mul = MathUtils.lerp(mul, 0.92, MathUtils.clamp(weather.rain, 0, 1) * 0.5);
         mul = MathUtils.lerp(mul, 1.14, MathUtils.clamp(weather.snow, 0, 1) * 0.6);
         return mul;
-      })()
+      })(),
+      seasonalBlend
     };
   }
 }
