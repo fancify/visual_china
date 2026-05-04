@@ -472,19 +472,6 @@ underpaint.rotation.x = -Math.PI / 2;
 underpaint.position.y = -8.5;
 scene.add(underpaint);
 
-const mistPlane = new Mesh(
-  new PlaneGeometry(1, 1),
-  new MeshBasicMaterial({
-    color: 0xbfd9cf,
-    transparent: true,
-    opacity: 0.05,
-    side: DoubleSide
-  })
-);
-mistPlane.rotation.x = -Math.PI / 2;
-mistPlane.position.y = 11;
-scene.add(mistPlane);
-
 let terrainGeometry = new PlaneGeometry(1, 1, 1, 1);
 terrainGeometry.rotateX(-Math.PI / 2);
 let positionAttribute = terrainGeometry.attributes.position;
@@ -3996,7 +3983,6 @@ function rebuildTerrainGeometry(
   terrain.geometry = terrainGeometry;
 
   underpaint.scale.set(worldWidth * 1.5, worldDepth * 1.5, 1);
-  mistPlane.scale.set(worldWidth * 1.3, worldDepth * 1.2, 1);
   waterRibbon.scale.set(worldWidth * 0.34, worldDepth * 0.52, 1);
 }
 
@@ -4143,7 +4129,6 @@ function update(deltaSeconds: number): void {
     skyBodyHorizonFadeWindow
   );
   moonSkyDisc.material.opacity = visuals.moonOpacity * moonHorizonFade;
-  mistPlane.material.opacity = visuals.mistOpacity;
   applyAmbientWaterSurfaceVisuals(visuals);
   applyWaterEnvironmentVisuals(visuals);
   waterSurface.setTime(clock.elapsedTime);
@@ -4373,8 +4358,6 @@ function update(deltaSeconds: number): void {
 
   underpaint.position.x = player.position.x * 0.04;
   underpaint.position.z = player.position.z * 0.03;
-  mistPlane.position.x = player.position.x * 0.015;
-  mistPlane.position.z = player.position.z * 0.02;
 
   precipitation.position.x = player.position.x;
   precipitation.position.z = player.position.z;

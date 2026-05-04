@@ -245,12 +245,14 @@ test("mid-range elevation enhancement lifts hill terrain without inflating peaks
 test("Qinling river carving keeps a narrow water footprint with sharper gorge walls", () => {
   const gorge = riverGorgeStats();
 
+  // 数值随 hydrography 扩展（commit d15e0c6 长江+金沙江+岷江+乌江+沱江
+  // 加入 slice）翻倍。新基线 ~2000 strong + ~4000 visible。
   assert.ok(
-    gorge.strongWaterCells >= 1000 && gorge.strongWaterCells <= 1100,
+    gorge.strongWaterCells >= 1900 && gorge.strongWaterCells <= 2200,
     `segment-walk river paint should expand the strong-water core without exploding width, got ${gorge.strongWaterCells} cells`
   );
   assert.ok(
-    gorge.visibleWaterCells >= 2200 && gorge.visibleWaterCells <= 2350,
+    gorge.visibleWaterCells >= 4000 && gorge.visibleWaterCells <= 4400,
     `segment-walk river paint should materially widen the visible river corridor, got ${gorge.visibleWaterCells} cells above 0.1`
   );
   assert.ok(
