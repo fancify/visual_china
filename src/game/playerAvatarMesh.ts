@@ -2,6 +2,7 @@ import { Group, Mesh } from "three";
 
 import { createAvatar } from "./avatars.js";
 import { createMount } from "./mounts.js";
+import { PLAYER_VISUAL_SCALE } from "./mountRuntime.js";
 import {
   loadPlayerCustomization,
   type AvatarId,
@@ -86,6 +87,7 @@ function assemble(
 export function createPlayerAvatar(): PlayerAvatarHandle {
   const customization = loadPlayerCustomization();
   const player = new Group();
+  player.scale.setScalar(PLAYER_VISUAL_SCALE);
   const { mountLegs } = assemble(player, customization.mountId, customization.avatarId);
 
   return {
