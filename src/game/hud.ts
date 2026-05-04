@@ -130,6 +130,7 @@ export function createHud(
       <div class="eyebrow">千里江山图</div>
       <h1>秦岭 - 关中 - 四川盆地</h1>
       <div class="loading-line" id="loading-line"></div>
+      <div class="title-environment" id="title-environment-line"></div>
     </div>
     <div class="compass-block" aria-label="游戏方位">
       <div class="compass-dial">
@@ -321,6 +322,7 @@ export function createHud(
   const zoneLine = requireElement<HTMLElement>(hud, "#zone-line");
   const modeLine = requireElement<HTMLElement>(hud, "#mode-line");
   const environmentLine = requireElement<HTMLElement>(hud, "#environment-line");
+  const titleEnvironmentLine = requireElement<HTMLElement>(hud, "#title-environment-line");
   const collectionLine = requireElement<HTMLElement>(hud, "#collection-line");
   const nearbyLine = requireElement<HTMLElement>(hud, "#nearby-line");
   const storyLine = requireElement<HTMLElement>(hud, "#story-line");
@@ -611,6 +613,8 @@ export function createHud(
       }
       if (lastStatus?.environment !== snapshot.environment) {
         environmentLine.textContent = snapshot.environment;
+        // 顶端 title-block 也回显时辰 + 季节 + 天气，免去用户展开"更多状态"。
+        titleEnvironmentLine.textContent = snapshot.environment;
       }
       if (lastStatus?.collection !== snapshot.collection) {
         collectionLine.textContent = snapshot.collection;
