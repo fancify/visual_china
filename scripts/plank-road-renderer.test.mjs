@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Matrix4, Quaternion, Vector3 } from "three";
 
+import { qinlingRouteAnchors } from "../src/game/data/qinlingRouteAnchors.js";
 import { buildPlankRoad, disposePlankRoad } from "../src/game/plankRoadRenderer.ts";
 
 function makeSampler(heightFn = () => 0) {
@@ -123,4 +124,24 @@ test("plank road lifts significantly more when the sampled route crosses a river
 
   disposePlankRoad(dryHandle);
   disposePlankRoad(wetHandle);
+});
+
+test("plank road prefers the precomputed dense route polyline when routeId is provided", () => {
+  const anchors = qinlingRouteAnchors["guanzhong-corridor"].points;
+  const sparsePoints = [anchors[0], anchors.at(-1)];
+  const sampler = makeSampler();
+  const sparseHandle = buildPlankRoad({
+    points: sparsePoints,
+    sampler
+  });
+  const denseHandle = buildPlankRoad({
+    routeId: "guanzhong-corridor",
+    points: sparsePoints,
+    sampler
+  });
+
+  assert.ok(denseHandle.plankCount > sparseHandle.plankCount);
+
+  disposePlankRoad(sparseHandle);
+  disposePlankRoad(denseHandle);
 });

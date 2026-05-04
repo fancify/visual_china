@@ -1982,6 +1982,7 @@ function rebuildRouteVisuals(): void {
 
   routePlankRoadHandle = buildPlankRoadNetwork(
     visibleRoutes.map((route) => ({
+      routeId: route.id,
       points: route.points,
       sampler: terrainSampler!
     }))

@@ -8,6 +8,8 @@ import {
 } from "three";
 
 import type { TerrainSampler } from "./demSampler";
+// @ts-expect-error -- generated JS asset has no standalone .d.ts file.
+import { qinlingRoutePaths } from "./data/qinlingRoutePaths.js";
 
 const DEFAULT_PLANK_SPACING = 0.4;
 const DEFAULT_LIFT_ABOVE_GROUND = 0.02;
@@ -50,10 +52,28 @@ export interface PlankRoadHandle {
 }
 
 export interface PlankRoadInput {
+  routeId?: string;
   points: Array<{ x: number; y: number }>;
   sampler: TerrainSampler;
   plankSpacing?: number;
   liftAboveGround?: number;
+}
+
+function getPathForRoute(
+  routeId: string | undefined,
+  fallbackPoints: RoutePoint[]
+): RoutePoint[] {
+  if (!routeId) {
+    return fallbackPoints;
+  }
+
+  const dense = qinlingRoutePaths[routeId];
+
+  if (dense && dense.length >= fallbackPoints.length) {
+    return dense;
+  }
+
+  return fallbackPoints;
 }
 
 function buildSegments(points: RoutePoint[]): SegmentSample[] {
@@ -196,7 +216,10 @@ export function buildPlankRoad(input: PlankRoadInput): PlankRoadHandle {
 
 export function buildPlankRoadNetwork(inputs: PlankRoadInput[]): PlankRoadHandle {
   const slotsByRoute = inputs.map((input) =>
-    densifyPathToPlanks(input.points, input.plankSpacing ?? DEFAULT_PLANK_SPACING)
+    densifyPathToPlanks(
+      getPathForRoute(input.routeId, input.points),
+      input.plankSpacing ?? DEFAULT_PLANK_SPACING
+    )
   );
   const firstInput = inputs[0];
   const liftAboveGround = firstInput?.liftAboveGround ?? DEFAULT_LIFT_ABOVE_GROUND;
