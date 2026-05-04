@@ -4,7 +4,7 @@ import type { SeasonalBlend } from "./biomeZones";
 import { celestialCycle } from "./celestial.js";
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
-export type Weather = "clear" | "windy" | "rain" | "snow" | "mist";
+export type Weather = "clear" | "windy" | "rain" | "storm" | "snow" | "mist";
 
 export interface EnvironmentState {
   timeOfDay: number;
@@ -81,7 +81,7 @@ interface WeatherConfig {
 }
 
 const seasons: Season[] = ["spring", "summer", "autumn", "winter"];
-const weathers: Weather[] = ["clear", "windy", "rain", "snow", "mist"];
+const weathers: Weather[] = ["clear", "windy", "rain", "storm", "snow", "mist"];
 const DAY_OF_YEAR_MAX = 365;
 const SYNODIC_MONTH = 29.5;
 const SEASON_BLEND_HALF_WINDOW = 16;
@@ -172,6 +172,15 @@ const weatherConfig: Record<Weather, WeatherConfig> = {
     fogBoost: 0.0012,
     sunCut: 0.42,
     shimmer: 0.55
+  },
+  storm: {
+    label: "暴",
+    wind: 0.98,
+    rain: 1,
+    snow: 0,
+    fogBoost: 0.0023,
+    sunCut: 0.68,
+    shimmer: 0.34
   },
   snow: {
     label: "雪",
@@ -456,8 +465,8 @@ export class EnvironmentController {
       this.state.season === "winter"
         ? (["clear", "windy", "mist", "snow"] as Weather[])
         : this.state.season === "summer"
-          ? (["clear", "windy", "rain", "mist"] as Weather[])
-          : (["clear", "windy", "rain", "mist"] as Weather[]);
+          ? (["clear", "windy", "rain", "storm", "mist"] as Weather[])
+          : (["clear", "windy", "rain", "storm", "mist"] as Weather[]);
 
     const currentIndex = options.indexOf(this.state.weather);
     const nextIndex = (currentIndex + 1 + Math.floor(Math.random() * options.length)) % options.length;
