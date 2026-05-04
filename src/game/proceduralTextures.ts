@@ -8,10 +8,16 @@ import { CanvasTexture } from "three";
  * 一起。它们没有任何运行时状态，是纯函数。
  */
 
+export interface RadialGradientStop {
+  offset: number;
+  color: string;
+}
+
 export function createCircleTexture(
   innerColor: string,
   outerColor: string,
-  size = 256
+  size = 256,
+  stops?: RadialGradientStop[]
 ): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -31,21 +37,41 @@ export function createCircleTexture(
     size * 0.5,
     size * 0.45
   );
-  gradient.addColorStop(0, innerColor);
-  gradient.addColorStop(1, outerColor);
+  const gradientStops = stops ?? [
+    { offset: 0, color: innerColor },
+    { offset: 1, color: outerColor }
+  ];
+  gradientStops.forEach(({ offset, color }) => {
+    gradient.addColorStop(offset, color);
+  });
 
   context.fillStyle = gradient;
   context.fillRect(0, 0, size, size);
 
   const texture = new CanvasTexture(canvas);
   texture.needsUpdate = true;
+  texture.userData.gradientStops = gradientStops.map((stop) => ({ ...stop }));
   return texture;
 }
 
-export function createMoonTexture(size = 256): CanvasTexture {
+export function normalizeMoonPhase(phase: number): number {
+  return ((phase % 1) + 1) % 1;
+}
+
+export function moonPhaseTextureIndex(phase: number, steps = 8): number {
+  if (steps <= 1) {
+    return 0;
+  }
+  return Math.round(normalizeMoonPhase(phase) * steps) % steps;
+}
+
+export function createMoonTexture(phaseOrSize = 0.5, size = 256): CanvasTexture {
+  const usesLegacySignature = phaseOrSize > 1;
+  const phase = usesLegacySignature ? 0.5 : normalizeMoonPhase(phaseOrSize);
+  const textureSize = usesLegacySignature ? phaseOrSize : size;
   const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = textureSize;
+  canvas.height = textureSize;
 
   const context = canvas.getContext("2d");
 
@@ -53,36 +79,65 @@ export function createMoonTexture(size = 256): CanvasTexture {
     throw new Error("Failed to create moon texture context");
   }
 
-  const center = size * 0.5;
-  const radius = size * 0.32;
-  context.clearRect(0, 0, size, size);
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  // 月盘主体必须是实心 alpha=1，否则星点会穿过 disc。
-  context.fillStyle = "rgba(232, 236, 224, 1)";
-  context.fill();
-
+  const center = textureSize * 0.5;
+  const radius = textureSize * 0.32;
+  const image = context.createImageData(textureSize, textureSize);
+  const data = image.data;
+  const lightAngle = phase * Math.PI * 2;
+  const lightDirX = Math.sin(lightAngle);
+  const lightDirZ = -Math.cos(lightAngle);
   const markings: Array<[number, number, number, number]> = [
     [0.42, 0.42, 0.055, 0.13],
     [0.57, 0.48, 0.08, 0.1],
     [0.47, 0.61, 0.065, 0.11],
     [0.61, 0.62, 0.035, 0.09]
   ];
-  markings.forEach(([x, y, r, opacity]) => {
-    context.beginPath();
-    context.arc(size * x, size * y, size * r, 0, Math.PI * 2);
-    context.fillStyle = `rgba(120, 132, 128, ${opacity})`;
-    context.fill();
-  });
 
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  context.strokeStyle = "rgba(255, 255, 246, 0.22)";
-  context.lineWidth = 2;
-  context.stroke();
+  context.clearRect(0, 0, textureSize, textureSize);
+
+  for (let y = 0; y < textureSize; y += 1) {
+    for (let x = 0; x < textureSize; x += 1) {
+      const nx = (x + 0.5 - center) / radius;
+      const ny = (y + 0.5 - center) / radius;
+      const distanceSquared = nx * nx + ny * ny;
+
+      if (distanceSquared > 1) {
+        continue;
+      }
+
+      const nz = Math.sqrt(1 - distanceSquared);
+      const light = Math.max(0, nx * lightDirX + nz * lightDirZ);
+
+      if (light <= 0.01) {
+        continue;
+      }
+
+      let craterShadow = 0;
+      markings.forEach(([mx, my, mr, opacity]) => {
+        const craterDx = nx - ((mx - 0.5) * textureSize) / radius;
+        const craterDy = ny - ((my - 0.5) * textureSize) / radius;
+        const craterDistance = Math.sqrt(craterDx * craterDx + craterDy * craterDy);
+        craterShadow += Math.max(0, 1 - craterDistance / ((mr * textureSize) / radius)) * opacity;
+      });
+
+      const edgeGlow = Math.pow(Math.max(0, 1 - Math.sqrt(distanceSquared)), 0.5);
+      const visibility = Math.pow(light, 0.8);
+      const albedo = 0.78 + edgeGlow * 0.12 - craterShadow * 0.28;
+      const brightness = 0.55 + visibility * 0.45;
+      const index = (y * textureSize + x) * 4;
+
+      data[index] = Math.round(232 * albedo * brightness);
+      data[index + 1] = Math.round(236 * albedo * brightness);
+      data[index + 2] = Math.round(224 * albedo * brightness);
+      data[index + 3] = Math.round(Math.min(1, visibility * 1.08) * 255);
+    }
+  }
+
+  context.putImageData(image, 0, 0);
 
   const texture = new CanvasTexture(canvas);
   texture.needsUpdate = true;
+  texture.userData.phase = phase;
   return texture;
 }
 

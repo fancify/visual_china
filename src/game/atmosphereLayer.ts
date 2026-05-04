@@ -20,6 +20,7 @@ import { skyDomePolicy } from "./skyDome.js";
 import {
   createCircleTexture,
   createCloudTexture,
+  moonPhaseTextureIndex,
   createMoonTexture,
   createStarDome
 } from "./proceduralTextures";
@@ -34,6 +35,8 @@ export interface SkyDomeHandle {
   sunDiscMaterial: SpriteMaterial;
   moonDisc: Sprite;
   moonDiscMaterial: SpriteMaterial;
+  moonPhaseTextures: CanvasTexture[];
+  moonPhaseTextureIndex: number;
 }
 
 interface StarTwinkleUniforms {
@@ -197,12 +200,19 @@ export function createSkyDome(): SkyDomeHandle {
   starDome.renderOrder = -997;
   group.add(starDome);
 
+  const sunDiscTexture = createCircleTexture(
+    "rgba(255, 230, 180, 1)",
+    "rgba(255, 100, 60, 0)",
+    256,
+    [
+      { offset: 0, color: "rgba(255, 230, 180, 1)" },
+      { offset: 0.45, color: "rgba(255, 200, 130, 0.7)" },
+      { offset: 0.65, color: "rgba(255, 150, 80, 0.25)" },
+      { offset: 1, color: "rgba(255, 100, 60, 0)" }
+    ]
+  );
   const sunDiscMaterial = new SpriteMaterial({
-    map: createCircleTexture(
-      "rgba(255, 244, 203, 0.9)",
-      "rgba(255, 194, 91, 0)",
-      256
-    ),
+    map: sunDiscTexture,
     transparent: true,
     opacity: 0,
     depthTest: false,
@@ -213,8 +223,14 @@ export function createSkyDome(): SkyDomeHandle {
   sunDisc.renderOrder = -996;
   group.add(sunDisc);
 
+  const moonPhaseTextures = Array.from({ length: 8 }, (_value, index) => {
+    const texture = createMoonTexture(index / 8, 256);
+    texture.userData.phaseIndex = index;
+    return texture;
+  });
+  const defaultMoonPhaseIndex = 4;
   const moonDiscMaterial = new SpriteMaterial({
-    map: createMoonTexture(256),
+    map: moonPhaseTextures[defaultMoonPhaseIndex] ?? null,
     transparent: true,
     opacity: 0,
     alphaTest: 0.32,
@@ -235,7 +251,9 @@ export function createSkyDome(): SkyDomeHandle {
     sunDisc,
     sunDiscMaterial,
     moonDisc,
-    moonDiscMaterial
+    moonDiscMaterial,
+    moonPhaseTextures,
+    moonPhaseTextureIndex: defaultMoonPhaseIndex
   };
 }
 
@@ -260,6 +278,7 @@ export function applySkyVisuals(
     horizonCoolColor?: Color;
     groundColor?: Color;
     sunInfluence?: number;
+    moonPhase?: number;
   }
 ): void {
   const ground = options.groundColor ?? options.skyColor.clone().multiplyScalar(0.18);
@@ -274,6 +293,14 @@ export function applySkyVisuals(
   );
   if (options.sunDirection) {
     handle.shellMaterial.uniforms.sunDirection.value.copy(options.sunDirection).normalize();
+  }
+  if (options.moonPhase !== undefined) {
+    const phaseIndex = moonPhaseTextureIndex(options.moonPhase, handle.moonPhaseTextures.length);
+    if (phaseIndex !== handle.moonPhaseTextureIndex) {
+      handle.moonPhaseTextureIndex = phaseIndex;
+      handle.moonDiscMaterial.map = handle.moonPhaseTextures[phaseIndex] ?? null;
+      handle.moonDiscMaterial.needsUpdate = true;
+    }
   }
   handle.shellMaterial.uniforms.groundColor.value.copy(ground);
   handle.shellMaterial.uniforms.sunInfluence.value = options.sunInfluence ?? 0;

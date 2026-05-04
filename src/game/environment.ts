@@ -44,6 +44,7 @@ export interface EnvironmentVisuals {
   windStrength: number;
   waterShimmer: number;
   daylight: number;
+  moonPhase: number;
   starOpacity: number;
   moonOpacity: number;
   sunDiscOpacity: number;
@@ -82,6 +83,7 @@ interface WeatherConfig {
 const seasons: Season[] = ["spring", "summer", "autumn", "winter"];
 const weathers: Weather[] = ["clear", "windy", "rain", "snow", "mist"];
 const DAY_OF_YEAR_MAX = 365;
+const SYNODIC_MONTH = 29.5;
 const SEASON_BLEND_HALF_WINDOW = 16;
 const SEASON_BOUNDARIES = {
   spring: 60,
@@ -106,7 +108,7 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     ambient: "#efe0bd",
     sun: "#ffe9b9",
     rim: "#8ab6c3",
-    twilight: "#f3a37c"
+    twilight: "#ff8a58"
   },
   summer: {
     label: "夏",
@@ -117,7 +119,7 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     ambient: "#f3e6c2",
     sun: "#fff1ce",
     rim: "#7cb2bf",
-    twilight: "#ff9a72"
+    twilight: "#ff7a45"
   },
   autumn: {
     label: "秋",
@@ -128,7 +130,7 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     ambient: "#f0dec0",
     sun: "#ffdca2",
     rim: "#a8b4cb",
-    twilight: "#e8753a"
+    twilight: "#ff5e2e"
   },
   winter: {
     label: "冬",
@@ -139,7 +141,7 @@ const seasonConfig: Record<Season, SeasonConfig> = {
     ambient: "#dfe7ef",
     sun: "#f7f6ff",
     rim: "#9ec0dd",
-    twilight: "#dc8a8a"
+    twilight: "#ff8b70"
   }
 };
 
@@ -196,6 +198,23 @@ function dayFactor(timeOfDay: number): number {
   return MathUtils.smoothstep(solar, -0.08, 0.38);
 }
 
+// 地平线上的日/月轮不该在中心刚触到 horizon 时就被压到半透明。
+// 现在改成：中心略低于地平线才开始 fade，沉到更低处再完全消失。
+export const SKY_BODY_HORIZON_FADE_START = -0.04;
+export const SKY_BODY_HORIZON_FADE_END = -0.14;
+
+export function skyBodyHorizonFade(altitude: number): number {
+  return MathUtils.smoothstep(
+    altitude,
+    SKY_BODY_HORIZON_FADE_END,
+    SKY_BODY_HORIZON_FADE_START
+  );
+}
+
+export function sunDiscScaleForAltitude(altitude: number): number {
+  return 60 + Math.max(0, altitude) * 18;
+}
+
 export function daylightFactor(timeOfDay: number): number {
   return dayFactor(timeOfDay);
 }
@@ -210,6 +229,19 @@ export function weatherLabel(weather: Weather): string {
 
 function normalizedDayOfYear(dayOfYear: number): number {
   return MathUtils.euclideanModulo(dayOfYear, DAY_OF_YEAR_MAX);
+}
+
+export function moonPhaseForDayOfYear(dayOfYear: number): number {
+  return MathUtils.euclideanModulo(dayOfYear, SYNODIC_MONTH) / SYNODIC_MONTH;
+}
+
+export function sunDirectionForTimeOfDay(timeOfDay: number): Vector3 {
+  const sunHourAngle = ((timeOfDay - 12) / 24) * Math.PI * 2;
+  return new Vector3(
+    -Math.sin(sunHourAngle) * 90,
+    Math.cos(sunHourAngle) * 150 + 10,
+    0
+  );
 }
 
 function circularBoundaryDelta(dayOfYear: number, boundary: number): number {
@@ -447,6 +479,7 @@ export class EnvironmentController {
       windStrength: weather.wind
     });
     const daylight = celestial.daylight;
+    const moonPhase = moonPhaseForDayOfYear(this.state.dayOfYear);
     const solar = Math.sin(((this.state.timeOfDay - 6) / 24) * Math.PI * 2);
     const nightReadableSky = new Color(season.skyNight).lerp(
       new Color("#314648"),
@@ -475,12 +508,17 @@ export class EnvironmentController {
       0,
       1
     );
-    const twilightColor = new Color(season.twilight);
+    const sunDiscOpacity = MathUtils.clamp(
+      (MathUtils.clamp(daylight, 0, 1) + twilightStrength * 0.4) * (1 - weather.sunCut * 0.5),
+      0,
+      1
+    );
+    const twilightColor = new Color(season.twilight).lerp(new Color("#ff5e2e"), 0.32);
     const skyHorizonColor = nightHorizonBase.clone().lerp(dayHorizonBase, daylight);
     // seasonal palette 默认切到夏季后，base horizon 的红量略低于旧春季默认，
     // 需要把 twilight 暖色轻微灌回主 horizon ramp，才能保持 dusk 时地平线
     // 比 zenith 更暖，也让 renderer clearColor / 远山边缘过渡更一致。
-    skyHorizonColor.lerp(twilightColor, twilightStrength * 0.2);
+    skyHorizonColor.lerp(twilightColor, twilightStrength * 0.28);
     const skyZenithColor = nightReadableSky
       .clone()
       .lerp(dayZenithBase, daylight)
@@ -496,24 +534,20 @@ export class EnvironmentController {
             .multiplyScalar(MathUtils.lerp(1, 0.76, twilightStrength * 0.9));
     const skySunWarmColor = skyHorizonColor
       .clone()
-      .lerp(twilightColor, twilightStrength * 0.96);
+      .lerp(twilightColor, MathUtils.lerp(0.78, 0.98, twilightStrength));
     const skyGroundColor =
       daylight > 0.28
         ? skyHorizonColor.clone().multiplyScalar(0.18)
         : new Color("#06080c").lerp(skyHorizonColor, daylight * 0.28);
-    fogColor.lerp(twilightColor, twilightStrength * 0.42);
-    sunColor.lerp(twilightColor, twilightStrength * 0.85);
+    fogColor.lerp(twilightColor, twilightStrength * 0.5);
+    sunColor.lerp(twilightColor, twilightStrength * 0.9);
     // skyColor 本身也被推一点暖色——renderer.setClearColor 用它，
     // sky dome 视野以外的"留白"也跟着 dawn/dusk 一起变暖。
-    skyColor.lerp(twilightColor, twilightStrength * 0.24);
+    skyColor.lerp(twilightColor, twilightStrength * 0.28);
     const moonColor = new Color("#dce7ff").lerp(new Color("#fff2d0"), daylight * 0.18);
     const cloudColor = new Color("#d7d2ad").lerp(new Color("#f4ead0"), daylight);
     const rimColor = new Color(season.rim).multiplyScalar(MathUtils.lerp(0.5, 1, daylight));
-    const sunDirection = new Vector3(
-      Math.cos(((this.state.timeOfDay - 12) / 24) * Math.PI * 2) * 90,
-      MathUtils.lerp(10, 160, Math.max(solar, 0)),
-      Math.sin(((this.state.timeOfDay - 12) / 24) * Math.PI * 2) * 54
-    );
+    const sunDirection = sunDirectionForTimeOfDay(this.state.timeOfDay);
     const moonDirection = sunDirection.clone().multiplyScalar(-0.74);
     moonDirection.y = Math.max(28, -sunDirection.y + 48);
 
@@ -554,9 +588,10 @@ export class EnvironmentController {
       windStrength: weather.wind,
       waterShimmer: weather.shimmer * MathUtils.lerp(0.35, 1, daylight),
       daylight,
+      moonPhase,
       starOpacity: celestial.starOpacity,
       moonOpacity: celestial.moonOpacity,
-      sunDiscOpacity: celestial.sunDiscOpacity,
+      sunDiscOpacity,
       cloudOpacity: celestial.cloudOpacity,
       cloudDriftSpeed: celestial.cloudDriftSpeed,
       terrainHueShift:
