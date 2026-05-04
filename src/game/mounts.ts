@@ -15,7 +15,7 @@ import {
 } from "./mounts/mountCloud.js";
 
 /**
- * 9 种坐骑（mount）。
+ * 10 种坐骑（mount，含步行模式）。
  *
  * 设计目标：
  * - 都用 low-poly Three primitives，零外部 asset
@@ -25,6 +25,7 @@ import {
  */
 
 export type MountId =
+  | "none"
   | "horse"
   | "ox"
   | "sheep"
@@ -44,6 +45,7 @@ export interface MountDefinition {
 }
 
 export const MOUNT_DEFINITIONS: MountDefinition[] = [
+  { id: "none", name: "步行", description: "脱去坐骑，慢步山河。" },
   { id: "horse", name: "木马", description: "经典枣红木马，平稳。" },
   { id: "ox", name: "黄牛", description: "宽身长角，沉稳跋涉。" },
   { id: "sheep", name: "绵羊", description: "蓬松米白，山道灵巧。" },
@@ -98,6 +100,15 @@ function buildLegs(specs: LegSpec[], material: MeshPhongMaterial): Mesh[] {
     leg.rotation.z = spec.baseRotation;
     return leg;
   });
+}
+
+function buildNoMount(): MountHandle {
+  return {
+    mount: new Group(),
+    legsByName: new Map(),
+    saddleHeight: 0,
+    saddleX: 0
+  };
 }
 
 function buildBirdLegs(specs: LegSpec[], material: MeshPhongMaterial): Mesh[] {
@@ -959,6 +970,7 @@ function buildChicken(): MountHandle {
 }
 
 const MOUNT_BUILDERS: Record<MountId, () => MountHandle> = {
+  none: buildNoMount,
   horse: buildHorse,
   ox: buildOx,
   sheep: buildSheep,
