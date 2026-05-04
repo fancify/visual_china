@@ -32,6 +32,10 @@ export interface PlayerAvatarHandle {
   mountId: MountId;
   /** 当前 avatar id */
   avatarId: AvatarId;
+  /** 步行模式下的 avatar 腿引用；骑乘时为空。 */
+  avatarWalkLegsByName: Map<string, Mesh>;
+  /** 步行模式下的 avatar 手臂引用；骑乘时为空。 */
+  avatarWalkArmsByName: Map<string, Mesh>;
 }
 
 function disposeMesh(mesh: Mesh): void {
@@ -59,25 +63,126 @@ function clearGroup(group: Group): void {
   }
 }
 
+function buildWalkingAvatarLegRig(avatar: Group): Map<string, Mesh> {
+  const legCandidates = avatar.children
+    .filter(
+      (child): child is Mesh =>
+        (child as Mesh).isMesh === true &&
+        (child as Mesh).geometry.type === "CylinderGeometry" &&
+        child.position.y <= 0.3
+    )
+    .sort((left, right) => right.position.z - left.position.z)
+    .slice(0, 2);
+
+  if (legCandidates.length < 2) {
+    return new Map();
+  }
+
+  const avatarLegsByName = new Map<string, Mesh>();
+  const specs = [
+    {
+      name: "avatar-walk-left-leg",
+      z: 0.14,
+      baseRotation: 0.08
+    },
+    {
+      name: "avatar-walk-right-leg",
+      z: -0.14,
+      baseRotation: -0.08
+    }
+  ] as const;
+
+  legCandidates.forEach((leg, index) => {
+    const spec = specs[index];
+    leg.name = spec.name;
+    leg.position.set(0.02, -0.18, spec.z);
+    leg.rotation.set(0, 0, spec.baseRotation);
+    // 腿短化：原 1.55 拉长到接近成人比例，用户偏好"chibi 短腿"卡通感，
+    // 降到 0.78（约一半），剪影更接近 千里江山图 风格的小人。
+    leg.scale.set(1, 0.78, 1);
+    avatarLegsByName.set(spec.name, leg);
+  });
+
+  return avatarLegsByName;
+}
+
+export function buildWalkingAvatarArmRig(avatar: Group): Map<string, Mesh> {
+  const leftArm = avatar.getObjectByName("avatar-arm-left") as Mesh | undefined;
+  const rightArm = avatar.getObjectByName("avatar-arm-right") as Mesh | undefined;
+
+  if (
+    !leftArm ||
+    !rightArm ||
+    leftArm.isMesh !== true ||
+    rightArm.isMesh !== true
+  ) {
+    return new Map();
+  }
+
+  const armsByName = new Map<string, Mesh>();
+  const armSpecs = [
+    {
+      key: "avatar-walk-left-arm",
+      mesh: leftArm,
+      z: 0.32,
+      baseRotation: -0.15
+    },
+    {
+      key: "avatar-walk-right-arm",
+      mesh: rightArm,
+      z: -0.32,
+      baseRotation: 0.15
+    }
+  ] as const;
+
+  armSpecs.forEach((spec) => {
+    spec.mesh.position.set(0.04, 0.7, spec.z);
+    spec.mesh.rotation.set(0, 0, spec.baseRotation);
+    armsByName.set(spec.key, spec.mesh);
+  });
+
+  return armsByName;
+}
+
 function assemble(
   player: Group,
   mountId: MountId,
   avatarId: AvatarId
-): { mountLegs: Map<string, Mesh> } {
+): {
+  mountLegs: Map<string, Mesh>;
+  avatarWalkLegs: Map<string, Mesh>;
+  avatarWalkArms: Map<string, Mesh>;
+} {
   const mountHandle = createMount(mountId);
   const avatarHandle = createAvatar(avatarId);
+  const avatarWalkLegs =
+    mountId === "none"
+      ? buildWalkingAvatarLegRig(avatarHandle.avatar)
+      : new Map<string, Mesh>();
+  const avatarWalkArms =
+    mountId === "none"
+      ? buildWalkingAvatarArmRig(avatarHandle.avatar)
+      : new Map<string, Mesh>();
 
-  // avatar 局部坐标系以 saddle 顶面为 y=0；放到 mount.saddleHeight 上方即可。
-  avatarHandle.avatar.position.set(
-    mountHandle.saddleX,
-    mountHandle.saddleHeight,
-    0
-  );
+  // 骑乘时以 saddle 顶面为 y=0；步行时把 avatar 原点压低到脚底附近。
+  if (mountId === "none") {
+    avatarHandle.avatar.position.set(0, 0.08, 0);
+  } else {
+    avatarHandle.avatar.position.set(
+      mountHandle.saddleX,
+      mountHandle.saddleHeight,
+      0
+    );
+  }
 
   player.add(mountHandle.mount);
   player.add(avatarHandle.avatar);
 
-  return { mountLegs: mountHandle.legsByName };
+  return {
+    mountLegs: mountHandle.legsByName,
+    avatarWalkLegs,
+    avatarWalkArms
+  };
 }
 
 /**
@@ -88,14 +193,20 @@ export function createPlayerAvatar(): PlayerAvatarHandle {
   const customization = loadPlayerCustomization();
   const player = new Group();
   player.scale.setScalar(PLAYER_VISUAL_SCALE);
-  const { mountLegs } = assemble(player, customization.mountId, customization.avatarId);
+  const { mountLegs, avatarWalkLegs, avatarWalkArms } = assemble(
+    player,
+    customization.mountId,
+    customization.avatarId
+  );
 
   return {
     player,
     horseLegsByName: mountLegs,
     mountLegsByName: mountLegs,
     mountId: customization.mountId,
-    avatarId: customization.avatarId
+    avatarId: customization.avatarId,
+    avatarWalkLegsByName: avatarWalkLegs,
+    avatarWalkArmsByName: avatarWalkArms
   };
 }
 
@@ -109,8 +220,20 @@ export function rebuildPlayerAvatar(
   player: Group,
   mountId: MountId,
   avatarId: AvatarId
-): { mountLegsByName: Map<string, Mesh> } {
+): {
+  mountLegsByName: Map<string, Mesh>;
+  avatarWalkLegsByName: Map<string, Mesh>;
+  avatarWalkArmsByName: Map<string, Mesh>;
+} {
   clearGroup(player);
-  const { mountLegs } = assemble(player, mountId, avatarId);
-  return { mountLegsByName: mountLegs };
+  const { mountLegs, avatarWalkLegs, avatarWalkArms } = assemble(
+    player,
+    mountId,
+    avatarId
+  );
+  return {
+    mountLegsByName: mountLegs,
+    avatarWalkLegsByName: avatarWalkLegs,
+    avatarWalkArmsByName: avatarWalkArms
+  };
 }
