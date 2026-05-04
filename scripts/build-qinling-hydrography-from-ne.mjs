@@ -11,13 +11,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { qinlingBounds, qinlingWorld } from "./qinling-dem-common.mjs";
+
 const RIVERS_PATH = path.resolve("public/data/china/major-rivers.json");
 const OSM_PATH = path.resolve("public/data/regions/qinling/hydrography/osm-modern.json");
 const OUT_PATH = path.resolve("src/game/data/qinlingNeRivers.js");
 
 // 用于把 OSM 的 {x, y=z} 反投回 {lat, lon}
-const QINLING_BOUNDS = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
-const QINLING_WORLD = { width: 180, depth: 240 };
+const QINLING_BOUNDS = { ...qinlingBounds };
+const QINLING_WORLD = { ...qinlingWorld };
 function unprojectWorldToGeo({ x, y }) {
   const lonSpan = QINLING_BOUNDS.east - QINLING_BOUNDS.west;
   const latSpan = QINLING_BOUNDS.north - QINLING_BOUNDS.south;
@@ -29,7 +31,7 @@ function unprojectWorldToGeo({ x, y }) {
 }
 
 // 切片范围
-const SLICE_BBOX = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
+const SLICE_BBOX = { ...qinlingBounds };
 
 // NE name → 我们 game 的 river id 映射 + 主流方向 + game metadata
 // flowDir: "lon-asc" = W→E (lon 递增), "lon-desc" = E→W, "lat-desc" = N→S, "lat-asc" = S→N
@@ -40,11 +42,13 @@ const SLICE_BBOX = { west: 103.5, east: 110, south: 30.4, north: 35.4 };
 // 岷江上游 NE 没收。warning 而已，不会进结果。)
 const NAME_TO_ID = {
   "长江":   { id: "river-changjiang",   flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "长江" },
+  "金沙江": { id: "river-jinshajiang", flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "金沙江" },
   "黄河":   { id: "river-huanghe",      flowDir: "lon-asc",  rank: 1, basin: "黄河流域", displayName: "黄河" },
   "渭河":   { id: "river-weihe",        flowDir: "lon-asc",  rank: 1, basin: "黄河流域", displayName: "渭河" },
   "汉水":   { id: "river-hanjiang",     flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "汉水", aliases: ["汉江"] },
   "嘉陵江": { id: "river-jialingjiang", flowDir: "lat-desc", rank: 1, basin: "长江流域", displayName: "嘉陵江" },
   "岷江":   { id: "river-minjiang",     flowDir: "lat-desc", rank: 1, basin: "长江流域", displayName: "岷江" },
+  "乌江":   { id: "river-wujiang",      flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "乌江" },
   "沱江":   { id: "river-tuojiang",     flowDir: "lat-desc", rank: 2, basin: "长江流域", displayName: "沱江" }
 };
 
@@ -301,9 +305,8 @@ function stitchOsmRiverByName({
   return { points, segCount: segs.length, joinedCount: joined.length };
 }
 
-// 2026-05 用户："只要 prototype 里有的。其他的都去掉"
-// → prototype 用的是 major-rivers.json (Natural Earth 10m only)，不用 OSM。
-// 所以下面 OSM 拼接 (岷江上游 / 褒河 / 内江) 全部跳过。
+// 当前扩区需求只要求补齐 major-rivers.json / NE 进入新 slice 的主干河流；
+// OSM 拼接器先留着作为岷江上游/小支流补洞工具，默认关闭。
 const SKIP_OSM_STITCHING = true;
 
 // === OSM 上游岷江 (NE 10m 没收) ===
