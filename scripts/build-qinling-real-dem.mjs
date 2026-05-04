@@ -111,9 +111,165 @@ function densifyForCarving(points, maxDeg = 0.012) {
   return out;
 }
 
+function latLonToGrid(lon, lat, gridColumns, gridRows, regionBounds) {
+  const lonSpan = regionBounds.east - regionBounds.west || 1;
+  const latSpan = regionBounds.north - regionBounds.south || 1;
+  return {
+    col: ((lon - regionBounds.west) / lonSpan) * (gridColumns - 1),
+    row: ((regionBounds.north - lat) / latSpan) * (gridRows - 1)
+  };
+}
+
+function forEachSegmentCell(aGrid, bGrid, visitor) {
+  // supercover grid traversal：用浮点端点走过 line 穿过的所有 raster cells。
+  // 相比 round 后的 Bresenham，斜线和 corner crossing 不会漏格。
+  let col = Math.round(aGrid.col);
+  let row = Math.round(aGrid.row);
+  const endCol = Math.round(bGrid.col);
+  const endRow = Math.round(bGrid.row);
+  const deltaCol = bGrid.col - aGrid.col;
+  const deltaRow = bGrid.row - aGrid.row;
+  const stepCol = deltaCol > 0 ? 1 : deltaCol < 0 ? -1 : 0;
+  const stepRow = deltaRow > 0 ? 1 : deltaRow < 0 ? -1 : 0;
+  const absDeltaCol = Math.abs(deltaCol);
+  const absDeltaRow = Math.abs(deltaRow);
+  const epsilon = 1e-9;
+  let count = 0;
+  let lastKey = null;
+
+  const visit = (visitCol, visitRow) => {
+    const key = `${visitCol},${visitRow}`;
+    if (key === lastKey) {
+      return;
+    }
+    lastKey = key;
+    visitor(visitCol, visitRow);
+    count += 1;
+  };
+
+  visit(col, row);
+  if (col === endCol && row === endRow) {
+    return count;
+  }
+
+  let tMaxCol =
+    stepCol === 0
+      ? Number.POSITIVE_INFINITY
+      : ((col + 0.5 * stepCol - aGrid.col) / deltaCol);
+  let tMaxRow =
+    stepRow === 0
+      ? Number.POSITIVE_INFINITY
+      : ((row + 0.5 * stepRow - aGrid.row) / deltaRow);
+  const tDeltaCol = stepCol === 0 ? Number.POSITIVE_INFINITY : 1 / absDeltaCol;
+  const tDeltaRow = stepRow === 0 ? Number.POSITIVE_INFINITY : 1 / absDeltaRow;
+
+  while (true) {
+    if (Math.abs(tMaxCol - tMaxRow) <= epsilon) {
+      if (stepCol !== 0) {
+        visit(col + stepCol, row);
+      }
+      if (stepRow !== 0) {
+        visit(col, row + stepRow);
+      }
+      col += stepCol;
+      row += stepRow;
+      tMaxCol += tDeltaCol;
+      tMaxRow += tDeltaRow;
+      visit(col, row);
+    } else if (tMaxCol < tMaxRow) {
+      col += stepCol;
+      tMaxCol += tDeltaCol;
+      visit(col, row);
+    } else {
+      row += stepRow;
+      tMaxRow += tDeltaRow;
+      visit(col, row);
+    }
+
+    if (col === endCol && row === endRow) {
+      break;
+    }
+  }
+
+  return count;
+}
+
+function sampleGridHeight(values, colF, rowF, gridColumns, gridRows) {
+  const column = clamp(Math.round(colF), 0, gridColumns - 1);
+  const row = clamp(Math.round(rowF), 0, gridRows - 1);
+  return values[indexAt(column, row, gridColumns)];
+}
+
+function paintDiscAt(
+  heights,
+  riverMask,
+  gridColumns,
+  gridRows,
+  colF,
+  rowF,
+  radiusCells,
+  maskRadius,
+  depth,
+  riverHeight
+) {
+  // 允许 center 落在 slice 外侧；bbox clamp 后仍可把边界内那一小段画出来。
+  if (
+    colF < -radiusCells ||
+    colF > gridColumns - 1 + radiusCells ||
+    rowF < -radiusCells ||
+    rowF > gridRows - 1 + radiusCells
+  ) {
+    return false;
+  }
+
+  const minCol = Math.max(0, Math.floor(colF - radiusCells));
+  const maxCol = Math.min(gridColumns - 1, Math.ceil(colF + radiusCells));
+  const minRow = Math.max(0, Math.floor(rowF - radiusCells));
+  const maxRow = Math.min(gridRows - 1, Math.ceil(rowF + radiusCells));
+  let touched = false;
+
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      const dist = Math.hypot(col - colF, row - rowF);
+      if (dist > radiusCells) continue;
+      const idx = indexAt(col, row, gridColumns);
+      touched = true;
+
+      if (heights && Number.isFinite(riverHeight)) {
+        // 二次曲线比 raised-cosine 掉得更快：谷壁更陡，中心仍保持最深。
+        const t = dist / radiusCells;
+        const falloff = (1 - t) * (1 - t);
+        const carvedTo = riverHeight - depth * falloff;
+        if (heights[idx] > carvedTo) {
+          heights[idx] = carvedTo;
+        }
+      }
+
+      if (riverMask) {
+        // riverMask: 核心半径 (maskRadius) 内 mask=1，外圈到 r 渐淡到 0。
+        // 用 (1-t)^6 把高值尽量锁在窄核心里，让水边更利。
+        if (dist <= maskRadius) {
+          riverMask[idx] = Math.max(riverMask[idx], 1.0);
+        } else {
+          const t = (dist - maskRadius) / (radiusCells - maskRadius);
+          const oneMinusT = 1 - t;
+          const m =
+            oneMinusT *
+            oneMinusT *
+            oneMinusT *
+            oneMinusT *
+            oneMinusT *
+            oneMinusT;
+          if (m > riverMask[idx]) riverMask[idx] = m;
+        }
+      }
+    }
+  }
+
+  return touched;
+}
+
 function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBounds, riverFeatures) {
-  const lonSpan = regionBounds.east - regionBounds.west;
-  const latSpan = regionBounds.north - regionBounds.south;
   // 关键：必须从 pre-carve 高度采样 riverHeight。否则密 polyline (岷江 2273 点)
   // 会反复在同一个 cell 上越挖越深 — 每个新 point 看到的是上个点已经挖过的低值。
   const preCarveHeights = new Float32Array(heights);
@@ -128,58 +284,63 @@ function carveRiverValleys(heights, riverMask, gridColumns, gridRows, regionBoun
     const r = cfg.radiusCells;
     // riverMask paint：只把最核心的一窄条保留成纯水面，外围快速退到湿岸。
     const maskRadius = r * 0.16;
+    const gridPoints = points.map(({ lon, lat }) =>
+      latLonToGrid(lon, lat, gridColumns, gridRows, regionBounds)
+    );
 
-    let featureCarved = false;
+    let featureTouched = false;
 
-    for (let i = 0; i < points.length; i += 1) {
-      const { lon, lat } = points[i];
-      // 反投到 grid (column, row): 北 = row 0
-      const colF = ((lon - regionBounds.west) / lonSpan) * (gridColumns - 1);
-      const rowF = ((regionBounds.north - lat) / latSpan) * (gridRows - 1);
-      if (colF < 0 || colF > gridColumns - 1 || rowF < 0 || rowF > gridRows - 1) continue;
-      const ix = Math.round(colF);
-      const iy = Math.round(rowF);
-      const riverHeight = preCarveHeights[iy * gridColumns + ix];
-
-      const minCol = Math.max(0, Math.floor(colF - r));
-      const maxCol = Math.min(gridColumns - 1, Math.ceil(colF + r));
-      const minRow = Math.max(0, Math.floor(rowF - r));
-      const maxRow = Math.min(gridRows - 1, Math.ceil(rowF + r));
-
-      for (let row = minRow; row <= maxRow; row += 1) {
-        for (let col = minCol; col <= maxCol; col += 1) {
-          const dist = Math.hypot(col - colF, row - rowF);
-          if (dist > r) continue;
-          const idx = row * gridColumns + col;
-          // 二次曲线比 raised-cosine 掉得更快：谷壁更陡，中心仍保持最深。
-          const t = dist / r;
-          const falloff = (1 - t) * (1 - t);
-          const carvedTo = riverHeight - cfg.depth * falloff;
-          if (heights[idx] > carvedTo) {
-            heights[idx] = carvedTo;
-            featureCarved = true;
-          }
-          // riverMask: 核心半径 (maskRadius) 内 mask=1，外圈到 r 渐淡到 0。
-          // 用 (1-t)^6 把高值尽量锁在窄核心里，让水边更利。
-          if (dist <= maskRadius) {
-            riverMask[idx] = Math.max(riverMask[idx], 1.0);
-          } else {
-            const t = (dist - maskRadius) / (r - maskRadius);
-            const oneMinusT = 1 - t;
-            const m =
-              oneMinusT *
-              oneMinusT *
-              oneMinusT *
-              oneMinusT *
-              oneMinusT *
-              oneMinusT;
-            if (m > riverMask[idx]) riverMask[idx] = m;
-          }
-        }
-      }
-      inSliceCount.points += 1;
+    // Pass 1: 整条折线 segment-walk 画 mask，确保相邻 anchor 之间没有空洞。
+    for (let i = 0; i < gridPoints.length - 1; i += 1) {
+      const aGrid = gridPoints[i];
+      const bGrid = gridPoints[i + 1];
+      inSliceCount.points += forEachSegmentCell(aGrid, bGrid, (colF, rowF) => {
+        const touched = paintDiscAt(
+          null,
+          riverMask,
+          gridColumns,
+          gridRows,
+          colF,
+          rowF,
+          r,
+          maskRadius,
+          cfg.depth,
+          NaN
+        );
+        featureTouched = featureTouched || touched;
+      });
     }
-    if (featureCarved) inSliceCount.features += 1;
+
+    // Pass 2: 仍然沿 segment-walk 雕刻，但 riverHeight 始终采样自 pre-carve
+    // 高度场，只做 min(current, carvedTo)；这样 overlap 只会取最低目标高程，
+    // 不会因为前一个 sample 已经挖低而继续级联深挖。
+    for (let i = 0; i < gridPoints.length - 1; i += 1) {
+      const aGrid = gridPoints[i];
+      const bGrid = gridPoints[i + 1];
+      forEachSegmentCell(aGrid, bGrid, (colF, rowF) => {
+        const riverHeight = sampleGridHeight(
+          preCarveHeights,
+          colF,
+          rowF,
+          gridColumns,
+          gridRows
+        );
+        const touched = paintDiscAt(
+          heights,
+          null,
+          gridColumns,
+          gridRows,
+          colF,
+          rowF,
+          r,
+          maskRadius,
+          cfg.depth,
+          riverHeight
+        );
+        featureTouched = featureTouched || touched;
+      });
+    }
+    if (featureTouched) inSliceCount.features += 1;
   }
 
   return inSliceCount;

@@ -246,16 +246,16 @@ test("Qinling river carving keeps a narrow water footprint with sharper gorge wa
   const gorge = riverGorgeStats();
 
   assert.ok(
-    gorge.strongWaterCells <= 1100,
-    `strong water footprint should stay narrow after mask tightening, got ${gorge.strongWaterCells} cells`
+    gorge.strongWaterCells >= 1000 && gorge.strongWaterCells <= 1100,
+    `segment-walk river paint should expand the strong-water core without exploding width, got ${gorge.strongWaterCells} cells`
   );
   assert.ok(
-    gorge.visibleWaterCells <= 3200,
-    `river corridor should stay visually slimmer overall, got ${gorge.visibleWaterCells} cells above 0.1`
+    gorge.visibleWaterCells >= 2200 && gorge.visibleWaterCells <= 2350,
+    `segment-walk river paint should materially widen the visible river corridor, got ${gorge.visibleWaterCells} cells above 0.1`
   );
   assert.ok(
-    gorge.bankRise90 >= 0.2,
-    `river-adjacent banks should read as sharper gorges, got p90 rise ${gorge.bankRise90.toFixed(3)}`
+    gorge.bankRise90 >= 0.48 && gorge.bankRise90 <= 0.55,
+    `continuous river carving should keep gorge banks pronounced, got p90 rise ${gorge.bankRise90.toFixed(3)}`
   );
 });
 
