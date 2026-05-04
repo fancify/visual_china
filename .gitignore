@@ -24,3 +24,6 @@ data/natural-earth/
 /*.png
 .playwright-mcp/
 atlas-snapshot.md
+
+tmp/
+.claude/
