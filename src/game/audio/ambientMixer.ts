@@ -11,24 +11,17 @@ export interface AmbientContext {
 
 export interface AmbientMixer {
   setContext(ctx: AmbientContext): void;
-  /** 每帧或者 200ms tick 调用一次。内部 throttle */
   tick(elapsedMs: number): void;
   getActiveLayers(): AmbientLayerSnapshot[];
 }
 
 export type LoopTrackId =
-  | "ambient_forest_birds"
-  | "ambient_insects_night"
-  | "ambient_wind_plain"
-  | "ambient_mountain_wind"
-  | "ambient_rain_heavy"
-  | "ambient_stream_water"
-  | "ambient_river_large";
+  | "ambient_soft_wind"
+  | "ambient_rain_heavy";
 
 export interface AmbientLayerSnapshot {
   trackId: LoopTrackId;
   currentGain: number;
-  /** 最近一次给到这个 layer 的 trigger 描述，用于 HUD 显示 */
   triggerLabel: string;
 }
 
@@ -49,16 +42,12 @@ interface TrackState {
 }
 
 const LOOP_TRACK_IDS: LoopTrackId[] = [
-  "ambient_forest_birds",
-  "ambient_insects_night",
-  "ambient_wind_plain",
-  "ambient_mountain_wind",
-  "ambient_rain_heavy",
-  "ambient_stream_water",
-  "ambient_river_large"
+  "ambient_soft_wind",
+  "ambient_rain_heavy"
 ];
 const CROSSFADE_SECONDS = 1.5;
 const TICK_THROTTLE_MS = 200;
+const RAIN_GAIN = 0.6;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -75,85 +64,14 @@ function defaultAmbientContext(): AmbientContext {
   };
 }
 
-function baseTriggerLabel(
-  label: string,
-  ctx: AmbientContext
-): string {
-  return ctx.weather === "clear" ? label : `${label}, weather=${ctx.weather}`;
-}
-
-function targetGainsForContext(ctx: AmbientContext): Map<LoopTrackId, AmbientTrackTarget> {
-  const targets = new Map<LoopTrackId, AmbientTrackTarget>(
-    LOOP_TRACK_IDS.map((id) => [
-      id,
-      { gain: 0, triggerLabel: "" }
-    ])
-  );
-  const weatherDucking = ctx.weather === "clear" ? 1 : 0.2;
-
-  if (ctx.biome === "highland" || ctx.altitudeBand === "high") {
-    targets.set("ambient_mountain_wind", {
-      gain: 0.7 * weatherDucking,
-      triggerLabel: baseTriggerLabel(
-        ctx.biome === "highland" ? "biome=highland" : "altitude=high",
-        ctx
-      )
-    });
-  } else if (ctx.biome === "forest") {
-    targets.set(ctx.isNight ? "ambient_insects_night" : "ambient_forest_birds", {
-      gain: ctx.isNight ? 0.5 * weatherDucking : 0.6 * weatherDucking,
-      triggerLabel: baseTriggerLabel(
-        ctx.isNight ? "biome=forest, night" : "biome=forest, day",
-        ctx
-      )
-    });
-  } else if (ctx.biome === "plain") {
-    targets.set("ambient_wind_plain", {
-      gain: 0.5 * weatherDucking,
-      triggerLabel: baseTriggerLabel("biome=plain, day", ctx)
-    });
-  } else if (ctx.biome === "basin") {
-    targets.set(ctx.isNight ? "ambient_insects_night" : "ambient_wind_plain", {
-      gain: ctx.isNight ? 0.5 * weatherDucking : 0.45 * weatherDucking,
-      triggerLabel: baseTriggerLabel(
-        ctx.isNight ? "biome=basin, night" : "biome=basin, day",
-        ctx
-      )
-    });
-  } else {
-    targets.set(ctx.isNight ? "ambient_insects_night" : "ambient_forest_birds", {
-      gain: ctx.isNight ? 0.5 * weatherDucking : 0.38 * weatherDucking,
-      triggerLabel: baseTriggerLabel(
-        ctx.isNight ? `biome=${ctx.biome}, night` : `biome=${ctx.biome}, day`,
-        ctx
-      )
-    });
-  }
-
+export function targetGainForContext(ctx: AmbientContext): number {
   if (ctx.weather === "rain" || ctx.weather === "storm") {
-    targets.set("ambient_rain_heavy", {
-      gain: 0.7,
-      triggerLabel: `weather=${ctx.weather}`
-    });
+    return 0;
   }
-
-  if (ctx.riverProximity > 0.4) {
-    targets.set("ambient_stream_water", {
-      gain: clamp01(ctx.riverProximity) * 0.6,
-      triggerLabel: `river-proximity=${clamp01(ctx.riverProximity).toFixed(2)}`
-    });
+  if (ctx.altitudeBand === "high") {
+    return 0.08;
   }
-
-  if (ctx.largeRiverProximity > 0.4) {
-    targets.set("ambient_river_large", {
-      gain: clamp01(ctx.largeRiverProximity) * 0.7,
-      triggerLabel: `large-river-proximity=${clamp01(
-        ctx.largeRiverProximity
-      ).toFixed(2)}`
-    });
-  }
-
-  return targets;
+  return 0.04;
 }
 
 function currentGainAtTime(state: TrackState, now: number): number {
@@ -165,6 +83,26 @@ function currentGainAtTime(state: TrackState, now: number): number {
     (now - state.transitionStartedAt) / state.transitionDurationSec
   );
   return state.startGain + (state.targetGain - state.startGain) * progress;
+}
+
+function buildTargetMap(ctx: AmbientContext): Map<LoopTrackId, AmbientTrackTarget> {
+  const windGain = targetGainForContext(ctx);
+  return new Map<LoopTrackId, AmbientTrackTarget>([
+    [
+      "ambient_soft_wind",
+      {
+        gain: windGain,
+        triggerLabel: `weather=${ctx.weather}, altitude=${ctx.altitudeBand}`
+      }
+    ],
+    [
+      "ambient_rain_heavy",
+      {
+        gain: ctx.weather === "rain" || ctx.weather === "storm" ? RAIN_GAIN : 0,
+        triggerLabel: `weather=${ctx.weather}`
+      }
+    ]
+  ]);
 }
 
 export function createAmbientMixer(runtime: AudioRuntime): AmbientMixer {
@@ -226,20 +164,18 @@ export function createAmbientMixer(runtime: AudioRuntime): AmbientMixer {
 
   function applyTargetGains(): void {
     const now = runtime.context.currentTime;
-    const targets = targetGainsForContext(currentContext);
+    const targets = buildTargetMap(currentContext);
 
     LOOP_TRACK_IDS.forEach((trackId) => {
       const state = ensureLoopTrack(trackId);
-      const target = targets.get(trackId) ?? { gain: 0, triggerLabel: "" };
+      const target = targets.get(trackId)!;
       const currentGain = currentGainAtTime(state, now);
 
       state.startGain = currentGain;
       state.targetGain = target.gain;
       state.transitionStartedAt = now;
       state.transitionDurationSec = CROSSFADE_SECONDS;
-      if (target.gain > 0) {
-        state.triggerLabel = target.triggerLabel;
-      }
+      state.triggerLabel = target.gain > 0 ? target.triggerLabel : "";
 
       if (!state.gain) {
         return;

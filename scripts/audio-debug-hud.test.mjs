@@ -113,14 +113,14 @@ test("audio debug hud renders active layers and recent fires", () => {
     hud.refresh({
       activeLayers: [
         {
-          trackId: "ambient_stream_water",
-          currentGain: 0.42,
-          triggerLabel: "river-proximity=0.70"
+          trackId: "ambient_rain_heavy",
+          currentGain: 0.6,
+          triggerLabel: "weather=rain"
         },
         {
-          trackId: "ambient_forest_birds",
-          currentGain: 0.6,
-          triggerLabel: "biome=forest, day"
+          trackId: "ambient_soft_wind",
+          currentGain: 0.04,
+          triggerLabel: "weather=clear, altitude=mid"
         }
       ],
       recentFires: [
@@ -142,10 +142,10 @@ test("audio debug hud renders active layers and recent fires", () => {
     assert.equal(root.children.length, 1);
     const panel = root.children[0];
     assert.match(panel.innerHTML, /环境音 \(0\.25\)/);
-    assert.match(panel.innerHTML, /ambient_stream_water/);
-    assert.match(panel.innerHTML, /0\.42/);
-    assert.match(panel.innerHTML, /river-proximity=0\.70/);
-    assert.match(panel.innerHTML, /ambient_forest_birds/);
+    assert.match(panel.innerHTML, /ambient_rain_heavy/);
+    assert.match(panel.innerHTML, /0\.60/);
+    assert.match(panel.innerHTML, /weather=rain/);
+    assert.match(panel.innerHTML, /ambient_soft_wind/);
     assert.match(panel.innerHTML, /2\.8s ui_hover/);
     assert.match(panel.innerHTML, /hover POI: 黄龙/);
     assert.match(panel.innerHTML, /5\.0s footstep_grass/);

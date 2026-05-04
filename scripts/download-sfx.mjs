@@ -8,7 +8,7 @@
 // 用法：
 //   node scripts/download-sfx.mjs           # 下载缺失项
 //   node scripts/download-sfx.mjs --force   # 强制重新下载并转码
-//   node scripts/download-sfx.mjs --only ambient_forest_birds  # 单条
+//   node scripts/download-sfx.mjs --only ambient_soft_wind  # 单条
 //
 // 注意：ogg 输出文件不入 git（见 .gitignore），manifest 入 git 作为 source of truth。
 
