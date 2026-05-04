@@ -150,6 +150,10 @@ import {
   passLandmarkGeometries
 } from "./game/passLandmarks.js";
 import {
+  buildScenicPoiMeshes,
+  scenicPoiLabelHeights
+} from "./game/scenicPoiVisuals";
+import {
   buildWaterRibbonVertices,
   buildWaterRibbonAlphas,
   buildRiverVegetationSamples,
@@ -189,6 +193,7 @@ import {
   type HoverPoi,
   type HoverPoiCategory
 } from "./game/cityHoverHud";
+import { gameHeightToRealMeters } from "./game/realElevation";
 import {
   cityFromMarkerIntersection,
   createCityMarkers,
@@ -779,13 +784,14 @@ function updateCityHoverCard(event: PointerEvent): void {
         sampler.asset.world
       );
       const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
+      const elevationMeters = gameHeightToRealMeters(elevation, sampler.asset);
       const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
       nextHoverCard = {
         key: hoverPoi.key,
         html: buildPoiHoverCardHtml({
           poi: hoverPoi.poi,
           category: hoverPoi.category,
-          elevation,
+          elevationMeters,
           zone
         })
       };
@@ -809,6 +815,7 @@ function updateCityHoverCard(event: PointerEvent): void {
       sampler.asset.world
     );
     const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
+    const elevationMeters = gameHeightToRealMeters(elevation, sampler.asset);
     const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
     const beat = findStoryBeatForZone(
       storyBeats,
@@ -819,7 +826,7 @@ function updateCityHoverCard(event: PointerEvent): void {
       key: `city:${nextCity.id}`,
       html: buildCityHoverCardHtml({
         city: nextCity,
-        elevation,
+        elevationMeters,
         zone,
         beat
       })
@@ -1111,43 +1118,6 @@ const passSteleCapMaterial = new MeshPhongMaterial({
   opacity: 1
 });
 
-// 名胜（scenic）共用几何 + 材质——7 个 POI 共 6 类 mesh 形态。
-const scenicGeometries = {
-  // 太白山：8m 高的 sharp cone（peak base radius 5.5）；雪冠是顶端小白锥。
-  alpinePeakBody: new ConeGeometry(5.5, 8, 8),
-  alpineSnowCap: new ConeGeometry(2.2, 2.8, 8),
-  // 青城山：圆顶，3m 高 + 顶上一个迷你方亭暗示道观（青城天下幽）。
-  forestPeakDome: new SphereGeometry(4.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-  forestPavilion: new BoxGeometry(1.2, 0.6, 1.2),
-  forestPavilionRoof: new ConeGeometry(0.95, 0.6, 4),
-  // 九寨沟：海子（cyan disk）+ 两个低锥代表周围森林。disk 半径 2.4。
-  karstPool: new CylinderGeometry(2.4, 2.4, 0.18, 24),
-  karstPoolSmall: new CylinderGeometry(1.4, 1.4, 0.16, 18),
-  karstFringeTree: new ConeGeometry(0.55, 1.6, 5),
-  // 法门寺：5 层方塔，每层缩进 0.18，最高 4.5m。基座 box，塔身 cylinder*5。
-  pagodaBase: new BoxGeometry(2.4, 0.5, 2.4),
-  pagodaTier1: new BoxGeometry(2.0, 0.85, 2.0),
-  pagodaTier2: new BoxGeometry(1.7, 0.85, 1.7),
-  pagodaTier3: new BoxGeometry(1.45, 0.85, 1.45),
-  pagodaTier4: new BoxGeometry(1.2, 0.85, 1.2),
-  pagodaSpire: new ConeGeometry(0.5, 1.4, 6),
-  // 乾陵：黄土封土圆丘（hemisphere）+ 两通石碑（无字碑/述圣纪碑）立在前方。
-  mausoleumMound: new SphereGeometry(4.6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-  mausoleumStele: new BoxGeometry(0.45, 2.4, 0.18),
-  // 黄龙：钙华梯田金水池——6 层降幅圆盘叠瀑（半径 0.9..2.6），水位略错开。
-  travertineDisk1: new CylinderGeometry(2.6, 2.6, 0.22, 22),
-  travertineDisk2: new CylinderGeometry(2.2, 2.2, 0.22, 20),
-  travertineDisk3: new CylinderGeometry(1.85, 1.85, 0.22, 18),
-  travertineDisk4: new CylinderGeometry(1.5, 1.5, 0.22, 16),
-  travertineDisk5: new CylinderGeometry(1.15, 1.15, 0.22, 14),
-  travertineDisk6: new CylinderGeometry(0.9, 0.9, 0.22, 12),
-  // 汉中天坑：暗深井圆柱（向下 4m）+ 灰岩环形沿口（外径 3.4 内径 2.6）。
-  // 三维里没法真正"挖洞"，所以用深色 cylinder 立在地面上，外加一圈石灰岩沿。
-  tiankengWell: new CylinderGeometry(2.4, 2.6, 0.3, 24),
-  tiankengRimOuter: new CylinderGeometry(3.4, 3.4, 0.5, 20),
-  tiankengRimInner: new CylinderGeometry(2.5, 2.5, 0.55, 20)
-};
-
 const scenicMaterials = {
   alpineRock: new MeshPhongMaterial({
     color: 0x9a8e7c, emissive: 0x16100a, flatShading: true, shininess: 6,
@@ -1377,15 +1347,6 @@ function rebuildScenicVisuals(): void {
   const bounds = terrainSampler.asset.bounds;
   const world = terrainSampler.asset.world;
 
-  const recordChunkId = (
-    object: { userData: { chunkId?: string | null } },
-    position: Vector2
-  ): void => {
-    object.userData.chunkId = regionChunkManifest
-      ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
-      : null;
-  };
-
   qinlingScenicLandmarks.forEach((spot) => {
     if (
       spot.lat < bounds.south ||
@@ -1402,117 +1363,29 @@ function rebuildScenicVisuals(): void {
     );
     const groundY = terrainSampler!.sampleHeight(wp.x, wp.z);
     const position = new Vector2(wp.x, wp.z);
+    const chunkId = regionChunkManifest
+      ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
+      : null;
 
-    const addPiece = (mesh: Mesh, yOffset: number): void => {
-      mesh.position.set(wp.x, groundY + yOffset, wp.z);
-      mesh.userData.terrainYOffset = yOffset;
-      mesh.userData.sharedResources = true;
-      recordChunkId(mesh, position);
+    buildScenicPoiMeshes({
+      chunkId,
+      ground: groundY,
+      materials: scenicMaterials,
+      position,
+      role: spot.role
+    }).forEach((mesh) => {
       attachHoverPoiMetadata(mesh, spot, "scenic");
       scenicGroup.add(mesh);
-    };
-
-    let labelHeight = 6.4;
-
-    if (spot.role === "alpine-peak") {
-      // 太白山：8m 锥山身 + 2.8m 雪冠（顶在 ~10m）。label 抬到 13m 高。
-      addPiece(new Mesh(scenicGeometries.alpinePeakBody, scenicMaterials.alpineRock), 4.0);
-      addPiece(new Mesh(scenicGeometries.alpineSnowCap, scenicMaterials.alpineSnow), 8.4);
-      labelHeight = 12.4;
-    } else if (spot.role === "religious-mountain") {
-      // 青城山：圆顶 + 顶上小道观（亭 + 锥顶）。
-      addPiece(new Mesh(scenicGeometries.forestPeakDome, scenicMaterials.forestGreen), 0);
-      addPiece(new Mesh(scenicGeometries.forestPavilion, scenicMaterials.pavilionWall), 4.55);
-      addPiece(new Mesh(scenicGeometries.forestPavilionRoof, scenicMaterials.pavilionRoof), 5.15);
-      labelHeight = 7.0;
-    } else if (spot.role === "karst-lake-system") {
-      // 九寨沟：3 个海子 + 4 株冷杉 cluster，沿东北 / 西南错位。
-      const pools: Array<[number, number, number]> = [
-        [0, 0.09, 0],
-        [3.4, 0.08, 1.6],
-        [-2.6, 0.08, -1.8]
-      ];
-      pools.forEach(([dx, dy, dz], index) => {
-        const geom = index === 0 ? scenicGeometries.karstPool : scenicGeometries.karstPoolSmall;
-        const mesh = new Mesh(geom, scenicMaterials.karstWater);
-        mesh.position.set(wp.x + dx, groundY + dy, wp.z + dz);
-        mesh.userData.terrainYOffset = dy;
-        mesh.userData.sharedResources = true;
-        recordChunkId(mesh, position);
-        attachHoverPoiMetadata(mesh, spot, "scenic");
-        scenicGroup.add(mesh);
-      });
-      const trees: Array<[number, number]> = [
-        [-1.6, 1.4], [1.8, 1.2], [-3.4, -0.4], [2.6, -2.6]
-      ];
-      trees.forEach(([dx, dz]) => {
-        const tree = new Mesh(scenicGeometries.karstFringeTree, scenicMaterials.karstTree);
-        tree.position.set(wp.x + dx, groundY + 0.8, wp.z + dz);
-        tree.userData.terrainYOffset = 0.8;
-        tree.userData.sharedResources = true;
-        recordChunkId(tree, position);
-        attachHoverPoiMetadata(tree, spot, "scenic");
-        scenicGroup.add(tree);
-      });
-      labelHeight = 4.2;
-    } else if (spot.role === "buddhist-relic") {
-      // 法门寺：5 层方塔 + 顶尖 spire。基座 0.25m 起。
-      addPiece(new Mesh(scenicGeometries.pagodaBase, scenicMaterials.pagodaBaseStone), 0.25);
-      addPiece(new Mesh(scenicGeometries.pagodaTier1, scenicMaterials.pagodaWall), 0.92);
-      addPiece(new Mesh(scenicGeometries.pagodaTier2, scenicMaterials.pagodaWall), 1.85);
-      addPiece(new Mesh(scenicGeometries.pagodaTier3, scenicMaterials.pagodaWall), 2.78);
-      addPiece(new Mesh(scenicGeometries.pagodaTier4, scenicMaterials.pagodaWall), 3.71);
-      addPiece(new Mesh(scenicGeometries.pagodaSpire, scenicMaterials.pagodaWall), 4.84);
-      labelHeight = 6.5;
-    } else if (spot.role === "imperial-mausoleum") {
-      // 乾陵：黄土圆丘 + 前方两通石碑（无字碑左、述圣纪碑右）。
-      addPiece(new Mesh(scenicGeometries.mausoleumMound, scenicMaterials.mausoleumEarth), 0);
-      const stele1 = new Mesh(scenicGeometries.mausoleumStele, scenicMaterials.mausoleumStele);
-      stele1.position.set(wp.x - 1.6, groundY + 1.2, wp.z + 5.0);
-      stele1.userData.terrainYOffset = 1.2;
-      stele1.userData.sharedResources = true;
-      recordChunkId(stele1, position);
-      attachHoverPoiMetadata(stele1, spot, "scenic");
-      scenicGroup.add(stele1);
-      const stele2 = new Mesh(scenicGeometries.mausoleumStele, scenicMaterials.mausoleumStele);
-      stele2.position.set(wp.x + 1.6, groundY + 1.2, wp.z + 5.0);
-      stele2.userData.terrainYOffset = 1.2;
-      stele2.userData.sharedResources = true;
-      recordChunkId(stele2, position);
-      attachHoverPoiMetadata(stele2, spot, "scenic");
-      scenicGroup.add(stele2);
-      labelHeight = 5.4;
-    } else if (spot.role === "travertine-terraces") {
-      // 黄龙：6 层钙华梯田金水池，半径递减、Y 错位 0.18 模拟叠瀑。
-      const disks: Array<[keyof typeof scenicGeometries, number]> = [
-        ["travertineDisk1", 0.11],
-        ["travertineDisk2", 0.34],
-        ["travertineDisk3", 0.57],
-        ["travertineDisk4", 0.80],
-        ["travertineDisk5", 1.03],
-        ["travertineDisk6", 1.26]
-      ];
-      disks.forEach(([key, y]) => {
-        addPiece(new Mesh(scenicGeometries[key], scenicMaterials.travertineGold), y);
-      });
-      labelHeight = 3.0;
-    } else if (spot.role === "karst-sinkhole") {
-      // 汉中天坑：暗深井 + 灰岩沿口（双圈造出环形沿）。
-      // 井底用大半径低色 cylinder 地表下沉感（用 -0.15 让其顶面略低于地面）。
-      addPiece(new Mesh(scenicGeometries.tiankengWell, scenicMaterials.tiankengWell), -0.15);
-      // 外圈大、内圈小一点，叠出"中空"看感。
-      addPiece(new Mesh(scenicGeometries.tiankengRimOuter, scenicMaterials.tiankengRim), 0.25);
-      addPiece(new Mesh(scenicGeometries.tiankengRimInner, scenicMaterials.tiankengWell), 0.27);
-      labelHeight = 2.6;
-    }
+    });
 
     // 名胜 label 用青金色——区别于 pass 的 #efcf83，更靠近"名山古迹"
     // 调性。LOD fade 跟 prefecture 同档（updateCityLodFade 走遍数组）。
     const label = createTextSprite(spot.name, "#dde7c2");
     label.scale.multiplyScalar(1.05);
+    const labelHeight = scenicPoiLabelHeights[spot.role];
     label.position.set(wp.x, groundY + labelHeight, wp.z);
     label.userData.terrainYOffset = labelHeight;
-    recordChunkId(label, position);
+    label.userData.chunkId = chunkId;
     attachHoverPoiMetadata(label, spot, "scenic");
     scenicGroup.add(label);
     scenicLabelSprites.push(label);

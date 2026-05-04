@@ -7,7 +7,7 @@ import type { StoryBeat } from "./storyGuide";
 
 export interface CityHoverCardState {
   city: RealCity;
-  elevation: number;
+  elevationMeters: number;
   zone: string;
   beat: StoryBeat | null;
 }
@@ -19,7 +19,7 @@ export type HoverPoi = QinlingScenicLandmark | QinlingAncientSite;
 export interface PoiHoverCardState {
   poi: HoverPoi;
   category: HoverPoiCategory;
-  elevation: number;
+  elevationMeters: number;
   zone: string;
 }
 
@@ -62,9 +62,17 @@ export function findStoryBeatForZone(
   return storyBeats.find((beat) => resolveBeatZone(beat) === zone) ?? null;
 }
 
+function formatLatitude(lat: number): string {
+  return `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? "N" : "S"}`;
+}
+
+function formatLongitude(lon: number): string {
+  return `${Math.abs(lon).toFixed(4)}°${lon >= 0 ? "E" : "W"}`;
+}
+
 export function buildCityHoverCardHtml({
   city,
-  elevation,
+  elevationMeters,
   zone,
   beat
 }: CityHoverCardState): string {
@@ -86,8 +94,8 @@ export function buildCityHoverCardHtml({
     )}</div>
     <strong>${escapeHtml(city.name)}</strong>
     <div class="hud-hover-card-meta">地带：${escapeHtml(zone)}</div>
-    <div class="hud-hover-card-meta">海拔：${elevation.toFixed(1)}</div>
-    <div class="hud-hover-card-meta">坐标：${city.lat.toFixed(4)}, ${city.lon.toFixed(4)}</div>
+    <div class="hud-hover-card-meta">海拔：${elevationMeters} m</div>
+    <div class="hud-hover-card-meta">坐标：${formatLatitude(city.lat)}, ${formatLongitude(city.lon)}</div>
     <p>${escapeHtml(summary)}</p>
     ${beatHtml}
   `;
@@ -96,7 +104,7 @@ export function buildCityHoverCardHtml({
 export function buildPoiHoverCardHtml({
   poi,
   category,
-  elevation,
+  elevationMeters,
   zone
 }: PoiHoverCardState): string {
   const summary = truncateHoverText(poi.summary || "暂无补充说明。", 110);
@@ -105,8 +113,8 @@ export function buildPoiHoverCardHtml({
     <div class="hud-hover-card-kicker">${escapeHtml(poiCategoryLabel(category))}</div>
     <strong>${escapeHtml(poi.name)}</strong>
     <div class="hud-hover-card-meta">地带：${escapeHtml(zone)}</div>
-    <div class="hud-hover-card-meta">海拔：${elevation.toFixed(1)}</div>
-    <div class="hud-hover-card-meta">坐标：${poi.lat.toFixed(4)}, ${poi.lon.toFixed(4)}</div>
+    <div class="hud-hover-card-meta">海拔：${elevationMeters} m</div>
+    <div class="hud-hover-card-meta">坐标：${formatLatitude(poi.lat)}, ${formatLongitude(poi.lon)}</div>
     <p>${escapeHtml(summary)}</p>
   `;
 }

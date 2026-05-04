@@ -27,6 +27,7 @@ export interface DemPresentation {
   underpaintLevel?: number;
   globalMinHeight?: number;
   globalMaxHeight?: number;
+  realPeakMeters?: number;
   visualIntent?: string;
 }
 
@@ -274,6 +275,10 @@ function validateOptionalPresentation(raw: unknown): DemPresentation | undefined
       raw.globalMaxHeight === undefined
         ? undefined
         : asFiniteNumber(raw.globalMaxHeight, "presentation.globalMaxHeight"),
+    realPeakMeters:
+      raw.realPeakMeters === undefined
+        ? undefined
+        : asFiniteNumber(raw.realPeakMeters, "presentation.realPeakMeters"),
     visualIntent:
       typeof raw.visualIntent === "string" ? raw.visualIntent : undefined
   };

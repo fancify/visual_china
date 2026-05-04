@@ -200,15 +200,16 @@ test("city hover card includes city facts and matching story beat", () => {
 
   const html = buildCityHoverCardHtml({
     city,
-    elevation: 12.4,
+    elevationMeters: 460,
     zone: "关中平原",
     beat
   });
 
   assert.match(html, /西安/);
   assert.match(html, /capital/);
-  assert.match(html, /34\.2700/);
-  assert.match(html, /108\.9500/);
+  assert.match(html, /海拔：460 m/);
+  assert.match(html, /34\.2700°N/);
+  assert.match(html, /108\.9500°E/);
   assert.match(html, /关中起行/);
   assert.match(html, /先感受腹地的开阔/);
 });
@@ -223,27 +224,27 @@ test("poi hover card includes scenic and ancient POI facts", () => {
   const scenicHtml = buildPoiHoverCardHtml({
     poi: scenicPoi,
     category: "scenic",
-    elevation: 612.4,
+    elevationMeters: 612,
     zone: "关中西缘"
   });
   const ancientHtml = buildPoiHoverCardHtml({
     poi: ancientPoi,
     category: "ancient",
-    elevation: 523.1,
+    elevationMeters: 523,
     zone: "关中东缘"
   });
 
   assert.match(scenicHtml, /法门寺/);
   assert.match(scenicHtml, /名胜/);
-  assert.match(scenicHtml, /34\.4300/);
-  assert.match(scenicHtml, /107\.8300/);
-  assert.match(scenicHtml, /海拔：612\.4/);
+  assert.match(scenicHtml, /34\.4300°N/);
+  assert.match(scenicHtml, /107\.8300°E/);
+  assert.match(scenicHtml, /海拔：612 m/);
   assert.match(scenicHtml, /佛指舍利/);
 
   assert.match(ancientHtml, /秦始皇陵/);
   assert.match(ancientHtml, /考古/);
-  assert.match(ancientHtml, /34\.3800/);
-  assert.match(ancientHtml, /109\.2500/);
-  assert.match(ancientHtml, /海拔：523\.1/);
+  assert.match(ancientHtml, /34\.3800°N/);
+  assert.match(ancientHtml, /109\.2500°E/);
+  assert.match(ancientHtml, /海拔：523 m/);
   assert.match(ancientHtml, /统一帝王陵/);
 });
