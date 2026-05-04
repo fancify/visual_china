@@ -10,7 +10,7 @@
     "qinling:fabdem:download": "node scripts/download-qinling-fabdem.mjs",
     "qinling:fabdem:extract": "node scripts/extract-qinling-fabdem.mjs",
     "qinling:dem:status": "node scripts/qinling-dem-status.mjs",
-    "qinling:dem:build-real": "node scripts/build-qinling-real-dem.mjs && node scripts/build-qinling-region-assets.mjs && node scripts/build-shu-road-paths.mjs",
+    "qinling:dem:build-real": "node scripts/build-qinling-real-dem.mjs && node scripts/build-qinling-region-assets.mjs && node scripts/build-qinling-route-anchors.mjs && node scripts/build-shu-road-paths.mjs",
     "build:hydrography:report": "node scripts/build-qinling-hydrography-report.mjs",
     "fetch:hydrography:osm": "node scripts/fetch-qinling-osm-waterways.mjs",
     "build:hydrography:osm": "node scripts/build-qinling-osm-hydrography.mjs",
