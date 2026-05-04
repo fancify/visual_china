@@ -28,6 +28,19 @@ function smoothstep(value, min, max) {
   return t * t * (3 - 2 * t);
 }
 
+// 高斯凸起叠在线性真实高程上：海平面与高峰基本不动，中段丘陵被拉高，
+// 让梓潼-剑门关这类 300-1500m 地带在游戏纵向上更有体积感。
+function enhanceMidRangeRelief(realMeters) {
+  const safeMeters = Math.max(0, realMeters);
+  const midPoint = 1000;
+  const spread = 800;
+  const peakBoost = 0.5;
+
+  const dx = (safeMeters - midPoint) / spread;
+  const bumpFactor = Math.exp(-dx * dx);
+  return safeMeters * (1 + peakBoost * bumpFactor);
+}
+
 function indexAt(column, row, columns) {
   return row * columns + column;
 }
@@ -547,6 +560,16 @@ for (let index = 0; index < rawHeights.length; index += 1) {
   }
 }
 
+// 在进入 touring/base synth 和游戏归一化之前，先把中段真实高程抬起。
+// 这样 300-1500m 丘陵会更立体，而海平面与 3000m+ 主峰轮廓基本保持不变。
+minRawHeight = Number.POSITIVE_INFINITY;
+maxRawHeight = Number.NEGATIVE_INFINITY;
+for (let index = 0; index < rawHeights.length; index += 1) {
+  rawHeights[index] = enhanceMidRangeRelief(rawHeights[index]);
+  minRawHeight = Math.min(minRawHeight, rawHeights[index]);
+  maxRawHeight = Math.max(maxRawHeight, rawHeights[index]);
+}
+
 let { normalized, minHeight, maxHeight } = normalizeHeights(
   buildTouringLayerRawHeights(rawHeights),
   minRawHeight,
@@ -641,6 +664,7 @@ const asset = {
     "Built from FABDEM tiles intersecting the Qinling region bounds.",
     "L1 national touring layer uses a 90m touring terrain base synthesized from the 30m FABDEM source before gameplay normalization.",
     "30m correction zones retain more source detail around Guanzhong, Hanzhong, northern Sichuan, and Qinling-Shu route corridors.",
+    "A Gaussian mid-range relief enhancement boosts 300-1500m hill terrain while keeping lowlands and high peaks close to their prior silhouettes.",
     "Real elevations are normalized into a gameplay-friendly stylized height range that keeps lowland basins readable.",
     `Raw sampled coverage before interpolation: ${(coverageRatio * 100).toFixed(2)}%.`,
     `Required FABDEM tiles: ${requiredTileNames.length}. Available required tiles: ${requiredTileNames.length - missingRequiredTileNames.length}.`,

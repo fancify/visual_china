@@ -218,6 +218,30 @@ test("Qinling visual relief avoids needle-like mountain noise", () => {
   );
 });
 
+test("mid-range elevation enhancement lifts hill terrain without inflating peaks", () => {
+  const zitong = sampleHeightAt(105.16, 31.64);
+  const jianmen = sampleHeightAt(105.55, 32.2);
+  const taibaiPeak = sampleHeightAt(107.77, 33.95);
+  const hillRelief = jianmen - zitong;
+
+  assert.ok(
+    zitong >= -0.5 && zitong <= 0,
+    `Zitong hill belt should lift into a clearly higher mid-hill band, got ${zitong.toFixed(3)}`
+  );
+  assert.ok(
+    jianmen >= 1.35 && jianmen <= 1.85,
+    `Jianmen Pass should lift into a distinctly raised hill relief band, got ${jianmen.toFixed(3)}`
+  );
+  assert.ok(
+    hillRelief >= 1.65 && hillRelief <= 2.15,
+    `Zitong-Jianmen hill relief should expand well beyond the prior ~1.2 unit contrast, got ${hillRelief.toFixed(3)}`
+  );
+  assert.ok(
+    taibaiPeak >= 7.6 && taibaiPeak <= 8.0,
+    `Taibai peak should remain near its prior silhouette, got ${taibaiPeak.toFixed(3)}`
+  );
+});
+
 test("Qinling river carving keeps a narrow water footprint with sharper gorge walls", () => {
   const gorge = riverGorgeStats();
 
