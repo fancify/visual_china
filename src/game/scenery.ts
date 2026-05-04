@@ -10,11 +10,11 @@ import {
   Object3D
 } from "three";
 
-import { applySeasonalAdjustment, biomeWeightsAt } from "./biomeZones";
-import { TerrainSampler } from "./demSampler";
+import { applySeasonalAdjustment, biomeWeightsAt } from "./biomeZones.js";
+import { TerrainSampler } from "./demSampler.js";
 import { unprojectWorldToGeo } from "./mapOrientation.js";
-import type { RuntimePerformanceBudget } from "./performanceBudget";
-import type { SeasonalBlend } from "./biomeZones";
+import type { RuntimePerformanceBudget } from "./performanceBudget.js";
+import type { SeasonalBlend } from "./biomeZones.js";
 
 // 共享 geometry / material：scenery 在每个 chunk 加载时被频繁创建/卸载，
 // 共享资源避免重复 GPU 上传和材质实例数膨胀。transparent + 默认 opacity:1
@@ -109,17 +109,22 @@ export function createChunkScenery(
           : biomeBase;
       const baseVegetationChance =
         0.12 + river * 0.22 + forestBand * 0.24 + lowlandGreen * 0.16;
-      const vegetationChance = Math.min(
+      const vegetationChance = Math.min(1, baseVegetationChance);
+      const inBasin = h < 0.18;
+      const basinDensity = inBasin
+        ? MathUtils.lerp(0.004, 0.08, MathUtils.smoothstep(h, 0.05, 0.18))
+        : 1.0;
+      const adjustedChance = Math.min(
         1,
-        baseVegetationChance * (biome?.vegetationDensity ?? 1)
+        vegetationChance * (biome?.vegetationDensity ?? 1) * basinDensity
       );
 
       if (
         treeMatrices.length < budget.maxTreesPerChunk &&
-        h > 0.18 &&
+        h > 0.05 &&
         h < 0.78 &&
         slope < 0.62 &&
-        pseudoRandom(seed + 31) < vegetationChance
+        pseudoRandom(seed + 31) < adjustedChance
       ) {
         const scale = 0.62 + pseudoRandom(seed + 43) * 0.55;
         dummy.position.set(x, height + 0.88 * scale, z);

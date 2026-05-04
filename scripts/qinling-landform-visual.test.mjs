@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
+import { createChunkScenery } from "../src/game/scenery.ts";
+import { qinlingRuntimeBudget } from "../src/game/performanceBudget.ts";
+
 const asset = JSON.parse(
   fs.readFileSync("public/data/qinling-slice-dem.json", "utf8")
 );
@@ -94,6 +97,39 @@ function riverGorgeStats() {
     bankRise90: bankRise[Math.floor(bankRise.length * 0.9)] ?? 0,
     bankRiseMean:
       bankRise.reduce((total, value) => total + value, 0) / (bankRise.length || 1)
+  };
+}
+
+function makeFlatScenerySampler({
+  normalizedHeight,
+  slope = 0,
+  river = 0,
+  width = 36,
+  depth = 36,
+  worldBounds
+}) {
+  return {
+    asset: {
+      minHeight: 0,
+      maxHeight: 1,
+      world: { width, depth },
+      grid: { columns: 2, rows: 2 },
+      bounds: undefined,
+      presentation: undefined,
+      worldBounds
+    },
+    sampleHeight() {
+      return normalizedHeight;
+    },
+    sampleSurfaceHeight() {
+      return normalizedHeight;
+    },
+    sampleSlope() {
+      return slope;
+    },
+    sampleRiver() {
+      return river;
+    }
   };
 }
 
@@ -276,5 +312,43 @@ test("terrain river tint thresholds stay narrowed for crisp water edges", () => 
     terrainModelSource,
     /river\s*\*\s*0\.20/,
     "riparian tint should stay weaker so river banks do not look mushy"
+  );
+});
+
+test("chunk scenery now allows sparse basin trees without exceeding the tree cap", () => {
+  const basinSampler = makeFlatScenerySampler({
+    normalizedHeight: 0.1,
+    slope: 0.04,
+    river: 0.02,
+    worldBounds: { minX: 120, maxX: 156, minZ: 40, maxZ: 76 }
+  });
+  const mountainSampler = makeFlatScenerySampler({
+    normalizedHeight: 0.36,
+    slope: 0.08,
+    river: 0.12,
+    worldBounds: { minX: 120, maxX: 156, minZ: 80, maxZ: 116 }
+  });
+  const basinScenery = createChunkScenery(
+    basinSampler,
+    qinlingRuntimeBudget.scenery
+  );
+  const mountainScenery = createChunkScenery(
+    mountainSampler,
+    qinlingRuntimeBudget.scenery
+  );
+  const basinTrees = basinScenery.children[0]?.count ?? 0;
+  const mountainTrees = mountainScenery.children[0]?.count ?? 0;
+
+  assert.ok(
+    basinTrees > 0,
+    `Sichuan-style basin chunk should no longer be locked to 0 trees, got ${basinTrees}`
+  );
+  assert.ok(
+    basinTrees < mountainTrees,
+    `basin chunk should stay sparser than mountain chunk, got basin=${basinTrees} mountain=${mountainTrees}`
+  );
+  assert.ok(
+    mountainTrees <= qinlingRuntimeBudget.scenery.maxTreesPerChunk,
+    `mountain chunk must still respect maxTreesPerChunk=${qinlingRuntimeBudget.scenery.maxTreesPerChunk}, got ${mountainTrees}`
   );
 });
