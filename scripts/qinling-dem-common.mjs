@@ -2,31 +2,31 @@ import path from "node:path";
 
 import { fabdemDataset } from "./china-dem-common.mjs";
 
-// 2026-05 east extension 已完成（refactor #63 把所有 hardcoded {x,y} 迁到
-// lat/lon 后，bounds 改成 1 行配置）：109 → 110，纳入 兵马俑 / 秦始皇陵 /
-// 半坡。跟 src/data/qinlingRegion.js 必须同值（构建期 + 运行期一致）。
+// 2026-05 slice 扩到完整关中 + 四川盆地北缘：东到 110.5 纳入 华山 / 潼关，
+// 南到 28.5 纳入 重庆 / 涪陵 / 泸州 / 宜宾。跟 src/data/qinlingRegion.js
+// 必须同值（构建期 + 运行期一致）。
 export const qinlingBounds = {
   west: 103.5,
-  east: 110.0,
-  south: 30.4,
+  east: 110.5,
+  south: 28.5,
   north: 35.4
 };
 
 export const qinlingRegionManifestBounds = { ...qinlingBounds };
 
 export const qinlingWorld = {
-  width: 180,
-  depth: 240
+  width: 193,
+  depth: 331
 };
 
 export const qinlingGeographicFootprintKm = {
-  width: 420,
-  depth: 560
+  width: 452,
+  depth: 773
 };
 
 export const qinlingOutputGrid = {
-  columns: 193,
-  rows: 241
+  columns: 208,
+  rows: 333
 };
 
 export const qinlingResolutionStrategy = {
@@ -47,7 +47,7 @@ export const qinlingResolutionStrategy = {
     {
       id: "guanzhong-plain",
       role: "basin-edge-readability",
-      bounds: { west: 106.4, east: 109.0, south: 33.75, north: 34.95 },
+      bounds: { west: 106.4, east: 110.5, south: 33.75, north: 34.95 },
       correctionWeight: 0.7
     },
     {
@@ -59,7 +59,7 @@ export const qinlingResolutionStrategy = {
     {
       id: "northern-sichuan-basin",
       role: "basin-transition-readability",
-      bounds: { west: 103.5, east: 106.25, south: 30.4, north: 32.35 },
+      bounds: { west: 103.5, east: 107.6, south: 28.5, north: 32.35 },
       correctionWeight: 0.65
     },
     {

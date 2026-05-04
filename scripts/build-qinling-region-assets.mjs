@@ -16,8 +16,7 @@ const chunksRoot = path.join(regionRoot, "chunks");
 const regionBounds = qinlingBounds;
 const geographicFootprintKm = qinlingGeographicFootprintKm;
 
-const chunkColumns = 4;
-const chunkRows = 5;
+const targetChunkSpanCells = 50;
 const densityClass = "high-focus";
 const experienceProfile = densityProfileForClass(densityClass);
 
@@ -46,6 +45,8 @@ function buildChunkChannel(data, sourceColumns, startColumn, endColumn, startRow
 }
 
 const asset = JSON.parse(await fs.readFile(legacyAssetPath, "utf8"));
+const chunkColumns = Math.max(1, Math.ceil((asset.grid.columns - 1) / targetChunkSpanCells));
+const chunkRows = Math.max(1, Math.ceil((asset.grid.rows - 1) / targetChunkSpanCells));
 const sliceAsset = {
   ...asset,
   id: "qinling-l1-slice",

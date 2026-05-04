@@ -31,7 +31,7 @@ test("historical qinling routes expose verified anchor-based metadata", () => {
   }
 });
 
-test("historical route anchor geography stays within qinling region bounds unless explicitly extending out of slice", () => {
+test("historical route anchor geography now stays within the expanded qinling region bounds", () => {
   for (const [routeId, anchors] of Object.entries(QINLING_ROUTE_ANCHOR_GEOGRAPHY)) {
     assert.ok(anchors.length >= 4, `${routeId} should define at least four geographic anchors`);
 
@@ -41,11 +41,6 @@ test("historical route anchor geography stays within qinling region bounds unles
         anchor.lat <= qinlingRegionBounds.north &&
         anchor.lon >= qinlingRegionBounds.west &&
         anchor.lon <= qinlingRegionBounds.east;
-
-      if (routeId === "lizhi-road" && anchor.name.includes("涪陵")) {
-        assert.equal(isInBounds, false, "lizhi-road should extend out of the current south slice");
-        continue;
-      }
 
       assert.equal(isInBounds, true, `${routeId}:${anchor.name} should stay within region bounds`);
     }
@@ -123,12 +118,13 @@ test("guanzhong corridor links the northern Shu-road mouths across the Wei south
   );
 });
 
-test("lizhi road starts from Chang'an and extends beyond the current southern slice", () => {
+test("lizhi road starts from Chang'an and now lands inside the expanded southern slice", () => {
   const lizhiAnchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["lizhi-road"];
   assert.equal(lizhiAnchors.length, 5);
   assert.equal(lizhiAnchors[0]?.name.includes("西安"), true);
   assert.equal(lizhiAnchors.at(-1)?.name.includes("涪陵"), true);
-  assert.ok(lizhiAnchors.at(-1).lat < qinlingRegionBounds.south);
+  assert.ok(lizhiAnchors.at(-1).lat >= qinlingRegionBounds.south);
+  assert.ok(lizhiAnchors.at(-1).lat <= 29.8, "lizhi-road should still reach the far south edge corridor");
 });
 
 test("precomputed world anchors stay aligned with route points", () => {

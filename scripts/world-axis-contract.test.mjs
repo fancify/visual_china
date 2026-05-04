@@ -31,11 +31,11 @@ const repoRoot = path.resolve(here, "..");
 
 const qinlingBounds = {
   west: 103.5,
-  east: 109.0,
-  south: 30.4,
+  east: 110.5,
+  south: 28.5,
   north: 35.4
 };
-const qinlingWorld = { width: 180, depth: 240 };
+const qinlingWorld = { width: 193, depth: 331 };
 
 test("engine axis contract describes Three.js convention only", () => {
   // worldAxis 不带"东南西北"语义——只描述引擎几何
@@ -240,7 +240,7 @@ test("legacy atlasRender.worldPointToOverviewPixel matches the new contract", ()
 });
 
 test("latitudeAtRow row=0 is north, row=rows-1 is south", () => {
-  const rows = 241;
+  const rows = 333;
   const first = latitudeAtRow(0, rows, qinlingBounds);
   const last = latitudeAtRow(rows - 1, rows, qinlingBounds);
   const mid = latitudeAtRow(Math.floor((rows - 1) / 2), rows, qinlingBounds);
@@ -250,7 +250,7 @@ test("latitudeAtRow row=0 is north, row=rows-1 is south", () => {
 });
 
 test("longitudeAtColumn column=0 is west, last column is east", () => {
-  const columns = 193;
+  const columns = 208;
   assert.equal(longitudeAtColumn(0, columns, qinlingBounds), qinlingBounds.west);
   assert.equal(
     longitudeAtColumn(columns - 1, columns, qinlingBounds),
