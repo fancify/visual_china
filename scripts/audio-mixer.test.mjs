@@ -12,15 +12,10 @@ function lastRampValue(events) {
   return ramp?.value ?? 0;
 }
 
-test("ambient mixer enables the expected forest day layer", () => {
+test("ambient mixer keeps a single soft wind layer in dry weather", () => {
   const { runtime, context } = createRuntime([
-    "ambient_forest_birds",
-    "ambient_insects_night",
-    "ambient_wind_plain",
-    "ambient_mountain_wind",
-    "ambient_rain_heavy",
-    "ambient_stream_water",
-    "ambient_river_large"
+    "ambient_soft_wind",
+    "ambient_rain_heavy"
   ]);
   const mixer = createAmbientMixer(runtime);
 
@@ -29,52 +24,37 @@ test("ambient mixer enables the expected forest day layer", () => {
     isNight: false,
     weather: "clear",
     altitudeBand: "mid",
-    riverProximity: 0,
-    largeRiverProximity: 0
+    riverProximity: 0.9,
+    largeRiverProximity: 0.8
   });
 
-  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_forest_birds")), 0.6);
-  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_insects_night")), 0);
+  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_soft_wind")), 0.04);
+  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_rain_heavy")), 0);
 });
 
-test("ambient mixer crossfades old and new biome layers", () => {
+test("ambient mixer lifts wind slightly at high altitude", () => {
   const { runtime, context } = createRuntime([
-    "ambient_forest_birds",
-    "ambient_wind_plain",
-    "ambient_rain_heavy",
-    "ambient_stream_water",
-    "ambient_river_large"
+    "ambient_soft_wind",
+    "ambient_rain_heavy"
   ]);
   const mixer = createAmbientMixer(runtime);
 
   mixer.setContext({
-    biome: "forest",
+    biome: "highland",
     isNight: false,
     weather: "clear",
-    altitudeBand: "mid",
-    riverProximity: 0,
-    largeRiverProximity: 0
-  });
-  context.currentTime = 2;
-  mixer.setContext({
-    biome: "plain",
-    isNight: false,
-    weather: "clear",
-    altitudeBand: "low",
+    altitudeBand: "high",
     riverProximity: 0,
     largeRiverProximity: 0
   });
 
-  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_forest_birds")), 0);
-  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_wind_plain")), 0.5);
+  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_soft_wind")), 0.08);
 });
 
-test("rain pushes down the base ambient layer and lifts rain ambience", () => {
+test("rain takes over by muting wind and raising the rain loop", () => {
   const { runtime, context } = createRuntime([
-    "ambient_wind_plain",
-    "ambient_rain_heavy",
-    "ambient_stream_water",
-    "ambient_river_large"
+    "ambient_soft_wind",
+    "ambient_rain_heavy"
   ]);
   const mixer = createAmbientMixer(runtime);
 
@@ -87,24 +67,23 @@ test("rain pushes down the base ambient layer and lifts rain ambience", () => {
     largeRiverProximity: 0
   });
 
-  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_rain_heavy")), 0.7);
-  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_wind_plain")), 0.1);
+  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_soft_wind")), 0);
+  assert.equal(lastRampValue(gainEventsForTrack(context, "ambient_rain_heavy")), 0.6);
 });
 
 test("ambient mixer exposes active layers with current gain and trigger label", () => {
   const { runtime } = createRuntime([
-    "ambient_forest_birds",
-    "ambient_stream_water",
-    "ambient_river_large"
+    "ambient_soft_wind",
+    "ambient_rain_heavy"
   ]);
   const mixer = createAmbientMixer(runtime);
 
   mixer.setContext({
-    biome: "forest",
+    biome: "plain",
     isNight: false,
     weather: "clear",
     altitudeBand: "mid",
-    riverProximity: 0.8,
+    riverProximity: 0,
     largeRiverProximity: 0
   });
   runtime.context.currentTime = 2;
@@ -112,14 +91,9 @@ test("ambient mixer exposes active layers with current gain and trigger label", 
   assert.equal(typeof mixer.getActiveLayers, "function");
   assert.deepEqual(mixer.getActiveLayers(), [
     {
-      trackId: "ambient_forest_birds",
-      currentGain: 0.6,
-      triggerLabel: "biome=forest, day"
-    },
-    {
-      trackId: "ambient_stream_water",
-      currentGain: 0.48,
-      triggerLabel: "river-proximity=0.80"
+      trackId: "ambient_soft_wind",
+      currentGain: 0.04,
+      triggerLabel: "weather=clear, altitude=mid"
     }
   ]);
 });
