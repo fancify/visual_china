@@ -1,3 +1,5 @@
+import { findZoneAt } from "./cityFlattenZones.js";
+
 export interface DemBounds {
   west: number;
   east: number;
@@ -505,13 +507,15 @@ export async function loadDemAsset(requestUrl: string): Promise<LoadedDemAsset> 
 
 export class TerrainSampler {
   readonly asset: DemAsset;
+  private heightOverride: ((originalY: number, x: number, z: number) => number) | null = null;
 
   constructor(asset: DemAsset) {
     this.asset = asset;
   }
 
   sampleHeight(x: number, z: number): number {
-    return this.sampleChannel("heights", x, z);
+    const rawY = this.sampleChannel("heights", x, z);
+    return this.applyHeightOverride(rawY, x, z);
   }
 
   // 跟 Three.js PlaneGeometry 一致的 triangular interp。
@@ -543,13 +547,17 @@ export class TerrainSampler {
     const D = data[y0 * columns + x1] ?? A; // (1,0)
     if (tx + ty <= 1) {
       // 上三角 a,b,d = (0,0)(0,1)(1,0)
-      return (1 - tx - ty) * A + ty * B + tx * D;
+      return this.applyHeightOverride((1 - tx - ty) * A + ty * B + tx * D, x, z);
     }
     // 下三角 b,c,d = (0,1)(1,1)(1,0)
-    return (1 - tx) * B + (tx + ty - 1) * C + (1 - ty) * D;
+    return this.applyHeightOverride((1 - tx) * B + (tx + ty - 1) * C + (1 - ty) * D, x, z);
   }
 
   sampleRiver(x: number, z: number): number {
+    const world = this.worldPositionForSample(x, z);
+    if (findZoneAt(world.x, world.z)) {
+      return 0;
+    }
     return this.sampleChannel("riverMask", x, z);
   }
 
@@ -566,6 +574,31 @@ export class TerrainSampler {
     const dx = this.sampleHeight(x + delta, z) - this.sampleHeight(x - delta, z);
     const dz = this.sampleHeight(x, z + delta) - this.sampleHeight(x, z - delta);
     return Math.min(Math.hypot(dx, dz) / 4.2, 1);
+  }
+
+  setHeightOverride(fn: ((originalY: number, x: number, z: number) => number) | null): void {
+    this.heightOverride = fn;
+  }
+
+  worldPositionForSample(x: number, z: number): { x: number; z: number } {
+    const worldBounds = this.asset.worldBounds;
+    if (!worldBounds) {
+      return { x, z };
+    }
+
+    return {
+      x: x + (worldBounds.minX + worldBounds.maxX) * 0.5,
+      z: z + (worldBounds.minZ + worldBounds.maxZ) * 0.5
+    };
+  }
+
+  private applyHeightOverride(originalY: number, x: number, z: number): number {
+    if (!this.heightOverride) {
+      return originalY;
+    }
+
+    const world = this.worldPositionForSample(x, z);
+    return this.heightOverride(originalY, world.x, world.z);
   }
 
   private sampleChannel(channel: ChannelName, x: number, z: number): number {

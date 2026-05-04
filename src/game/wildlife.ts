@@ -15,6 +15,7 @@ import {
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import { biomeWeightsAt, type BiomeWeights } from "./biomeZones.js";
+import { findZoneAt } from "./cityFlattenZones.js";
 import type { TerrainSampler } from "./demSampler.js";
 import { unprojectWorldToGeo } from "./mapOrientation.js";
 
@@ -367,6 +368,26 @@ function samplerWorldOffset(sampler: TerrainSampler): { x: number; z: number } {
   };
 }
 
+function worldPointForSampler(
+  sampler: TerrainSampler,
+  x: number,
+  z: number
+): { x: number; z: number } {
+  if (typeof sampler.worldPositionForSample === "function") {
+    return sampler.worldPositionForSample(x, z);
+  }
+
+  const worldBounds = sampler.asset.worldBounds;
+  if (!worldBounds) {
+    return { x, z };
+  }
+
+  return {
+    x: x + (worldBounds.minX + worldBounds.maxX) * 0.5,
+    z: z + (worldBounds.minZ + worldBounds.maxZ) * 0.5
+  };
+}
+
 export function buildWildlifeChunk(
   sampler: TerrainSampler,
   biomeOverride?: BiomeWeights | null
@@ -390,6 +411,10 @@ export function buildWildlifeChunk(
       const jitterZ = (pseudoRandom(seed + 29) - 0.5) * (depth / rows) * 0.58;
       const x = -width * 0.5 + ((column + 0.5) / columns) * width + jitterX;
       const z = -depth * 0.5 + ((row + 0.5) / rows) * depth + jitterZ;
+      const world = worldPointForSampler(sampler, x, z);
+      if (findZoneAt(world.x, world.z)) {
+        continue;
+      }
       const height = sampler.sampleSurfaceHeight(x, z);
       const h = normalizedHeight(height, sampler);
       const slope = sampler.sampleSlope(x, z);

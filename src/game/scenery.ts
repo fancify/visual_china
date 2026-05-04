@@ -11,6 +11,7 @@ import {
 } from "three";
 
 import { applySeasonalAdjustment, biomeWeightsAt } from "./biomeZones.js";
+import { findZoneAt } from "./cityFlattenZones.js";
 import { TerrainSampler } from "./demSampler.js";
 import { unprojectWorldToGeo } from "./mapOrientation.js";
 import type { RuntimePerformanceBudget } from "./performanceBudget.js";
@@ -50,6 +51,26 @@ function normalizedHeight(height: number, sampler: TerrainSampler): number {
   );
 }
 
+function worldPointForSampler(
+  sampler: TerrainSampler,
+  x: number,
+  z: number
+): { x: number; z: number } {
+  if (typeof sampler.worldPositionForSample === "function") {
+    return sampler.worldPositionForSample(x, z);
+  }
+
+  const worldBounds = sampler.asset.worldBounds;
+  if (!worldBounds) {
+    return { x, z };
+  }
+
+  return {
+    x: x + (worldBounds.minX + worldBounds.maxX) * 0.5,
+    z: z + (worldBounds.minZ + worldBounds.maxZ) * 0.5
+  };
+}
+
 export function createChunkScenery(
   sampler: TerrainSampler,
   budget: RuntimePerformanceBudget["scenery"],
@@ -85,6 +106,10 @@ export function createChunkScenery(
       const jitterZ = (pseudoRandom(seed + 17) - 0.5) * (depth / rows) * 0.8;
       const x = -width * 0.5 + ((column + 0.5) / columns) * width + jitterX;
       const z = -depth * 0.5 + ((row + 0.5) / rows) * depth + jitterZ;
+      const world = worldPointForSampler(sampler, x, z);
+      if (findZoneAt(world.x, world.z)) {
+        continue;
+      }
       // sampleSurfaceHeight 跟 GPU triangulation 一致 — 树底面跟 mesh
       // 表面同一个 Y，绝不悬空，也不被雕刻河谷误埋。bilinear sampleHeight
       // 在雕刻 cell 边缘会跟 GPU 渲染面差 0.3-0.8 单元，是之前"树飘"
