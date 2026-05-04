@@ -67,15 +67,29 @@ function installCanvasStub() {
     fillStyle: "",
     strokeStyle: "",
     lineWidth: 0,
+    globalCompositeOperation: "source-over",
     createRadialGradient: createGradient,
     createLinearGradient: createGradient,
+    createImageData(width, height) {
+      return {
+        width,
+        height,
+        data: new Uint8ClampedArray(width * height * 4)
+      };
+    },
     fillRect() {},
     clearRect() {},
     beginPath() {},
     arc() {},
     fill() {},
     stroke() {},
-    ellipse() {}
+    ellipse() {},
+    clip() {},
+    save() {},
+    restore() {},
+    moveTo() {},
+    closePath() {},
+    putImageData() {}
   };
 
   globalThis.document = {
@@ -170,6 +184,67 @@ test("twilight keeps the cool-side horizon no brighter than the zenith while noo
   );
 });
 
+test("sun and moon horizon fade stay full at the horizon and only collapse after sinking below it", async () => {
+  const { environment } = await loadGameModules();
+
+  assert.ok(
+    environment.skyBodyHorizonFade(0) >= 0.95,
+    "disc fade should stay effectively full at the horizon"
+  );
+  assert.ok(
+    environment.skyBodyHorizonFade(-0.04) >= 0.99,
+    "disc fade should stay full while the center has only just dipped below the horizon"
+  );
+  assert.ok(
+    environment.skyBodyHorizonFade(-0.14) <= 0.01,
+    "disc fade should collapse once the body is meaningfully below the horizon"
+  );
+});
+
+test("twilight boosts sun disc opacity so sunset keeps a readable disc", async () => {
+  const { environment } = await loadGameModules();
+  const controller = new environment.EnvironmentController();
+
+  controller.state.timeOfDay = 18;
+  const dusk = controller.computeVisuals();
+
+  assert.ok(dusk.twilightStrength > 0.7);
+  assert.ok(dusk.sunDiscOpacity >= 0.4, "sunset sun disc should stay readable through twilight");
+});
+
+test("environment maps the sun across an east-noon-west arc and exposes the synodic moon phase", async () => {
+  const { environment } = await loadGameModules();
+  const controller = new environment.EnvironmentController();
+
+  controller.state.dayOfYear = 0;
+  controller.state.timeOfDay = 6;
+  const sunrise = controller.computeVisuals();
+  assert.ok(sunrise.sunDirection.x > 70, "sunrise sun should emerge from +X/east");
+  assert.ok(Math.abs(sunrise.sunDirection.z) < 1e-6, "sunrise sun should stay on the east-west arc");
+
+  controller.state.timeOfDay = 12;
+  const noon = controller.computeVisuals();
+  assert.ok(Math.abs(noon.sunDirection.x) < 1e-6, "noon sun should sit on the meridian");
+  assert.ok(noon.sunDirection.y > 150, "noon sun should climb near the zenith");
+
+  controller.state.timeOfDay = 18;
+  const sunset = controller.computeVisuals();
+  assert.ok(sunset.sunDirection.x < -70, "sunset sun should fall toward -X/west");
+  assert.ok(Math.abs(sunset.sunDirection.z) < 1e-6, "sunset sun should stay on the east-west arc");
+
+  controller.state.timeOfDay = 0;
+  const midnight = controller.computeVisuals();
+  assert.ok(midnight.sunDirection.y < 0, "midnight sun should stay below the horizon");
+
+  controller.state.dayOfYear = 14.75;
+  const fullMoon = controller.computeVisuals();
+  assert.ok(Math.abs(fullMoon.moonPhase - 0.5) < 1e-9, "half a synodic month should land on full moon");
+
+  controller.state.dayOfYear = 29.5;
+  const resetMoon = controller.computeVisuals();
+  assert.ok(resetMoon.moonPhase < 1e-9, "one synodic month should wrap back to new moon");
+});
+
 test("sky dome materials use moon occlusion depth, directional horizon uniforms, and star twinkle attributes", async () => {
   const restoreDocument = installCanvasStub();
   try {
@@ -179,6 +254,11 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
     assert.equal(dome.starDomeMaterial.depthTest, true);
     assert.equal(dome.moonDiscMaterial.depthTest, true);
     assert.equal(dome.moonDiscMaterial.depthWrite, true);
+    assert.deepEqual(
+      dome.sunDiscMaterial.map.userData.gradientStops.map((stop) => stop.offset),
+      [0, 0.45, 0.65, 1],
+      "sun disc should use the tighter warm-core gradient"
+    );
 
     const phaseAttribute = dome.starDome.geometry.getAttribute("phase");
     assert.ok(phaseAttribute, "star dome should expose per-star twinkle phase");
@@ -198,8 +278,14 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
       sunDirection: { x: 3, y: 1, z: 2 },
       sunWarmColor: dome.shellMaterial.uniforms.horizonColor.value.clone(),
       horizonCoolColor: dome.shellMaterial.uniforms.zenithColor.value.clone(),
-      groundColor: dome.shellMaterial.uniforms.groundColor.value.clone()
+      groundColor: dome.shellMaterial.uniforms.groundColor.value.clone(),
+      moonPhase: 0.52
     });
+    assert.equal(
+      dome.moonDiscMaterial.map.userData.phaseIndex,
+      4,
+      "moon disc should snap to the nearest cached phase texture"
+    );
 
     const shaderStub = {
       uniforms: {},
