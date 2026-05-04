@@ -17,9 +17,14 @@ import {
 } from "../src/game/cityMarkers.ts";
 import { realQinlingCities } from "../src/data/realCities.js";
 import {
+  buildPoiHoverCardHtml,
   buildCityHoverCardHtml,
   findStoryBeatForZone
 } from "../src/game/cityHoverHud.ts";
+import {
+  qinlingAncientSites,
+  qinlingScenicLandmarks
+} from "../src/game/qinlingAtlas.js";
 
 const regionManifest = JSON.parse(
   await readFile("public/data/regions/qinling/manifest.json", "utf8")
@@ -66,9 +71,9 @@ test("city wall geometry sits on the sampled ground instead of floating by one w
   );
 
   const expectedHeightsByMesh = new Map([
-    ["city-walls-capital", 1.4 * 1.5],
-    ["city-walls-prefecture", 1.1 * 1.2],
-    ["city-walls-county", 0.8]
+    ["city-walls-capital", 0.9 * 1.7 * 1.02],
+    ["city-walls-prefecture", 0.7 * 1.2],
+    ["city-walls-county", 0.4 + 0.18]
   ]);
   const vertexCountsByMesh = new Map();
 
@@ -120,22 +125,49 @@ test("city tier specs add houses and one gate per tier", () => {
   assert.deepEqual(
     {
       capital: {
+        outerSide: CITY_TIER_SPECS.capital.outerSide,
+        innerSide: CITY_TIER_SPECS.capital.innerSide,
+        height: CITY_TIER_SPECS.capital.height,
         houses: CITY_TIER_SPECS.capital.houses,
         gateOnSide: CITY_TIER_SPECS.capital.gateOnSide
       },
       prefecture: {
+        outerSide: CITY_TIER_SPECS.prefecture.outerSide,
+        innerSide: CITY_TIER_SPECS.prefecture.innerSide,
+        height: CITY_TIER_SPECS.prefecture.height,
         houses: CITY_TIER_SPECS.prefecture.houses,
         gateOnSide: CITY_TIER_SPECS.prefecture.gateOnSide
       },
       county: {
+        outerSide: CITY_TIER_SPECS.county.outerSide,
+        innerSide: CITY_TIER_SPECS.county.innerSide,
+        height: CITY_TIER_SPECS.county.height,
         houses: CITY_TIER_SPECS.county.houses,
         gateOnSide: CITY_TIER_SPECS.county.gateOnSide
       }
     },
     {
-      capital: { houses: 6, gateOnSide: "south" },
-      prefecture: { houses: 3, gateOnSide: "south" },
-      county: { houses: 2, gateOnSide: "south" }
+      capital: {
+        outerSide: 4.4,
+        innerSide: 3.6,
+        height: 0.9,
+        houses: 6,
+        gateOnSide: "south"
+      },
+      prefecture: {
+        outerSide: 3.4,
+        innerSide: 2.6,
+        height: 0.7,
+        houses: 3,
+        gateOnSide: "south"
+      },
+      county: {
+        outerSide: 2.4,
+        innerSide: 1.6,
+        height: 0.5,
+        houses: 2,
+        gateOnSide: "south"
+      }
     }
   );
 });
@@ -179,4 +211,39 @@ test("city hover card includes city facts and matching story beat", () => {
   assert.match(html, /108\.9500/);
   assert.match(html, /关中起行/);
   assert.match(html, /先感受腹地的开阔/);
+});
+
+test("poi hover card includes scenic and ancient POI facts", () => {
+  const scenicPoi = qinlingScenicLandmarks.find((entry) => entry.name === "法门寺");
+  const ancientPoi = qinlingAncientSites.find((entry) => entry.name === "秦始皇陵");
+
+  assert.ok(scenicPoi, "法门寺 scenic fixture should exist");
+  assert.ok(ancientPoi, "秦始皇陵 ancient fixture should exist");
+
+  const scenicHtml = buildPoiHoverCardHtml({
+    poi: scenicPoi,
+    category: "scenic",
+    elevation: 612.4,
+    zone: "关中西缘"
+  });
+  const ancientHtml = buildPoiHoverCardHtml({
+    poi: ancientPoi,
+    category: "ancient",
+    elevation: 523.1,
+    zone: "关中东缘"
+  });
+
+  assert.match(scenicHtml, /法门寺/);
+  assert.match(scenicHtml, /名胜/);
+  assert.match(scenicHtml, /34\.4300/);
+  assert.match(scenicHtml, /107\.8300/);
+  assert.match(scenicHtml, /海拔：612\.4/);
+  assert.match(scenicHtml, /佛指舍利/);
+
+  assert.match(ancientHtml, /秦始皇陵/);
+  assert.match(ancientHtml, /考古/);
+  assert.match(ancientHtml, /34\.3800/);
+  assert.match(ancientHtml, /109\.2500/);
+  assert.match(ancientHtml, /海拔：523\.1/);
+  assert.match(ancientHtml, /统一帝王陵/);
 });

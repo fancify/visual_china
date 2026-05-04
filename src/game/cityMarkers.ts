@@ -2,7 +2,6 @@ import {
   BoxGeometry,
   BufferGeometry,
   ConeGeometry,
-  CylinderGeometry,
   Group,
   InstancedMesh,
   MeshPhongMaterial,
@@ -24,9 +23,9 @@ import { projectGeoToWorld } from "./mapOrientation.js";
  *   county（县城）= 外环 + 2 户屋舍
  *
  * 三档尺寸：
- *   capital（京城）= 外 4.4 内 3.0、墙厚 0.7、高 1.4（最大）
- *   prefecture（州府）= 外 3.4 内 2.4、墙厚 0.5、高 1.1
- *   county（县城）= 外 2.4 内 1.6、墙厚 0.4、高 0.8（最矮）
+ *   capital（京城）= 外 4.4 内 3.6、墙厚 0.4、高 0.9（最大）
+ *   prefecture（州府）= 外 3.4 内 2.6、墙厚 0.4、高 0.7
+ *   county（县城）= 外 2.4 内 1.6、墙厚 0.4、高 0.5（最矮）
  *
  * 用 InstancedMesh：每档 1 个 mesh，共 3 个 instanced mesh（之前 base+
  * roof 6 个减半）。29 个 instance，draw call 3。
@@ -60,7 +59,7 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
   county: {
     outerSide: 2.4,
     innerSide: 1.6,
-    height: 0.8,
+    height: 0.5,
     cornerTowers: false,
     centralTower: false,
     houses: 2,
@@ -68,8 +67,8 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
   },
   prefecture: {
     outerSide: 3.4,
-    innerSide: 2.4,
-    height: 1.1,
+    innerSide: 2.6,
+    height: 0.7,
     cornerTowers: true,
     centralTower: false,
     houses: 3,
@@ -77,8 +76,8 @@ export const CITY_TIER_SPECS: Record<CityTier, CityTierSpec> = {
   },
   capital: {
     outerSide: 4.4,
-    innerSide: 3.0,
-    height: 1.4,
+    innerSide: 3.6,
+    height: 0.9,
     cornerTowers: true,
     centralTower: true,
     houses: 6,
@@ -110,6 +109,20 @@ function houseSlots(innerSide: number, count: number): Array<[number, number]> {
     [spread * 0.2, spread * 1.08]
   ];
   return slots.slice(0, Math.max(0, count));
+}
+
+function buildCentralPalace(width: number, height: number): BufferGeometry[] {
+  const bodyHeight = height * 0.55;
+  const upperHeight = height * 0.2;
+  const roofDeckHeight = height * 0.05;
+  const roofRidgeHeight = height * 0.2;
+
+  return [
+    translatedBox(width, bodyHeight, width, 0, bodyHeight * 0.5, 0),
+    translatedBox(width * 0.85, upperHeight, width * 0.85, 0, height * 0.65, 0),
+    translatedBox(width * 1.1, roofDeckHeight, width * 1.1, 0, height * 0.78, 0),
+    translatedBox(width * 0.6, roofRidgeHeight, width * 1.05, 0, height * 0.92, 0)
+  ];
 }
 
 function makeWalledRingGeometry(
@@ -242,16 +255,9 @@ function makeTierWallGeometry(
   }
 
   if (spec.centralTower) {
-    const towerGeom = prepareForMerge(
-      new CylinderGeometry(
-        spec.outerSide * 0.16,
-        spec.outerSide * 0.18,
-        spec.height * 1.5,
-        8
-      )
-    );
-    towerGeom.translate(0, spec.height * 0.75, 0);
-    parts.push(towerGeom);
+    const palaceWidth = spec.outerSide * 0.7;
+    const palaceHeight = spec.height * 1.7;
+    parts.push(...buildCentralPalace(palaceWidth, palaceHeight));
   }
 
   const merged = BufferGeometryUtils.mergeGeometries(parts);

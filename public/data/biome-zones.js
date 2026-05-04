@@ -11,11 +11,11 @@ export const BIOME_ZONE_DATA = Object.freeze({
   },
   presets: {
     "subtropical-humid": {
-      hueShift: 0.028,
-      satScale: 1.16,
-      lumScale: 0.96,
-      vegetationDensity: 1.3,
-      treeHue: 0.31
+      hueShift: 0.06,
+      satScale: 1.3,
+      lumScale: 0.92,
+      vegetationDensity: 1.45,
+      treeHue: 0.33
     },
     "tropical-humid": {
       hueShift: 0.045,

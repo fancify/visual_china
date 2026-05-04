@@ -1,4 +1,8 @@
 import type { RealCity } from "../data/realCities.js";
+import type {
+  QinlingAncientSite,
+  QinlingScenicLandmark
+} from "./qinlingAtlas.js";
 import type { StoryBeat } from "./storyGuide";
 
 export interface CityHoverCardState {
@@ -6,6 +10,17 @@ export interface CityHoverCardState {
   elevation: number;
   zone: string;
   beat: StoryBeat | null;
+}
+
+export type HoverPoiCategory = "scenic" | "ancient";
+
+export type HoverPoi = QinlingScenicLandmark | QinlingAncientSite;
+
+export interface PoiHoverCardState {
+  poi: HoverPoi;
+  category: HoverPoiCategory;
+  elevation: number;
+  zone: string;
 }
 
 function escapeHtml(value: string): string {
@@ -33,6 +48,10 @@ export function cityTierLabel(tier: RealCity["tier"]): string {
     return "州府";
   }
   return "县城";
+}
+
+export function poiCategoryLabel(category: HoverPoiCategory): string {
+  return category === "scenic" ? "名胜" : "考古";
 }
 
 export function findStoryBeatForZone(
@@ -71,5 +90,23 @@ export function buildCityHoverCardHtml({
     <div class="hud-hover-card-meta">坐标：${city.lat.toFixed(4)}, ${city.lon.toFixed(4)}</div>
     <p>${escapeHtml(summary)}</p>
     ${beatHtml}
+  `;
+}
+
+export function buildPoiHoverCardHtml({
+  poi,
+  category,
+  elevation,
+  zone
+}: PoiHoverCardState): string {
+  const summary = truncateHoverText(poi.summary || "暂无补充说明。", 110);
+
+  return `
+    <div class="hud-hover-card-kicker">${escapeHtml(poiCategoryLabel(category))}</div>
+    <strong>${escapeHtml(poi.name)}</strong>
+    <div class="hud-hover-card-meta">地带：${escapeHtml(zone)}</div>
+    <div class="hud-hover-card-meta">海拔：${elevation.toFixed(1)}</div>
+    <div class="hud-hover-card-meta">坐标：${poi.lat.toFixed(4)}, ${poi.lon.toFixed(4)}</div>
+    <p>${escapeHtml(summary)}</p>
   `;
 }

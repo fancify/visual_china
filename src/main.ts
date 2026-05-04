@@ -183,8 +183,11 @@ import {
   sharedTreeMaterial
 } from "./game/scenery";
 import {
+  buildPoiHoverCardHtml,
   buildCityHoverCardHtml,
-  findStoryBeatForZone
+  findStoryBeatForZone,
+  type HoverPoi,
+  type HoverPoiCategory
 } from "./game/cityHoverHud";
 import {
   cityFromMarkerIntersection,
@@ -391,7 +394,13 @@ hoverCard.className = "hud-hover-card hud-hover-card-hidden";
 appRoot.appendChild(hoverCard);
 const hoverRaycaster = new Raycaster();
 const hoverPointer = new Vector2();
-let hoveredCityId: string | null = null;
+let hoveredHoverCardKey: string | null = null;
+
+interface HoverPoiMetadata {
+  key: string;
+  poi: HoverPoi;
+  category: HoverPoiCategory;
+}
 
 const scene = new Scene();
 const sceneFog = new FogExp2(0x091416, 0.0065);
@@ -669,8 +678,42 @@ const routeLabelSprites: Sprite[] = [];
 let routePlankRoadHandle: PlankRoadHandle | null = null;
 
 function hideHoverCard(): void {
-  hoveredCityId = null;
+  hoveredHoverCardKey = null;
   hoverCard.classList.add("hud-hover-card-hidden");
+}
+
+function isHoverPoiMetadata(value: unknown): value is HoverPoiMetadata {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<HoverPoiMetadata>;
+  return (
+    typeof candidate.key === "string" &&
+    (candidate.category === "scenic" || candidate.category === "ancient") &&
+    !!candidate.poi &&
+    typeof candidate.poi.id === "string" &&
+    typeof candidate.poi.name === "string" &&
+    typeof candidate.poi.lat === "number" &&
+    typeof candidate.poi.lon === "number" &&
+    typeof candidate.poi.summary === "string"
+  );
+}
+
+function attachHoverPoiMetadata(
+  object: Object3D,
+  poi: HoverPoi,
+  category: HoverPoiCategory
+): void {
+  object.userData.hoverPoi = {
+    key: `${category}:${poi.id}`,
+    poi,
+    category
+  } satisfies HoverPoiMetadata;
+}
+
+function hoverPoiMetadataFromObject(object: Object3D): HoverPoiMetadata | null {
+  return isHoverPoiMetadata(object.userData.hoverPoi) ? object.userData.hoverPoi : null;
 }
 
 function positionHoverCard(clientX: number, clientY: number): void {
@@ -692,7 +735,6 @@ function positionHoverCard(clientX: number, clientY: number): void {
 function updateCityHoverCard(event: PointerEvent): void {
   if (
     !terrainSampler ||
-    !cityMarkersHandle ||
     isDragging ||
     atlasWorkbench.isFullscreen ||
     cityDetailPanelOpen ||
@@ -714,42 +756,85 @@ function updateCityHoverCard(event: PointerEvent): void {
   hoverPointer.y = -(((event.clientY - canvasRect.top) / canvasRect.height) * 2 - 1);
   hoverRaycaster.setFromCamera(hoverPointer, camera);
 
-  const intersections = hoverRaycaster.intersectObjects(cityMarkersHandle.group.children, false);
-  const nextCity = intersections[0]
-    ? cityFromMarkerIntersection(
-        cityMarkersHandle,
-        intersections[0].object,
-        intersections[0].instanceId
-      )
-    : null;
+  const hoverTargets = [
+    ...(cityMarkersHandle?.group.children ?? []),
+    ...scenicGroup.children,
+    ...ancientGroup.children
+  ];
+  const intersections = hoverRaycaster.intersectObjects(hoverTargets, false);
 
-  if (!nextCity || !sampler.asset.bounds) {
+  if (!sampler.asset.bounds) {
     hideHoverCard();
     return;
   }
 
-  const worldPoint = projectGeoToWorld(
-    { lat: nextCity.lat, lon: nextCity.lon },
-    sampler.asset.bounds,
-    sampler.asset.world
-  );
-  const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
-  const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
-  const beat = findStoryBeatForZone(
-    storyBeats,
-    zone,
-    (storyBeat) => zoneNameAt(storyBeat.target.x, storyBeat.target.y, sampler)
-  );
-  const nextHtml = buildCityHoverCardHtml({
-    city: nextCity,
-    elevation,
-    zone,
-    beat
-  });
+  let nextHoverCard: { key: string; html: string } | null = null;
 
-  if (hoveredCityId !== nextCity.id || hoverCard.innerHTML !== nextHtml) {
-    hoverCard.innerHTML = nextHtml;
-    hoveredCityId = nextCity.id;
+  for (const intersection of intersections) {
+    const hoverPoi = hoverPoiMetadataFromObject(intersection.object);
+    if (hoverPoi) {
+      const worldPoint = projectGeoToWorld(
+        { lat: hoverPoi.poi.lat, lon: hoverPoi.poi.lon },
+        sampler.asset.bounds,
+        sampler.asset.world
+      );
+      const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
+      const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
+      nextHoverCard = {
+        key: hoverPoi.key,
+        html: buildPoiHoverCardHtml({
+          poi: hoverPoi.poi,
+          category: hoverPoi.category,
+          elevation,
+          zone
+        })
+      };
+      break;
+    }
+
+    const nextCity = cityMarkersHandle
+      ? cityFromMarkerIntersection(
+          cityMarkersHandle,
+          intersection.object,
+          intersection.instanceId
+        )
+      : null;
+    if (!nextCity) {
+      continue;
+    }
+
+    const worldPoint = projectGeoToWorld(
+      { lat: nextCity.lat, lon: nextCity.lon },
+      sampler.asset.bounds,
+      sampler.asset.world
+    );
+    const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
+    const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
+    const beat = findStoryBeatForZone(
+      storyBeats,
+      zone,
+      (storyBeat) => zoneNameAt(storyBeat.target.x, storyBeat.target.y, sampler)
+    );
+    nextHoverCard = {
+      key: `city:${nextCity.id}`,
+      html: buildCityHoverCardHtml({
+        city: nextCity,
+        elevation,
+        zone,
+        beat
+      })
+    };
+    break;
+  }
+
+  if (!nextHoverCard) {
+    hideHoverCard();
+    return;
+  }
+
+  if (hoveredHoverCardKey !== nextHoverCard.key || hoverCard.innerHTML !== nextHoverCard.html) {
+    hoverCard.innerHTML = nextHoverCard.html;
+    hoveredHoverCardKey = nextHoverCard.key;
   }
 
   positionHoverCard(event.clientX, event.clientY);
@@ -1323,6 +1408,7 @@ function rebuildScenicVisuals(): void {
       mesh.userData.terrainYOffset = yOffset;
       mesh.userData.sharedResources = true;
       recordChunkId(mesh, position);
+      attachHoverPoiMetadata(mesh, spot, "scenic");
       scenicGroup.add(mesh);
     };
 
@@ -1353,6 +1439,7 @@ function rebuildScenicVisuals(): void {
         mesh.userData.terrainYOffset = dy;
         mesh.userData.sharedResources = true;
         recordChunkId(mesh, position);
+        attachHoverPoiMetadata(mesh, spot, "scenic");
         scenicGroup.add(mesh);
       });
       const trees: Array<[number, number]> = [
@@ -1364,6 +1451,7 @@ function rebuildScenicVisuals(): void {
         tree.userData.terrainYOffset = 0.8;
         tree.userData.sharedResources = true;
         recordChunkId(tree, position);
+        attachHoverPoiMetadata(tree, spot, "scenic");
         scenicGroup.add(tree);
       });
       labelHeight = 4.2;
@@ -1384,12 +1472,14 @@ function rebuildScenicVisuals(): void {
       stele1.userData.terrainYOffset = 1.2;
       stele1.userData.sharedResources = true;
       recordChunkId(stele1, position);
+      attachHoverPoiMetadata(stele1, spot, "scenic");
       scenicGroup.add(stele1);
       const stele2 = new Mesh(scenicGeometries.mausoleumStele, scenicMaterials.mausoleumStele);
       stele2.position.set(wp.x + 1.6, groundY + 1.2, wp.z + 5.0);
       stele2.userData.terrainYOffset = 1.2;
       stele2.userData.sharedResources = true;
       recordChunkId(stele2, position);
+      attachHoverPoiMetadata(stele2, spot, "scenic");
       scenicGroup.add(stele2);
       labelHeight = 5.4;
     } else if (spot.role === "travertine-terraces") {
@@ -1423,6 +1513,7 @@ function rebuildScenicVisuals(): void {
     label.position.set(wp.x, groundY + labelHeight, wp.z);
     label.userData.terrainYOffset = labelHeight;
     recordChunkId(label, position);
+    attachHoverPoiMetadata(label, spot, "scenic");
     scenicGroup.add(label);
     scenicLabelSprites.push(label);
   });
@@ -1463,6 +1554,7 @@ function rebuildAncientVisuals(): void {
       mesh.userData.chunkId = regionChunkManifest
         ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
         : null;
+      attachHoverPoiMetadata(mesh, site, "ancient");
       ancientGroup.add(mesh);
     };
 
@@ -1531,6 +1623,7 @@ function rebuildAncientVisuals(): void {
     label.userData.chunkId = regionChunkManifest
       ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
       : null;
+    attachHoverPoiMetadata(label, site, "ancient");
     ancientGroup.add(label);
     ancientLabelSprites.push(label);
   });
@@ -4480,6 +4573,11 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   disposeChunkTerrain();
   terrainSampler = sampler;
   resetStoryGuide();
+  // scenic / ancient POI 需要 sampler.bounds + sampleHeight 才能落地；init
+  // 里如果先 rebuild 再设 terrainSampler，会直接 early return 变成空组。
+  // 把这两组重建收口到 terrain apply 之后，避免 atlas 有点位但 3D 首帧没有。
+  rebuildScenicVisuals();
+  rebuildAncientVisuals();
   rebuildTerrainGeometry(
     sampler.asset.world.width,
     sampler.asset.world.depth,
@@ -4679,8 +4777,6 @@ async function init(): Promise<void> {
     storyBeats = regionBundle.content.storyBeats ?? getQinlingStoryBeats();
     resetStoryGuide();
     rebuildLandmarkVisuals();
-    rebuildScenicVisuals();
-    rebuildAncientVisuals();
     rebuildFragmentVisuals();
     renderJournal();
     hudDirty = true;

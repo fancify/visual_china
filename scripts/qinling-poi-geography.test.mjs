@@ -3,6 +3,10 @@ import fs from "node:fs";
 import test from "node:test";
 
 import { geoToWorld } from "../src/game/geoProjection.js";
+import {
+  qinlingAncientSites,
+  qinlingScenicLandmarks
+} from "../src/game/qinlingAtlas.js";
 
 const REMOVED_PLACEHOLDER_LANDMARKS = [
   "长安意象",
@@ -129,4 +133,25 @@ test("Guanzhong start and narrative fragment use real east-side coordinates", ()
     distance({ x: positionToWorld(heartlandFragment.position).x, z: positionToWorld(heartlandFragment.position).y }, expectedChangan) < 12,
     "first Guanzhong fragment should match the same east-side geography"
   );
+});
+
+test("requested scenic and ancient POIs stay inside the current Qinling slice", () => {
+  const requiredPois = [
+    qinlingAncientSites.find((entry) => entry.name === "三星堆"),
+    qinlingAncientSites.find((entry) => entry.name === "秦始皇陵"),
+    qinlingScenicLandmarks.find((entry) => entry.name === "乾陵"),
+    qinlingScenicLandmarks.find((entry) => entry.name === "法门寺")
+  ];
+
+  requiredPois.forEach((poi) => {
+    assert.ok(poi, "requested POI fixture should exist");
+    assert.ok(
+      poi.lat >= asset.bounds.south && poi.lat <= asset.bounds.north,
+      `${poi.name} latitude should stay inside the current slice`
+    );
+    assert.ok(
+      poi.lon >= asset.bounds.west && poi.lon <= asset.bounds.east,
+      `${poi.name} longitude should stay inside the current slice`
+    );
+  });
 });
