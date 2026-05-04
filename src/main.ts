@@ -28,6 +28,7 @@ import {
   PlaneGeometry,
   Points,
   PointsMaterial,
+  Raycaster,
   Scene,
   SphereGeometry,
   Sprite,
@@ -182,6 +183,11 @@ import {
   sharedTreeMaterial
 } from "./game/scenery";
 import {
+  buildCityHoverCardHtml,
+  findStoryBeatForZone
+} from "./game/cityHoverHud";
+import {
+  cityFromMarkerIntersection,
   createCityMarkers,
   disposeCityMarkers,
   type CityMarkersHandle
@@ -355,6 +361,7 @@ const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
   throw new Error("Missing app root");
 }
+const appRoot = app;
 
 const renderer = new WebGLRenderer({
   antialias: true,
@@ -368,7 +375,7 @@ const renderer = new WebGLRenderer({
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x081213);
-app.appendChild(renderer.domElement);
+appRoot.appendChild(renderer.domElement);
 
 const perfStats = createPerfStats({ enabled: isDevModeEnabled() });
 if (perfStats.element.hidden === false) {
@@ -377,7 +384,14 @@ if (perfStats.element.hidden === false) {
 
 // 旧版 DOM sky overlay（96 个 span 星星 + 3 个 div 云朵）已被 WebGL sky dome
 // 完全替代，DOM 层删除以减少 compositor 负担。
-const hud = createHud(app, terrainAssetRequest, knowledgeFragments.length);
+const hud = createHud(appRoot, terrainAssetRequest, knowledgeFragments.length);
+const hoverCard = document.createElement("div");
+hoverCard.id = "hud-hover-card";
+hoverCard.className = "hud-hover-card hud-hover-card-hidden";
+appRoot.appendChild(hoverCard);
+const hoverRaycaster = new Raycaster();
+const hoverPointer = new Vector2();
+let hoveredCityId: string | null = null;
 
 const scene = new Scene();
 const sceneFog = new FogExp2(0x091416, 0.0065);
@@ -653,6 +667,94 @@ const riverLabelSpritesByTier: { major: Sprite[]; tributary: Sprite[] } = {
 };
 const routeLabelSprites: Sprite[] = [];
 let routePlankRoadHandle: PlankRoadHandle | null = null;
+
+function hideHoverCard(): void {
+  hoveredCityId = null;
+  hoverCard.classList.add("hud-hover-card-hidden");
+}
+
+function positionHoverCard(clientX: number, clientY: number): void {
+  const appRect = appRoot.getBoundingClientRect();
+  const cardWidth = hoverCard.offsetWidth || 296;
+  const cardHeight = hoverCard.offsetHeight || 196;
+  const left = Math.min(
+    Math.max(12, clientX - appRect.left + 18),
+    Math.max(12, appRect.width - cardWidth - 12)
+  );
+  const top = Math.min(
+    Math.max(12, clientY - appRect.top + 18),
+    Math.max(12, appRect.height - cardHeight - 12)
+  );
+  hoverCard.style.left = `${left}px`;
+  hoverCard.style.top = `${top}px`;
+}
+
+function updateCityHoverCard(event: PointerEvent): void {
+  if (
+    !terrainSampler ||
+    !cityMarkersHandle ||
+    isDragging ||
+    atlasWorkbench.isFullscreen ||
+    cityDetailPanelOpen ||
+    journalOpen ||
+    customizationPanelOpen
+  ) {
+    hideHoverCard();
+    return;
+  }
+  const sampler = terrainSampler;
+
+  const canvasRect = renderer.domElement.getBoundingClientRect();
+  if (canvasRect.width <= 0 || canvasRect.height <= 0) {
+    hideHoverCard();
+    return;
+  }
+
+  hoverPointer.x = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
+  hoverPointer.y = -(((event.clientY - canvasRect.top) / canvasRect.height) * 2 - 1);
+  hoverRaycaster.setFromCamera(hoverPointer, camera);
+
+  const intersections = hoverRaycaster.intersectObjects(cityMarkersHandle.group.children, false);
+  const nextCity = intersections[0]
+    ? cityFromMarkerIntersection(
+        cityMarkersHandle,
+        intersections[0].object,
+        intersections[0].instanceId
+      )
+    : null;
+
+  if (!nextCity || !sampler.asset.bounds) {
+    hideHoverCard();
+    return;
+  }
+
+  const worldPoint = projectGeoToWorld(
+    { lat: nextCity.lat, lon: nextCity.lon },
+    sampler.asset.bounds,
+    sampler.asset.world
+  );
+  const elevation = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z);
+  const zone = zoneNameAt(worldPoint.x, worldPoint.z, sampler);
+  const beat = findStoryBeatForZone(
+    storyBeats,
+    zone,
+    (storyBeat) => zoneNameAt(storyBeat.target.x, storyBeat.target.y, sampler)
+  );
+  const nextHtml = buildCityHoverCardHtml({
+    city: nextCity,
+    elevation,
+    zone,
+    beat
+  });
+
+  if (hoveredCityId !== nextCity.id || hoverCard.innerHTML !== nextHtml) {
+    hoverCard.innerHTML = nextHtml;
+    hoveredCityId = nextCity.id;
+  }
+
+  positionHoverCard(event.clientX, event.clientY);
+  hoverCard.classList.remove("hud-hover-card-hidden");
+}
 
 /**
  * 距离视角分档 fade：camera 远了 county 先消失、再 prefecture 消失，
@@ -3458,6 +3560,7 @@ function resetGameplayInput(): void {
   clearGameplayInput(keys);
   isDragging = false;
   isAtlasMapDragging = false;
+  hideHoverCard();
 }
 
 document.addEventListener("keydown", (event) => {
@@ -3471,6 +3574,7 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     customizationPanelOpen = false;
     hud.setCustomizationPanelOpen(null);
+    hideHoverCard();
     return;
   }
   if (normalized === "escape" && cityDetailPanelOpen) {
@@ -3478,6 +3582,7 @@ document.addEventListener("keydown", (event) => {
     cityDetailPanelOpen = false;
     cityDetailOpenCityId = null;
     hud.setCityDetailPanelOpen(null);
+    hideHoverCard();
     return;
   }
   if (normalized === "escape" && atlasWorkbench.isFullscreen) {
@@ -3517,6 +3622,7 @@ document.addEventListener("keydown", (event) => {
       hint: city.hint,
       description: city.description
     });
+    hideHoverCard();
     return;
   }
   // P：开关坐骑/造型面板（power-user 走 [ ] - = 直接切，不必开面板）。
@@ -3532,6 +3638,7 @@ document.addEventListener("keydown", (event) => {
     } else {
       hud.setCustomizationPanelOpen(null);
     }
+    hideHoverCard();
     return;
   }
 
@@ -3637,10 +3744,13 @@ renderer.domElement.addEventListener("pointerdown", (event: PointerEvent) => {
   isDragging = true;
   dragOriginX = event.clientX;
   dragOriginY = event.clientY;
+  hideHoverCard();
   renderer.domElement.setPointerCapture(event.pointerId);
 });
 
 renderer.domElement.addEventListener("pointermove", (event: PointerEvent) => {
+  updateCityHoverCard(event);
+
   if (!isDragging) {
     return;
   }
@@ -3665,6 +3775,7 @@ renderer.domElement.addEventListener("pointerup", (event: PointerEvent) => {
 
 renderer.domElement.addEventListener("pointerleave", () => {
   isDragging = false;
+  hideHoverCard();
 });
 
 renderer.domElement.addEventListener("wheel", (event: WheelEvent) => {
@@ -3691,17 +3802,20 @@ window.addEventListener("resize", () => {
 hud.closeJournalButton.addEventListener("click", () => {
   journalOpen = false;
   renderJournal();
+  hideHoverCard();
 });
 
 hud.closeCityDetailButton.addEventListener("click", () => {
   cityDetailPanelOpen = false;
   cityDetailOpenCityId = null;
   hud.setCityDetailPanelOpen(null);
+  hideHoverCard();
 });
 
 hud.closeCustomizationButton.addEventListener("click", () => {
   customizationPanelOpen = false;
   hud.setCustomizationPanelOpen(null);
+  hideHoverCard();
 });
 
 hud.onSelectMount((id) => {
@@ -3783,11 +3897,13 @@ function selectAtlasFeatureFromCanvas(
 hud.openAtlasFullscreenButton.addEventListener("click", () => {
   atlasWorkbench = setAtlasFullscreen(atlasWorkbench, true);
   refreshAtlasWorkbench();
+  hideHoverCard();
 });
 
 hud.closeAtlasFullscreenButton.addEventListener("click", () => {
   atlasWorkbench = setAtlasFullscreen(atlasWorkbench, false);
   refreshAtlasWorkbench();
+  hideHoverCard();
 });
 
 hud.atlasLayerList.addEventListener("click", handleAtlasLayerClick);
@@ -4389,6 +4505,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
     disposeCityLabelSprites();
     cityMarkersGroup.clear();
     cityMarkersHandle = null;
+    hideHoverCard();
   }
   if (sampler.asset.bounds) {
     const visibleCities = realQinlingCities.filter(

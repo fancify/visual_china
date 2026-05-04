@@ -12,8 +12,8 @@ export const compactHudPanelConfig = {
     openByDefault: false
   },
   status: {
-    visible: false,
-    openByDefault: false
+    visible: true,
+    openByDefault: true
   },
   journal: {
     visible: false,
