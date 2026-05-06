@@ -13,7 +13,10 @@ import {
   qinlingWorkspacePath,
   qinlingWorld
 } from "./qinling-dem-common.mjs";
+import { getEtopoSampler } from "./etopo-fallback.mjs";
 import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
+
+const SUPPORTED_DEM_SOURCES = new Set(["fabdem", "srtm90"]);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -30,7 +33,7 @@ function smoothstep(value, min, max) {
 
 // 高斯凸起叠在线性真实高程上：海平面与高峰基本不动，中段丘陵被拉高，
 // 让梓潼-剑门关这类 300-1500m 地带在游戏纵向上更有体积感。
-function enhanceMidRangeRelief(realMeters) {
+function enhanceMidRangeRelief(realMeters, lat = qinlingBounds.north) {
   const safeMeters = Math.max(0, realMeters);
   const midPoint = 1000;
   const spread = 800;
@@ -38,7 +41,17 @@ function enhanceMidRangeRelief(realMeters) {
 
   const dx = (safeMeters - midPoint) / spread;
   const bumpFactor = Math.exp(-dx * dx);
-  return safeMeters * (1 + peakBoost * bumpFactor);
+
+  // 南扩后 global peak 被更高山体主导，贵州/桂北 800-2500m 的喀斯特山地
+  // 在全局归一化下会显得"发闷"。只在 lat<30 的中海拔带额外抬一档，
+  // 不动全国其余区域的 baseline，也避免把 3000m+ 主峰继续拉爆。
+  const southernWeight = smoothstep(30 - lat, 0, 8);
+  const karstBand =
+    smoothstep(safeMeters, 800, 1500) *
+    (1 - smoothstep(safeMeters, 2500, 3200));
+  const southernKarstBoost = 0.08 * southernWeight * karstBand;
+
+  return safeMeters * (1 + peakBoost * bumpFactor + southernKarstBoost);
 }
 
 function indexAt(column, row, columns) {
@@ -87,9 +100,12 @@ const RIVER_CARVE_BY_RANK = {
   // 当前约束已经变了：城市贴地修复已完成、独立 river ribbon 也已删除，
   // 因此可以安全回到 narrower + deeper 的峡谷雕刻，而不再触发"城市消失"
   // 或 "低角度看不到 ribbon" 两个旧问题。
-  1: { radiusCells: 2.4, depth: 0.95 }, // 主干 (渭/汉/嘉陵/岷)
-  2: { radiusCells: 1.7, depth: 0.60 }, // 一级支流
-  3: { radiusCells: 1.2, depth: 0.38 } // 二级支流 (褒/斜/外/内)
+  // grid 翻倍 + radius 1.0 cells 后还是看着 4-6km 宽水体（乌江 confluence 像湖）。
+  // 怀疑 NE 数据乌江包含支流分叉（多平行 stripe）。下一档：radius 砍到 0.5
+  // ≈ 1 km wide，stripe 之间不再几乎相连。如果还宽就动 NE 数据本身。
+  1: { radiusCells: 0.5, depth: 0.85 }, // 主干 ≈ 1 km wide
+  2: { radiusCells: 0.4, depth: 0.55 }, // 一级支流 ≈ 0.8 km wide
+  3: { radiusCells: 0.3, depth: 0.32 } // 二级支流 ≈ 0.6 km wide
 };
 
 // 内部用：把 polyline 密化到 ~1 cell 间隔 (~0.012°, ~1.3km)，让 carving
@@ -439,6 +455,34 @@ function detailCorrectionWeightAt(lon, lat) {
   );
 }
 
+function parseBuildOptions(argv = process.argv.slice(2)) {
+  const options = { source: "fabdem" };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg !== "--source") {
+      continue;
+    }
+
+    const nextValue = argv[index + 1];
+    if (!nextValue) {
+      throw new Error("Missing value for --source. Supported values: fabdem, srtm90.");
+    }
+
+    options.source = nextValue;
+    index += 1;
+  }
+
+  if (!SUPPORTED_DEM_SOURCES.has(options.source)) {
+    throw new Error(
+      `Unsupported DEM source "${options.source}". Supported values: fabdem, srtm90.`
+    );
+  }
+
+  return options;
+}
+
 function buildTouringLayerRawHeights(rawHeights) {
   const touringBase = smoothHeightField(rawHeights, columns, rows, {
     passes: 1,
@@ -461,8 +505,15 @@ function buildTouringLayerRawHeights(rawHeights) {
   return result;
 }
 
-const primaryTilesDir = qinlingWorkspacePath("data", "fabdem", "china", "tiles");
-const fallbackTilesDir = qinlingWorkspacePath("data", "fabdem", "qinling", "tiles");
+const buildOptions = parseBuildOptions();
+
+if (buildOptions.source === "srtm90") {
+  // TODO: 接 SRTM 90m HGT reader；当前先把 CLI/source 切换打通，避免未来再改接口。
+  throw new Error("srtm90 source not yet implemented; use --source fabdem (default).");
+}
+
+const primaryTilesDir = qinlingWorkspacePath("data", buildOptions.source, "china", "tiles");
+const fallbackTilesDir = qinlingWorkspacePath("data", buildOptions.source, "qinling", "tiles");
 const legacyOutputPath = qinlingWorkspacePath("public", "data", "qinling-slice-dem.json");
 
 async function findGeoTiffFiles(directory) {
@@ -539,17 +590,35 @@ if (tilePaths.length === 0) {
   );
 }
 
+// 缺 FABDEM tile 时先退到仓库内 vendored ETOPO fallback；只有 ETOPO 也不可读时
+// 才保留最后的 zero-fill，避免东扩/南扩边缘被直接压成海平面平板。
 const columns = qinlingOutputGrid.columns;
 const rows = qinlingOutputGrid.rows;
 const rawHeights = new Float32Array(columns * rows);
 rawHeights.fill(Number.NaN);
 const missingRequiredMask = new Uint8Array(columns * rows);
+const missingRequiredTileNamesWithEtopoFallback = [];
+const missingRequiredTileNamesZeroFilled = [];
 
 let sampledCellCount = 0;
 let minRawHeight = Number.POSITIVE_INFINITY;
 let maxRawHeight = Number.NEGATIVE_INFINITY;
+let etopoSampler = null;
+let etopoUnavailableReason = null;
+
+try {
+  etopoSampler = await getEtopoSampler();
+} catch (error) {
+  etopoUnavailableReason =
+    error instanceof Error ? error.message : `Unknown ETOPO fallback error: ${String(error)}`;
+}
 
 for (const tileName of missingRequiredTileNames) {
+  if (etopoSampler) {
+    console.warn(`Missing tile ${tileName}, fallback to ETOPO 60s`);
+  } else {
+    console.warn(`Missing tile ${tileName}, zero-fill (ETOPO unavailable)`);
+  }
   const tileMeta = parseFabdemTileName(tileName);
   const overlap = tileMeta ? intersectBounds(tileMeta, qinlingBounds) : null;
 
@@ -577,11 +646,51 @@ for (const tileName of missingRequiredTileNames) {
     1,
     rows
   );
+  let usedEtopoFallback = false;
+
+  let etopoGrid = null;
+  const targetWidth = Math.max(1, columnEnd - columnStart);
+  const targetHeight = Math.max(1, rowEnd - rowStart);
+
+  if (etopoSampler) {
+    try {
+      etopoGrid = await etopoSampler.sampleGrid(overlap, targetWidth, targetHeight);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn(`ETOPO fallback failed for ${tileName}, zero-fill instead: ${reason}`);
+      etopoGrid = null;
+    }
+  }
 
   for (let row = rowStart; row < rowEnd; row += 1) {
     for (let column = columnStart; column < columnEnd; column += 1) {
-      missingRequiredMask[indexAt(column, row, columns)] = 1;
+      const index = indexAt(column, row, columns);
+
+      if (etopoGrid) {
+        const rowOffset = row - rowStart;
+        const columnOffset = column - columnStart;
+        const value = etopoGrid[rowOffset * targetWidth + columnOffset];
+
+        if (Number.isFinite(value)) {
+          if (!Number.isFinite(rawHeights[index])) {
+            sampledCellCount += 1;
+          }
+          rawHeights[index] = value;
+          minRawHeight = Math.min(minRawHeight, value);
+          maxRawHeight = Math.max(maxRawHeight, value);
+          usedEtopoFallback = true;
+          continue;
+        }
+      }
+
+      missingRequiredMask[index] = 1;
     }
+  }
+
+  if (usedEtopoFallback) {
+    missingRequiredTileNamesWithEtopoFallback.push(tileName);
+  } else {
+    missingRequiredTileNamesZeroFilled.push(tileName);
   }
 }
 
@@ -727,10 +836,16 @@ for (let index = 0; index < rawHeights.length; index += 1) {
 // 这样 300-1500m 丘陵会更立体，而海平面与 3000m+ 主峰轮廓基本保持不变。
 minRawHeight = Number.POSITIVE_INFINITY;
 maxRawHeight = Number.NEGATIVE_INFINITY;
-for (let index = 0; index < rawHeights.length; index += 1) {
-  rawHeights[index] = enhanceMidRangeRelief(rawHeights[index]);
-  minRawHeight = Math.min(minRawHeight, rawHeights[index]);
-  maxRawHeight = Math.max(maxRawHeight, rawHeights[index]);
+for (let row = 0; row < rows; row += 1) {
+  const lat =
+    qinlingBounds.north -
+    (row / (rows - 1)) * (qinlingBounds.north - qinlingBounds.south);
+  for (let column = 0; column < columns; column += 1) {
+    const index = indexAt(column, row, columns);
+    rawHeights[index] = enhanceMidRangeRelief(rawHeights[index], lat);
+    minRawHeight = Math.min(minRawHeight, rawHeights[index]);
+    maxRawHeight = Math.max(maxRawHeight, rawHeights[index]);
+  }
 }
 
 let { normalized, minHeight, maxHeight } = normalizeHeights(
@@ -764,8 +879,19 @@ console.log(
 // 再做一遍 light smooth 把雕刻边缘过渡平滑掉，避免 1-cell 锯齿
 normalized = smoothHeightField(normalized, columns, rows, { passes: 1, blend: 0.35 });
 
-minHeight = Math.min(...normalized);
-maxHeight = Math.max(...normalized);
+// grid 翻倍后 normalized 277K 元素 → Math.min(...normalized) spread 超 args 上限
+// (RangeError)。改成显式 loop 计算 min/max。
+{
+  let minH = Number.POSITIVE_INFINITY;
+  let maxH = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < normalized.length; i += 1) {
+    const v = normalized[i];
+    if (v < minH) minH = v;
+    if (v > maxH) maxH = v;
+  }
+  minHeight = minH;
+  maxHeight = maxH;
+}
 
 const riverMask = [];
 const passMask = [];
@@ -826,15 +952,19 @@ const asset = {
   settlementMask,
   notes: [
     "Built from FABDEM tiles intersecting the Qinling region bounds.",
+    "Missing FABDEM tiles first fall back to the vendored ETOPO terrain subset; only unreadable ETOPO cells remain eligible for final zero-fill.",
     "L1 national touring layer uses a 90m touring terrain base synthesized from the 30m FABDEM source before gameplay normalization.",
     "30m correction zones retain more source detail around Guanzhong, Hanzhong, northern Sichuan, and Qinling-Shu route corridors.",
     "A Gaussian mid-range relief enhancement boosts 300-1500m hill terrain while keeping lowlands and high peaks close to their prior silhouettes.",
     "Real elevations are normalized into a gameplay-friendly stylized height range that keeps lowland basins readable.",
     `Raw sampled coverage before interpolation: ${(coverageRatio * 100).toFixed(2)}%.`,
     `Required FABDEM tiles: ${requiredTileNames.length}. Available required tiles: ${requiredTileNames.length - missingRequiredTileNames.length}.`,
-    missingRequiredTileNames.length > 0
-      ? `Missing required tiles filled with 0 (flat fallback): ${missingRequiredTileNames.join(", ")}.`
-      : "All required FABDEM tiles were available."
+    missingRequiredTileNamesWithEtopoFallback.length > 0
+      ? `Missing required FABDEM tiles fell back to ETOPO 60s: ${missingRequiredTileNamesWithEtopoFallback.join(", ")}.`
+      : "No required FABDEM tiles needed ETOPO fallback.",
+    missingRequiredTileNamesZeroFilled.length > 0
+      ? `Missing required tiles fell back to 0 only after ETOPO was unavailable: ${missingRequiredTileNamesZeroFilled.join(", ")}.${etopoUnavailableReason ? ` Reason: ${etopoUnavailableReason}.` : ""}`
+      : "ETOPO fallback covered every missing required FABDEM tile."
   ]
 };
 
