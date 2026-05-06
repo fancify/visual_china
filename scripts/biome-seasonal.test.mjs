@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import "./scenery-seasonal.test.mjs";
+
 import {
   applySeasonalAdjustment,
   biomeWeightsAt

@@ -47,11 +47,21 @@ test("qinling pass landmarks carry explicit subKind classifications", async () =
       .map((landmark) => [landmark.name, landmark.subKind])
   );
 
-  assert.deepEqual([...passSubKinds.keys()], ["剑门关"]);
+  assert.deepEqual([...passSubKinds.keys()], [
+    "剑门关",
+    "軹关陉",
+    "太行陉",
+    "白陉",
+    "滏口陉",
+    "井陉",
+    "飞狐陉",
+    "蒲阴陉"
+  ]);
   assert.equal(passSubKinds.get("剑门关"), "major-pass");
-  assert.equal(passSubKinds.get("陈仓道"), undefined);
-  assert.equal(passSubKinds.get("剑门蜀道"), undefined);
-  assert.equal(passSubKinds.get("褒斜谷意象"), undefined);
+  assert.equal(passSubKinds.get("井陉"), "major-pass");
+  assert.equal(passSubKinds.get("滏口陉"), "gorge-pass");
+  assert.equal(passSubKinds.get("軹关陉"), "memorial-stele");
+  assert.equal(passSubKinds.get("蒲阴陉"), "major-pass");
 });
 
 test("pass landmark helper builds distinct major and gorge silhouettes", async () => {

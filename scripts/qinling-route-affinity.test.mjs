@@ -4,16 +4,18 @@ import test from "node:test";
 import { qinlingRoutes, routeAffinityAt } from "../src/game/qinlingRoutes.js";
 
 test("Qinling route affinity uses historical-reference routes by default", () => {
-  // 留坝县 (lat 33.62, lon 106.92) — 褒斜道中段，slice 扩后的实际坐标
-  const influence = routeAffinityAt({ x: -2.21, y: -80.11 });
+  // 北扩到 40°N 后 baseline 更新：同一留坝经纬度按当前 slice 重新投影到世界坐标。
+  // 留坝县 (lat 33.62, lon 106.92) — 褒斜道中段，当前 slice 的实际世界坐标
+  const influence = routeAffinityAt({ x: -92.01, y: -84.28 });
 
   assert.ok(influence.affinity > 0.7);
   assert.equal(influence.nearestRoute?.id, "baoxie-road");
 });
 
 test("Qinling historical routes stay available when explicitly including unverified routes", () => {
-  // 昭化（古葭萌） (lat 32.32, lon 105.86) — 金牛道中段，slice 扩后的实际坐标
-  const influence = routeAffinityAt({ x: -31.43, y: -17.75 }, 11, {
+  // 北扩到 40°N 后 baseline 更新：同一昭化经纬度按当前 slice 重新投影到世界坐标。
+  // 昭化（古葭萌） (lat 32.32, lon 105.86) — 金牛道中段，当前 slice 的实际世界坐标
+  const influence = routeAffinityAt({ x: -121.29, y: -42.46 }, 11, {
     includeUnverifiedRoutes: true
   });
 

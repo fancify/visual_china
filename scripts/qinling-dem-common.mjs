@@ -2,31 +2,32 @@ import path from "node:path";
 
 import { fabdemDataset } from "./china-dem-common.mjs";
 
-// 2026-05 slice 扩到完整关中 + 四川盆地北缘：东到 110.5 纳入 华山 / 潼关，
-// 南到 28.5 纳入 重庆 / 涪陵 / 泸州 / 宜宾。跟 src/data/qinlingRegion.js
+// 2026-05 slice 继续东扩 + 南扩，并北推到 40N。跟 src/data/qinlingRegion.js
 // 必须同值（构建期 + 运行期一致）。
 export const qinlingBounds = {
   west: 103.5,
-  east: 110.5,
-  south: 28.5,
-  north: 35.4
+  east: 117.0,
+  south: 22.0,
+  north: 40.0
 };
 
 export const qinlingRegionManifestBounds = { ...qinlingBounds };
 
 export const qinlingWorld = {
-  width: 193,
-  depth: 331
+  // 保持 u/°lon = 27.6，不让 east 扩展把横向比例压扁。
+  width: 373,
+  // 这里必须跟运行期 source of truth 一致，否则构建产物和 3D/atlas 投影会分叉。
+  depth: 579
 };
 
 export const qinlingGeographicFootprintKm = {
   width: 452,
-  depth: 773
+  depth: 1502
 };
 
 export const qinlingOutputGrid = {
-  columns: 208,
-  rows: 333
+  columns: 416,
+  rows: 666
 };
 
 export const qinlingResolutionStrategy = {

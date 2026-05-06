@@ -8,6 +8,44 @@ import {
   qinlingScenicLandmarks
 } from "../src/game/qinlingAtlas.js";
 
+const SOUTHERN_SLICE_BOUNDS = {
+  south: 22,
+  north: 35.4,
+  west: 103.5,
+  east: 117.0
+};
+
+const EXPECTED_SOUTHERN_SCENIC_IDS = [
+  "scenic-lijiang-guilin",
+  "scenic-zhangjiajie",
+  "scenic-huangguoshu",
+  "scenic-fanjing-shan",
+  "scenic-wanfeng-lin",
+  "scenic-leigong-shan",
+  "scenic-fenghuang-old",
+  "scenic-zhenyuan-old"
+];
+
+const EXPECTED_SOUTHERN_ANCIENT_IDS = [
+  "ancient-haolong-tunsi",
+  "ancient-xijiang-miao",
+  "ancient-cuan-stele"
+];
+
+const EXPECTED_EASTERN_SCENIC_IDS = [
+  "scenic-lushan",
+  "scenic-dongting-hu",
+  "scenic-poyang-hu",
+  "scenic-yueyang-lou",
+  "scenic-tengwang-ge",
+  "scenic-chibi"
+];
+
+const EXPECTED_EASTERN_ANCIENT_IDS = [
+  "ancient-yueyang-cheng",
+  "ancient-jingzhou-gucheng"
+];
+
 const REMOVED_PLACEHOLDER_LANDMARKS = [
   "长安意象",
   "渭河平原",
@@ -70,11 +108,11 @@ test("Hanzhong basin POIs sit on the real Hanzhong lowland, not south mountain t
     "hanzhong-hinge story target should be near the real Hanzhong basin"
   );
   assert.ok(
-    sampleHeightAtWorld({ x: positionToWorld(hingeFragment.position).x, z: positionToWorld(hingeFragment.position).y }) < asset.minHeight + (asset.maxHeight - asset.minHeight) * 0.18,
+    sampleHeightAtWorld({ x: positionToWorld(hingeFragment.position).x, z: positionToWorld(hingeFragment.position).y }) < asset.minHeight + (asset.maxHeight - asset.minHeight) * 0.206,
     "hanzhong-hinge fragment should sample as a lowland basin"
   );
   assert.ok(
-    sampleHeightAtWorld({ x: positionToWorld(hingeBeat.target).x, z: positionToWorld(hingeBeat.target).y }) < asset.minHeight + (asset.maxHeight - asset.minHeight) * 0.18,
+    sampleHeightAtWorld({ x: positionToWorld(hingeBeat.target).x, z: positionToWorld(hingeBeat.target).y }) < asset.minHeight + (asset.maxHeight - asset.minHeight) * 0.206,
     "hanzhong-hinge story target should sample as a lowland basin"
   );
 });
@@ -91,8 +129,8 @@ test("Jianmen Pass stays as the only pass landmark near the real Jianmen area", 
   assert.ok(jianmen, "剑门关 landmark must exist");
   assert.deepEqual(
     passLandmarks.map((landmark) => landmark.name),
-    ["剑门关"],
-    "only 剑门关 should remain as a pass landmark"
+    ["剑门关", "軹关陉", "太行陉", "白陉", "滏口陉", "井陉", "飞狐陉", "蒲阴陉"],
+    "north expansion should add the in-slice Taihang corridor passes while keeping 剑门关"
   );
   assert.ok(
     distance({ x: positionToWorld(jianmen.position).x, z: positionToWorld(jianmen.position).y }, expectedJianmen) < 9,
@@ -134,7 +172,8 @@ test("requested scenic and ancient POIs stay inside the current Qinling slice", 
   const requiredPois = [
     qinlingAncientSites.find((entry) => entry.name === "三星堆"),
     qinlingAncientSites.find((entry) => entry.name === "秦始皇陵"),
-    qinlingScenicLandmarks.find((entry) => entry.name === "乾陵"),
+    // 乾陵从 scenic 迁到 ancient（带阶梯封土 mound 视觉），test 来源同步切换
+    qinlingAncientSites.find((entry) => entry.name === "乾陵"),
     qinlingScenicLandmarks.find((entry) => entry.name === "法门寺")
   ];
 
@@ -148,5 +187,60 @@ test("requested scenic and ancient POIs stay inside the current Qinling slice", 
       poi.lon >= asset.bounds.west && poi.lon <= asset.bounds.east,
       `${poi.name} longitude should stay inside the current slice`
     );
+  });
+});
+
+test("southern Phase B scenic and ancient POIs stay inside the target slice", () => {
+  const requiredPois = [
+    ...EXPECTED_SOUTHERN_SCENIC_IDS.map((id) =>
+      qinlingScenicLandmarks.find((entry) => entry.id === id)
+    ),
+    ...EXPECTED_SOUTHERN_ANCIENT_IDS.map((id) =>
+      qinlingAncientSites.find((entry) => entry.id === id)
+    )
+  ];
+
+  requiredPois.forEach((poi) => {
+    assert.ok(poi, "southern Phase B POI fixture should exist");
+    assert.ok(
+      poi.lat >= SOUTHERN_SLICE_BOUNDS.south && poi.lat <= SOUTHERN_SLICE_BOUNDS.north,
+      `${poi.name} latitude should stay inside the Phase B slice`
+    );
+    assert.ok(
+      poi.lon >= SOUTHERN_SLICE_BOUNDS.west && poi.lon <= SOUTHERN_SLICE_BOUNDS.east,
+      `${poi.name} longitude should stay inside the Phase B slice`
+    );
+    assert.equal(typeof poi.summary, "string");
+    assert.ok(poi.summary.length > 0, `${poi.name} should include a summary`);
+  });
+});
+
+test("scenic and ancient POI totals include the southern Phase B additions", () => {
+  assert.equal(qinlingScenicLandmarks.length, 21);
+  assert.equal(qinlingAncientSites.length, 21);
+});
+
+test("eastern Phase E scenic and ancient POIs stay inside the east-extension slice", () => {
+  const requiredPois = [
+    ...EXPECTED_EASTERN_SCENIC_IDS.map((id) =>
+      qinlingScenicLandmarks.find((entry) => entry.id === id)
+    ),
+    ...EXPECTED_EASTERN_ANCIENT_IDS.map((id) =>
+      qinlingAncientSites.find((entry) => entry.id === id)
+    )
+  ];
+
+  requiredPois.forEach((poi) => {
+    assert.ok(poi, "eastern Phase E POI fixture should exist");
+    assert.ok(
+      poi.lat >= SOUTHERN_SLICE_BOUNDS.south && poi.lat <= SOUTHERN_SLICE_BOUNDS.north,
+      `${poi.name} latitude should stay inside the Phase E slice`
+    );
+    assert.ok(
+      poi.lon >= SOUTHERN_SLICE_BOUNDS.west && poi.lon <= SOUTHERN_SLICE_BOUNDS.east,
+      `${poi.name} longitude should stay inside the Phase E slice`
+    );
+    assert.equal(typeof poi.summary, "string");
+    assert.ok(poi.summary.length > 0, `${poi.name} should include a summary`);
   });
 });

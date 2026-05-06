@@ -576,8 +576,8 @@ test("poi hover card includes scenic and ancient POI facts", () => {
 
   assert.match(ancientHtml, /秦始皇陵/);
   assert.match(ancientHtml, /考古/);
-  assert.match(ancientHtml, /34\.3800°N/);
-  assert.match(ancientHtml, /109\.2500°E/);
+  assert.match(ancientHtml, /34\.3815°N/);
+  assert.match(ancientHtml, /109\.2541°E/);
   assert.match(ancientHtml, /海拔：523 m/);
-  assert.match(ancientHtml, /统一帝王陵/);
+  assert.match(ancientHtml, /中国第一位皇帝陵/);
 });

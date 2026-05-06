@@ -8,10 +8,13 @@ import {
   qinlingAtlasRequiredNames,
   qinlingWaterSystem
 } from "../src/game/qinlingAtlas.js";
+import { qinlingRegionWorld } from "../src/data/qinlingRegion.js";
 
 const featuresByName = new Map(
   qinlingAtlasFeatures.map((feature) => [feature.name, feature])
 );
+const sliceHalfWidth = qinlingRegionWorld.width * 0.5;
+const sliceHalfDepth = qinlingRegionWorld.depth * 0.5;
 
 test("Qinling 2D atlas has the required independent map layers", () => {
   // 用户要求 atlas 跟 3D 主游戏对齐——3D 没有 landform / road / culture /
@@ -30,7 +33,7 @@ test("Qinling 2D atlas contains named geography needed for the slice narrative",
     assert.ok(featuresByName.has(name), `${name} must exist in the 2D atlas`);
   }
 
-  for (const name of ["潼关", "华山", "重庆", "涪陵", "泸州", "宜宾"]) {
+  for (const name of ["潼关", "华山", "重庆", "涪陵", "泸州", "宜宾", "武汉", "长沙", "南昌", "洞庭湖", "鄱阳湖", "岳阳楼", "滕王阁", "荆州古城"]) {
     assert.ok(featuresByName.has(name), `${name} should be visible after the east/south expansion`);
   }
 });
@@ -50,8 +53,18 @@ test("Qinling atlas features are renderable and carry gameplay-facing semantics"
       : feature.world.points ?? [feature.world];
 
     for (const point of points) {
-      assert.ok(point.x >= -96.5 && point.x <= 96.5, `${feature.name} x is in slice bounds`);
-      assert.ok(point.y >= -165.5 && point.y <= 165.5, `${feature.name} y is in slice bounds`);
+      const inSliceBounds =
+        point.x >= -sliceHalfWidth &&
+        point.x <= sliceHalfWidth &&
+        point.y >= -sliceHalfDepth &&
+        point.y <= sliceHalfDepth;
+      const allowedOutOfSliceCarryForward =
+        feature.layer === "ancient" && feature.name === "黄帝陵";
+
+      assert.ok(
+        inSliceBounds || allowedOutOfSliceCarryForward,
+        `${feature.name} should either render inside the current slice or stay as a future carry-forward POI`
+      );
     }
   }
 });

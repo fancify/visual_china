@@ -59,6 +59,12 @@ function makeFlatScenerySampler({
   };
 }
 
+function sceneryLeafCount(group) {
+  return group.children.reduce((sum, child) => {
+    return child.userData?.role === "leaf" ? sum + (child.count ?? 0) : sum;
+  }, 0);
+}
+
 test("findZoneAt returns the nearest zone when a point is inside multiple", () => {
   setCityFlattenZones([
     { cityId: "a", centerX: 0, centerZ: 0, radius: 5, groundY: 1.0 },
@@ -111,13 +117,13 @@ test("chunk scenery skips tree instances inside city flatten zones", () => {
 
   setCityFlattenZones([]);
   const baseline = createChunkScenery(sampler, qinlingRuntimeBudget.scenery);
-  const baselineTrees = baseline.children[0]?.count ?? 0;
+  const baselineTrees = sceneryLeafCount(baseline);
 
   setCityFlattenZones([
     { cityId: "city", centerX: 138, centerZ: 58, radius: 40, groundY: 0.36 }
   ]);
   const flattened = createChunkScenery(sampler, qinlingRuntimeBudget.scenery);
-  const flattenedTrees = flattened.children[0]?.count ?? 0;
+  const flattenedTrees = sceneryLeafCount(flattened);
 
   assert.ok(baselineTrees > 0, `baseline chunk should still grow trees, got ${baselineTrees}`);
   assert.equal(flattenedTrees, 0);

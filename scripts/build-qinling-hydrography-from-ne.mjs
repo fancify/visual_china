@@ -10,6 +10,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { qinlingBounds, qinlingWorld } from "./qinling-dem-common.mjs";
 
@@ -48,9 +49,32 @@ const NAME_TO_ID = {
   "汉水":   { id: "river-hanjiang",     flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "汉水", aliases: ["汉江"] },
   "嘉陵江": { id: "river-jialingjiang", flowDir: "lat-desc", rank: 1, basin: "长江流域", displayName: "嘉陵江" },
   "岷江":   { id: "river-minjiang",     flowDir: "lat-desc", rank: 1, basin: "长江流域", displayName: "岷江" },
-  "乌江":   { id: "river-wujiang",      flowDir: "lon-asc",  rank: 1, basin: "长江流域", displayName: "乌江" },
-  "沱江":   { id: "river-tuojiang",     flowDir: "lat-desc", rank: 2, basin: "长江流域", displayName: "沱江" }
+  // 乌江实际流向 S→N (贵阳源 → 涪陵入长江)，旧 lon-asc 排序把多支线合并成
+  // "梳齿"垂直平行条。改 lat-asc 让 polyline 沿主干 S→N 单调连。
+  "乌江":   { id: "river-wujiang",      flowDir: "lat-asc",  rank: 1, basin: "长江流域", displayName: "乌江" },
+  "沱江":   { id: "river-tuojiang",     flowDir: "lat-desc", rank: 2, basin: "长江流域", displayName: "沱江" },
+  // 沅江流向 W→E（黔东 → 湖南），但 NE 数据本地段在 黔东 109°E 附近主要
+  // 走 S→N。lat-asc 比 lon-asc 在我们 slice 里更连续。
+  "沅江":   { id: "river-yuanjiang",    flowDir: "lat-asc",  rank: 2, basin: "长江流域", displayName: "沅江", aliases: ["沅水"] },
+  // 江汉 / 江南东段继续东扩后新增两条关键支流。按纬度递增排序，避免
+  // MultiLineString 在局部横向散开时被 lon-asc 排成 comb。
+  "湘江":   { id: "river-xiangjiang",   flowDir: "lat-asc",  rank: 2, basin: "长江流域", displayName: "湘江" },
+  "赣江":   { id: "river-ganjiang",     flowDir: "lat-asc",  rank: 2, basin: "长江流域", displayName: "赣江" },
+  // 北扩到太行-华北平原后新增海河流域骨架，按西→东排序即可保持主干连续。
+  "海河":   { id: "river-haihe",        flowDir: "lon-asc",  rank: 1, basin: "海河流域", displayName: "海河" },
+  "漳河":   { id: "river-zhanghe",      flowDir: "lon-asc",  rank: 2, basin: "海河流域", displayName: "漳河" }
 };
+
+// 南扩后用户点名的几条珠江系干支流，在当前本地数据里还缺源：
+// - major-rivers.json 没有 红水河 / 漓江 / 邕江
+// - 当前仓库内 OSM snapshot 也没有 漓江 / 邕江，红水河仅有旧 slice 北侧局部小段，
+//   不能冒充广西主干。
+// 先显式记成 source gap，build 时打印 TODO，等用户补本地 OSM/curated 数据后再接。
+const SOUTHERN_SOURCE_GAPS = [
+  { displayName: "红水河", aliases: ["右江"], basin: "珠江流域" },
+  { displayName: "漓江", aliases: [], basin: "珠江流域" },
+  { displayName: "邕江", aliases: [], basin: "珠江流域" }
+];
 
 // greedy join 不保证 traversal order — 子段被反向拼接时会跳点 (例如
 // "去南再回北再去南"，渲染成横穿地形的折返线)。按主流方向硬排序修。
@@ -63,6 +87,47 @@ function sortByFlowDir(points, flowDir) {
     case "lat-desc": sorted.sort((a, b) => b[1] - a[1]); break;
   }
   return sorted;
+}
+
+function pointDistance([lonA, latA], [lonB, latB]) {
+  return Math.hypot(lonA - lonB, latA - latB);
+}
+
+export function polylineLength(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    total += pointDistance(points[i - 1], points[i]);
+  }
+  return total;
+}
+
+function flowProjection([lon, lat], flowDir) {
+  switch (flowDir) {
+    case "lon-asc":
+    case "lon-desc":
+      return lon;
+    case "lat-asc":
+    case "lat-desc":
+      return lat;
+    default:
+      return lat;
+  }
+}
+
+function shouldReverseByFlowDir(line, flowDir) {
+  if (line.length < 2) return false;
+  const head = line[0];
+  const tail = line[line.length - 1];
+  const headProjection = flowProjection(head, flowDir);
+  const tailProjection = flowProjection(tail, flowDir);
+  if (flowDir.endsWith("asc")) return headProjection > tailProjection;
+  return headProjection < tailProjection;
+}
+
+function orientPolylineByFlowDir(line, flowDir) {
+  const oriented = line.slice();
+  if (shouldReverseByFlowDir(oriented, flowDir)) oriented.reverse();
+  return oriented;
 }
 
 // Cohen-Sutherland 线段对 bbox 裁剪
@@ -159,6 +224,177 @@ function densifyPolylineLatLon(points, maxDeg = 0.018) {
   return out;
 }
 
+function perpendicularDistanceSq(point, segmentStart, segmentEnd) {
+  const dx = segmentEnd.lon - segmentStart.lon;
+  const dy = segmentEnd.lat - segmentStart.lat;
+  if (dx === 0 && dy === 0) {
+    return (point.lon - segmentStart.lon) ** 2 + (point.lat - segmentStart.lat) ** 2;
+  }
+  const t =
+    ((point.lon - segmentStart.lon) * dx + (point.lat - segmentStart.lat) * dy) /
+    (dx * dx + dy * dy);
+  const clamped = Math.max(0, Math.min(1, t));
+  const projectedLon = segmentStart.lon + clamped * dx;
+  const projectedLat = segmentStart.lat + clamped * dy;
+  return (point.lon - projectedLon) ** 2 + (point.lat - projectedLat) ** 2;
+}
+
+export function simplifyPolyline(points, toleranceDeg = 0.01) {
+  if (points.length <= 2) return points.slice();
+  const sqTolerance = toleranceDeg * toleranceDeg;
+  const keep = new Set([0, points.length - 1]);
+
+  function rdp(startIndex, endIndex) {
+    let maxDistance = 0;
+    let maxIndex = -1;
+    for (let i = startIndex + 1; i < endIndex; i += 1) {
+      const distance = perpendicularDistanceSq(points[i], points[startIndex], points[endIndex]);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        maxIndex = i;
+      }
+    }
+    if (maxDistance > sqTolerance && maxIndex !== -1) {
+      keep.add(maxIndex);
+      rdp(startIndex, maxIndex);
+      rdp(maxIndex, endIndex);
+    }
+  }
+
+  rdp(0, points.length - 1);
+  return [...keep]
+    .sort((a, b) => a - b)
+    .map((index) => points[index]);
+}
+
+function buildNeRiverGeometryFromClipped(
+  clipped,
+  {
+    flowDir,
+    chainThresholdDeg = 0.5,
+    // 旧版 max=2 让 汉水 4 个 sub-polyline 接不全（Part 1 汉中源 被丢出 extras）。
+    // 上调到 8 → 长河（汉水/长江/嘉陵江）的所有上下游连续段都能 chain 进主干。
+    maxChainedExtras = 8,
+    densifyMaxDeg = 0.018,
+    simplifyToleranceDeg = 0.01
+  }
+) {
+  if (clipped.length === 0) return null;
+  const oriented = clipped
+    .map((line) => orientPolylineByFlowDir(line, flowDir))
+    .sort((a, b) => polylineLength(b) - polylineLength(a));
+  const { primaryLine, extraLines } = chainNearbySubLines(
+    oriented,
+    chainThresholdDeg,
+    maxChainedExtras
+  );
+  const toLatLon = (line) => line.map(([lon, lat]) => ({ lat, lon }));
+  return {
+    points: simplifyPolyline(
+      densifyPolylineLatLon(toLatLon(primaryLine), densifyMaxDeg),
+      simplifyToleranceDeg
+    ),
+    extraPolylines: extraLines.map((line) =>
+      simplifyPolyline(
+        densifyPolylineLatLon(toLatLon(line), densifyMaxDeg),
+        simplifyToleranceDeg
+      )
+    ),
+    primaryLengthDeg: polylineLength(primaryLine)
+  };
+}
+
+export function buildNeRiverGeometry(
+  river,
+  {
+    flowDir,
+    chainThresholdDeg = 0.5,
+    // 旧版 max=2 让 汉水 4 个 sub-polyline 接不全（Part 1 汉中源 被丢出 extras）。
+    // 上调到 8 → 长河（汉水/长江/嘉陵江）的所有上下游连续段都能 chain 进主干。
+    maxChainedExtras = 8,
+    clipBbox = SLICE_BBOX,
+    densifyMaxDeg = 0.018,
+    simplifyToleranceDeg = 0.01
+  }
+) {
+  const clipped = [];
+  for (const line of river.polylines ?? []) {
+    clipped.push(...clipPolyline(line, clipBbox));
+  }
+  return buildNeRiverGeometryFromClipped(clipped, {
+    flowDir,
+    chainThresholdDeg,
+    maxChainedExtras,
+    densifyMaxDeg,
+    simplifyToleranceDeg
+  });
+}
+
+function findBestEndpointJoin(seed, candidate) {
+  const seedHead = seed[0];
+  const seedTail = seed[seed.length - 1];
+  const candidateHead = candidate[0];
+  const candidateTail = candidate[candidate.length - 1];
+  const joins = [
+    {
+      distance: pointDistance(seedHead, candidateHead),
+      side: "head",
+      candidatePoints: candidate.slice().reverse()
+    },
+    {
+      distance: pointDistance(seedHead, candidateTail),
+      side: "head",
+      candidatePoints: candidate.slice()
+    },
+    {
+      distance: pointDistance(seedTail, candidateHead),
+      side: "tail",
+      candidatePoints: candidate.slice()
+    },
+    {
+      distance: pointDistance(seedTail, candidateTail),
+      side: "tail",
+      candidatePoints: candidate.slice().reverse()
+    }
+  ];
+  joins.sort((a, b) => a.distance - b.distance);
+  return joins[0];
+}
+
+function chainNearbySubLines(lines, thresholdDeg, maxChainedExtras) {
+  if (lines.length === 0) {
+    return { primaryLine: null, extraLines: [] };
+  }
+  const [seedLine, ...remainingLines] = lines.map((line) => line.slice());
+  const primaryLine = seedLine.slice();
+  let chainedExtras = 0;
+
+  while (remainingLines.length > 0 && chainedExtras < maxChainedExtras) {
+    const rankedCandidates = remainingLines
+      .map((candidate, index) => ({
+        index,
+        candidate,
+        join: findBestEndpointJoin(primaryLine, candidate)
+      }))
+      .sort((a, b) => a.join.distance - b.join.distance);
+    const best = rankedCandidates[0];
+    if (!best || best.join.distance > thresholdDeg) break;
+
+    if (best.join.side === "head") {
+      primaryLine.unshift(...best.join.candidatePoints);
+    } else {
+      primaryLine.push(...best.join.candidatePoints);
+    }
+    remainingLines.splice(best.index, 1);
+    chainedExtras += 1;
+  }
+
+  return {
+    primaryLine,
+    extraLines: remainingLines
+  };
+}
+
 // 把端点距离 < tolerance 的子段缝起来。greedy: 反复找一条线，看能不能把
 // 任何一条剩余子段拼到它两端，能拼就拼，不能拼就把当前线放进结果换下一条。
 function joinPolylines(lines, tolerance) {
@@ -207,57 +443,60 @@ function joinPolylines(lines, tolerance) {
   return out;
 }
 
-const data = JSON.parse(await fs.readFile(RIVERS_PATH, "utf8"));
-const result = {};
-let totalIn = 0;
-let totalOut = 0;
-for (const river of data.rivers) {
-  const meta = NAME_TO_ID[river.name];
-  if (!meta) continue;
-  if (!river.polylines || river.polylines.length === 0) continue;
-  const clipped = [];
-  for (const line of river.polylines) {
-    const segs = clipPolyline(line, SLICE_BBOX);
-    clipped.push(...segs);
+async function main() {
+  const data = JSON.parse(await fs.readFile(RIVERS_PATH, "utf8"));
+  const sourceRiverNames = new Set(data.rivers.map((river) => river.name));
+  for (const gap of SOUTHERN_SOURCE_GAPS) {
+    const hasLocalSource =
+      sourceRiverNames.has(gap.displayName) ||
+      gap.aliases.some((alias) => sourceRiverNames.has(alias));
+    if (!hasLocalSource) {
+      console.log(
+        `TODO(source-gap): ${gap.displayName} (${gap.basin}) 缺本地主河源数据；待用户补 OSM/curated geometry`
+      );
+    }
   }
-  const inPoints = river.polylines.reduce((s, p) => s + p.length, 0);
-  const outPoints = clipped.reduce((s, p) => s + p.length, 0);
-  totalIn += inPoints;
-  totalOut += outPoints;
-  if (clipped.length === 0) {
+  const result = {};
+  let totalIn = 0;
+  let totalOut = 0;
+  for (const river of data.rivers) {
+    const meta = NAME_TO_ID[river.name];
+    if (!meta) continue;
+    if (!river.polylines || river.polylines.length === 0) continue;
+    const clipped = [];
+    for (const line of river.polylines) {
+      const segs = clipPolyline(line, SLICE_BBOX);
+      clipped.push(...segs);
+    }
+    const inPoints = river.polylines.reduce((s, p) => s + p.length, 0);
+    const outPoints = clipped.reduce((s, p) => s + p.length, 0);
+    totalIn += inPoints;
+    totalOut += outPoints;
+    if (clipped.length === 0) {
+      console.log(
+        `${river.name.padEnd(6)}  ⚠️  ${river.polylines.length} polyline(s) ${inPoints} pts → 0 inside slice (NE 10m 在切片范围内没有此河，保留 hand-typed)`
+      );
+      continue;
+    }
+    const geometry = buildNeRiverGeometryFromClipped(clipped, {
+      flowDir: meta.flowDir
+    });
     console.log(
-      `${river.name.padEnd(6)}  ⚠️  ${river.polylines.length} polyline(s) ${inPoints} pts → 0 inside slice (NE 10m 在切片范围内没有此河，保留 hand-typed)`
+      `${river.name.padEnd(6)}  ${river.polylines.length} polyline(s) ${inPoints} pts → ${clipped.length} clipped → primary ${geometry.points.length} pts + ${geometry.extraPolylines.length} extras (longest ${geometry.primaryLengthDeg.toFixed(3)}°)`
     );
-    continue;
+    result[meta.id] = {
+      name: river.name,
+      displayName: meta.displayName,
+      aliases: meta.aliases ?? [],
+      rank: meta.rank,
+      basin: meta.basin,
+      sourceScore: river.score,
+      sourceBasin: river.basin,
+      flowDir: meta.flowDir,
+      points: geometry.points,
+      extraPolylines: geometry.extraPolylines
+    };
   }
-  // NE 把河流在每条支流汇入处切断，clip 完会得到几段端点接近的子段。
-  // 0.05° (~5 km) 内的端点视为同一点，缝回去成单条 points 数组。
-  const joined = joinPolylines(clipped, 0.05);
-  console.log(
-    `${river.name.padEnd(6)}  ${river.polylines.length} polyline(s) ${inPoints} pts → ${clipped.length} clipped → ${joined.length} joined (longest ${Math.max(...joined.map((l) => l.length))} pts)`
-  );
-  // 取最长的那条作为主流；其余作为额外段（一般是支流交汇造成的小残段）
-  joined.sort((a, b) => b.length - a.length);
-  // 按主流方向排序所有点 (修 greedy join 跳序问题)
-  const primarySorted = sortByFlowDir(joined[0], meta.flowDir);
-  // 密化 (~2km 间隔)：保证 carving 覆盖整段、ribbon 不画长直线
-  const densified = densifyPolylineLatLon(
-    primarySorted.map(([lon, lat]) => ({ lat, lon })),
-    0.018
-  );
-  result[meta.id] = {
-    name: river.name,
-    displayName: meta.displayName,
-    aliases: meta.aliases ?? [],
-    rank: meta.rank,
-    basin: meta.basin,
-    sourceScore: river.score,
-    sourceBasin: river.basin,
-    flowDir: meta.flowDir,
-    points: densified,
-    extraPolylines: joined.slice(1).map((line) => line.map(([lon, lat]) => ({ lat, lon })))
-  };
-}
 
 // === 通用 OSM 河流拼接器 ===
 // 把 OSM 同名 way 拼成单 polyline。flowDir + sort 修 greedy join 跳序。
@@ -476,17 +715,25 @@ for (const target of SKIP_OSM_STITCHING ? [] : SMALL_TRIB_OSM_TARGETS) {
   };
 }
 
-const banner = `// AUTO-GENERATED by scripts/build-qinling-hydrography-from-ne.mjs — 不要手改。
+  const banner = `// AUTO-GENERATED by scripts/build-qinling-hydrography-from-ne.mjs — 不要手改。
 // 数据源: Natural Earth 10m rivers + OSM Overpass (public domain)
 // Slice bbox: ${SLICE_BBOX.west}°-${SLICE_BBOX.east}°E, ${SLICE_BBOX.south}°-${SLICE_BBOX.north}°N
 // 跑 \`node scripts/build-qinling-hydrography-from-ne.mjs\` 重新生成。
 `;
 
-await fs.mkdir(path.dirname(OUT_PATH), { recursive: true });
-await fs.writeFile(
-  OUT_PATH,
-  `${banner}export const qinlingNeRivers = ${JSON.stringify(result, null, 2)};\n`,
-  "utf8"
-);
-console.log(`\n输出 ${OUT_PATH}`);
-console.log(`总计: ${totalIn} 输入 → ${totalOut} 裁剪后 (${Object.keys(result).length} 条河)`);
+  await fs.mkdir(path.dirname(OUT_PATH), { recursive: true });
+  await fs.writeFile(
+    OUT_PATH,
+    `${banner}export const qinlingNeRivers = ${JSON.stringify(result, null, 2)};\n`,
+    "utf8"
+  );
+  console.log(`\n输出 ${OUT_PATH}`);
+  console.log(`总计: ${totalIn} 输入 → ${totalOut} 裁剪后 (${Object.keys(result).length} 条河)`);
+}
+
+const isCliEntrypoint =
+  process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isCliEntrypoint) {
+  await main();
+}

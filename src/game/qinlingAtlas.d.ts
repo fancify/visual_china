@@ -24,7 +24,10 @@ export type QinlingAncientRole =
   | "shu-sun-bird"
   | "yangshao-dwelling"
   | "qin-terracotta-army"
-  | "qin-imperial-mausoleum";
+  | "imperial-tomb"
+  | "tusi-military-castle"
+  | "ethnic-village"
+  | "stone-inscription";
 
 export interface QinlingScenicLandmark {
   id: string;
@@ -42,6 +45,7 @@ export interface QinlingAncientSite {
   lon: number;
   summary: string;
   role: QinlingAncientRole;
+  symbol: QinlingAtlasVisualRule;
 }
 
 export interface QinlingAtlasPoint {
@@ -98,6 +102,7 @@ export const qinlingAtlasFeatures: QinlingAtlasFeature[];
 export const qinlingWaterSystem: QinlingAtlasFeature[];
 export const qinlingScenicLandmarks: QinlingScenicLandmark[];
 export const qinlingAncientSites: QinlingAncientSite[];
+export const ancientImperialTombSymbol: QinlingAtlasVisualRule;
 
 export function atlasFeaturesByLayer(
   layerId: QinlingAtlasLayerId

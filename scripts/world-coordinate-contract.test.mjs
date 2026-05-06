@@ -6,17 +6,22 @@ import {
   geoToWorld,
   worldToGeo
 } from "../src/game/geoProjection.js";
+import { projectGeoToWorld } from "../src/game/mapOrientation.js";
+import {
+  qinlingRegionBounds,
+  qinlingRegionWorld
+} from "../src/data/qinlingRegion.js";
+import {
+  qinlingAncientSites,
+  qinlingAtlasFeatures,
+  qinlingScenicLandmarks,
+  qinlingWaterSystem
+} from "../src/game/qinlingAtlas.js";
+import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
+import { realQinlingCities } from "../src/data/realCities.js";
 
-const qinlingBounds = {
-  west: 103.5,
-  east: 110.5,
-  south: 28.5,
-  north: 35.4
-};
-const qinlingWorld = {
-  width: 193,
-  depth: 331
-};
+const qinlingBounds = qinlingRegionBounds;
+const qinlingWorld = qinlingRegionWorld;
 
 function nearlyEqual(actual, expected) {
   assert.ok(
@@ -33,11 +38,79 @@ test("geographic and game coordinates use a strict linear reversible mapping", (
   );
   const roundTrip = worldToGeo(hanzhong, qinlingBounds, qinlingWorld);
 
-  nearlyEqual(hanzhong.x, 0.8271428571428663);
-  // 南扩到 28.5 后，汉中相对整个 slice 明显更靠北，z 负值会更大。
-  nearlyEqual(hanzhong.z, -53.72753623188408);
+  assert.deepEqual(qinlingBounds, {
+    west: 103.5,
+    east: 117.0,
+    south: 22.0,
+    north: 40.0
+  });
+  assert.deepEqual(qinlingWorld, {
+    width: 373,
+    depth: 579
+  });
+  nearlyEqual(hanzhong.x, -88.96740740740736);
+  // 北扩到 40N 后，汉中在新 slice 里的纵向位置会明显回到更靠近中心。
+  nearlyEqual(hanzhong.z, -66.585);
   nearlyEqual(roundTrip.lon, 107.03);
   nearlyEqual(roundTrip.lat, 33.07);
+});
+
+test("world.depth physically matches lat-span × cos(midLat) of slice", () => {
+  const lonSpan = qinlingRegionBounds.east - qinlingRegionBounds.west;
+  const latSpan = qinlingRegionBounds.north - qinlingRegionBounds.south;
+  const midLat = (qinlingRegionBounds.north + qinlingRegionBounds.south) / 2;
+  const cosMidLat = Math.cos((midLat * Math.PI) / 180);
+
+  // u_per_lon * cos(midLat) = u_per_lat，保证局部东西/南北物理尺度 1:1。
+  const uPerLon = qinlingRegionWorld.width / lonSpan;
+  const uPerLatPhysical = uPerLon / cosMidLat;
+  const uPerLatActual = qinlingRegionWorld.depth / latSpan;
+  const stretchRatio = uPerLatActual / uPerLatPhysical;
+
+  assert.ok(
+    stretchRatio > 0.95 && stretchRatio < 1.05,
+    `world depth must keep N-S aspect within 5% of physical (cos(midLat)=${cosMidLat.toFixed(3)}). ` +
+      `Got u/° lon=${uPerLon.toFixed(2)}, u/° lat actual=${uPerLatActual.toFixed(2)}, ` +
+      `physical=${uPerLatPhysical.toFixed(2)}, stretch=${stretchRatio.toFixed(3)}.`
+  );
+});
+
+test("atlas projection uses the same qinlingRegionBounds + qinlingRegionWorld as 3D scene", () => {
+  const xianCity = realQinlingCities.find((city) => city.id === "xian");
+  const xianAtlas = qinlingAtlasFeatures.find((feature) => feature.id === "real-city-xian");
+  const taibai = qinlingScenicLandmarks.find((spot) => spot.id === "scenic-taibai-shan");
+  const taibaiAtlas = qinlingAtlasFeatures.find((feature) => feature.id === "scenic-taibai-shan");
+  const sanxingdui = qinlingAncientSites.find((site) => site.id === "ancient-sanxingdui");
+  const sanxingduiAtlas = qinlingAtlasFeatures.find((feature) => feature.id === "ancient-sanxingdui");
+  const weiheSource = qinlingModernHydrography.features.find(
+    (feature) => feature.displayName === "渭河" || feature.name === "渭河"
+  );
+  const weiheAtlas = qinlingWaterSystem.find((feature) => feature.name === "渭河");
+
+  assert.ok(xianCity && xianAtlas, "Xi'an atlas city must come from real city projection");
+  assert.ok(taibai && taibaiAtlas, "Taibai atlas POI must exist");
+  assert.ok(sanxingdui && sanxingduiAtlas, "Sanxingdui atlas POI must exist");
+  assert.ok(weiheSource && weiheAtlas, "Wei River atlas geometry must exist");
+
+  for (const [label, geo, atlasPoint] of [
+    ["Xi'an city", xianCity, xianAtlas.world],
+    ["Taibai scenic", taibai, taibaiAtlas.world],
+    ["Sanxingdui ancient", sanxingdui, sanxingduiAtlas.world]
+  ]) {
+    const worldPoint = projectGeoToWorld(geo, qinlingRegionBounds, qinlingRegionWorld);
+    nearlyEqual(atlasPoint.x, worldPoint.x);
+    nearlyEqual(atlasPoint.y, worldPoint.z);
+  }
+
+  const sampleIndexes = [0, Math.floor(weiheSource.geometry.points.length / 2), weiheSource.geometry.points.length - 1];
+  for (const index of sampleIndexes) {
+    const geoPoint = weiheSource.geometry.points[index];
+    const atlasPoint = weiheAtlas.world.points[index];
+    const worldPoint = projectGeoToWorld(geoPoint, qinlingRegionBounds, qinlingRegionWorld);
+
+    nearlyEqual(atlasPoint.x, worldPoint.x);
+    nearlyEqual(atlasPoint.y, worldPoint.z);
+  }
 });
 
 test("experience density changes pacing, not map projection", () => {
