@@ -107,9 +107,12 @@ export interface LoadedDemAsset {
 
 type ChannelName = "heights" | "riverMask" | "passMask" | "settlementMask";
 
-const MAX_GRID_COLUMNS = 1024;
-const MAX_GRID_ROWS = 1024;
-const MAX_TOTAL_CELLS = 1024 * 1024;
+// Phase 2 全国扩张：grid 升到 3113×2158 = 6.7M cells。原来的 1024×1024 上限
+// 是为旧 slice 设的，全国规模下会硬拒绝 L1 base map 加载。提到 4096×4096 +
+// 8M 总 cell，保留对崩溃 grid（譬如解析错误把 3113 写成 31130000）的防护。
+const MAX_GRID_COLUMNS = 4096;
+const MAX_GRID_ROWS = 4096;
+const MAX_TOTAL_CELLS = 8 * 1024 * 1024;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));

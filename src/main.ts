@@ -3116,9 +3116,11 @@ function drawAtlasOverlay(
   }
 
   // 比例尺：50km 在 worldspace 是多少世界单位？
-  // worldspace 单位 = qinlingGeographicFootprintKm.width / asset.world.width 公里。
-  // 这里 hardcode 420km / 180 unit = 2.33 km/unit。后续多 region 可改成读 manifest。
-  const kmPerUnit = 420 / asset.world.width;
+  // worldspace 单位 = asset.geographicFootprintKm.width / asset.world.width 公里。
+  // 旧 slice (420km/180unit) → 全国 (5602km/1711unit ≈ 3.27 km/unit)，差 ~20×。
+  // 必须从 asset 读，不能 hardcode。
+  const footprintKmWidth = asset.geographicFootprintKm?.width ?? asset.world.width;
+  const kmPerUnit = footprintKmWidth / asset.world.width;
   const scaleKm = 50;
   const scaleUnits = scaleKm / kmPerUnit;
   const scaleBarPx =
