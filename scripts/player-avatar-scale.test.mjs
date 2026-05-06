@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { Box3 } from "three";
 import ts from "typescript";
 
 async function writeTranspiledModule(tempDir, sourceRelativePath) {
@@ -89,5 +90,28 @@ test("player root scales rider and mount down to two-thirds and mount cycling in
   assert.ok(
     handle.player.getObjectByName("avatar-walk-right-leg"),
     "on-foot mode should add a right walking leg to the avatar rig"
+  );
+
+  const leftLeg = handle.player.getObjectByName("avatar-walk-left-leg");
+  const rightLeg = handle.player.getObjectByName("avatar-walk-right-leg");
+  assert.equal(leftLeg.position.y, 0.1);
+  assert.equal(rightLeg.position.y, 0.1);
+  assert.equal(leftLeg.scale.y, 0.78);
+  assert.equal(rightLeg.scale.y, 0.78);
+
+  const torso = handle.player.getObjectByName("avatar-torso");
+  assert.ok(torso, "on-foot mode should still expose the seated torso mesh");
+  const torsoBounds = new Box3().setFromObject(torso);
+  const leftLegBounds = new Box3().setFromObject(leftLeg);
+  const rightLegBounds = new Box3().setFromObject(rightLeg);
+  const leftGap = torsoBounds.min.y - leftLegBounds.max.y;
+  const rightGap = torsoBounds.min.y - rightLegBounds.max.y;
+  assert.ok(
+    leftGap <= 0.1,
+    `left walking leg should sit close to the torso, got gap ${leftGap}`
+  );
+  assert.ok(
+    rightGap <= 0.1,
+    `right walking leg should sit close to the torso, got gap ${rightGap}`
   );
 });

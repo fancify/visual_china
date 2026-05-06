@@ -1,10 +1,10 @@
 import {
   BoxGeometry,
-  ConeGeometry,
   CylinderGeometry,
   Group,
   Mesh,
   MeshPhongMaterial,
+  ConeGeometry,
   SphereGeometry
 } from "three";
 
@@ -33,10 +33,10 @@ export interface AvatarDefinition {
 
 export const AVATAR_DEFINITIONS: AvatarDefinition[] = [
   { id: "default", name: "原游侠", description: "斗笠 + 红袍，旅程之始的形象。" },
-  { id: "wenren", name: "文人", description: "灰蓝长袍 + 幞头，背书袋。" },
+  { id: "wenren", name: "文人", description: "灰蓝长袍 + 幞头，简洁文士形象。" },
   { id: "wujiang", name: "武将", description: "红袍方甲 + 兜鍪，腰悬利剑。" },
-  { id: "youxia", name: "游侠", description: "深褐短打 + 斗笠，背行囊。" },
-  { id: "nongfu", name: "农夫", description: "浅黄短衣 + 草帽，肩扛锄。" },
+  { id: "youxia", name: "游侠", description: "深褐短打 + 斗笠，轻装行路。" },
+  { id: "nongfu", name: "农夫", description: "浅黄短衣 + 草帽，朴素田家打扮。" },
   { id: "monk", name: "僧人", description: "杏黄僧袍 + 光头 + 颈挂佛珠。" }
 ];
 
@@ -57,14 +57,21 @@ interface BodyMaterials {
 
 const sharedSkinHex = 0xe2ceb0;
 const eyeMaterial = new MeshPhongMaterial({ color: 0x141414, shininess: 80 });
+// 眼睛 r 0.06 → 0.025："就两个小点"，避免大球眼睛诡异感。
+// 眼珠：往大调一档（0.025 → 0.045）+ 推到头表面（X 0.20 → 0.30）才能看见。
 const eyeGeometry = new SphereGeometry(0.045, 6, 6);
 
-/** 把眼睛安在 head sphere 前方（+X 朝向）。 */
+/** 把眼睛安在 head sphere 前方表面（+X 朝向）。
+ * head 在 (0.05, headY, 0) 半径 0.30 → 前表面 X ≈ 0.32。眼珠 X=0.30 让它"露出"
+ * 头表面而不是埋在球里。Z ±0.10 给眼距，Y headY-0.04 略低于眼正中（更像看
+ * 前方稍下）。 */
 function addEyes(target: Group, headY: number): void {
   const left = new Mesh(eyeGeometry, eyeMaterial);
-  left.position.set(0.28, headY, 0.13);
+  left.name = "avatar-eye-left";
+  left.position.set(0.30, headY - 0.04, 0.1);
   const right = new Mesh(eyeGeometry, eyeMaterial);
-  right.position.set(0.28, headY, -0.13);
+  right.name = "avatar-eye-right";
+  right.position.set(0.30, headY - 0.04, -0.1);
   target.add(left, right);
 }
 
@@ -75,24 +82,35 @@ function buildSeatedTorso(
 ): { group: Group; headY: number } {
   const group = new Group();
 
-  const torsoSize = options.torsoSize ?? [0.55, 0.7, 0.42];
-  const thighThickness = options.thighThickness ?? 0.18;
+  // 反馈循环：先太粗（0.55×0.42）→ 太细（0.34×0.22）→ 现在中间值。
+  // width 0.42（窄但不瘦），depth 0.28（前后明显薄于宽）。
+  // thighThickness 0.10 保留（腿能看出两根）。
+  const torsoSize = options.torsoSize ?? [0.42, 0.46, 0.28];
+  const thighThickness = options.thighThickness ?? 0.11;
+  const torsoCenterY = 0.62;
+  const headY = 1.1;
 
   // 躯干：略前倾（往 +X）以贴合"骑马含腰"姿势
   const torso = new Mesh(
     new BoxGeometry(torsoSize[0], torsoSize[1], torsoSize[2]),
     materials.garment
   );
-  torso.position.set(0.0, 0.55, 0);
+  torso.name = "avatar-torso";
+  torso.position.set(0.0, torsoCenterY, 0);
   torso.rotation.z = -0.08;
   group.add(torso);
+
+  // 肩头球已移除：用户反馈"不用加，胳膊直接接到身上"。手臂根部下移到 torso
+  // 中部位置，足够视觉接住，不需要额外几何过渡。
 
   // 大腿：分腿坐在鞍两侧，微前弯
   const thighGeometry = new CylinderGeometry(thighThickness, thighThickness, 0.55, 5);
   const thighLeft = new Mesh(thighGeometry, materials.garment);
+  thighLeft.name = "avatar-thigh-left";
   thighLeft.position.set(0.18, 0.18, 0.22);
   thighLeft.rotation.set(0, 0, Math.PI / 2 - 0.2);
   const thighRight = new Mesh(thighGeometry, materials.garment);
+  thighRight.name = "avatar-thigh-right";
   thighRight.position.set(0.18, 0.18, -0.22);
   thighRight.rotation.set(0, 0, Math.PI / 2 - 0.2);
   group.add(thighLeft, thighRight);
@@ -101,17 +119,27 @@ function buildSeatedTorso(
   const armGeometry = new CylinderGeometry(0.07, 0.08, 0.5, 5);
   const armLeft = new Mesh(armGeometry, materials.garment);
   armLeft.name = "avatar-arm-left";
-  armLeft.position.set(0.28, 0.6, 0.22);
-  armLeft.rotation.set(0, 0, Math.PI / 2 - 0.5);
+  // 胳膊位置三轮迭代：0.62 → 0.55 → 0.45 → 0.32。
+  // 用户反馈"肩膀不要超过躯干最高处" — torso 顶 ≈ 0.85，position.y 0.32 后
+  // arm cylinder 上端最高点 ≈ 0.32 + 0.12 = 0.44，远低于 torso 顶。
+  // rotation 也调到 π/2 - 0.7（更斜往下），让 arm 自然 hang 而不是前伸。
+  armLeft.position.set(0.22, 0.32, 0.22);
+  armLeft.rotation.set(0, 0, Math.PI / 2 - 0.7);
   const armRight = new Mesh(armGeometry, materials.garment);
   armRight.name = "avatar-arm-right";
-  armRight.position.set(0.28, 0.6, -0.22);
-  armRight.rotation.set(0, 0, Math.PI / 2 - 0.5);
+  armRight.position.set(0.22, 0.32, -0.22);
+  armRight.rotation.set(0, 0, Math.PI / 2 - 0.7);
   group.add(armLeft, armRight);
 
+  const neck = new Mesh(new CylinderGeometry(0.1, 0.12, 0.09, 6), materials.skin);
+  neck.name = "avatar-neck";
+  neck.position.set(0.04, 0.845, 0);
+  group.add(neck);
+
   // 头球
-  const headY = 1.05;
-  const head = new Mesh(new SphereGeometry(0.32, 12, 12), materials.skin);
+  // 头 r 0.22 → 0.30："头可以再大一点"，跟新窄身躯比例更协调（chibi 风）。
+  const head = new Mesh(new SphereGeometry(0.30, 12, 12), materials.skin);
+  head.name = "avatar-head";
   head.position.set(0.05, headY, 0);
   group.add(head);
 
@@ -139,21 +167,20 @@ function buildDefaultAvatar(): AvatarHandle {
 
   const { group, headY } = buildSeatedTorso(materials);
 
-  // 长披风（cone 罩在背后，模拟旧 cloak）
-  const cloak = new Mesh(new ConeGeometry(0.55, 1.1, 5), materials.garment);
-  cloak.position.set(-0.05, 0.55, 0);
-  cloak.rotation.y = Math.PI / 5;
-  group.add(cloak);
+  // 直筒外袍：压到膝盖位置，避免旧版披风外扩成裙摆。
+  const robe = new Mesh(new CylinderGeometry(0.22, 0.22, 0.58, 8), materials.garment);
+  robe.position.set(0.02, 0.31, 0);
+  group.add(robe);
 
   // 斗笠
   const douli = new Mesh(new ConeGeometry(0.5, 0.2, 12), materials.hat);
-  douli.position.set(0.05, headY + 0.34, 0);
+  douli.position.set(0.05, headY + 0.24, 0);
   group.add(douli);
 
   return { avatar: group };
 }
 
-/** 文人：长袍灰蓝 + 幞头 + 背包袱 */
+/** 文人：长袍灰蓝 + 幞头 */
 function buildWenrenAvatar(): AvatarHandle {
   const materials: BodyMaterials = {
     skin: new MeshPhongMaterial({ color: sharedSkinHex, flatShading: true }),
@@ -170,31 +197,17 @@ function buildWenrenAvatar(): AvatarHandle {
     accent: new MeshPhongMaterial({ color: 0xc6a368, flatShading: true })
   };
 
-  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.6, 0.78, 0.44] });
+  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.44, 0.48, 0.30] });
 
-  // 长袍下摆：cone 在大腿外面盖住
-  const robe = new Mesh(new ConeGeometry(0.6, 0.85, 6), materials.garment);
-  robe.position.set(0.05, 0.05, 0);
+  // 长袍直上直下，到膝盖附近即可。
+  const robe = new Mesh(new CylinderGeometry(0.23, 0.23, 0.62, 8), materials.garment);
+  robe.position.set(0.04, 0.31, 0);
   group.add(robe);
 
-  // 幞头：方块帽 + 后方两条带
+  // 幞头：只保留方帽主形，去掉细小帽带。
   const cap = new Mesh(new BoxGeometry(0.42, 0.22, 0.4), materials.hat);
-  cap.position.set(0.0, headY + 0.32, 0);
+  cap.position.set(0.0, headY + 0.2, 0);
   group.add(cap);
-  const tailGeometry = new BoxGeometry(0.06, 0.22, 0.08);
-  const capTailLeft = new Mesh(tailGeometry, materials.hat);
-  capTailLeft.position.set(-0.18, headY + 0.18, 0.14);
-  capTailLeft.rotation.z = 0.4;
-  const capTailRight = new Mesh(tailGeometry, materials.hat);
-  capTailRight.position.set(-0.18, headY + 0.18, -0.14);
-  capTailRight.rotation.z = 0.4;
-  group.add(capTailLeft, capTailRight);
-
-  // 背后包袱：方布 + 系绳点
-  const bundle = new Mesh(new BoxGeometry(0.36, 0.36, 0.32), materials.accent);
-  bundle.position.set(-0.32, 0.78, 0);
-  bundle.rotation.set(0.2, 0, 0.1);
-  group.add(bundle);
 
   return { avatar: group };
 }
@@ -226,7 +239,7 @@ function buildWujiangAvatar(): AvatarHandle {
     shininess: 30
   });
 
-  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.6, 0.74, 0.46] });
+  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.46, 0.50, 0.32] });
 
   // 甲胄：胸前两块方块 + 肩护
   const chestPlate = new Mesh(new BoxGeometry(0.5, 0.42, 0.08), armorMaterial);
@@ -234,17 +247,17 @@ function buildWujiangAvatar(): AvatarHandle {
   group.add(chestPlate);
   const shoulderGeometry = new BoxGeometry(0.18, 0.18, 0.18);
   const shoulderLeft = new Mesh(shoulderGeometry, armorMaterial);
-  shoulderLeft.position.set(0.05, 0.92, 0.28);
+  shoulderLeft.position.set(0.05, 0.82, 0.28);
   const shoulderRight = new Mesh(shoulderGeometry, armorMaterial);
-  shoulderRight.position.set(0.05, 0.92, -0.28);
+  shoulderRight.position.set(0.05, 0.82, -0.28);
   group.add(shoulderLeft, shoulderRight);
 
   // 头盔：圆顶 + 顶尖
   const helmet = new Mesh(new SphereGeometry(0.36, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), materials.hat);
-  helmet.position.set(0.05, headY + 0.05, 0);
+  helmet.position.set(0.05, headY + 0.02, 0);
   group.add(helmet);
   const helmetTip = new Mesh(new ConeGeometry(0.08, 0.22, 6), materials.hat);
-  helmetTip.position.set(0.05, headY + 0.42, 0);
+  helmetTip.position.set(0.05, headY + 0.28, 0);
   group.add(helmetTip);
 
   // 腰间剑：长方块 + 圆柄
@@ -260,7 +273,7 @@ function buildWujiangAvatar(): AvatarHandle {
   return { avatar: group };
 }
 
-/** 游侠：深褐短打 + 斗笠 + 行囊 */
+/** 游侠：深褐短打 + 斗笠 */
 function buildYouxiaAvatar(): AvatarHandle {
   const materials: BodyMaterials = {
     skin: new MeshPhongMaterial({ color: sharedSkinHex, flatShading: true }),
@@ -277,7 +290,11 @@ function buildYouxiaAvatar(): AvatarHandle {
     accent: new MeshPhongMaterial({ color: 0x6b3a22, flatShading: true })
   };
 
-  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.52, 0.66, 0.4] });
+  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.40, 0.46, 0.28] });
+
+  const tunic = new Mesh(new CylinderGeometry(0.20, 0.20, 0.5, 8), materials.garment);
+  tunic.position.set(0.04, 0.29, 0);
+  group.add(tunic);
 
   // 腰带
   const belt = new Mesh(new BoxGeometry(0.56, 0.08, 0.42), materials.accent);
@@ -286,14 +303,8 @@ function buildYouxiaAvatar(): AvatarHandle {
 
   // 斗笠（比 default 更宽更平）
   const douli = new Mesh(new ConeGeometry(0.58, 0.16, 14), materials.hat);
-  douli.position.set(0.05, headY + 0.32, 0);
+  douli.position.set(0.05, headY + 0.23, 0);
   group.add(douli);
-
-  // 行囊：椭圆背在肩上
-  const pack = new Mesh(new SphereGeometry(0.28, 8, 6), materials.accent);
-  pack.position.set(-0.32, 0.7, 0);
-  pack.scale.set(0.9, 1.1, 0.7);
-  group.add(pack);
 
   // 短刀别在腰
   const dagger = new Mesh(new BoxGeometry(0.04, 0.32, 0.04), materials.accent);
@@ -304,7 +315,7 @@ function buildYouxiaAvatar(): AvatarHandle {
   return { avatar: group };
 }
 
-/** 农夫：浅黄短衣 + 草帽 + 肩扛锄 */
+/** 农夫：浅黄短衣 + 草帽 */
 function buildNongfuAvatar(): AvatarHandle {
   const materials: BodyMaterials = {
     skin: new MeshPhongMaterial({ color: sharedSkinHex, flatShading: true }),
@@ -325,25 +336,20 @@ function buildNongfuAvatar(): AvatarHandle {
     })
   };
 
-  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.54, 0.66, 0.4] });
+  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.42, 0.46, 0.28] });
+
+  const tunic = new Mesh(new CylinderGeometry(0.21, 0.21, 0.5, 8), materials.garment);
+  tunic.position.set(0.04, 0.29, 0);
+  group.add(tunic);
 
   // 草帽：宽 cone（比 youxia 更宽更扁）
   const hat = new Mesh(new ConeGeometry(0.62, 0.18, 14), materials.hat);
-  hat.position.set(0.05, headY + 0.34, 0);
+  hat.position.set(0.05, headY + 0.24, 0);
   group.add(hat);
   // 帽尖（尖顶草帽）
   const hatTip = new Mesh(new ConeGeometry(0.18, 0.18, 8), materials.hat);
-  hatTip.position.set(0.05, headY + 0.5, 0);
+  hatTip.position.set(0.05, headY + 0.38, 0);
   group.add(hatTip);
-
-  // 肩扛锄头：竖长杆 + 端头方块
-  const handle = new Mesh(new CylinderGeometry(0.04, 0.04, 1.0, 5), materials.accent);
-  handle.position.set(-0.18, 0.95, 0.28);
-  handle.rotation.set(0, 0, 0.5);
-  group.add(handle);
-  const blade = new Mesh(new BoxGeometry(0.18, 0.16, 0.06), materials.accent);
-  blade.position.set(-0.55, 1.32, 0.28);
-  group.add(blade);
 
   // 腰间小布带
   const sash = new Mesh(new BoxGeometry(0.56, 0.06, 0.42), materials.accent);
@@ -382,42 +388,33 @@ function buildMonkAvatar(): AvatarHandle {
     shininess: 18
   });
 
-  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.58, 0.76, 0.44] });
+  const { group, headY } = buildSeatedTorso(materials, { torsoSize: [0.44, 0.48, 0.30] });
 
-  const robe = new Mesh(new ConeGeometry(0.62, 0.92, 7), materials.garment);
-  robe.position.set(0.04, 0.04, 0);
+  // 僧袍：直筒、从肩部一直披到膝盖。
+  // 用户反馈"袈裟位置像胡子一样诡异"——根因是旧版 robe 只在腰下，看起来像
+  // "腰部以下挂一截"。新版从肩部 (y≈0.84) 披到膝盖 (y≈0.0)，h 0.55 → 0.84，
+  // position.y 0.3 → 0.42，覆盖整个躯干。
+  const robe = new Mesh(
+    new CylinderGeometry(0.22, 0.22, 0.84, 8),
+    materials.garment
+  );
+  robe.name = "avatar-robe";
+  robe.position.set(0.04, 0.42, 0);
   group.add(robe);
 
-  const belt = new Mesh(new BoxGeometry(0.6, 0.08, 0.44), materials.accent);
-  belt.position.set(0.02, 0.36, 0);
+  // 腰带跟随新 robe 中部位置（约 0.40）。
+  const belt = new Mesh(new BoxGeometry(0.45, 0.06, 0.32), materials.accent);
+  belt.position.set(0.02, 0.40, 0);
   group.add(belt);
 
-  // 左肩偏袒：肩头布料更高，并向胸前斜披一块。
-  const shoulderWrap = new Mesh(new BoxGeometry(0.24, 0.34, 0.2), materials.garment);
-  shoulderWrap.position.set(0.08, 0.92, 0.26);
-  shoulderWrap.rotation.z = 0.16;
-  group.add(shoulderWrap);
-
-  const chestDrape = new Mesh(new BoxGeometry(0.14, 0.5, 0.16), materials.garment);
-  chestDrape.position.set(0.2, 0.66, 0.18);
-  chestDrape.rotation.set(0.18, 0.08, 0.34);
-  group.add(chestDrape);
-
-  const scalpCrown = new Mesh(new SphereGeometry(0.09, 10, 10), materials.skin);
-  scalpCrown.position.set(0.05, headY + 0.28, 0);
-  group.add(scalpCrown);
-
-  const beadGeometry = new SphereGeometry(0.055, 8, 8);
+  // 念珠：缩到颈部一圈短弧（前胸 5 颗），围一圈反而显得乱。
+  const beadGeometry = new SphereGeometry(0.05, 8, 8);
   const beadOffsets = [
-    { x: -0.08, y: headY + 0.08, z: 0.18 },
-    { x: -0.01, y: headY - 0.02, z: 0.26 },
-    { x: 0.08, y: headY - 0.11, z: 0.23 },
-    { x: 0.16, y: headY - 0.16, z: 0.14 },
-    { x: 0.19, y: headY - 0.19, z: 0 },
-    { x: 0.16, y: headY - 0.16, z: -0.14 },
-    { x: 0.08, y: headY - 0.11, z: -0.23 },
-    { x: -0.01, y: headY - 0.02, z: -0.26 },
-    { x: -0.08, y: headY + 0.08, z: -0.18 }
+    { x: 0.18, y: headY - 0.18, z: -0.14 },
+    { x: 0.22, y: headY - 0.22, z: -0.07 },
+    { x: 0.23, y: headY - 0.24, z: 0 },
+    { x: 0.22, y: headY - 0.22, z: 0.07 },
+    { x: 0.18, y: headY - 0.18, z: 0.14 }
   ];
 
   beadOffsets.forEach((offset) => {

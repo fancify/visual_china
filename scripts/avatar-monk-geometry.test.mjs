@@ -36,7 +36,18 @@ test("monk avatar builds a full seated geometry set", async () => {
 
   handle.avatar.updateMatrixWorld(true);
   const bounds = new Box3().setFromObject(handle.avatar);
-  assert.ok(bounds.max.y > 1.4, `monk avatar should reach a readable seated height, got ${bounds.max.y}`);
+  // 新头身比把头略收小，但整体高度仍需保持可读。
+  assert.ok(bounds.max.y > 1.3, `monk avatar should reach a readable seated height, got ${bounds.max.y}`);
+
+  const robe = handle.avatar.getObjectByName("avatar-robe");
+  assert.ok(robe, "monk avatar should expose avatar-robe");
+  assert.equal(robe.geometry?.type, "CylinderGeometry");
+  // 用户反馈"身躯太粗"——僧袍 r 0.36→0.22 跟 torso 一起变窄。
+  assert.equal(robe.geometry?.parameters?.radiusTop, 0.22);
+  assert.equal(robe.geometry?.parameters?.radiusBottom, 0.22);
+  // 袈裟披全身：h 0.55 → 0.84, position 0.3 → 0.42。
+  assert.equal(robe.geometry?.parameters?.height, 0.84);
+  assert.equal(robe.position.y, 0.42);
 
   let meshCount = 0;
   handle.avatar.traverse((node) => {
@@ -44,5 +55,6 @@ test("monk avatar builds a full seated geometry set", async () => {
       meshCount += 1;
     }
   });
-  assert.ok(meshCount >= 14, `monk avatar should include torso, limbs, robe and beads, got ${meshCount} meshes`);
+  // 新比例增加了脖子与更醒目的眼睛，僧袍仍保持极简但 mesh 总数更高。
+  assert.ok(meshCount >= 10, `monk avatar should include torso, limbs, robe and beads, got ${meshCount} meshes`);
 });
