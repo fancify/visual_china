@@ -28,8 +28,9 @@ test("Qinling terrain chunks include shared boundary samples to avoid visible se
     Math.abs(north.grid.rows - south.grid.rows) <= 1,
     "adjacent north/south chunks should stay within one shared-sample row of each other"
   );
-  assert.ok(west.grid.columns >= 47 && west.grid.columns <= 48);
-  assert.ok(north.grid.rows >= 48 && north.grid.rows <= 49);
+  // Phase 2 全国 grid 3113×2158 / 63×44 chunks → 每 chunk ~50×50 (含 +1 共享边)
+  assert.ok(west.grid.columns >= 49 && west.grid.columns <= 51);
+  assert.ok(north.grid.rows >= 49 && north.grid.rows <= 51);
 
   for (let row = 0; row < west.grid.rows; row += 1) {
     assert.equal(
@@ -48,8 +49,9 @@ test("Qinling terrain chunks include shared boundary samples to avoid visible se
   }
 });
 
-test("Qinling chunk manifest expands to a 9 by 14 terrain grid", () => {
-  assert.equal(manifest.chunkColumns, 9);
-  assert.equal(manifest.chunkRows, 14);
-  assert.equal(manifest.chunks.length, 126);
+test("Qinling chunk manifest expands to the full-China terrain grid", () => {
+  // Phase 2 全中国扩张：grid 3113 × 2158 cells / targetChunkSpanCells 50
+  assert.equal(manifest.chunkColumns, 63);
+  assert.equal(manifest.chunkRows, 44);
+  assert.equal(manifest.chunks.length, 63 * 44);
 });

@@ -137,21 +137,43 @@ async function loadEtopo() {
 }
 
 function buildSampler({ data, winWidth, winHeight, sourcePath, west, north, east, south }) {
+  function sample(lon, lat) {
+    if (lon < west || lon > east || lat < south || lat > north) {
+      return 0;
+    }
+
+    const u = (lon - west) / (east - west || 1);
+    const v = (north - lat) / (north - south || 1);
+    const column = clamp(Math.round(u * (winWidth - 1)), 0, winWidth - 1);
+    const row = clamp(Math.round(v * (winHeight - 1)), 0, winHeight - 1);
+    const meters = data[row * winWidth + column];
+
+    return Number.isFinite(meters) && meters > -10000 ? meters : 0;
+  }
+
+  // 给 build pipeline 用：在 overlap 区域上均匀采 width×height 个点，返回扁平
+  // 数组（row-major，行从 north 到 south，列从 west 到 east）。
+  // 调用 ~tens of thousands of times per build, 避免 per-cell async overhead。
+  function sampleGrid(overlap, gridWidth, gridHeight) {
+    const out = new Float32Array(gridWidth * gridHeight);
+    const lonSpan = (overlap.east - overlap.west) / Math.max(1, gridWidth - 1);
+    const latSpan = (overlap.north - overlap.south) / Math.max(1, gridHeight - 1);
+
+    for (let row = 0; row < gridHeight; row += 1) {
+      const lat = overlap.north - row * latSpan;
+      for (let col = 0; col < gridWidth; col += 1) {
+        const lon = overlap.west + col * lonSpan;
+        out[row * gridWidth + col] = sample(lon, lat);
+      }
+    }
+
+    return out;
+  }
+
   return {
     sourcePath,
-    sample(lon, lat) {
-      if (lon < west || lon > east || lat < south || lat > north) {
-        return 0;
-      }
-
-      const u = (lon - west) / (east - west || 1);
-      const v = (north - lat) / (north - south || 1);
-      const column = clamp(Math.round(u * (winWidth - 1)), 0, winWidth - 1);
-      const row = clamp(Math.round(v * (winHeight - 1)), 0, winHeight - 1);
-      const meters = data[row * winWidth + column];
-
-      return Number.isFinite(meters) && meters > -10000 ? meters : 0;
-    }
+    sample,
+    sampleGrid
   };
 }
 

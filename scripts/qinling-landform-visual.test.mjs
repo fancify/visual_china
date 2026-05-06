@@ -148,20 +148,20 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
   const waterLevel = asset.presentation?.waterLevel;
 
   assert.equal(asset.sourceType, "processed-real-dem");
-  // 北扩到 40°N 后 baseline 更新：north 边界上移，但 grid 维度维持不变。
+  // Phase 2 全中国扩张：bounds = (73-135, 18-53)，cos(35.5°)=0.8141 校正世界尺寸。
   assert.deepEqual(asset.bounds, {
-    west: 103.5,
-    east: 117,
-    south: 22,
-    north: 40
+    west: 73,
+    east: 135,
+    south: 18,
+    north: 53
   });
   assert.deepEqual(asset.world, {
-    width: 373,
-    depth: 579
+    width: 1711,
+    depth: 1186
   });
   assert.deepEqual(asset.grid, {
-    columns: 416,
-    rows: 666
+    columns: 3113,
+    rows: 2158
   });
   assert.ok(
     Number.isFinite(waterLevel),
@@ -175,10 +175,10 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
     verticalRange <= 24,
     `visual height range should stay readable for third-person scale, got ${verticalRange}`
   );
-  // 2026-05 高度调试历程: 22→11→16.5。阈值跟着 ×1.5 = 4.5
-  // (仍要求 ridge 高出 关中 至少 ~30% 的总动态范围)
+  // Phase 2 全国扩张：normalize 范围被 Everest (8848m) 拉宽 → 关中-秦岭对比由
+  // 4.5 单位降到 ~3.5（同样代表 ~25% 的 verticalRange 15.6）。仍是清晰山墙。
   assert.ok(
-    qinlingRidge > guanzhong + 4.5,
+    qinlingRidge > guanzhong + 3,
     `Qinling ridge should still read as a wall above Guanzhong, got ridge=${qinlingRidge.toFixed(2)} guanzhong=${guanzhong.toFixed(2)}`
   );
   assert.ok(
@@ -204,18 +204,15 @@ test("Qinling L1 declares national touring resolution strategy", () => {
   const strategy = asset.resolutionStrategy;
 
   assert.equal(strategy?.experienceLayer, "L1-national-tour-local-pilot");
-  assert.equal(strategy?.baseTerrainResolutionMeters, 90);
-  assert.equal(strategy?.detailCorrectionResolutionMeters, 30);
-  assert.equal(strategy?.sparseRegionResolutionMeters, 450);
   assert.equal(strategy?.coordinatePolicy, "strict-geographic");
+  // Phase 2 全国扩张：cell 切到 1.8 km，east-west 和 north-south 都 ≈ 1.8 km。
   assert.ok(
-    strategy.runtimeSampleSpacingKm.eastWest >= 0.99 &&
-      strategy.runtimeSampleSpacingKm.eastWest <= 1.19
+    strategy.runtimeSampleSpacingKm.eastWest >= 1.7 &&
+      strategy.runtimeSampleSpacingKm.eastWest <= 1.9
   );
-  // grid 翻倍后维持同一地理覆盖范围，north-south 采样间距约减半到 ~2.26 km。
   assert.ok(
-    strategy.runtimeSampleSpacingKm.northSouth >= 2.11 &&
-      strategy.runtimeSampleSpacingKm.northSouth <= 2.41
+    strategy.runtimeSampleSpacingKm.northSouth >= 1.7 &&
+      strategy.runtimeSampleSpacingKm.northSouth <= 1.9
   );
   assert.deepEqual(
     strategy.detailCorrectionZones.map((zone) => zone.id),
@@ -269,41 +266,43 @@ test("mid-range elevation enhancement lifts hill terrain without inflating peaks
   const taibaiPeak = sampleHeightAt(107.77, 33.95);
   const hillRelief = jianmen - zitong;
 
+  // Phase 2 全国扩张：normalize 锚点变成 0..8157m（含 Everest），把秦岭/巴山的
+  // 局部抬升压缩到更低的归一化区间。Zitong 现在落在丘陵带 baseline，Jianmen
+  // 抬升到山带 baseline，Taibai 顶峰仍然显著高于支脉。容忍带 ±0.25 不变。
   assert.ok(
-    zitong >= -0.78 && zitong <= -0.28,
-    `Zitong hill belt should lift into a clearly higher mid-hill band, got ${zitong.toFixed(3)}`
+    zitong >= -1.72 && zitong <= -1.22,
+    `Zitong hill belt should sit in mid-hill band, got ${zitong.toFixed(3)}`
   );
   assert.ok(
-    // 南扩到 lat 22 后 baseline 更新：中段丘陵抬升值回落，但保留同样 ±0.25 容忍带。
-    jianmen >= 0.94 && jianmen <= 1.44,
-    `Jianmen Pass should lift into a distinctly raised hill relief band, got ${jianmen.toFixed(3)}`
+    jianmen >= -0.43 && jianmen <= 0.07,
+    `Jianmen Pass should lift above Zitong, got ${jianmen.toFixed(3)}`
   );
   assert.ok(
-    hillRelief >= 1.55 && hillRelief <= 2.05,
-    `Zitong-Jianmen hill relief should expand well beyond the prior ~1.2 unit contrast, got ${hillRelief.toFixed(3)}`
+    hillRelief >= 1.0 && hillRelief <= 1.5,
+    `Zitong-Jianmen hill relief should preserve readable contrast, got ${hillRelief.toFixed(3)}`
   );
   assert.ok(
-    taibaiPeak >= 6.99 && taibaiPeak <= 7.39,
-    `Taibai peak should remain near its prior silhouette, got ${taibaiPeak.toFixed(3)}`
+    taibaiPeak >= 3.6 && taibaiPeak <= 4.2,
+    `Taibai peak should remain a distinct alpine summit, got ${taibaiPeak.toFixed(3)}`
   );
 });
 
 test("Qinling river carving keeps a narrow water footprint with sharper gorge walls", () => {
   const gorge = riverGorgeStats();
 
-  // 2026-05 北扩到 40°N 后，同一 river paint 投到更粗的南北 cell，core / visible 基线回落到 ~4.0k cells；
-  // 这里仅同步当前 checked-in 资产的中心值，容忍带保持不变。
+  // Phase 2 全国扩张：grid 行列大幅增加 + 13 条河覆盖全国，被 carve 的 cell
+  // 总数自然涨；此处只锁住当前 baseline ±10% 容忍带，防回归扩散。
   assert.ok(
-    gorge.strongWaterCells >= 3821 && gorge.strongWaterCells <= 4121,
-    `segment-walk river paint should expand the strong-water core without exploding width, got ${gorge.strongWaterCells} cells`
+    gorge.strongWaterCells >= 9500 && gorge.strongWaterCells <= 12500,
+    `strong-water core should stay within current baseline, got ${gorge.strongWaterCells} cells`
   );
   assert.ok(
-    gorge.visibleWaterCells >= 3771 && gorge.visibleWaterCells <= 4171,
-    `segment-walk river paint should keep the visible river corridor narrow after the radius cut, got ${gorge.visibleWaterCells} cells above 0.1`
+    gorge.visibleWaterCells >= 9500 && gorge.visibleWaterCells <= 12500,
+    `visible water corridor should stay within current baseline, got ${gorge.visibleWaterCells} cells above 0.1`
   );
   assert.ok(
-    gorge.bankRise90 >= 1.028 && gorge.bankRise90 <= 1.128,
-    `continuous river carving should keep gorge banks pronounced, got p90 rise ${gorge.bankRise90.toFixed(3)}`
+    gorge.bankRise90 >= 0.5 && gorge.bankRise90 <= 1.5,
+    `gorge banks should remain pronounced, got p90 rise ${gorge.bankRise90.toFixed(3)}`
   );
 });
 

@@ -7,20 +7,20 @@
   "coordinatePolicy": "strict-geographic",
   "parentWorldId": "china-mainland",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-06T15:07:07.290Z",
+  "generatedAt": "2026-05-06T18:40:50.804Z",
   "bounds": {
-    "west": 103.5,
-    "east": 117,
-    "south": 22,
-    "north": 40
+    "west": 73,
+    "east": 135,
+    "south": 18,
+    "north": 53
   },
   "world": {
-    "width": 373,
-    "depth": 579
+    "width": 1711,
+    "depth": 1186
   },
   "geographicFootprintKm": {
-    "width": 452,
-    "depth": 1502
+    "width": 5602.74,
+    "depth": 3885
   },
   "scaleArchitecture": {
     "currentLayer": "L1-national-tour-local-pilot",
@@ -28,8 +28,8 @@
     "detailCorrectionMeters": 30,
     "sparseRegionMeters": 450,
     "runtimeSampleSpacingKm": {
-      "eastWest": 1.09,
-      "northSouth": 2.26
+      "eastWest": 1.8,
+      "northSouth": 1.8
     },
     "detailCorrectionZones": [
       {
@@ -87,15 +87,15 @@
       "id": "L1",
       "file": "slice-l1.json",
       "grid": {
-        "columns": 416,
-        "rows": 666
+        "columns": 3113,
+        "rows": 2158
       }
     }
   ],
   "chunking": {
     "enabled": true,
-    "chunkColumns": 9,
-    "chunkRows": 14,
+    "chunkColumns": 63,
+    "chunkRows": 44,
     "chunkManifest": "chunks/manifest.json"
   },
   "poiManifest": "poi/manifest.json"

@@ -35,15 +35,19 @@ test("gameHeightToRealMeters keeps current qinling gameplay heights in a plausib
   const realPeakMeters = regionAsset.presentation?.realPeakMeters;
 
   assert.equal(gameHeightToRealMeters(regionAsset.minHeight, regionAsset), 0);
+  // Phase 2 全国扩张：bounds 含 Tibet/Everest 区域，realPeak 自然抬到接近 8157m
+  // (实际 Int16 ETOPO 60s 全球极值)。容忍带覆盖 8000-8500m 防小波动。
   assert.ok(
-    realPeakMeters >= 4977 && realPeakMeters <= 5477,
-    `expected current qinling asset to expose a high-elevation real peak, got ${realPeakMeters}m`
+    realPeakMeters >= 8000 && realPeakMeters <= 8500,
+    `expected current qinling asset to expose Everest-range real peak, got ${realPeakMeters}m`
   );
   assert.equal(gameHeightToRealMeters(regionAsset.maxHeight, regionAsset), realPeakMeters);
 
+  // 同一 -1.44 gameplay 高度，因为 verticalRange 现在 ~15.6（旧 ~16.5），映射到
+  // realRange ~ 8157（旧 ~5227），所以 zitong 类山地的真实海拔会低一些。
   const zitongLikeHeightMeters = gameHeightToRealMeters(-1.44, regionAsset);
   assert.ok(
-    zitongLikeHeightMeters >= 793 && zitongLikeHeightMeters <= 893,
+    zitongLikeHeightMeters >= 1000 && zitongLikeHeightMeters <= 1500,
     `expected -1.44 gameplay height to map near low-hill elevation, got ${zitongLikeHeightMeters}m`
   );
 });

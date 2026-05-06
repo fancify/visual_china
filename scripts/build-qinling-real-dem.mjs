@@ -708,8 +708,16 @@ for (const tilePath of tilePaths) {
     continue;
   }
 
-  const tiff = await fromFile(tilePath);
-  const image = await tiff.getImage();
+  let tiff;
+  let image;
+  try {
+    tiff = await fromFile(tilePath);
+    image = await tiff.getImage();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`Skipping corrupted FABDEM tile ${tileName}: ${reason}`);
+    continue;
+  }
 
   const columnStart = clamp(
     Math.floor(((overlap.west - qinlingBounds.west) / (qinlingBounds.east - qinlingBounds.west)) * columns),
@@ -742,14 +750,21 @@ for (const tilePath of tilePaths) {
   const targetWidth = Math.max(1, columnEnd - columnStart);
   const targetHeight = Math.max(1, rowEnd - rowStart);
 
-  const raster = await image.readRasters({
-    interleave: true,
-    window,
-    width: targetWidth,
-    height: targetHeight,
-    resampleMethod: "bilinear",
-    fillValue: -9999
-  });
+  let raster;
+  try {
+    raster = await image.readRasters({
+      interleave: true,
+      window,
+      width: targetWidth,
+      height: targetHeight,
+      resampleMethod: "bilinear",
+      fillValue: -9999
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`Skipping corrupted FABDEM tile ${tileName} (read): ${reason}`);
+    continue;
+  }
 
   for (let rowOffset = 0; rowOffset < targetHeight; rowOffset += 1) {
     for (let columnOffset = 0; columnOffset < targetWidth; columnOffset += 1) {
