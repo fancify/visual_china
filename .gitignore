@@ -32,3 +32,4 @@ tmp/
 # 跑 `node scripts/download-sfx.mjs` 重新生成。
 public/sfx/*/*.opus
 public/sfx/*/*.ogg
+data/hydrosheds/
