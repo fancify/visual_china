@@ -13,7 +13,9 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const INPUT = path.join(ROOT, "public/data/regions/qinling/slice-l1.json");
 const OUTPUT = INPUT;  // 覆写
 
-const STRIDE = 8;  // 8× 下采样：3113/8=389, 2158/8=270，文件 ~16 MB → ~250 KB
+// 8× 太狠（14km/cell 山形糊）；4× 是 7km/cell，山脊走向看得清。
+// 文件大小约 17 MB，parse ~150ms 可接受（不会触发 Page Unresponsive）。
+const STRIDE = 4;
 
 const raw = await fs.readFile(INPUT, "utf8");
 const asset = JSON.parse(raw);
