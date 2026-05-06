@@ -2,37 +2,39 @@ import path from "node:path";
 
 import { fabdemDataset } from "./china-dem-common.mjs";
 
-// 2026-05 slice 继续东扩 + 南扩，并北推到 40N。跟 src/data/qinlingRegion.js
-// 必须同值（构建期 + 运行期一致）。
+// 2026-05 Phase 2：bounds 扩到全中国。跟 src/data/qinlingRegion.js 必须同值
+// （构建期 + 运行期一致）。
 export const qinlingBounds = {
-  west: 103.5,
-  east: 117.0,
-  south: 22.0,
-  north: 40.0
+  west: 73.0,
+  east: 135.0,
+  south: 18.0,
+  north: 53.0
 };
 
 export const qinlingRegionManifestBounds = { ...qinlingBounds };
 
 export const qinlingWorld = {
-  // 保持 u/°lon = 27.6，不让 east 扩展把横向比例压扁。
-  width: 373,
-  // 这里必须跟运行期 source of truth 一致，否则构建产物和 3D/atlas 投影会分叉。
-  depth: 579
+  // 保持 u/°lon = 27.6，不拉长东西向比例。
+  width: 1711,
+  // 用 cos(midLat=35.5°) 校正物理纵横比；必须跟运行期 source of truth 一致。
+  depth: 1186
 };
 
 export const qinlingGeographicFootprintKm = {
-  width: 452,
-  depth: 1502
+  width: 5602.74,
+  depth: 3885
 };
 
 export const qinlingOutputGrid = {
-  columns: 416,
-  rows: 666
+  columns: 3113,
+  rows: 2158
 };
 
 export const qinlingResolutionStrategy = {
   experienceLayer: "L1-national-tour-local-pilot",
   coordinatePolicy: "strict-geographic",
+  target: "1800m-stride4-450m",
+  comment: "Full China at 1.8 km cell with ETOPO 60s + future HydroSHEDS upgrade path",
   baseTerrainResolutionMeters: 90,
   detailCorrectionResolutionMeters: 30,
   sparseRegionResolutionMeters: 450,

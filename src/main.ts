@@ -2771,6 +2771,11 @@ function computeHillshade(
   return Math.max(0, shade);
 }
 
+// Atlas base map 渲染分辨率上限。grid 直接当 canvas 在小尺度（416×666）够用，
+// 但全国 grid 可能去到 3000+ × 2000+ = 27MB ImageData + 6.7M 次 hillshade 采样，
+// 卡顿明显。1500 已经够 retina 显示器看清，再大是浪费。
+const ATLAS_BASE_MAP_MAX_DIM = 1500;
+
 function createAtlasBaseMapCanvas(asset: DemAsset): HTMLCanvasElement {
   const cached = atlasBaseMapCache.get(asset);
 
@@ -2779,8 +2784,13 @@ function createAtlasBaseMapCanvas(asset: DemAsset): HTMLCanvasElement {
   }
 
   const canvas = document.createElement("canvas");
-  canvas.width = asset.grid.columns;
-  canvas.height = asset.grid.rows;
+  // 按 DEM 长宽比缩放到 ≤ ATLAS_BASE_MAP_MAX_DIM
+  const scale = Math.min(
+    1,
+    ATLAS_BASE_MAP_MAX_DIM / Math.max(asset.grid.columns, asset.grid.rows)
+  );
+  canvas.width = Math.max(1, Math.round(asset.grid.columns * scale));
+  canvas.height = Math.max(1, Math.round(asset.grid.rows * scale));
   const context = canvas.getContext("2d");
 
   if (!context) {
@@ -2790,18 +2800,25 @@ function createAtlasBaseMapCanvas(asset: DemAsset): HTMLCanvasElement {
 
   const image = context.createImageData(canvas.width, canvas.height);
 
-  for (let row = 0; row < asset.grid.rows; row += 1) {
-    for (let column = 0; column < asset.grid.columns; column += 1) {
+  for (let row = 0; row < canvas.height; row += 1) {
+    for (let column = 0; column < canvas.width; column += 1) {
       const offset = (row * canvas.width + column) * 4;
       const color = demSampleColor(asset, {
-        x: ((column / Math.max(1, asset.grid.columns - 1)) - 0.5) * asset.world.width,
-        y: (0.5 - row / Math.max(1, asset.grid.rows - 1)) * asset.world.depth
+        x: ((column / Math.max(1, canvas.width - 1)) - 0.5) * asset.world.width,
+        y: (0.5 - row / Math.max(1, canvas.height - 1)) * asset.world.depth
       });
 
       // Hillshade：太阳从西北上方（azimuth=315°, altitude=45°）打过来。
       // shade ∈ [0, 1]——0 完全背光、1 完全正照。把它映射到 [0.45, 1.15] 的
       // 调色乘子，让平原保留底色（shade≈1），山阴侧明显变暗，山脊高光。
-      const shade = computeHillshade(asset, column, row);
+      // 把 atlas canvas 坐标映射回 DEM grid 坐标算 hillshade
+      const demColumn = Math.round(
+        (column / Math.max(1, canvas.width - 1)) * (asset.grid.columns - 1)
+      );
+      const demRow = Math.round(
+        (row / Math.max(1, canvas.height - 1)) * (asset.grid.rows - 1)
+      );
+      const shade = computeHillshade(asset, demColumn, demRow);
       const factor = 0.45 + shade * 0.7;
 
       image.data[offset] = Math.min(255, color[0] * factor);

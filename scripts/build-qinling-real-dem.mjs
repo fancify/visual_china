@@ -32,7 +32,7 @@ function smoothstep(value, min, max) {
 }
 
 // 高斯凸起叠在线性真实高程上：海平面与高峰基本不动，中段丘陵被拉高，
-// 让梓潼-剑门关这类 300-1500m 地带在游戏纵向上更有体积感。
+// 让 300-1500m 地带在全国视野里仍保留体积感。
 function enhanceMidRangeRelief(realMeters, lat = qinlingBounds.north) {
   const safeMeters = Math.max(0, realMeters);
   const midPoint = 1000;
@@ -42,8 +42,8 @@ function enhanceMidRangeRelief(realMeters, lat = qinlingBounds.north) {
   const dx = (safeMeters - midPoint) / spread;
   const bumpFactor = Math.exp(-dx * dx);
 
-  // 南扩后 global peak 被更高山体主导，贵州/桂北 800-2500m 的喀斯特山地
-  // 在全局归一化下会显得"发闷"。只在 lat<30 的中海拔带额外抬一档，
+  // 全中国 bounds 下 global peak 被更高山体主导，贵州/桂北 800-2500m 的
+  // 喀斯特山地在全局归一化下会显得"发闷"。只在 lat<30 的中海拔带额外抬一档，
   // 不动全国其余区域的 baseline，也避免把 3000m+ 主峰继续拉爆。
   const southernWeight = smoothstep(30 - lat, 0, 8);
   const karstBand =
@@ -591,7 +591,7 @@ if (tilePaths.length === 0) {
 }
 
 // 缺 FABDEM tile 时先退到仓库内 vendored ETOPO fallback；只有 ETOPO 也不可读时
-// 才保留最后的 zero-fill，避免东扩/南扩边缘被直接压成海平面平板。
+// 才保留最后的 zero-fill，避免全国边缘缺口被直接压成海平面平板。
 const columns = qinlingOutputGrid.columns;
 const rows = qinlingOutputGrid.rows;
 const rawHeights = new Float32Array(columns * rows);

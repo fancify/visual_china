@@ -39,18 +39,17 @@ test("geographic and game coordinates use a strict linear reversible mapping", (
   const roundTrip = worldToGeo(hanzhong, qinlingBounds, qinlingWorld);
 
   assert.deepEqual(qinlingBounds, {
-    west: 103.5,
-    east: 117.0,
-    south: 22.0,
-    north: 40.0
+    west: 73.0,
+    east: 135.0,
+    south: 18.0,
+    north: 53.0
   });
   assert.deepEqual(qinlingWorld, {
-    width: 373,
-    depth: 579
+    width: 1711,
+    depth: 1186
   });
-  nearlyEqual(hanzhong.x, -88.96740740740736);
-  // 北扩到 40N 后，汉中在新 slice 里的纵向位置会明显回到更靠近中心。
-  nearlyEqual(hanzhong.z, -66.585);
+  nearlyEqual(hanzhong.x, 83.61822580645173);
+  nearlyEqual(hanzhong.z, 82.34228571428568);
   nearlyEqual(roundTrip.lon, 107.03);
   nearlyEqual(roundTrip.lat, 33.07);
 });

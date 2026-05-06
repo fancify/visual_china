@@ -87,13 +87,18 @@ test("build-qinling-real-dem warns when required FABDEM tiles fall back to ETOPO
   assert.match(buildScript, /Missing tile \$\{tileName\}, fallback to ETOPO 60s/);
 });
 
-test("Qinling DEM common config doubles the grid while keeping ~2km north-south samples", () => {
+test("Qinling DEM common config switches to the full-China 1.8km grid", () => {
   assert.deepEqual(qinlingOutputGrid, {
-    columns: 416,
-    rows: 666
+    columns: 3113,
+    rows: 2158
   });
+  assert.equal(qinlingResolutionStrategy.target, "1800m-stride4-450m");
+  assert.equal(
+    qinlingResolutionStrategy.comment,
+    "Full China at 1.8 km cell with ETOPO 60s + future HydroSHEDS upgrade path"
+  );
   assert.deepEqual(qinlingResolutionStrategy.runtimeSampleSpacingKm, {
-    eastWest: 1.09,
-    northSouth: 2.26
+    eastWest: 1.8,
+    northSouth: 1.8
   });
 });

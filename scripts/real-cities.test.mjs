@@ -23,8 +23,6 @@ const EXPECTED_NORTHERN_CITY_IDS = [
   "kaifeng"
 ];
 
-const EXPECTED_EDGE_CARRY_FORWARD_CITY_IDS = ["datong"];
-
 const EXPECTED_NEW_CITY_IDS = [
   "xihe",
   "qishan",
@@ -134,7 +132,7 @@ test("eastern Phase E cities stay inside the east-extension slice and include de
 });
 
 test("north expansion adds the North China / Loess Plateau city set with descriptions", () => {
-  for (const cityId of [...EXPECTED_NORTHERN_CITY_IDS, ...EXPECTED_EDGE_CARRY_FORWARD_CITY_IDS]) {
+  for (const cityId of [...EXPECTED_NORTHERN_CITY_IDS, "datong"]) {
     const city = realQinlingCities.find((entry) => entry.id === cityId);
     assert.ok(city, `${cityId} should exist`);
     assert.equal(typeof city.description, "string");
@@ -142,8 +140,8 @@ test("north expansion adds the North China / Loess Plateau city set with descrip
   }
 });
 
-test("renderable northern cities stay inside the 40N slice, while Datong remains an edge carry-forward", () => {
-  for (const cityId of EXPECTED_NORTHERN_CITY_IDS) {
+test("full-China bounds bring the northern city set and Datong into the current slice", () => {
+  for (const cityId of [...EXPECTED_NORTHERN_CITY_IDS, "datong"]) {
     const city = realQinlingCities.find((entry) => entry.id === cityId);
     assert.ok(city, `${cityId} should exist`);
 
@@ -153,12 +151,8 @@ test("renderable northern cities stay inside the 40N slice, while Datong remains
       city.lon >= qinlingRegionBounds.west &&
       city.lon <= qinlingRegionBounds.east;
 
-    assert.equal(isInBounds, true, `${cityId} should be renderable inside the north-expanded slice`);
+    assert.equal(isInBounds, true, `${cityId} should be renderable inside the full-China slice`);
   }
-
-  const datong = realQinlingCities.find((entry) => entry.id === "datong");
-  assert.ok(datong, "datong should exist as an edge carry-forward city");
-  assert.ok(datong.lat > qinlingRegionBounds.north, "datong should stay just north of the current slice");
 });
 
 test("Phase A medium cities stay inside the current slice and include descriptions", () => {

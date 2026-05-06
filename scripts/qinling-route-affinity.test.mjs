@@ -1,21 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { geoToWorld } from "../src/game/geoProjection.js";
+import {
+  qinlingRegionBounds,
+  qinlingRegionWorld
+} from "../src/data/qinlingRegion.js";
 import { qinlingRoutes, routeAffinityAt } from "../src/game/qinlingRoutes.js";
 
 test("Qinling route affinity uses historical-reference routes by default", () => {
-  // 北扩到 40°N 后 baseline 更新：同一留坝经纬度按当前 slice 重新投影到世界坐标。
-  // 留坝县 (lat 33.62, lon 106.92) — 褒斜道中段，当前 slice 的实际世界坐标
-  const influence = routeAffinityAt({ x: -92.01, y: -84.28 });
+  const liuba = geoToWorld(
+    { lon: 106.92, lat: 33.62 },
+    qinlingRegionBounds,
+    qinlingRegionWorld
+  );
+  const influence = routeAffinityAt({ x: liuba.x, y: liuba.z });
 
   assert.ok(influence.affinity > 0.7);
   assert.equal(influence.nearestRoute?.id, "baoxie-road");
 });
 
 test("Qinling historical routes stay available when explicitly including unverified routes", () => {
-  // 北扩到 40°N 后 baseline 更新：同一昭化经纬度按当前 slice 重新投影到世界坐标。
-  // 昭化（古葭萌） (lat 32.32, lon 105.86) — 金牛道中段，当前 slice 的实际世界坐标
-  const influence = routeAffinityAt({ x: -121.29, y: -42.46 }, 11, {
+  const zhaohua = geoToWorld(
+    { lon: 105.86, lat: 32.32 },
+    qinlingRegionBounds,
+    qinlingRegionWorld
+  );
+  const influence = routeAffinityAt({ x: zhaohua.x, y: zhaohua.z }, 11, {
     includeUnverifiedRoutes: true
   });
 
@@ -24,7 +35,14 @@ test("Qinling historical routes stay available when explicitly including unverif
 });
 
 test("Qinling route affinity is low away from the Guanzhong-Hanzhong crossings", () => {
-  const influence = routeAffinityAt({ x: 78, y: 78 });
+  // 选海南三亚附近 (lat 18.3, lon 109.5)，远离所有秦岭/巴蜀历史路线。
+  // 用 lat/lon 重投影避免硬编码 world 单位（bounds 改了就漂）。
+  const offRoute = geoToWorld(
+    { lon: 109.5, lat: 18.3 },
+    qinlingRegionBounds,
+    qinlingRegionWorld
+  );
+  const influence = routeAffinityAt({ x: offRoute.x, y: offRoute.z });
 
   assert.ok(influence.affinity < 0.2);
 });
