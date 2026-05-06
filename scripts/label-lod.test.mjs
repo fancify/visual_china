@@ -14,17 +14,59 @@ try {
 
 test("label hidden when distance exceeds maxLabelDistance", () => {
   const [visible] = computeLabelVisibility(
-    { x: 30, y: 0, z: 0 },
-    [{ position: { x: 0, y: 0, z: 0 }, userData: { maxLabelDistance: 20 } }]
+    [
+      {
+        position: { x: 0, y: 0, z: 0 },
+        scale: { y: 1 },
+        userData: { maxLabelDistance: 20 }
+      }
+    ],
+    {
+      cameraPosition: { x: 30, y: 0, z: 0 },
+      cameraFovDeg: 60,
+      canvasHeightPx: 1080,
+      maxScreenHeightPx: 110
+    }
   );
 
   assert.equal(visible, false);
 });
 
-test("label stays visible when distance is within maxLabelDistance", () => {
+test("label hidden when projected screen height exceeds the near-field cap", () => {
   const [visible] = computeLabelVisibility(
-    { x: 12, y: 0, z: 0 },
-    [{ position: { x: 0, y: 0, z: 0 }, userData: { maxLabelDistance: 20 } }]
+    [
+      {
+        position: { x: 0, y: 0, z: 0 },
+        scale: { y: 2 },
+        userData: { maxLabelDistance: 20 }
+      }
+    ],
+    {
+      cameraPosition: { x: 0.5, y: 0, z: 0 },
+      cameraFovDeg: 60,
+      canvasHeightPx: 1080,
+      maxScreenHeightPx: 110
+    }
+  );
+
+  assert.equal(visible, false);
+});
+
+test("label stays visible when distance and projected size are both within limits", () => {
+  const [visible] = computeLabelVisibility(
+    [
+      {
+        position: { x: 0, y: 0, z: 0 },
+        scale: { y: 1 },
+        userData: { maxLabelDistance: 20 }
+      }
+    ],
+    {
+      cameraPosition: { x: 9, y: 0, z: 0 },
+      cameraFovDeg: 60,
+      canvasHeightPx: 1080,
+      maxScreenHeightPx: 110
+    }
   );
 
   assert.equal(visible, true);

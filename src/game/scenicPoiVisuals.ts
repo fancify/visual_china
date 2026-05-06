@@ -258,7 +258,10 @@ export function buildScenicPoiMeshes({
   position: Vector2;
   role: ScenicPoiRole;
 }): Mesh[] {
-  return scenicPoiPieceSpecs[role].map((spec) => {
+  // 未知 role（譬如 east-extend 加入但还没单独建模的 lake-system / ancient-tower /
+  // battlefield）fallback 到 alpine-peak 视觉，避免 .map(undefined) 崩溃。
+  const specs = scenicPoiPieceSpecs[role] ?? scenicPoiPieceSpecs["alpine-peak"];
+  return specs.map((spec) => {
     const piece = new Mesh(spec.geometry, materials[spec.material]);
     piece.name = spec.name;
     piece.position.set(

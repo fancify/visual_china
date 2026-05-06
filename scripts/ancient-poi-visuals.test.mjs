@@ -50,12 +50,8 @@ test("ancient geometry constructors stay on the compact post-scenic scale", () =
     "兵马俑坑应该缩到 1.25 x 0.06 x 0.40"
   );
   expectSourceMatch(
-    /qinMausoleumMound:\s*new ConeGeometry\(1\.10,\s*1\.5,\s*12\)/,
-    "秦始皇陵封土应该缩到半径 1.10、高 1.5"
-  );
-  expectSourceMatch(
-    /qinMausoleumStele:\s*new BoxGeometry\(0\.14,\s*0\.40,\s*0\.05\)/,
-    "秦始皇陵石碑应该缩到 0.14 x 0.40 x 0.05"
+    /imperialTombMound:\s*buildImperialTombMound\(0\.6\)/,
+    "帝陵封土应该走共享的 buildImperialTombMound(0.6)"
   );
 });
 
@@ -109,12 +105,8 @@ test("ancient role offsets and array spacing stay on the compact scale", () => {
     "兵马俑头部 yOffset 应该缩到 0.38"
   );
   expectSourceMatch(
-    /addPiece\(new Mesh\(ancientGeometries\.qinMausoleumMound, ancientMaterials\.qinEarth\), 0\.75\);/,
-    "秦始皇陵封土 yOffset 应该缩到 0.75"
-  );
-  expectSourceMatch(
-    /new Mesh\(ancientGeometries\.qinMausoleumStele, ancientMaterials\.bronzeRelic\),\s*1\.70,/,
-    "秦始皇陵石碑中心应该落在 1.70，让底边贴住 1.5 高封土顶面"
+    /new Mesh\(ancientGeometries\.imperialTombMound, ancientMaterials\.imperialTombEarth\),\s*0\s*\)/,
+    "帝陵封土应该直接贴地放置，由几何自身提供阶梯高度"
   );
 });
 
@@ -123,5 +115,20 @@ test("ancient label heights stay just above the compact meshes", () => {
   expectSourceMatch(/labelHeight = 0\.9;/, "金沙 labelHeight 应该缩到 0.9");
   expectSourceMatch(/labelHeight = 0\.75;/, "仰韶聚落 labelHeight 应该缩到 0.75");
   expectSourceMatch(/labelHeight = 0\.7;/, "兵马俑 labelHeight 应该缩到 0.7");
-  expectSourceMatch(/labelHeight = 2\.25;/, "秦始皇陵 labelHeight 应该缩到 2.25");
+  expectSourceMatch(/labelHeight = 1\.5;/, "帝陵 labelHeight 应该缩到 1.5");
+});
+
+test("imperial tomb branch uses the shared stepped mound geometry", () => {
+  expectSourceMatch(
+    /if \(site\.role === "imperial-tomb"\)/,
+    "imperial-tomb role branch should exist in rebuildAncientVisuals"
+  );
+  expectSourceMatch(
+    /buildImperialTombMound\(0\.6\)/,
+    "imperial-tomb role should build the shared stepped mound at 0.6 scale"
+  );
+  expectSourceMatch(
+    /labelHeight = 1\.5;/,
+    "imperial-tomb labelHeight should stay just above the stepped mound"
+  );
 });

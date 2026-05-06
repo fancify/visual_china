@@ -134,7 +134,10 @@ import {
   createPlayerAvatar,
   rebuildPlayerAvatar
 } from "./game/playerAvatarMesh";
-import { mountSpeedMultiplier } from "./game/mountRuntime.js";
+import {
+  advanceMountVelocityScale,
+  mountSpeedMultiplier
+} from "./game/mountRuntime.js";
 import {
   cycleAvatar,
   cycleMount,
@@ -174,6 +177,7 @@ import {
   buildScenicPoiMeshes,
   scenicPoiLabelHeights
 } from "./game/scenicPoiVisuals";
+import { buildImperialTombMound } from "./game/ancientPoiVisuals";
 import {
   buildWaterRibbonVertices,
   buildWaterRibbonAlphas,
@@ -205,7 +209,8 @@ import {
 import {
   createChunkScenery,
   disposeScenery,
-  sharedTreeMaterial
+  sharedTreeMaterial,
+  updateSceneryColors
 } from "./game/scenery";
 import {
   createWildlifeHandle,
@@ -489,10 +494,12 @@ function hudDebugWarn(message: string, details?: unknown): void {
   console.warn("[HUD-DEBUG]", message, details);
 }
 
-const PROXIMITY_RADIUS_DEFAULT = 3.5;
-const PROXIMITY_RADIUS_CITY_COUNTY = 3.0;
-const PROXIMITY_RADIUS_CITY_PREF = 4.0;
-const PROXIMITY_RADIUS_CITY_CAP = 5.0;
+// proximity 半径：原 3-5u 太宽——玩家出生位置就压在西安半径内，HUD 一直挂着
+// 不会消失，用户报告"不会触发"。半径砍半，强制"必须走进城/景"才显示。
+const PROXIMITY_RADIUS_DEFAULT = 1.6;
+const PROXIMITY_RADIUS_CITY_COUNTY = 1.4;
+const PROXIMITY_RADIUS_CITY_PREF = 1.8;
+const PROXIMITY_RADIUS_CITY_CAP = 2.2;
 
 interface RuntimePoiInfo extends PoiInfo {
   cityTier?: RealCity["tier"];
@@ -755,7 +762,77 @@ let currentMountId: MountId = playerAvatarHandle.mountId;
 let currentAvatarId: AvatarId = playerAvatarHandle.avatarId;
 let customizationPanelOpen = false;
 let avatarWalkPhase = 0;
+let currentVelocityScale = 0;
+let lastMovementHeading: { x: number; z: number } | null = null;
+const CLOUD_FLIGHT_ASCEND_STEP = 0.4;
+const CLOUD_FLIGHT_MAX_ALTITUDE = 50;
+const CLOUD_FLIGHT_MIN_CLEARANCE = 1;
+const CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET = 8;
 scene.add(player);
+
+export function resetCloudFlightAltitudeForGround(ground: number): number {
+  return ground + CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET;
+}
+
+export function resolvePlayerTargetY({
+  currentMountId,
+  ground,
+  cloudFlightAltitude
+}: {
+  currentMountId: MountId;
+  ground: number;
+  cloudFlightAltitude: number;
+}): number {
+  if (currentMountId === "cloud") {
+    return cloudFlightAltitude;
+  }
+
+  return ground + 0.35;
+}
+
+export function nextCloudFlightAltitude({
+  currentMountId,
+  keys,
+  ground,
+  cloudFlightAltitude
+}: {
+  currentMountId: MountId;
+  keys: Set<string>;
+  ground: number;
+  cloudFlightAltitude: number;
+}): number {
+  if (currentMountId !== "cloud") {
+    return cloudFlightAltitude;
+  }
+
+  let nextAltitude = cloudFlightAltitude;
+
+  if (keys.has(" ")) {
+    nextAltitude += CLOUD_FLIGHT_ASCEND_STEP;
+  }
+  if (keys.has("x")) {
+    nextAltitude -= CLOUD_FLIGHT_ASCEND_STEP;
+  }
+
+  return MathUtils.clamp(
+    nextAltitude,
+    ground + CLOUD_FLIGHT_MIN_CLEARANCE,
+    CLOUD_FLIGHT_MAX_ALTITUDE
+  );
+}
+
+function normalizeRuntimeInputKey(event: KeyboardEvent): string {
+  if (event.code === "KeyX") {
+    return "x";
+  }
+
+  return normalizeInputKey(event);
+}
+
+function wrapCloudDriftX(value: number, limit = 250): number {
+  const span = limit * 2;
+  return ((((value + limit) % span) + span) % span) - limit;
+}
 
 function applyCustomization(mountId: MountId, avatarId: AvatarId): void {
   if (mountId === currentMountId && avatarId === currentAvatarId) {
@@ -918,12 +995,9 @@ let oxMooTimerMs = 0;
 let audioHudTimerMs = 0;
 
 function handlePoiEntryAudio(poi: RuntimePoiInfo): void {
+  // 用户反馈"新发现 chime 难听"——已从 manifest + 触发器移除。
   if (!discoveredPoiIds.has(poi.id)) {
     discoveredPoiIds.add(poi.id);
-    triggerSystem.fire("cultural_magic_chime", {
-      volume: 0.5,
-      reason: `discovery: ${poi.name}`
-    });
   }
 
   if (poi.category === "scenic") {
@@ -1388,8 +1462,13 @@ function updateCityLodFade(): void {
 
 function updateLabelVisibility(): void {
   const visibility = computeLabelVisibility(
-    camera.position,
-    allDistanceLimitedLabelSprites
+    allDistanceLimitedLabelSprites,
+    {
+      cameraPosition: camera.position,
+      cameraFovDeg: camera.fov,
+      canvasHeightPx: renderer.domElement.clientHeight,
+      maxScreenHeightPx: 110
+    }
   );
 
   visibility.forEach((isWithinDistance, index) => {
@@ -1595,9 +1674,8 @@ const ancientGeometries = {
   terracottaSoldier: new CylinderGeometry(0.05, 0.06, 0.3, 6),
   terracottaHead: new SphereGeometry(0.05, 6, 6),
   terracottaPit: new BoxGeometry(1.25, 0.06, 0.40),
-  // 秦始皇陵：紧凑封土山（76 m → 缩成 1.5 单元高）+ 顶端小石碑指向陵园。
-  qinMausoleumMound: new ConeGeometry(1.10, 1.5, 12),
-  qinMausoleumStele: new BoxGeometry(0.14, 0.40, 0.05)
+  // 帝陵：三层阶梯方台 + 顶部四棱锥，统一表现关中大型封土。
+  imperialTombMound: buildImperialTombMound(0.6)
 };
 
 const ancientMaterials = {
@@ -1626,9 +1704,9 @@ const ancientMaterials = {
     color: 0x8c6e54, emissive: 0x18120a, flatShading: true, shininess: 4,
     transparent: true, opacity: 1
   }),
-  // 秦始皇陵封土：黄褐土壤。
-  qinEarth: new MeshPhongMaterial({
-    color: 0xa48560, emissive: 0x1c1408, flatShading: true, shininess: 3,
+  // 帝陵封土：更偏黄土色，跟城市夯土和一般遗址台基拉开层次。
+  imperialTombEarth: new MeshPhongMaterial({
+    color: 0xa7895a, emissive: 0x1c1408, flatShading: true, shininess: 3,
     transparent: true, opacity: 1
   })
 };
@@ -1813,7 +1891,7 @@ function rebuildScenicVisuals(): void {
     // 调性。LOD fade 跟 prefecture 同档（updateCityLodFade 走遍数组）。
     const label = createTextSprite(spot.name, "#dde7c2");
     label.scale.multiplyScalar(1.05);
-    const labelHeight = scenicPoiLabelHeights[spot.role];
+    const labelHeight = scenicPoiLabelHeights[spot.role] ?? scenicPoiLabelHeights["alpine-peak"];
     label.position.set(wp.x, groundY + labelHeight, wp.z);
     label.userData.terrainYOffset = labelHeight;
     label.userData.chunkId = chunkId;
@@ -1913,16 +1991,13 @@ function rebuildAncientVisuals(): void {
         );
       }
       labelHeight = 0.7;
-    } else if (site.role === "qin-imperial-mausoleum") {
-      // 秦始皇陵：紧凑封土山 + 顶端小石碑代表陵园朝向。
-      addPiece(new Mesh(ancientGeometries.qinMausoleumMound, ancientMaterials.qinEarth), 0.75);
+    } else if (site.role === "imperial-tomb") {
+      // 帝陵：统一用阶梯式封土 mound，秦/汉/唐几座主陵都走同一视觉语汇。
       addPiece(
-        new Mesh(ancientGeometries.qinMausoleumStele, ancientMaterials.bronzeRelic),
-        1.70,
-        0,
+        new Mesh(ancientGeometries.imperialTombMound, ancientMaterials.imperialTombEarth),
         0
       );
-      labelHeight = 2.25;
+      labelHeight = 1.5;
     }
 
     // 考古 label 用米白色，跟 scenic 的青金色稍区分；走 prefecture LOD。
@@ -2012,6 +2087,7 @@ const sunSkyDiscMaterial = skyDome.sunDiscMaterial;
 const moonSkyDisc = skyDome.moonDisc;
 const moonSkyDiscMaterial = skyDome.moonDiscMaterial;
 const cloudGroup = cloudLayer.group;
+const cloudMaterial = cloudLayer.material;
 const cloudSprites = cloudLayer.sprites;
 const precipitation = precipitationLayer.points;
 const precipitationMaterial = precipitationLayer.material;
@@ -2082,25 +2158,12 @@ function updateTerrainColors(visuals: EnvironmentVisuals): void {
   });
 }
 
-function refreshChunkScenery(visuals: EnvironmentVisuals): void {
-  const budget = scaledSceneryBudget();
-
+function updateChunkScenerySeason(): void {
   terrainChunkMeshes.forEach((terrainChunk) => {
-    const wasVisible = terrainChunk.scenery?.visible ?? false;
-
-    if (terrainChunk.scenery) {
-      terrainChunk.mesh.remove(terrainChunk.scenery);
-      disposeScenery(terrainChunk.scenery);
+    if (!terrainChunk.scenery) {
+      return;
     }
-
-    const scenery = createChunkScenery(
-      terrainChunk.sampler,
-      budget,
-      visuals.seasonalBlend
-    );
-    scenery.visible = wasVisible;
-    terrainChunk.scenery = scenery;
-    terrainChunk.mesh.add(scenery);
+    updateSceneryColors(terrainChunk.scenery, environmentController.state.season);
   });
 }
 
@@ -3798,7 +3861,8 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         const scenery = createChunkScenery(
           chunkSampler,
           scaledSceneryBudget(),
-          lastVisuals?.seasonalBlend ?? environmentController.computeVisuals().seasonalBlend
+          lastVisuals?.seasonalBlend ?? environmentController.computeVisuals().seasonalBlend,
+          environmentController.state.season
         );
         const center = chunkCenterFromBounds(chunk.worldBounds);
         setTerrainMeshWorldPosition(terrainChunk, center.x, center.y, 0.12);
@@ -4042,7 +4106,7 @@ function isTextInputFocused(): boolean {
 document.addEventListener("keydown", (event) => {
   // 用 normalizeInputKey(event) 而不是 event.key.toLowerCase()——它走 event.code
   // 路径，不受中文输入法 IME 影响。否则 macOS 中文用户按 Q/E/W/A/S/D 全部失效。
-  const normalized = normalizeInputKey(event);
+  const normalized = normalizeRuntimeInputKey(event);
 
   // ESC 优先级：customization panel > city detail panel > atlas fullscreen。
   // 都是用户主动开的覆盖层，越靠近"刚开"越先关（栈式直觉）。
@@ -4185,7 +4249,9 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
 
-  if (isGameplayInputKey(event)) {
+  const isCloudFlightKey = normalized === " " || normalized === "x";
+
+  if (isGameplayInputKey(event) || (currentMountId === "cloud" && isCloudFlightKey)) {
     // 反方向键互相取消（codex 0a8e1b9 和用户反馈的"按反方向只能暂停，松手
     // 后还继续走"）。原本按 w + s 同时 forward = 0 cancel，松开 s 后只剩 w，
     // 玩家又开始往前走——感受像"我让它停它没听"。改成：按 s 时如果 w 还在，
@@ -4199,7 +4265,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("keyup", (event) => {
-  keys.delete(normalizeInputKey(event));
+  keys.delete(normalizeRuntimeInputKey(event));
 });
 
 window.addEventListener("blur", resetGameplayInput);
@@ -4500,6 +4566,7 @@ const targetCameraPosition = new Vector3();
 const lookTarget = new Vector3();
 const clock = new Clock();
 let cloudDrift = 0;
+let cloudFlightAltitude = 12;
 
 function rebuildTerrainGeometry(
   worldWidth: number,
@@ -4670,15 +4737,19 @@ function update(deltaSeconds: number): void {
   updateNearbyRealCity();
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 60;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
+  cloudMaterial.opacity = visuals.cloudOpacity * 0.74;
+  cloudMaterial.color.copy(visuals.cloudColor);
   cloudSprites.forEach((cloud, index) => {
     const phase = Number(cloud.userData.phase) || 0;
+    const speedFactor = Number(cloud.userData.driftSpeed) || 1;
+    const driftedX = wrapCloudDriftX(
+      Number(cloud.userData.baseX) + cloudDrift * (10 + index) * speedFactor
+    );
     cloud.position.set(
-      Number(cloud.userData.baseX) + cloudDrift * (14 + index),
+      driftedX,
       12 + Math.sin(clock.elapsedTime * 0.18 + phase) * 2.5,
       Number(cloud.userData.baseZ) + Math.cos(clock.elapsedTime * 0.13 + phase) * 8
     );
-    cloud.material.opacity = visuals.cloudOpacity * (0.58 + (index % 3) * 0.16);
-    cloud.material.color.copy(visuals.cloudColor);
   });
 
   // 把 effective weather 的连续值离散化（步长 0.1）丢进 signature，让
@@ -4702,7 +4773,7 @@ function update(deltaSeconds: number): void {
 
   if (environmentController.state.season !== lastScenerySeasonSignature) {
     lastScenerySeasonSignature = environmentController.state.season;
-    refreshChunkScenery(visuals);
+    updateChunkScenerySeason();
   }
 
   const { forward: forwardInput, right: rightInput } = movementAxesFromKeys(keys);
@@ -4735,7 +4806,15 @@ function update(deltaSeconds: number): void {
     mountSpeedMultiplier(currentMountId);
   const speed = baseSpeed * (slopePenalty + routeBonus) * offRouteCost;
   const isMoving = forwardInput !== 0 || rightInput !== 0;
-  const movementSpeed = isMoving ? speed : 0;
+  const targetVelocityScale = isMoving ? 1 : 0;
+  currentVelocityScale = advanceMountVelocityScale({
+    currentScale: currentVelocityScale,
+    targetScale: targetVelocityScale,
+    mountId: currentMountId
+  });
+  const effectiveSpeed = speed * currentVelocityScale;
+  const movementSpeed = effectiveSpeed;
+  const stillMoving = effectiveSpeed > 0.5;
 
   if (isMoving) {
     cameraViewMode = "follow";
@@ -4747,10 +4826,17 @@ function update(deltaSeconds: number): void {
     const worldX = movement.x;
     const worldZ = movement.z;
 
-    player.position.x += worldX * speed * deltaSeconds;
-    player.position.z += worldZ * speed * deltaSeconds;
+    lastMovementHeading = { x: worldX, z: worldZ };
+  }
+
+  // 仍只在真实输入帧刷新朝向；松键后沿最后一次输入方向滑行减速。
+  const heading = lastMovementHeading;
+
+  if (stillMoving && heading) {
+    player.position.x += heading.x * effectiveSpeed * deltaSeconds;
+    player.position.z += heading.z * effectiveSpeed * deltaSeconds;
     clampToWorld(player.position);
-    player.rotation.y = avatarHeadingForMovement({ x: worldX, z: worldZ });
+    player.rotation.y = avatarHeadingForMovement(heading);
   }
 
   horseMovementIntensity = MathUtils.lerp(
@@ -4769,8 +4855,10 @@ function update(deltaSeconds: number): void {
       leg.rotation.z = rotation;
     }
   });
-  avatarWalkPhase += movementSpeed * deltaSeconds * 0.9;
-  const avatarLimbPhase = avatarWalkPhase * 3.2;
+  // walk phase 频率：原 0.9 × 3.2 = 2.88 cycles/(unit movement)，用户反馈"脚倒得太快"
+  // 减一档到 0.6 × 2.0 = 1.2，更自然走路节奏。
+  avatarWalkPhase += movementSpeed * deltaSeconds * 0.6;
+  const avatarLimbPhase = avatarWalkPhase * 2.0;
   const avatarLegSwing = Math.sin(avatarLimbPhase) * 0.4 * horseMovementIntensity;
   avatarWalkLegsByName.forEach((leg, name) => {
     leg.rotation.z =
@@ -4803,9 +4891,26 @@ function update(deltaSeconds: number): void {
   player.rotation.z = MathUtils.lerp(player.rotation.z, avatarTilt.roll, 0.18);
 
   const ground = terrainSampler.sampleHeight(player.position.x, player.position.z);
-  player.position.y = MathUtils.lerp(player.position.y, ground + 0.35, 0.16);
+  cloudFlightAltitude = nextCloudFlightAltitude({
+    currentMountId,
+    keys,
+    ground,
+    cloudFlightAltitude
+  });
+  const targetY = resolvePlayerTargetY({
+    currentMountId,
+    ground,
+    cloudFlightAltitude
+  });
+  if (currentMountId !== "cloud") {
+    cloudFlightAltitude = resetCloudFlightAltitudeForGround(ground);
+  }
+  player.position.y = MathUtils.lerp(player.position.y, targetY, 0.16);
 
-  if (movementSpeed > 0.5) {
+  // 用户反馈"没在走路也有脚步声"——把门槛从 movementSpeed > 0.5 提到 1.5，
+  // 而且要求 isMoving=true（防止 lerp 余速触发）。停下立刻 reset timer，
+  // 任何"按一下就放"的伪 trigger 都消失。
+  if (isMoving && movementSpeed > 1.5) {
     footstepPulseTimerMs += deltaSeconds * 1000;
     if (footstepPulseTimerMs >= FOOTSTEP_INTERVAL_MS) {
       footstepPulseTimerMs = 0;
