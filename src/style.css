@@ -177,7 +177,7 @@ canvas {
 
 .audio-mute-toggle {
   position: absolute;
-  top: 18px;
+  top: 72px;
   right: 18px;
   z-index: 3;
   width: 42px;
@@ -725,7 +725,8 @@ canvas {
 .mode-block {
   position: absolute;
   right: 18px;
-  top: 18px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 160px;
   border-radius: 999px;
   padding: 12px 14px;
@@ -773,7 +774,8 @@ canvas {
 
 .status-block {
   position: absolute;
-  left: 18px;
+  left: auto;
+  right: 18px;
   bottom: 18px;
   width: min(380px, calc(100vw - 36px));
   border-radius: 20px;
@@ -819,8 +821,9 @@ canvas {
 .hud-hover-card {
   position: absolute;
   z-index: 4;
-  left: 18px;
+  left: 50%;
   bottom: 18px;
+  transform: translateX(-50%);
   width: min(280px, calc(100vw - 36px));
   padding: 12px 14px;
   border-radius: 16px;
@@ -927,7 +930,7 @@ canvas {
 .controls-block {
   position: absolute;
   right: 18px;
-  bottom: 18px;
+  bottom: 172px;
   max-width: min(300px, calc(100vw - 36px));
   border-radius: 999px;
   padding: 10px 12px;
@@ -1364,6 +1367,7 @@ canvas {
     width: min(180px, calc(100vw - 24px));
     top: auto;
     bottom: 144px;
+    transform: none;
     border-radius: 22px;
   }
 
@@ -1373,9 +1377,7 @@ canvas {
   }
 
   .title-block,
-  .compass-block,
-  .status-block,
-  .controls-block {
+  .compass-block {
     left: 12px;
   }
 
@@ -1390,12 +1392,14 @@ canvas {
   }
 
   .status-block {
+    left: auto;
     right: 12px;
-    width: auto;
+    width: min(320px, calc(100vw - 24px));
     bottom: 12px;
   }
 
   .controls-block {
+    left: auto;
     right: 12px;
     width: auto;
     bottom: 250px;

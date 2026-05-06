@@ -317,11 +317,6 @@ export interface CloudLayerHandle {
   material: SpriteMaterial;
 }
 
-/**
- * 7 个云朵 sprite 共享同一个 SpriteMaterial。原版每个云朵 new 一个 material，
- * 这里改成共享，减少 7 → 1 个 material 实例。每帧改 opacity / color 时改的是
- * 共享 material，所有云朵同步变化（视觉上无差别）。
- */
 export function createCloudLayer(): CloudLayerHandle {
   const group = new Group();
   const texture = createCloudTexture();
@@ -333,14 +328,18 @@ export function createCloudLayer(): CloudLayerHandle {
     opacity: 0.18
   });
   const sprites: Sprite[] = [];
+  const cloudCount = Math.floor(18 + Math.random() * 7);
 
-  for (let index = 0; index < 7; index += 1) {
+  for (let index = 0; index < cloudCount; index += 1) {
     const cloud = new Sprite(material);
+    const width = 30 + Math.random() * 60;
+    const height = 12 + Math.random() * 12;
     cloud.renderOrder = 10;
-    cloud.scale.set(54 + index * 7, 18 + (index % 3) * 5, 1);
-    cloud.userData.baseX = -140 + index * 48;
-    cloud.userData.baseZ = -96 + (index % 4) * 58;
-    cloud.userData.phase = index * 0.73;
+    cloud.scale.set(width, height, 1);
+    cloud.userData.baseX = (Math.random() - 0.5) * 400;
+    cloud.userData.baseZ = (Math.random() - 0.5) * 400;
+    cloud.userData.phase = Math.random() * Math.PI * 2;
+    cloud.userData.driftSpeed = 0.4 + Math.random() * 1.2;
     sprites.push(cloud);
     group.add(cloud);
   }

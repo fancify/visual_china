@@ -223,13 +223,14 @@ function buildGoatSilhouette(): BufferGeometry {
 }
 
 function buildRabbitSilhouette(): BufferGeometry {
-  // 兔子简化：身体一个圆球（不分头身，不出腿，避免"小凸起"碎片），加两只耳
-  // 朵和短尾，剪影里仍能识别是兔子。
+  // 兔子重设计：身体球缩小（0.24 → 0.18）+ 前面小球头 + 两只长耳 + 短尾。
+  // 整体瘦小一档，比鹿/羊都明显小一截。
   return finalizeSilhouette([
-    translatedSphere(0.22, 0, 0.18, 0, 1.0, 0.95, 1.1),
-    translatedCone(0.024, 0.22, -0.04, 0.42, 0.04),
-    translatedCone(0.024, 0.22, 0.04, 0.42, 0.04),
-    translatedSphere(0.05, 0, 0.18, -0.2)
+    translatedSphere(0.18, 0, 0.16, 0, 1.0, 0.92, 1.18),
+    translatedSphere(0.11, 0.18, 0.26, 0),
+    translatedCone(0.022, 0.22, 0.15, 0.42, -0.04),
+    translatedCone(0.022, 0.22, 0.15, 0.42, 0.04),
+    translatedSphere(0.05, -0.18, 0.16, 0)
   ]);
 }
 
@@ -259,7 +260,9 @@ const WILDLIFE_MATERIALS: Record<WildlifeKind, MeshPhongMaterial> = {
     flatShading: true,
     shininess: 5,
     transparent: true,
-    depthWrite: false,
+    // depthWrite 必须 true，否则同一只动物的身体不会遮住后面的尾/腿，
+    // 用户看到"身体透明可以看见尾巴"。fade-in 仍然走 opacity，不影响。
+    depthWrite: true,
     opacity: 1
   }),
   goat: new MeshPhongMaterial({
@@ -267,7 +270,9 @@ const WILDLIFE_MATERIALS: Record<WildlifeKind, MeshPhongMaterial> = {
     flatShading: true,
     shininess: 5,
     transparent: true,
-    depthWrite: false,
+    // depthWrite 必须 true，否则同一只动物的身体不会遮住后面的尾/腿，
+    // 用户看到"身体透明可以看见尾巴"。fade-in 仍然走 opacity，不影响。
+    depthWrite: true,
     opacity: 1
   }),
   rabbit: new MeshPhongMaterial({
@@ -275,7 +280,9 @@ const WILDLIFE_MATERIALS: Record<WildlifeKind, MeshPhongMaterial> = {
     flatShading: true,
     shininess: 5,
     transparent: true,
-    depthWrite: false,
+    // depthWrite 必须 true，否则同一只动物的身体不会遮住后面的尾/腿，
+    // 用户看到"身体透明可以看见尾巴"。fade-in 仍然走 opacity，不影响。
+    depthWrite: true,
     opacity: 1
   }),
   crane: new MeshPhongMaterial({
@@ -283,7 +290,9 @@ const WILDLIFE_MATERIALS: Record<WildlifeKind, MeshPhongMaterial> = {
     flatShading: true,
     shininess: 5,
     transparent: true,
-    depthWrite: false,
+    // depthWrite 必须 true，否则同一只动物的身体不会遮住后面的尾/腿，
+    // 用户看到"身体透明可以看见尾巴"。fade-in 仍然走 opacity，不影响。
+    depthWrite: true,
     opacity: 1
   })
 };

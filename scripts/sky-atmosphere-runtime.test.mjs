@@ -300,3 +300,47 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
     restoreDocument();
   }
 });
+
+test("cloud layer spawns a denser randomized field with per-sprite drift metadata", async () => {
+  const restoreDocument = installCanvasStub();
+  try {
+    const { atmosphereLayer } = await loadGameModules();
+    const cloudLayer = atmosphereLayer.createCloudLayer();
+
+    assert.ok(
+      cloudLayer.sprites.length >= 18 && cloudLayer.sprites.length <= 24,
+      `cloud sprite count should stay within 18-24, got ${cloudLayer.sprites.length}`
+    );
+
+    cloudLayer.sprites.forEach((cloud, index) => {
+      assert.ok(
+        cloud.scale.x >= 30 && cloud.scale.x <= 90,
+        `cloud ${index} width should stay within 30-90, got ${cloud.scale.x}`
+      );
+      assert.ok(
+        cloud.scale.y >= 12 && cloud.scale.y <= 24,
+        `cloud ${index} height should stay within 12-24, got ${cloud.scale.y}`
+      );
+      assert.ok(
+        Number(cloud.userData.baseX) >= -200 && Number(cloud.userData.baseX) <= 200,
+        `cloud ${index} baseX should stay within +/-200, got ${cloud.userData.baseX}`
+      );
+      assert.ok(
+        Number(cloud.userData.baseZ) >= -200 && Number(cloud.userData.baseZ) <= 200,
+        `cloud ${index} baseZ should stay within +/-200, got ${cloud.userData.baseZ}`
+      );
+      assert.ok(
+        Number(cloud.userData.phase) >= 0 &&
+          Number(cloud.userData.phase) <= Math.PI * 2,
+        `cloud ${index} phase should stay within 0-2pi, got ${cloud.userData.phase}`
+      );
+      assert.ok(
+        Number(cloud.userData.driftSpeed) >= 0.4 &&
+          Number(cloud.userData.driftSpeed) <= 1.6,
+        `cloud ${index} drift speed should stay within 0.4-1.6, got ${cloud.userData.driftSpeed}`
+      );
+    });
+  } finally {
+    restoreDocument();
+  }
+});
