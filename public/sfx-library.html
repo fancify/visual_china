@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>千里江山图 · 音效库</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #0e1518;
+      color: #d8e6df;
+      font-family: "PingFang SC", system-ui, sans-serif;
+      padding: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: 0.04em; }
+    .subtitle {
+      font-size: 12px;
+      color: #8aa49a;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 10px 14px;
+      background: rgba(20,32,36,0.6);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .toolbar input[type=range] { width: 140px; }
+    .toolbar button {
+      background: #2a4651;
+      color: #d8e6df;
+      border: 1px solid rgba(180,210,200,0.2);
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .toolbar button:hover { background: #36606e; }
+    .category {
+      margin-bottom: 28px;
+    }
+    .category-title {
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      color: #c9d8c8;
+      border-bottom: 1px solid rgba(180,210,200,0.2);
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+    }
+    .category-meta {
+      font-size: 11px;
+      color: #708278;
+      margin-left: 8px;
+      letter-spacing: 0;
+    }
+    .track-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 10px;
+    }
+    .track {
+      background: rgba(20,32,36,0.5);
+      border: 1px solid rgba(140,180,170,0.12);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .track-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .track-name { font-size: 14px; font-weight: 600; color: #f1efdc; }
+    .track-id { font-size: 10px; color: #6a8378; font-family: monospace; }
+    .play {
+      background: #36606e;
+      color: white;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .play:hover { background: #4a8090; }
+    .play.playing { background: #b06d1a; }
+    .track-meta {
+      font-size: 11px;
+      color: #92a89e;
+      line-height: 1.55;
+    }
+    .track-meta b { color: #c9d8c8; font-weight: 500; }
+    .missing {
+      color: #c47a4a;
+      font-size: 10px;
+    }
+    .credit {
+      margin-top: 6px;
+      font-size: 10px;
+      color: #587168;
+    }
+    .credit a { color: #7ba896; text-decoration: none; }
+    .credit a:hover { text-decoration: underline; }
+    audio { display: none; }
+  </style>
+</head>
+<body>
+  <h1>千里江山图 · 音效库</h1>
+  <div class="subtitle">
+    所有游戏内音效独立试听 · 点击 ▶︎ 播放 · 显示中文名/触发条件/频率/license。
+    数据源 <code>/sfx/manifest.json</code>，跟主游戏 audio 系统共享。
+  </div>
+
+  <div class="toolbar">
+    <span>主音量</span>
+    <input type="range" id="vol" min="0" max="1" step="0.05" value="0.6" />
+    <span id="volText">0.60</span>
+    <button id="stopAll">⏹ 全部停止</button>
+    <button id="testAll">▶︎ 串行试听全部</button>
+  </div>
+
+  <div id="content">加载中...</div>
+
+  <script>
+    // 中文名 + 触发逻辑映射（跟 audioDebugHud.ts 同步）
+    const TRACK_LABELS = {
+      ambient_soft_wind:   { name: "柔风",          trigger: "天气晴时持续",     frequency: "持续循环 (gain 0.04-0.08)" },
+      ambient_rain_heavy:  { name: "雨声",          trigger: "天气=雨/暴雨",      frequency: "持续循环 (gain 0.6 接管 wind)" },
+      ambient_thunder_distant: { name: "远雷",      trigger: "天气=暴雨",          frequency: "18-35 秒间隔" },
+      bird_chirp_a:        { name: "鸟鸣 A",        trigger: "白天 + 山林/亚热带", frequency: "25-60 秒间隔" },
+      bird_chirp_b:        { name: "鸟鸣 B",        trigger: "白天 + 山林/亚热带", frequency: "25-60 秒间隔" },
+      bird_chirp_c:        { name: "鸟鸣 C",        trigger: "白天 + 山林/亚热带", frequency: "25-60 秒间隔" },
+      bird_distant_song_a: { name: "远处鸟唱 A",     trigger: "白天",                frequency: "45-120 秒间隔" },
+      bird_distant_song_b: { name: "远处鸟唱 B",     trigger: "白天",                frequency: "45-120 秒间隔" },
+      cicada_burst_a:      { name: "蝉鸣 A",        trigger: "夜晚 + 非高山",       frequency: "18-50 秒间隔" },
+      cicada_burst_b:      { name: "蝉鸣 B",        trigger: "夜晚 + 非高山",       frequency: "18-50 秒间隔" },
+      frog_call_a:         { name: "蛙叫 A",        trigger: "夜晚 + 盆地/亚热带",   frequency: "22-75 秒间隔" },
+      frog_call_b:         { name: "蛙叫 B",        trigger: "夜晚 + 盆地/亚热带",   frequency: "22-75 秒间隔" },
+      owl_hoot:            { name: "猫头鹰啼",       trigger: "夜晚",                frequency: "90-240 秒间隔" },
+      wind_gust_a:         { name: "风急 A",        trigger: "高海拔/平原",          frequency: "30-90 秒间隔" },
+      wind_gust_b:         { name: "风急 B",        trigger: "高海拔/平原",          frequency: "30-90 秒间隔" },
+      footstep_grass:      { name: "草地脚步",       trigger: "走路 + 非水非坐骑",    frequency: "每步 0.45 秒（gain 0.34）" },
+      footstep_water_wading: { name: "蹚水声",      trigger: "走路 + 在河里",        frequency: "每步 0.45 秒" },
+      mount_horse_hoof:    { name: "马蹄声",         trigger: "骑马 + 走路",          frequency: "每步 0.45 秒" },
+      mount_ox_moo:        { name: "牛叫",           trigger: "骑牛",                 frequency: "25-40 秒概率触发 (40%)" },
+      ui_hover:            { name: "UI 悬停",        trigger: "hover POI",            frequency: "每次悬停 (50ms cooldown)" },
+      ui_click:            { name: "UI 点击",        trigger: "按 i 切换详情",        frequency: "每次点击 (50ms cooldown)" },
+      ui_page_turn:        { name: "翻页",          trigger: "atlas 切换",            frequency: "每次切换" },
+      cultural_magic_chime: { name: "新发现 chime", trigger: "首次走近 POI",         frequency: "每个 POI 一次（dedup by id）" },
+      cultural_guqin_pluck: { name: "古琴拨弦",     trigger: "进名胜 POI 10% 概率",  frequency: "8 秒冷却" },
+      cultural_dizi_flute: { name: "笛声",          trigger: "黄昏/进山林 5% 概率",   frequency: "8 秒冷却" },
+      cultural_temple_bell:{ name: "寺钟",          trigger: "古寺 POI 30% 概率",    frequency: "8 秒冷却" },
+      cultural_wooden_fish:{ name: "木鱼",          trigger: "古寺 POI 10% 概率",    frequency: "8 秒冷却" },
+      cultural_crane_call: { name: "鹤鸣",          trigger: "鹤 wildlife 实例 < 8u", frequency: "12 秒冷却" }
+    };
+
+    const CATEGORY_LABELS = {
+      ambient: "持续环境音 ambient",
+      footsteps: "脚步声 footsteps",
+      cultural: "文化点缀 cultural",
+      ui: "UI 微音 ui",
+      mount: "坐骑音 mount"
+    };
+
+    let currentAudio = null;
+    let masterVolume = 0.6;
+
+    document.getElementById("vol").addEventListener("input", (e) => {
+      masterVolume = +e.target.value;
+      document.getElementById("volText").textContent = masterVolume.toFixed(2);
+      if (currentAudio) currentAudio.volume = masterVolume;
+    });
+
+    document.getElementById("stopAll").addEventListener("click", () => {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+      }
+      document.querySelectorAll(".play.playing").forEach((b) => b.classList.remove("playing"));
+    });
+
+    function playTrack(track, button) {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        document.querySelectorAll(".play.playing").forEach((b) => b.classList.remove("playing"));
+      }
+      const audio = new Audio(`/sfx/${track.category}/${track.id}.opus`);
+      audio.volume = masterVolume;
+      audio.play().then(() => {
+        button.classList.add("playing");
+        button.textContent = "■";
+      }).catch((err) => {
+        button.textContent = "✗";
+        button.title = err.message;
+      });
+      audio.addEventListener("ended", () => {
+        button.classList.remove("playing");
+        button.textContent = "▶";
+        currentAudio = null;
+      });
+      currentAudio = audio;
+    }
+
+    document.getElementById("testAll").addEventListener("click", async () => {
+      const btns = [...document.querySelectorAll(".play")];
+      for (const btn of btns) {
+        btn.click();
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+    });
+
+    fetch("/sfx/manifest.json").then(r => r.json()).then((manifest) => {
+      const byCategory = {};
+      manifest.tracks.forEach((t) => {
+        const cat = t.category || "其他";
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(t);
+      });
+
+      const html = Object.keys(byCategory).map((cat) => {
+        const tracks = byCategory[cat];
+        const trackHtml = tracks.map((t) => {
+          const meta = TRACK_LABELS[t.id] || { name: t.name || t.id, trigger: "—", frequency: "—" };
+          const credit = t.credit_page ? `<div class="credit">来源 <a href="${t.credit_page}" target="_blank">${t.uploader || t.credit_page}</a> · ${t.license || "to-verify"}</div>` : "";
+          return `
+            <div class="track">
+              <div class="track-header">
+                <div>
+                  <div class="track-name">${meta.name}</div>
+                  <div class="track-id">${t.id}</div>
+                </div>
+                <button class="play" data-track-id="${t.id}">▶</button>
+              </div>
+              <div class="track-meta">
+                <b>触发</b>：${meta.trigger}<br>
+                <b>频率</b>：${meta.frequency}<br>
+                <b>原名</b>：${t.name || "—"}
+              </div>
+              ${credit}
+            </div>
+          `;
+        }).join("");
+
+        return `
+          <div class="category">
+            <div class="category-title">${CATEGORY_LABELS[cat] || cat} <span class="category-meta">${tracks.length} 条</span></div>
+            <div class="track-list">${trackHtml}</div>
+          </div>
+        `;
+      }).join("");
+
+      document.getElementById("content").innerHTML = html;
+
+      // 绑定 play 按钮
+      document.querySelectorAll(".play").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.trackId;
+          const t = manifest.tracks.find((x) => x.id === id);
+          if (!t) return;
+          if (btn.classList.contains("playing")) {
+            // stop
+            if (currentAudio) {
+              currentAudio.pause();
+              currentAudio.currentTime = 0;
+            }
+            btn.classList.remove("playing");
+            btn.textContent = "▶";
+            currentAudio = null;
+          } else {
+            playTrack(t, btn);
+          }
+        });
+      });
+    }).catch((err) => {
+      document.getElementById("content").innerHTML = `<div class="missing">manifest.json 加载失败：${err.message}</div>`;
+    });
+  </script>
+</body>
+</html>

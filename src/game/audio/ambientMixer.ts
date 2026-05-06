@@ -45,7 +45,9 @@ const LOOP_TRACK_IDS: LoopTrackId[] = [
   "ambient_soft_wind",
   "ambient_rain_heavy"
 ];
-const CROSSFADE_SECONDS = 1.5;
+// 用户反馈"环境音变化太突然"——把 crossfade 拉长到 4s（之前 1.5s），
+// 让风/雨切换的过渡更自然，不像开关一样瞬切。
+const CROSSFADE_SECONDS = 4.0;
 const TICK_THROTTLE_MS = 200;
 const RAIN_GAIN = 0.6;
 

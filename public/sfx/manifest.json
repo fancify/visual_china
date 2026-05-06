@@ -15,8 +15,8 @@
       "kind": "loop",
       "name": "Soft outdoor wind bed",
       "trigger_hint": "唯一常驻底噪；晴天/高海拔按 gain 调整",
-      "source_url": "https://cdn.freesound.org/previews/830/830005_1648170-hq.mp3",
-      "credit_page": "https://freesound.org/people/klankbeeld/sounds/830005/",
+      "source_url": "https://cdn.freesound.org/previews/47/47725_2518-hq.mp3",
+      "credit_page": "https://freesound.org/people/Jovica/sounds/47725/",
       "license": "to-verify",
       "curation_query": "soft wind field recording outdoor no gust no surf 30-60s",
       "curation_preferred_uploaders": [
@@ -27,8 +27,8 @@
         "dpoggioli",
         "InspectorJ"
       ],
-      "uploader": "klankbeeld",
-      "size_bytes": 798290
+      "uploader": "Jovica",
+      "size_bytes": 1305364
     },
     {
       "id": "ambient_rain_heavy",
@@ -36,10 +36,11 @@
       "kind": "loop",
       "name": "Heavy rain",
       "trigger_hint": "weather=rain",
-      "source_url": "https://cdn.freesound.org/previews/378/378052_2341984-hq.mp3",
-      "credit_page": "https://freesound.org/people/bajko/sounds/378052/",
+      "source_url": "https://cdn.freesound.org/previews/637/637781_612689-hq.mp3",
+      "credit_page": "https://freesound.org/people/kyles/sounds/637781/",
       "license": "to-verify",
-      "size_bytes": 811023
+      "uploader": "kyles",
+      "size_bytes": 1161731
     },
     {
       "id": "ambient_thunder_distant",
@@ -47,10 +48,11 @@
       "kind": "one-shot",
       "name": "Distant thunder",
       "trigger_hint": "weather=storm 间隔触发",
-      "source_url": "https://cdn.freesound.org/previews/158/158692_179538-hq.mp3",
-      "credit_page": "https://freesound.org/people/RutgerMuller/sounds/158692/",
-      "license": "cc0",
-      "size_bytes": 940145
+      "source_url": "https://cdn.freesound.org/previews/778/778367_8927049-hq.mp3",
+      "credit_page": "https://freesound.org/people/BlondPanda/sounds/778367/",
+      "license": "to-verify",
+      "uploader": "BlondPanda",
+      "size_bytes": 91240
     },
     {
       "id": "bird_chirp_a",
@@ -84,12 +86,12 @@
       "kind": "one-shot",
       "name": "Bird chirp C",
       "trigger_hint": "白天林地 sparse event",
-      "source_url": "https://cdn.freesound.org/previews/351/351649_279622-hq.mp3",
-      "credit_page": "https://freesound.org/people/alyceobvious/sounds/351649/",
+      "source_url": "https://cdn.freesound.org/previews/456/456440_5121236-hq.mp3",
+      "credit_page": "https://freesound.org/people/InspectorJ/sounds/456440/",
       "license": "to-verify",
       "curation_query": "bird chirp single clean field recording 0-5s",
-      "uploader": "alyceobvious",
-      "size_bytes": 80998
+      "uploader": "InspectorJ",
+      "size_bytes": 37971
     },
     {
       "id": "bird_distant_song_a",
@@ -136,12 +138,12 @@
       "kind": "one-shot",
       "name": "Cicada burst B",
       "trigger_hint": "夜间 sparse event",
-      "source_url": "https://cdn.freesound.org/previews/702/702481_13285437-hq.mp3",
-      "credit_page": "https://freesound.org/people/Fejluh/sounds/702481/",
+      "source_url": "https://cdn.freesound.org/previews/645/645936_8711646-hq.mp3",
+      "credit_page": "https://freesound.org/people/Patrick_Corra/sounds/645936/",
       "license": "to-verify",
       "curation_query": "cicada burst field recording 0-5s",
-      "uploader": "Fejluh",
-      "size_bytes": 114030
+      "uploader": "Patrick_Corra",
+      "size_bytes": 89853
     },
     {
       "id": "frog_call_a",
@@ -175,12 +177,12 @@
       "kind": "one-shot",
       "name": "Owl hoot",
       "trigger_hint": "夜间稀有 sparse event",
-      "source_url": "https://cdn.freesound.org/previews/546/546237_2977885-hq.mp3",
-      "credit_page": "https://freesound.org/people/Danjocross/sounds/546237/",
+      "source_url": "https://cdn.freesound.org/previews/465/465697_9159316-hq.mp3",
+      "credit_page": "https://freesound.org/people/Breviceps/sounds/465697/",
       "license": "to-verify",
       "curation_query": "owl hoot single field recording 0-5s",
-      "uploader": "Danjocross",
-      "size_bytes": 50090
+      "uploader": "Breviceps",
+      "size_bytes": 52545
     },
     {
       "id": "wind_gust_a",
@@ -188,12 +190,12 @@
       "kind": "one-shot",
       "name": "Wind gust A",
       "trigger_hint": "高海拔/平原 sparse event",
-      "source_url": "https://cdn.freesound.org/previews/615/615976_1648170-hq.mp3",
-      "credit_page": "https://freesound.org/people/klankbeeld/sounds/615976/",
+      "source_url": "https://cdn.freesound.org/previews/363/363139_6039349-hq.mp3",
+      "credit_page": "https://freesound.org/people/ShannonAHoniball/sounds/363139/",
       "license": "to-verify",
       "curation_query": "wind gust single outdoor field recording 0-5s",
-      "uploader": "klankbeeld",
-      "size_bytes": 35428
+      "uploader": "ShannonAHoniball",
+      "size_bytes": 44051
     },
     {
       "id": "wind_gust_b",
@@ -201,12 +203,13 @@
       "kind": "one-shot",
       "name": "Wind gust B",
       "trigger_hint": "高海拔/平原 sparse event",
-      "source_url": "https://cdn.freesound.org/previews/269/269314_4486188-hq.mp3",
-      "credit_page": "https://freesound.org/people/kwahmah_02/sounds/269314/",
+      "source_url": "https://cdn.freesound.org/previews/60/60028_71257-hq.mp3",
+      "credit_page": "https://freesound.org/people/qubodup/sounds/60028/",
       "license": "to-verify",
       "curation_query": "wind gust single outdoor field recording 0-5s",
-      "uploader": "kwahmah_02",
-      "size_bytes": 28753
+      "uploader": "qubodup",
+      "last_error": "Command failed: curl -fsSL --max-time 60 -o \"/Users/chen/Documents/GitHub/visual_china/tmp/sfx-raw/wind_gust_b.mp3\" \"https://cdn.freesound.org/previews/660/660300_13721094-hq.mp3\"\ncurl: (28) Operation timed out after 60001 milliseconds with",
+      "size_bytes": 15301
     },
     {
       "id": "footstep_grass",
@@ -214,10 +217,11 @@
       "kind": "loop-or-cycle",
       "name": "Grass footsteps",
       "trigger_hint": "步行（默认）",
-      "source_url": "https://cdn.freesound.org/previews/321/321445_5437135-hq.mp3",
-      "credit_page": "https://freesound.org/people/deleted_user_5437135/sounds/321445/",
+      "source_url": "https://cdn.freesound.org/previews/833/833456_16837934-hq.mp3",
+      "credit_page": "https://freesound.org/people/darceyprodanovic/sounds/833456/",
       "license": "to-verify",
-      "size_bytes": 226351
+      "uploader": "darceyprodanovic",
+      "size_bytes": 4304
     },
     {
       "id": "footstep_water_wading",
@@ -284,17 +288,6 @@
       "credit_page": "https://freesound.org/people/Robinhood76/sounds/816426/",
       "license": "to-verify",
       "size_bytes": 21776
-    },
-    {
-      "id": "cultural_magic_chime",
-      "category": "cultural",
-      "kind": "one-shot",
-      "name": "Soft chime (发现 POI 提示)",
-      "trigger_hint": "走近未访问 POI 首次",
-      "source_url": "https://cdn.freesound.org/previews/794/794217_13973196-hq.mp3",
-      "credit_page": "https://freesound.org/people/Vrymaa/sounds/794217/",
-      "license": "to-verify",
-      "size_bytes": 487041
     },
     {
       "id": "ui_hover",
