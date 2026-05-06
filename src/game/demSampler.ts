@@ -114,6 +114,11 @@ const MAX_GRID_COLUMNS = 4096;
 const MAX_GRID_ROWS = 4096;
 const MAX_TOTAL_CELLS = 8 * 1024 * 1024;
 
+// 千里江山图风格垂直夸张系数。在 sampleHeight 里统一应用，让 mesh、
+// player.y、scenery、label 全部一致使用夸张后的高度，避免漂浮 / 下沉。
+// 1.6× 让秦岭/巴山在 5600 km 画幅下仍然有山墙感，又不至于把 ridge 画成针。
+export const TERRAIN_VERTICAL_EXAGGERATION = 1.6;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -518,7 +523,12 @@ export class TerrainSampler {
 
   sampleHeight(x: number, z: number): number {
     const rawY = this.sampleChannel("heights", x, z);
-    return this.applyHeightOverride(rawY, x, z);
+    const overridden = this.applyHeightOverride(rawY, x, z);
+    // Phase 2 全国扩张：5600×3900 km 画幅下，绝对 game height（~12 单位）
+    // 相对世界尺寸（1711 单位）显得过低，山墙感丢失。1.6× 垂直夸张同时
+    // 抬升 player.y / scenery / label，让所有渲染层保持一致。
+    // 改这个常量同步影响：mesh, player.position.y, 树/城贴地, 标签高度。
+    return overridden * TERRAIN_VERTICAL_EXAGGERATION;
   }
 
   // 跟 Three.js PlaneGeometry 一致的 triangular interp。
@@ -548,12 +558,16 @@ export class TerrainSampler {
     const B = data[y1 * columns + x0] ?? A; // (0,1)
     const C = data[y1 * columns + x1] ?? A; // (1,1)
     const D = data[y0 * columns + x1] ?? A; // (1,0)
+    let raw;
     if (tx + ty <= 1) {
       // 上三角 a,b,d = (0,0)(0,1)(1,0)
-      return this.applyHeightOverride((1 - tx - ty) * A + ty * B + tx * D, x, z);
+      raw = (1 - tx - ty) * A + ty * B + tx * D;
+    } else {
+      // 下三角 b,c,d = (0,1)(1,1)(1,0)
+      raw = (1 - tx) * B + (tx + ty - 1) * C + (1 - ty) * D;
     }
-    // 下三角 b,c,d = (0,1)(1,1)(1,0)
-    return this.applyHeightOverride((1 - tx) * B + (tx + ty - 1) * C + (1 - ty) * D, x, z);
+    // 跟 sampleHeight 同步应用垂直夸张，让贴地物（树/城/牌位）跟 mesh 一致。
+    return this.applyHeightOverride(raw, x, z) * TERRAIN_VERTICAL_EXAGGERATION;
   }
 
   sampleRiver(x: number, z: number): number {

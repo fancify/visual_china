@@ -101,8 +101,10 @@ test("terrain sampler height override flattens heights and hides rivers inside c
 
   sampler.setHeightOverride((rawY, x, z) => flattenedY(rawY, x, z));
 
-  assert.equal(sampler.sampleHeight(0, 0), 1.5);
-  assert.equal(sampler.sampleSurfaceHeight(0, 0), 1.5);
+  // Phase 2 全国扩张：sampler.sampleHeight 应用 1.6× 垂直夸张，city flatten
+  // override 1.5 → 1.5 * 1.6 = 2.4。
+  assert.equal(sampler.sampleHeight(0, 0), 1.5 * 1.6);
+  assert.equal(sampler.sampleSurfaceHeight(0, 0), 1.5 * 1.6);
   assert.equal(sampler.sampleRiver(0, 0), 0);
   assert.notEqual(sampler.sampleHeight(4.5, 4.5), 1.5);
 });
