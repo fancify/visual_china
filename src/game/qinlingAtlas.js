@@ -55,6 +55,20 @@ function isInsideCurrentSlice(city) {
   );
 }
 
+function isWorldPointInsideCurrentSlice(point) {
+  return (
+    point.x >= -QINLING_WORLD.width * 0.5 &&
+    point.x <= QINLING_WORLD.width * 0.5 &&
+    point.y >= -QINLING_WORLD.depth * 0.5 &&
+    point.y <= QINLING_WORLD.depth * 0.5
+  );
+}
+
+function atlasFeatureTouchesCurrentSlice(atlasFeature) {
+  const points = atlasFeature.world.points ?? [atlasFeature.world];
+  return points.some(isWorldPointInsideCurrentSlice);
+}
+
 export const qinlingAtlasPolicy = {
   sourceOfTruth: "2d-atlas-first",
   coordinatePolicy: "strict-geographic",
@@ -96,7 +110,7 @@ export const qinlingAtlasLayers = [
     id: "ancient",
     name: "考古",
     defaultVisible: true,
-    description: "三星堆、金沙、大地湾——区域内已发掘的史前/古蜀文明遗址（真实坐标）。"
+    description: "三星堆、金沙、大地湾与关中帝陵——区域内重要遗址/陵墓（真实坐标）。"
   },
   {
     id: "livelihood",
@@ -238,15 +252,7 @@ export const qinlingScenicLandmarks = [
     symbol: scenicHeritageSymbol,
     role: "buddhist-relic"
   },
-  {
-    id: "scenic-qian-ling",
-    name: "乾陵",
-    lat: 34.59,
-    lon: 108.20,
-    summary: "唐高宗与武则天合葬陵，唐代石刻无字碑、石狮以雄浑著称。",
-    symbol: scenicHeritageSymbol,
-    role: "imperial-mausoleum"
-  },
+  // 乾陵已迁到 qinlingAncientSites（imperial-tomb mound 视觉），此处删除避免重复 label。
   {
     id: "scenic-huanglong",
     name: "黄龙",
@@ -264,60 +270,132 @@ export const qinlingScenicLandmarks = [
     summary: "2016 年发现的世界级喀斯特天坑群，分布在镇巴/宁强/南郑/西乡。",
     symbol: scenicMountainSymbol,
     role: "karst-sinkhole"
-  }
-];
-
-// 考古遗址：跟 scenicLandmarks 同样 schema，但 layer 是 ancient（考古），
-// 3D 渲染走另一组 mesh（青铜台座 / 太阳神鸟 / 仰韶圆台）。
-export const qinlingAncientSites = [
-  {
-    id: "ancient-sanxingdui",
-    name: "三星堆",
-    lat: 30.99,
-    lon: 104.34,
-    summary: "古蜀青铜文明祭祀坑（约前 3000–前 1200 年），纵目面具、青铜立人。",
-    role: "shu-bronze-altar"
   },
   {
-    id: "ancient-jinsha",
-    name: "金沙遗址",
-    lat: 30.68,
-    lon: 104.00,
-    summary: "古蜀晚期都邑（约前 1200–前 650 年），太阳神鸟金箔、玉璋祭祀坑。",
-    role: "shu-sun-bird"
+    id: "scenic-lijiang-guilin",
+    name: "漓江山水",
+    lat: 25.20,
+    lon: 110.30,
+    summary: "桂林到阳朔 80 里漓江峰林岩溶，宋人以来\"江作青罗带，山如碧玉簪\"。",
+    symbol: scenicMountainSymbol,
+    role: "karst-lake-system"
   },
   {
-    id: "ancient-dadiwan",
-    name: "大地湾遗址",
-    lat: 35.05,
-    lon: 105.91,
-    summary: "甘肃秦安，仰韶文化早期大型聚落（约前 5800 年），F901 大房址。",
-    role: "yangshao-dwelling"
-  },
-  // east 109 → 110 后纳入的 3 个考古遗址（refactor #63 + Phase 4 完成）
-  {
-    id: "ancient-banpo",
-    name: "半坡遗址",
-    lat: 34.27,
-    lon: 109.07,
-    summary: "西安东郊，仰韶半坡类型典型聚落（约前 4800 年），半地穴房 + 公共墓地。",
-    role: "yangshao-dwelling"
+    id: "scenic-zhangjiajie",
+    name: "张家界",
+    lat: 29.36,
+    lon: 110.50,
+    summary: "武陵源石英砂岩峰林，3000 多座石柱，世界自然遗产。",
+    symbol: scenicMountainSymbol,
+    role: "alpine-peak"
   },
   {
-    id: "ancient-bingmayong",
-    name: "兵马俑",
-    lat: 34.38,
-    lon: 109.27,
-    summary: "秦始皇陵东侧 1.5 km 陪葬坑，1974 年出土万件陶兵马，世界第八奇迹。",
-    role: "qin-terracotta-army"
+    id: "scenic-huangguoshu",
+    name: "黄果树瀑布",
+    lat: 25.99,
+    lon: 105.68,
+    summary: "白水河上 77.8 m 高瀑布，亚洲最大瀑布群之一。",
+    symbol: scenicMountainSymbol,
+    role: "karst-lake-system"
   },
   {
-    id: "ancient-qinshihuang-mausoleum",
-    name: "秦始皇陵",
-    lat: 34.38,
-    lon: 109.25,
-    summary: "中国第一个统一帝王陵（前 246–前 208 建造），封土高 76 m，地宫至今未发掘。",
-    role: "qin-imperial-mausoleum"
+    id: "scenic-fanjing-shan",
+    name: "梵净山",
+    lat: 27.92,
+    lon: 108.69,
+    summary: "贵州武陵山主峰 2572 m，世界自然遗产，金顶蘑菇石与佛光闻名。",
+    symbol: scenicMountainSymbol,
+    role: "alpine-peak"
+  },
+  {
+    id: "scenic-wanfeng-lin",
+    name: "万峰林",
+    lat: 25.05,
+    lon: 104.91,
+    summary: "黔西南兴义市郊喀斯特峰林群，方圆 200 平方公里上千锥峰。",
+    symbol: scenicMountainSymbol,
+    role: "karst-lake-system"
+  },
+  {
+    id: "scenic-leigong-shan",
+    name: "雷公山",
+    lat: 26.38,
+    lon: 108.20,
+    summary: "黔东南苗岭主峰 2178 m，原始森林与苗族圣山。",
+    symbol: scenicMountainSymbol,
+    role: "religious-mountain"
+  },
+  {
+    id: "scenic-fenghuang-old",
+    name: "凤凰古城",
+    lat: 27.95,
+    lon: 109.60,
+    summary: "沱江湾内明清古城，吊脚楼临江，沈从文笔下的湘西。",
+    symbol: scenicHeritageSymbol,
+    role: "buddhist-relic"
+  },
+  {
+    id: "scenic-zhenyuan-old",
+    name: "镇远古城",
+    lat: 27.05,
+    lon: 108.42,
+    summary: "黔东南舞阳河 S 形穿城，明清古城墙码头府衙保存完整。",
+    symbol: scenicHeritageSymbol,
+    role: "buddhist-relic"
+  },
+  {
+    id: "scenic-lushan",
+    name: "庐山",
+    lat: 29.55,
+    lon: 115.99,
+    summary: "江西九江名山，云海、瀑布与避暑传统并存，李白《望庐山瀑布》所咏。",
+    symbol: scenicMountainSymbol,
+    role: "alpine-peak"
+  },
+  {
+    id: "scenic-dongting-hu",
+    name: "洞庭湖",
+    lat: 29.30,
+    lon: 112.90,
+    summary: "中国第二大淡水湖，长江与湘资沅澧四水汇流之地，《岳阳楼记》里的巴陵胜状。",
+    symbol: scenicMountainSymbol,
+    role: "lake-system"
+  },
+  {
+    id: "scenic-poyang-hu",
+    name: "鄱阳湖",
+    lat: 29.10,
+    lon: 116.20,
+    summary: "中国最大淡水湖，赣江北上入湖后再汇长江，白鹤等候鸟越冬地。",
+    symbol: scenicMountainSymbol,
+    role: "lake-system"
+  },
+  {
+    id: "scenic-yueyang-lou",
+    name: "岳阳楼",
+    lat: 29.37,
+    lon: 113.13,
+    summary: "岳阳城头临洞庭，范仲淹《岳阳楼记》让它成为江湖名楼的代名词。",
+    symbol: scenicHeritageSymbol,
+    role: "ancient-tower"
+  },
+  {
+    id: "scenic-tengwang-ge",
+    name: "滕王阁",
+    lat: 28.68,
+    lon: 115.87,
+    summary: "南昌赣江畔名阁，王勃《滕王阁序》所由生，江右文化最强地标之一。",
+    symbol: scenicHeritageSymbol,
+    role: "ancient-tower"
+  },
+  {
+    id: "scenic-chibi",
+    name: "赤壁古战场",
+    lat: 29.72,
+    lon: 113.93,
+    summary: "长江南岸三国赤壁之战纪念地，江面、丘岗与古战叙事紧贴一线。",
+    symbol: scenicHeritageSymbol,
+    role: "battlefield"
   }
 ];
 
@@ -327,9 +405,210 @@ const ancientSymbol = {
   emphasis: "archaeological-site"
 };
 
-const qinlingModernWaterFeatures = qinlingModernHydrography.features.map(
-  hydrographyFeatureToAtlasFeature
-);
+export const ancientImperialTombSymbol = {
+  symbol: "diamond",
+  color: "#9c8456",
+  emphasis: "imperial-tomb"
+};
+
+// 考古遗址：跟 scenicLandmarks 同样 schema，但 layer 是 ancient（考古），
+// 3D 渲染对帝陵走阶梯封土 mound，其余仍走青铜台座 / 太阳神鸟 / 仰韶圆台。
+export const qinlingAncientSites = [
+  {
+    id: "ancient-sanxingdui",
+    name: "三星堆",
+    lat: 30.99,
+    lon: 104.34,
+    summary: "古蜀青铜文明祭祀坑（约前 3000–前 1200 年），纵目面具、青铜立人。",
+    role: "shu-bronze-altar",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-jinsha",
+    name: "金沙遗址",
+    lat: 30.68,
+    lon: 104.00,
+    summary: "古蜀晚期都邑（约前 1200–前 650 年），太阳神鸟金箔、玉璋祭祀坑。",
+    role: "shu-sun-bird",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-dadiwan",
+    name: "大地湾遗址",
+    lat: 35.05,
+    lon: 105.91,
+    summary: "甘肃秦安，仰韶文化早期大型聚落（约前 5800 年），F901 大房址。",
+    role: "yangshao-dwelling",
+    symbol: ancientSymbol
+  },
+  // east 109 → 110 后纳入的 3 个考古遗址（refactor #63 + Phase 4 完成）
+  {
+    id: "ancient-banpo",
+    name: "半坡遗址",
+    lat: 34.27,
+    lon: 109.07,
+    summary: "西安东郊，仰韶半坡类型典型聚落（约前 4800 年），半地穴房 + 公共墓地。",
+    role: "yangshao-dwelling",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-bingmayong",
+    name: "兵马俑",
+    lat: 34.38,
+    lon: 109.27,
+    summary: "秦始皇陵东侧 1.5 km 陪葬坑，1974 年出土万件陶兵马，世界第八奇迹。",
+    role: "qin-terracotta-army",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-qinshihuang-tomb",
+    name: "秦始皇陵",
+    lat: 34.3815,
+    lon: 109.2541,
+    summary: "中国第一位皇帝陵，封土 76m，附带兵马俑陪葬。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-maoling",
+    name: "茂陵",
+    lat: 34.3372,
+    lon: 108.4408,
+    summary: "西汉武帝陵，封土最大（46m 高 240m 见方），关中西汉十一陵之首。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-zhaoling",
+    name: "昭陵",
+    lat: 34.6131,
+    lon: 108.6628,
+    summary: "唐太宗李世民陵，依九嵕山为陵，开创\"山陵\"制。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-qianling",
+    name: "乾陵",
+    lat: 34.5856,
+    lon: 108.2122,
+    summary: "唐高宗李治与武则天合葬陵，梁山为穴，唯一未被盗大唐陵。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-xianling",
+    name: "献陵",
+    lat: 34.6788,
+    lon: 108.9361,
+    summary: "唐高祖李渊陵，三原县徐木乡，唐开国陵，封土覆斗形约 13m 高。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-duling",
+    name: "杜陵",
+    lat: 34.196,
+    lon: 108.995,
+    summary: "西汉宣帝陵，西安东南郊杜陵塬，离市区最近的西汉帝陵，封土完整。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-changling",
+    name: "长陵",
+    lat: 34.424,
+    lon: 108.802,
+    summary: "西汉高祖刘邦陵，咸阳塬之首，西汉开国之陵，11 陵中规模最大之一。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-yangling",
+    name: "阳陵",
+    lat: 34.430,
+    lon: 108.928,
+    summary: "西汉景帝陵，咸阳塬，附属汉阳陵博物馆出土数千彩绘陶俑著称。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-baling",
+    name: "霸陵",
+    lat: 34.275,
+    lon: 109.119,
+    summary: "西汉文帝陵，西安东郊白鹿原，西汉唯一依山为陵，无封土。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-qiaoling",
+    name: "桥陵",
+    lat: 34.810,
+    lon: 109.769,
+    summary: "唐睿宗陵，蒲城县丰山，关中十八唐陵中保存最完整，石刻雄壮。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-huangdi-tomb",
+    name: "黄帝陵",
+    lat: 35.5872,
+    lon: 109.2587,
+    summary: "中华人文始祖黄帝陵传说所在，桥山顶，五千年祭祀。",
+    role: "imperial-tomb",
+    symbol: ancientImperialTombSymbol
+  },
+  {
+    id: "ancient-haolong-tunsi",
+    name: "海龙屯土司城",
+    lat: 27.78,
+    lon: 106.77,
+    summary: "明代播州杨氏土司军事城堡，2015 年世界文化遗产。海拔 1350m 险峻山顶。",
+    role: "tusi-military-castle",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-xijiang-miao",
+    name: "西江千户苗寨",
+    lat: 26.49,
+    lon: 108.18,
+    summary: "雷公山下苗族最大聚落，吊脚楼层叠依山而建，千户规模延续千年。",
+    role: "ethnic-village",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-cuan-stele",
+    name: "爨碑遗址",
+    lat: 25.17,
+    lon: 103.78,
+    summary: "南北朝爨氏家族石碑（公元 405 年），中原文字传入云南实证，云南最早碑刻。",
+    role: "stone-inscription",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-yueyang-cheng",
+    name: "岳阳古城",
+    lat: 29.37,
+    lon: 113.13,
+    summary: "巴陵旧城沿洞庭湖东岸展开，楼城湖一体，是湘北最典型的江湖城廓。",
+    role: "ancient-town",
+    symbol: ancientSymbol
+  },
+  {
+    id: "ancient-jingzhou-gucheng",
+    name: "荆州古城",
+    lat: 30.34,
+    lon: 112.24,
+    summary: "三国荆州治所，明清城墙保存完整，长江中游平原城防体系代表。",
+    role: "ancient-walls",
+    symbol: ancientSymbol
+  }
+];
+
+const qinlingModernWaterFeatures = qinlingModernHydrography.features
+  .map(hydrographyFeatureToAtlasFeature)
+  .filter(atlasFeatureTouchesCurrentSlice);
 
 export const qinlingAtlasFeatures = [
   // landform 9 个手画 polygon 已删——跟 3D 不对应，clutter atlas。
@@ -407,7 +686,7 @@ export const qinlingAtlasFeatures = [
   ...realQinlingCities.filter(isInsideCurrentSlice).map(realCityToAtlasFeature),
   // 著名景点：太白山 / 青城山 / 九寨沟 / 法门寺 / 乾陵 / 黄龙 / 汉中天坑——
   // 全部真实坐标，verification: external-vector，跟 3D 一致地展示。
-  ...qinlingScenicLandmarks.map((spot) => ({
+  ...qinlingScenicLandmarks.filter(isInsideCurrentSlice).map((spot) => ({
     id: spot.id,
     name: spot.name,
     layer: "scenic",
@@ -425,7 +704,7 @@ export const qinlingAtlasFeatures = [
     visualRule: spot.symbol
   })),
   // 考古遗址 atlas feature：三星堆 / 金沙 / 大地湾，layer ancient。
-  ...qinlingAncientSites.map((site) => ({
+  ...qinlingAncientSites.filter(isInsideCurrentSlice).map((site) => ({
     id: site.id,
     name: site.name,
     layer: "ancient",
@@ -440,7 +719,7 @@ export const qinlingAtlasFeatures = [
       verification: "external-vector"
     },
     copy: { summary: site.summary },
-    visualRule: ancientSymbol
+    visualRule: site.symbol
   }))
 ];
 

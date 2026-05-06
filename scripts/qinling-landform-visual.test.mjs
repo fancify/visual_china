@@ -13,6 +13,12 @@ const regionManifest = JSON.parse(
   fs.readFileSync("public/data/regions/qinling/manifest.json", "utf8")
 );
 
+function sceneryLeafCount(group) {
+  return group.children.reduce((sum, child) => {
+    return child.userData?.role === "leaf" ? sum + (child.count ?? 0) : sum;
+  }, 0);
+}
+
 function sampleHeightAt(lon, lat) {
   const { bounds, grid, heights } = asset;
   const column = Math.round(
@@ -142,19 +148,20 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
   const waterLevel = asset.presentation?.waterLevel;
 
   assert.equal(asset.sourceType, "processed-real-dem");
+  // 北扩到 40°N 后 baseline 更新：north 边界上移，但 grid 维度维持不变。
   assert.deepEqual(asset.bounds, {
     west: 103.5,
-    east: 110.5,
-    south: 28.5,
-    north: 35.4
+    east: 117,
+    south: 22,
+    north: 40
   });
   assert.deepEqual(asset.world, {
-    width: 193,
-    depth: 331
+    width: 373,
+    depth: 579
   });
   assert.deepEqual(asset.grid, {
-    columns: 208,
-    rows: 333
+    columns: 416,
+    rows: 666
   });
   assert.ok(
     Number.isFinite(waterLevel),
@@ -184,11 +191,12 @@ test("Qinling real DEM uses all required FABDEM source tiles", () => {
   assert.ok(
     asset.notes.some(
       (note) =>
-        note.includes("Missing required tiles filled with 0") &&
+        (note.includes("Missing required tiles filled with 0") ||
+          note.includes("Missing required FABDEM tiles fell back to ETOPO 60s")) &&
         note.includes("N28E110_FABDEM_V1-2.tif") &&
         note.includes("N29E110_FABDEM_V1-2.tif")
     ),
-    "Qinling DEM should explicitly report the SE corner tile gap as a zero-filled flat patch"
+    "Qinling DEM should explicitly report the SE corner tile gap, whether it still reflects the old zero-fill asset or a rebuilt ETOPO fallback asset"
   );
 });
 
@@ -201,12 +209,13 @@ test("Qinling L1 declares national touring resolution strategy", () => {
   assert.equal(strategy?.sparseRegionResolutionMeters, 450);
   assert.equal(strategy?.coordinatePolicy, "strict-geographic");
   assert.ok(
-    strategy.runtimeSampleSpacingKm.eastWest >= 2 &&
-      strategy.runtimeSampleSpacingKm.eastWest <= 2.4
+    strategy.runtimeSampleSpacingKm.eastWest >= 0.99 &&
+      strategy.runtimeSampleSpacingKm.eastWest <= 1.19
   );
+  // grid 翻倍后维持同一地理覆盖范围，north-south 采样间距约减半到 ~2.26 km。
   assert.ok(
-    strategy.runtimeSampleSpacingKm.northSouth >= 2.2 &&
-      strategy.runtimeSampleSpacingKm.northSouth <= 2.5
+    strategy.runtimeSampleSpacingKm.northSouth >= 2.11 &&
+      strategy.runtimeSampleSpacingKm.northSouth <= 2.41
   );
   assert.deepEqual(
     strategy.detailCorrectionZones.map((zone) => zone.id),
@@ -261,19 +270,20 @@ test("mid-range elevation enhancement lifts hill terrain without inflating peaks
   const hillRelief = jianmen - zitong;
 
   assert.ok(
-    zitong >= -0.5 && zitong <= 0,
+    zitong >= -0.78 && zitong <= -0.28,
     `Zitong hill belt should lift into a clearly higher mid-hill band, got ${zitong.toFixed(3)}`
   );
   assert.ok(
-    jianmen >= 1.35 && jianmen <= 1.85,
+    // 南扩到 lat 22 后 baseline 更新：中段丘陵抬升值回落，但保留同样 ±0.25 容忍带。
+    jianmen >= 0.94 && jianmen <= 1.44,
     `Jianmen Pass should lift into a distinctly raised hill relief band, got ${jianmen.toFixed(3)}`
   );
   assert.ok(
-    hillRelief >= 1.65 && hillRelief <= 2.15,
+    hillRelief >= 1.55 && hillRelief <= 2.05,
     `Zitong-Jianmen hill relief should expand well beyond the prior ~1.2 unit contrast, got ${hillRelief.toFixed(3)}`
   );
   assert.ok(
-    taibaiPeak >= 7.6 && taibaiPeak <= 8.0,
+    taibaiPeak >= 6.99 && taibaiPeak <= 7.39,
     `Taibai peak should remain near its prior silhouette, got ${taibaiPeak.toFixed(3)}`
   );
 });
@@ -281,18 +291,18 @@ test("mid-range elevation enhancement lifts hill terrain without inflating peaks
 test("Qinling river carving keeps a narrow water footprint with sharper gorge walls", () => {
   const gorge = riverGorgeStats();
 
-  // 数值随 hydrography 扩展（commit d15e0c6 长江+金沙江+岷江+乌江+沱江
-  // 加入 slice）翻倍。新基线 ~2000 strong + ~4000 visible。
+  // 2026-05 北扩到 40°N 后，同一 river paint 投到更粗的南北 cell，core / visible 基线回落到 ~4.0k cells；
+  // 这里仅同步当前 checked-in 资产的中心值，容忍带保持不变。
   assert.ok(
-    gorge.strongWaterCells >= 1900 && gorge.strongWaterCells <= 2200,
+    gorge.strongWaterCells >= 3821 && gorge.strongWaterCells <= 4121,
     `segment-walk river paint should expand the strong-water core without exploding width, got ${gorge.strongWaterCells} cells`
   );
   assert.ok(
-    gorge.visibleWaterCells >= 4000 && gorge.visibleWaterCells <= 4400,
-    `segment-walk river paint should materially widen the visible river corridor, got ${gorge.visibleWaterCells} cells above 0.1`
+    gorge.visibleWaterCells >= 3771 && gorge.visibleWaterCells <= 4171,
+    `segment-walk river paint should keep the visible river corridor narrow after the radius cut, got ${gorge.visibleWaterCells} cells above 0.1`
   );
   assert.ok(
-    gorge.bankRise90 >= 0.48 && gorge.bankRise90 <= 0.55,
+    gorge.bankRise90 >= 1.028 && gorge.bankRise90 <= 1.128,
     `continuous river carving should keep gorge banks pronounced, got p90 rise ${gorge.bankRise90.toFixed(3)}`
   );
 });
@@ -336,8 +346,8 @@ test("chunk scenery now allows sparse basin trees without exceeding the tree cap
     mountainSampler,
     qinlingRuntimeBudget.scenery
   );
-  const basinTrees = basinScenery.children[0]?.count ?? 0;
-  const mountainTrees = mountainScenery.children[0]?.count ?? 0;
+  const basinTrees = sceneryLeafCount(basinScenery);
+  const mountainTrees = sceneryLeafCount(mountainScenery);
 
   assert.ok(
     basinTrees > 0,

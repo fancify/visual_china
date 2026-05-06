@@ -94,6 +94,24 @@ export const qinlingRoutes = [
     description: "自长安经西乡、镇巴南穿巴山直趋涪陵，是唐代著名的南向快递道。",
     labelPoint: qinlingRouteAnchors["lizhi-road"].labelPoint,
     points: qinlingRouteAnchors["lizhi-road"].points
+  },
+  {
+    id: "chama-route",
+    name: "茶马古道（西南支线）",
+    source: historicalRouteSource,
+    label: "茶马古道",
+    description: "西南茶贩道从成都平原经黔中、黔南折入桂北，是蜀茶南运与广西商贸衔接的主干支线。",
+    labelPoint: qinlingRouteAnchors["chama-route"].labelPoint,
+    points: qinlingRouteAnchors["chama-route"].points
+  },
+  {
+    id: "xiang-qian-route",
+    name: "湘黔古道",
+    source: historicalRouteSource,
+    label: "湘黔古道",
+    description: "明清官驿自湘西凤凰、怀化入黔，经镇远、凯里西抵贵阳，是湖广通黔中的驿传主线。",
+    labelPoint: qinlingRouteAnchors["xiang-qian-route"].labelPoint,
+    points: qinlingRouteAnchors["xiang-qian-route"].points
   }
 ];
 

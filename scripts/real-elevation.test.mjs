@@ -36,14 +36,14 @@ test("gameHeightToRealMeters keeps current qinling gameplay heights in a plausib
 
   assert.equal(gameHeightToRealMeters(regionAsset.minHeight, regionAsset), 0);
   assert.ok(
-    realPeakMeters >= 4500 && realPeakMeters <= 5000,
+    realPeakMeters >= 4977 && realPeakMeters <= 5477,
     `expected current qinling asset to expose a high-elevation real peak, got ${realPeakMeters}m`
   );
   assert.equal(gameHeightToRealMeters(regionAsset.maxHeight, regionAsset), realPeakMeters);
 
   const zitongLikeHeightMeters = gameHeightToRealMeters(-1.44, regionAsset);
   assert.ok(
-    zitongLikeHeightMeters >= 450 && zitongLikeHeightMeters <= 550,
+    zitongLikeHeightMeters >= 793 && zitongLikeHeightMeters <= 893,
     `expected -1.44 gameplay height to map near low-hill elevation, got ${zitongLikeHeightMeters}m`
   );
 });

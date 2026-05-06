@@ -105,6 +105,76 @@
         "lon": 105.53989
       },
       "description": "广元剑阁一带的入蜀锁口，两侧山势夹峙，让通道变成关隘。"
+    },
+    {
+      "name": "軹关陉",
+      "kind": "pass",
+      "subKind": "memorial-stele",
+      "position": {
+        "lat": 35.04,
+        "lon": 112.43
+      },
+      "description": "太行八陉之首，王屋山东麓，秦灭韩之路。"
+    },
+    {
+      "name": "太行陉",
+      "kind": "pass",
+      "subKind": "gorge-pass",
+      "position": {
+        "lat": 35.32,
+        "lon": 112.65
+      },
+      "description": "晋豫通道，唐时八驿之要。"
+    },
+    {
+      "name": "白陉",
+      "kind": "pass",
+      "subKind": "gorge-pass",
+      "position": {
+        "lat": 35.45,
+        "lon": 113.1
+      },
+      "description": "太行八陉第三，孟门关。"
+    },
+    {
+      "name": "滏口陉",
+      "kind": "pass",
+      "subKind": "gorge-pass",
+      "position": {
+        "lat": 36.5,
+        "lon": 113.92
+      },
+      "description": "邯郸西，曹魏邺城西出之路。"
+    },
+    {
+      "name": "井陉",
+      "kind": "pass",
+      "subKind": "major-pass",
+      "position": {
+        "lat": 38.04,
+        "lon": 114.07
+      },
+      "description": "韩信背水之战所在，土门关。"
+    },
+    {
+      "name": "飞狐陉",
+      "kind": "pass",
+      "subKind": "gorge-pass",
+      "position": {
+        "lat": 39.4,
+        "lon": 114.7
+      },
+      "description": "代郡至上谷之要，唐五代戍守关。"
+    },
+    {
+      "name": "蒲阴陉",
+      "kind": "pass",
+      "subKind": "major-pass",
+      "position": {
+        "lat": 39.3,
+        "lon": 114.2
+      },
+      "description": "紫荆关所在，明长城内三关之一。"
     }
   ],
   "fragments": [

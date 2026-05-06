@@ -28,7 +28,7 @@ test("Qinling terrain chunks include shared boundary samples to avoid visible se
     Math.abs(north.grid.rows - south.grid.rows) <= 1,
     "adjacent north/south chunks should stay within one shared-sample row of each other"
   );
-  assert.ok(west.grid.columns >= 42 && west.grid.columns <= 43);
+  assert.ok(west.grid.columns >= 47 && west.grid.columns <= 48);
   assert.ok(north.grid.rows >= 48 && north.grid.rows <= 49);
 
   for (let row = 0; row < west.grid.rows; row += 1) {
@@ -48,8 +48,8 @@ test("Qinling terrain chunks include shared boundary samples to avoid visible se
   }
 });
 
-test("Qinling chunk manifest expands to a 5 by 7 terrain grid", () => {
-  assert.equal(manifest.chunkColumns, 5);
-  assert.equal(manifest.chunkRows, 7);
-  assert.equal(manifest.chunks.length, 35);
+test("Qinling chunk manifest expands to a 9 by 14 terrain grid", () => {
+  assert.equal(manifest.chunkColumns, 9);
+  assert.equal(manifest.chunkRows, 14);
+  assert.equal(manifest.chunks.length, 126);
 });

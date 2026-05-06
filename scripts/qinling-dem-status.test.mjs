@@ -1,13 +1,25 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import "./etopo-fallback.test.mjs";
 
 import {
   collectQinlingDemStatus,
   formatQinlingDemStatus
 } from "./qinling-dem-status.mjs";
+import {
+  qinlingOutputGrid,
+  qinlingResolutionStrategy
+} from "./qinling-dem-common.mjs";
+
+const buildRealDemScriptPath = fileURLToPath(
+  new URL("./build-qinling-real-dem.mjs", import.meta.url)
+);
 
 test("collects Qinling DEM download and asset status", async () => {
   const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "qinling-dem-status-"));
@@ -48,4 +60,40 @@ test("collects Qinling DEM download and asset status", async () => {
   assert.match(formatted, /Tiles directory TIFF count: 1/);
   assert.match(formatted, /qinling-slice-dem\.json sourceType: FABDEM V1-2/);
   assert.match(formatted, /Region manifest: present/);
+});
+
+test("build-qinling-real-dem exposes an explicit srtm90 CLI mode placeholder", async () => {
+  const isolatedRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qinling-dem-build-"));
+  const result = spawnSync(
+    process.execPath,
+    [buildRealDemScriptPath, "--source", "srtm90"],
+    {
+      cwd: isolatedRoot,
+      encoding: "utf8"
+    }
+  );
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+
+  assert.notEqual(result.status, 0, "srtm90 placeholder mode should exit non-zero until implemented");
+  assert.match(
+    output,
+    /srtm90 source not yet implemented; use --source fabdem \(default\)\./
+  );
+});
+
+test("build-qinling-real-dem warns when required FABDEM tiles fall back to ETOPO", async () => {
+  const buildScript = await fs.readFile(buildRealDemScriptPath, "utf8");
+
+  assert.match(buildScript, /Missing tile \$\{tileName\}, fallback to ETOPO 60s/);
+});
+
+test("Qinling DEM common config doubles the grid while keeping ~2km north-south samples", () => {
+  assert.deepEqual(qinlingOutputGrid, {
+    columns: 416,
+    rows: 666
+  });
+  assert.deepEqual(qinlingResolutionStrategy.runtimeSampleSpacingKm, {
+    eastWest: 1.09,
+    northSouth: 2.26
+  });
 });

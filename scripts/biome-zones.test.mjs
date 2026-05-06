@@ -49,7 +49,7 @@ test("vegetation density descends from humid south to semiarid north edge", () =
 });
 
 test("nationwide sample maps Yangtze southland to subtropical humid", () => {
-  const biome = biomeWeightsAt({ lat: 25, lon: 110 });
+  const biome = biomeWeightsAt({ lat: 27.0, lon: 111.0 });
 
   assert.equal(biome.biomeId, "subtropical-humid");
   assertClose(biome.hueShift, 0.06);
@@ -57,6 +57,32 @@ test("nationwide sample maps Yangtze southland to subtropical humid", () => {
   assertClose(biome.lumScale, 0.92);
   assertClose(biome.vegetationDensity, 1.45);
   assertClose(biome.treeHue, 0.33);
+});
+
+test("Wuhan sample promotes the Jianghan plain biome", () => {
+  const biome = biomeWeightsAt({ lat: 30.59, lon: 114.31 });
+
+  assert.equal(biome.biomeId, "jianghan-plain");
+  assert.ok(biome.hueShift > 0.06);
+  assert.ok(biome.vegetationDensity > 1.2);
+});
+
+test("Guiyang sample promotes the Yungui plateau biome", () => {
+  const biome = biomeWeightsAt({ lat: 26.6, lon: 106.5 });
+
+  assert.equal(biome.biomeId, "yungui-plateau");
+});
+
+test("Guilin sample promotes the karst mountains biome", () => {
+  const biome = biomeWeightsAt({ lat: 25.27, lon: 110.29 });
+
+  assert.equal(biome.biomeId, "karst-mountains");
+});
+
+test("Xi'an sample stays in the warm-temperate humid biome", () => {
+  const biome = biomeWeightsAt({ lat: 34.27, lon: 108.9 });
+
+  assert.equal(biome.biomeId, "warm-temperate-humid");
 });
 
 test("Chengdu sample uses the stronger subtropical humid palette inside the Qinling slice", () => {
@@ -79,13 +105,28 @@ test("nationwide sample maps Hainan to tropical humid", () => {
   assertClose(biome.lumScale, 0.95);
 });
 
-test("nationwide sample maps North China plain to warm-temperate humid", () => {
+test("nationwide sample maps the broader North China plain to the dedicated plain zone", () => {
   const biome = biomeWeightsAt({ lat: 35, lon: 116 });
 
-  assert.equal(biome.biomeId, "warm-temperate-humid");
-  assertClose(biome.hueShift, -0.012);
-  assertClose(biome.satScale, 0.92);
-  assertClose(biome.lumScale, 1.02);
+  assert.equal(biome.biomeId, "north-china-plain");
+  assert.ok(biome.hueShift > -0.012);
+  assert.ok(biome.hueShift < 0);
+  assert.ok(biome.satScale > 0.92);
+  assert.ok(biome.satScale < 1.0);
+  assert.ok(biome.lumScale > 1.02);
+  assert.ok(biome.lumScale < 1.05);
+});
+
+test("Loess Plateau sample promotes the dedicated loess biome zone", () => {
+  const biome = biomeWeightsAt({ lat: 37.0, lon: 109.0 });
+
+  assert.equal(biome.biomeId, "loess-plateau");
+});
+
+test("North China Plain core sample promotes the dedicated plain biome zone", () => {
+  const biome = biomeWeightsAt({ lat: 37.0, lon: 114.0 });
+
+  assert.equal(biome.biomeId, "north-china-plain");
 });
 
 test("nationwide sample maps northeast forests to cold humid", () => {
@@ -124,15 +165,15 @@ test("nationwide sample maps Tibetan plateau to alpine meadow", () => {
   assertClose(biome.lumScale, 1.15);
 });
 
-test("nationwide boundary at 40N 110E soft-blends warm humid and grassland", () => {
+test("nationwide boundary at 40N 110E now leans into the loess/steppe transition", () => {
   const boundary = biomeWeightsAt({ lat: 40, lon: 110 });
 
-  assert.notEqual(boundary.biomeId, "warm-temperate-semiarid");
-  assert.ok(boundary.hueShift < -0.012);
-  assert.ok(boundary.hueShift > -0.03);
-  assert.ok(boundary.satScale < 0.92);
+  assert.equal(boundary.biomeId, "loess-plateau");
+  assert.ok(boundary.hueShift < -0.03);
+  assert.ok(boundary.hueShift > -0.05);
+  assert.ok(boundary.satScale < 0.8);
   assert.ok(boundary.satScale > 0.7);
-  assert.ok(boundary.lumScale > 1.02);
+  assert.ok(boundary.lumScale > 1.07);
   assert.ok(boundary.lumScale < 1.1);
   assert.ok(boundary.vegetationDensity > 0.6);
 });

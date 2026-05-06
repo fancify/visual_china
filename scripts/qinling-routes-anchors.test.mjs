@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { qinlingRegionBounds } from "../src/data/qinlingRegion.js";
+import { realQinlingCities } from "../src/data/realCities.js";
 import {
   QINLING_ROUTE_ANCHOR_GEOGRAPHY,
   qinlingRouteAnchors
@@ -17,10 +18,14 @@ const EXPECTED_ROUTE_IDS = [
   "jinniu-road",
   "micang-road",
   "qishan-road",
-  "lizhi-road"
+  "lizhi-road",
+  "chama-route",
+  "xiang-qian-route"
 ];
 
 test("historical qinling routes expose verified anchor-based metadata", () => {
+  assert.equal(qinlingRoutes.length, EXPECTED_ROUTE_IDS.length);
+
   for (const routeId of EXPECTED_ROUTE_IDS) {
     const route = qinlingRoutes.find((item) => item.id === routeId);
 
@@ -143,6 +148,45 @@ test("lizhi road starts from Chang'an and now lands inside the expanded southern
   assert.equal(lizhiAnchors.at(-1)?.name.includes("涪陵"), true);
   assert.ok(lizhiAnchors.at(-1).lat >= qinlingRegionBounds.south);
   assert.ok(lizhiAnchors.at(-1).lat <= 29.8, "lizhi-road should still reach the far south edge corridor");
+});
+
+test("southern expansion routes use real city coordinates in the expected sequence", () => {
+  const routeExpectations = [
+    {
+      routeId: "chama-route",
+      cityIds: ["chengdu", "dujiangyan", "guiyang", "duyun", "guilin"],
+      labelIndex: 2
+    },
+    {
+      routeId: "xiang-qian-route",
+      cityIds: ["fenghuang", "huaihua", "zhenyuan", "kaili", "guiyang"],
+      labelIndex: 2
+    }
+  ];
+
+  for (const { routeId, cityIds, labelIndex } of routeExpectations) {
+    const anchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY[routeId];
+    assert.ok(anchors, `${routeId} should define anchor geography`);
+    assert.equal(anchors.length, cityIds.length);
+
+    anchors.forEach((anchor, index) => {
+      const city = realQinlingCities.find((entry) => entry.id === cityIds[index]);
+      assert.ok(city, `${routeId}:${cityIds[index]} should exist in real cities`);
+      assert.equal(anchor.name.includes(city.name), true, `${routeId}:${city.id} should keep city name in sequence`);
+      assert.ok(Math.abs(anchor.lat - city.lat) <= 0.05, `${routeId}:${city.id} should keep real latitude`);
+      assert.ok(Math.abs(anchor.lon - city.lon) <= 0.05, `${routeId}:${city.id} should keep real longitude`);
+      assert.ok(anchor.lat >= qinlingRegionBounds.south, `${routeId}:${city.id} latitude should stay in slice`);
+      assert.ok(anchor.lat <= qinlingRegionBounds.north, `${routeId}:${city.id} latitude should stay in slice`);
+      assert.ok(anchor.lon >= qinlingRegionBounds.west, `${routeId}:${city.id} longitude should stay in slice`);
+      assert.ok(anchor.lon <= qinlingRegionBounds.east, `${routeId}:${city.id} longitude should stay in slice`);
+    });
+
+    assert.deepEqual(
+      qinlingRouteAnchors[routeId].labelPoint,
+      qinlingRouteAnchors[routeId].points[labelIndex],
+      `${routeId} should keep its label point on the configured middle anchor`
+    );
+  }
 });
 
 test("precomputed world anchors stay aligned with route points", () => {

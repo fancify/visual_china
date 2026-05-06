@@ -10,6 +10,12 @@ export type { GeographicCoordinate };
 
 export type BiomeId =
   | "subtropical-humid"
+  | "loess-plateau"
+  | "north-china-plain"
+  | "yungui-plateau"
+  | "karst-mountains"
+  | "jianghan-plain"
+  | "jiangnan-hills"
   | "tropical-humid"
   | "warm-temperate-humid"
   | "warm-temperate-semiarid"
@@ -71,8 +77,33 @@ interface NationwideRegion {
 }
 
 interface NationwideZone {
-  biomeId: Exclude<BiomeId, "warm-temperate-semiarid">;
+  biomeId: Exclude<
+    BiomeId,
+    | "warm-temperate-semiarid"
+    | "loess-plateau"
+    | "north-china-plain"
+    | "yungui-plateau"
+    | "karst-mountains"
+    | "jianghan-plain"
+    | "jiangnan-hills"
+  >;
   regions: NationwideRegion[];
+}
+
+interface LocalizedZone {
+  id: Extract<
+    BiomeId,
+    | "loess-plateau"
+    | "north-china-plain"
+    | "yungui-plateau"
+    | "karst-mountains"
+    | "jianghan-plain"
+    | "jiangnan-hills"
+  >;
+  name: string;
+  description: string;
+  center: GeographicCoordinate;
+  radius: number;
 }
 
 interface BiomeZoneData {
@@ -83,6 +114,7 @@ interface BiomeZoneData {
   };
   presets: Record<BiomeId, BiomePreset>;
   nationwideZones: NationwideZone[];
+  localizedZones?: LocalizedZone[];
 }
 
 const BIOME_ZONE_DATA = biomeZoneDataRaw as BiomeZoneData;
@@ -98,6 +130,7 @@ const BIOME_PROPERTIES: Array<keyof Omit<BiomeWeights, "biomeId">> = [
   "vegetationDensity",
   "treeHue"
 ];
+const LOCALIZED_ZONE_WEIGHT_SCALE = 3;
 
 function smoothBlend(value: number, start: number, end: number): number {
   if (value <= start) {
@@ -202,10 +235,10 @@ function regionWeight(coord: GeographicCoordinate, region: NationwideRegion): nu
   );
 }
 
-function normalizedNationwideWeights(
+function rawNationwideWeights(
   coord: GeographicCoordinate
 ): Array<{ biomeId: BiomeId; weight: number }> {
-  const rawWeights = BIOME_ZONE_DATA.nationwideZones
+  return BIOME_ZONE_DATA.nationwideZones
     .map((zone) => ({
       biomeId: zone.biomeId,
       weight: zone.regions.reduce((maxWeight, region) => {
@@ -213,6 +246,36 @@ function normalizedNationwideWeights(
       }, 0)
     }))
     .filter((entry) => entry.weight > 0.0001) as Array<{ biomeId: BiomeId; weight: number }>;
+}
+
+function localZoneWeight(coord: GeographicCoordinate, zone: LocalizedZone): number {
+  const latDistance = coord.lat - zone.center.lat;
+  const meanLatitudeCos = Math.cos(MathUtils.degToRad((coord.lat + zone.center.lat) * 0.5));
+  const lonDistance = (coord.lon - zone.center.lon) * Math.max(0.3, meanLatitudeCos);
+  const distance = Math.hypot(latDistance, lonDistance);
+
+  if (distance >= zone.radius) {
+    return 0;
+  }
+
+  return 1 - MathUtils.smoothstep(distance, zone.radius * 0.45, zone.radius);
+}
+
+function rawLocalizedWeights(
+  coord: GeographicCoordinate
+): Array<{ biomeId: BiomeId; weight: number }> {
+  return (BIOME_ZONE_DATA.localizedZones ?? [])
+    .map((zone) => ({
+      biomeId: zone.id,
+      weight: localZoneWeight(coord, zone) * LOCALIZED_ZONE_WEIGHT_SCALE
+    }))
+    .filter((entry) => entry.weight > 0.0001);
+}
+
+function normalizedBiomeWeights(
+  coord: GeographicCoordinate
+): Array<{ biomeId: BiomeId; weight: number }> {
+  const rawWeights = [...rawNationwideWeights(coord), ...rawLocalizedWeights(coord)];
 
   if (rawWeights.length === 0) {
     return [{ biomeId: fallbackBiomeId(coord), weight: 1 }];
@@ -301,12 +364,12 @@ export function applySeasonalAdjustment(
 /**
  * Phase 2:
  * - Qinling slice 内保持 Phase 1 行为不变，仍然只用纬度 soft blend。
- * - slice 外按全国简化 ecoregion rectangle/polygon 规则走，并在边界处做 smoothstep。
+ * - slice 外按全国简化 ecoregion rectangle/polygon 规则走，并叠加局部圆形 override zone。
  */
 export function biomeWeightsAt(coord: GeographicCoordinate): BiomeWeights {
   if (isInsideSlice(coord, BIOME_ZONE_DATA.qinlingSlice)) {
     return phase1Weights(coord);
   }
 
-  return blendByWeights(normalizedNationwideWeights(coord));
+  return blendByWeights(normalizedBiomeWeights(coord));
 }
