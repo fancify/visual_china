@@ -17,8 +17,8 @@ function resolveAudioContextCtor(): typeof AudioContext {
   return ctor;
 }
 
-/** 整体输出音量。用户偏好"似有似无"，所以所有 ambient/one-shot 经此再衰一道。 */
-export const MASTER_GAIN_DEFAULT = 0.25;
+/** 整体输出音量。用户偏好"似有似无"，0.25 仍嘈杂——再降到 0.15 让一切刚好"听得到没存在感"。 */
+export const MASTER_GAIN_DEFAULT = 0.15;
 
 export function createAudioRuntime(): AudioRuntime {
   const AudioContextCtor = resolveAudioContextCtor();

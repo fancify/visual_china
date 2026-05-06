@@ -86,7 +86,8 @@ test("ambient mixer exposes active layers with current gain and trigger label", 
     riverProximity: 0,
     largeRiverProximity: 0
   });
-  runtime.context.currentTime = 2;
+  // crossfade 时间已拉长到 4s，把时间点移到 5 让 fade 完成。
+  runtime.context.currentTime = 5;
 
   assert.equal(typeof mixer.getActiveLayers, "function");
   assert.deepEqual(mixer.getActiveLayers(), [

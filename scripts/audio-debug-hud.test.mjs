@@ -141,14 +141,15 @@ test("audio debug hud renders active layers and recent fires", () => {
 
     assert.equal(root.children.length, 1);
     const panel = root.children[0];
-    assert.match(panel.innerHTML, /环境音 \(0\.25\)/);
-    assert.match(panel.innerHTML, /ambient_rain_heavy/);
+    // HUD 改成中文显示 + 频率 + 触发条件，断言更新到新文案。
+    assert.match(panel.innerHTML, /持续环境音 · 总音量 0\.25/);
+    assert.match(panel.innerHTML, /雨声/);                        // ambient_rain_heavy
     assert.match(panel.innerHTML, /0\.60/);
-    assert.match(panel.innerHTML, /weather=rain/);
-    assert.match(panel.innerHTML, /ambient_soft_wind/);
-    assert.match(panel.innerHTML, /2\.8s ui_hover/);
-    assert.match(panel.innerHTML, /hover POI: 黄龙/);
-    assert.match(panel.innerHTML, /5\.0s footstep_grass/);
+    assert.match(panel.innerHTML, /柔风/);                        // ambient_soft_wind
+    assert.match(panel.innerHTML, /UI 悬停/);                     // ui_hover
+    assert.match(panel.innerHTML, /草地脚步/);                     // footstep_grass
+    assert.match(panel.innerHTML, /2\.8s 前/);
+    assert.match(panel.innerHTML, /5\.0s 前/);
   } finally {
     globalThis.document = previousDocument;
   }
