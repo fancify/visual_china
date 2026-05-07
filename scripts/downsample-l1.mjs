@@ -13,9 +13,11 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const INPUT = path.join(ROOT, "public/data/regions/qinling/slice-l1.json");
 const OUTPUT = INPUT;  // 覆写
 
-// 8× 太狠（14km/cell 山形糊）；4× 是 7km/cell，山脊走向看得清。
-// 文件大小约 17 MB，parse ~150ms 可接受（不会触发 Page Unresponsive）。
-const STRIDE = 4;
+// Phase 3 全国 0.9 km grid (6225×4316)：4× 还有 1.7M cells / ~70 MB JSON，
+// 浏览器 parse ~1 秒可接受但不舒适。8× → 778×540 = 420K cells / ~17 MB JSON，
+// parse ~200 ms。L1 只用于 atlas 概览 + chunk 加载前的 fallback mesh，
+// 7.2 km/cell 够用——细节由 chunks (45×45 km, 50×50 cells = 0.9 km/cell) 接管。
+const STRIDE = 8;
 
 const raw = await fs.readFile(INPUT, "utf8");
 const asset = JSON.parse(raw);
