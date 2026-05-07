@@ -45,9 +45,11 @@ test("gameHeightToRealMeters keeps current qinling gameplay heights in a plausib
 
   // 同一 -1.44 gameplay 高度，因为 verticalRange 现在 ~15.6（旧 ~16.5），映射到
   // realRange ~ 8157（旧 ~5227），所以 zitong 类山地的真实海拔会低一些。
+  // Phase 3 0.9 km grid + spike-filtered HydroSHEDS：realPeak ~8351m，
+  // verticalRange 17.265，所以 -1.44 game 映射到 ~918m（low-hill）。
   const zitongLikeHeightMeters = gameHeightToRealMeters(-1.44, regionAsset);
   assert.ok(
-    zitongLikeHeightMeters >= 1000 && zitongLikeHeightMeters <= 1500,
+    zitongLikeHeightMeters >= 800 && zitongLikeHeightMeters <= 1500,
     `expected -1.44 gameplay height to map near low-hill elevation, got ${zitongLikeHeightMeters}m`
   );
 });

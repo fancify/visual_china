@@ -317,9 +317,11 @@ test("Qinling river carving keeps a narrow water footprint with sharper gorge wa
     gorge.visibleWaterCells >= 18000 && gorge.visibleWaterCells <= 28000,
     `visible water corridor should stay within current baseline, got ${gorge.visibleWaterCells} cells above 0.1`
   );
+  // Phase 3 河流改成 ribbon 渲染后，carving 大幅压低（depth 0.85→0.18），
+  // bank rise 从 ~1 unit 降到 ~0.4 unit。河谷不再深沟，靠 ribbon 显水。
   assert.ok(
-    gorge.bankRise90 >= 0.5 && gorge.bankRise90 <= 1.5,
-    `gorge banks should remain pronounced, got p90 rise ${gorge.bankRise90.toFixed(3)}`
+    gorge.bankRise90 >= 0.2 && gorge.bankRise90 <= 0.8,
+    `gorge banks should remain readable, got p90 rise ${gorge.bankRise90.toFixed(3)}`
   );
 });
 
