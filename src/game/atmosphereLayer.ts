@@ -5,6 +5,8 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  MeshLambertMaterial,
+  Object3D,
   Points,
   PointsMaterial,
   ShaderMaterial,
@@ -312,14 +314,62 @@ export function applySkyVisuals(
 
 export interface CloudLayerHandle {
   group: Group;
-  sprites: Sprite[];
+  // 保留 sprites 字段名兼容 main.ts 既有 update loop（每个 sprite 现在是
+  // 一个 Object3D wrapper，下面挂着 4-6 个 mesh puff）；接口形态不变。
+  sprites: Object3D[];
   texture: CanvasTexture;
+  // 3D puffs 用 MeshLambertMaterial；保留 SpriteMaterial 是 legacy。两者的
+  // opacity / color 由 main loop 通过 setVisuals 同步推过来。
   material: SpriteMaterial;
+  bodyMaterial: MeshLambertMaterial;
+}
+
+/**
+ * 3D 立体云朵：每朵 = 4-6 个 SphereGeometry "puff" 拼成的 cluster。
+ * - SphereGeometry 8×6 widthSegments：低多边形，单云 ~150 tris × 24 朵 ≈
+ *   3.6K tris 总，对 GPU 没压力。
+ * - MeshLambertMaterial：白色 + 顶部高光 / 底部偏蓝灰，云的体积感来自 lighting
+ *   而不是贴图。flatShading=false 让 puff 之间过渡平滑。
+ * - 旧 SpriteMaterial + canvas 贴图保留导出（兼容外部 import），但不再渲染。
+ */
+const CLOUD_BODY_MATERIAL = new MeshLambertMaterial({
+  color: 0xfafcff,
+  emissive: 0x101820,
+  emissiveIntensity: 0.05,
+  transparent: true,
+  opacity: 0.92,
+  flatShading: false
+});
+
+function createCloudCluster(): Object3D {
+  const cluster = new Object3D();
+  const puffCount = 4 + Math.floor(Math.random() * 3); // 4-6 puffs
+  const baseRadius = 6 + Math.random() * 4; // 主泡 6-10 单位
+  for (let i = 0; i < puffCount; i += 1) {
+    const radius = baseRadius * (0.55 + Math.random() * 0.55);
+    // 用低多边形保持云轮廓 polygon-ish (千里江山图风格里云本来就硬朗块状)。
+    const geometry = new SphereGeometry(radius, 8, 6);
+    const puff = new Mesh(geometry, CLOUD_BODY_MATERIAL);
+    // 偏移：水平分布更宽（让云形是椭圆扁平），上下幅度小。
+    puff.position.set(
+      (Math.random() - 0.5) * baseRadius * 1.6,
+      (Math.random() - 0.5) * baseRadius * 0.45,
+      (Math.random() - 0.5) * baseRadius * 1.0
+    );
+    puff.scale.set(
+      0.85 + Math.random() * 0.4,
+      0.55 + Math.random() * 0.3, // 压扁
+      0.85 + Math.random() * 0.4
+    );
+    cluster.add(puff);
+  }
+  return cluster;
 }
 
 export function createCloudLayer(): CloudLayerHandle {
   const group = new Group();
   const texture = createCloudTexture();
+  // material 保留是为了 export 兼容；3D puff 自带 MeshLambert，跟它无关。
   const material = new SpriteMaterial({
     map: texture,
     transparent: true,
@@ -327,24 +377,21 @@ export function createCloudLayer(): CloudLayerHandle {
     depthWrite: false,
     opacity: 0.18
   });
-  const sprites: Sprite[] = [];
+  const sprites: Object3D[] = [];
   const cloudCount = Math.floor(18 + Math.random() * 7);
 
   for (let index = 0; index < cloudCount; index += 1) {
-    const cloud = new Sprite(material);
-    const width = 30 + Math.random() * 60;
-    const height = 12 + Math.random() * 12;
-    cloud.renderOrder = 10;
-    cloud.scale.set(width, height, 1);
-    cloud.userData.baseX = (Math.random() - 0.5) * 400;
-    cloud.userData.baseZ = (Math.random() - 0.5) * 400;
-    cloud.userData.phase = Math.random() * Math.PI * 2;
-    cloud.userData.driftSpeed = 0.4 + Math.random() * 1.2;
-    sprites.push(cloud);
-    group.add(cloud);
+    const cluster = createCloudCluster();
+    cluster.renderOrder = 10;
+    cluster.userData.baseX = (Math.random() - 0.5) * 400;
+    cluster.userData.baseZ = (Math.random() - 0.5) * 400;
+    cluster.userData.phase = Math.random() * Math.PI * 2;
+    cluster.userData.driftSpeed = 0.4 + Math.random() * 1.2;
+    sprites.push(cluster);
+    group.add(cluster);
   }
 
-  return { group, sprites, texture, material };
+  return { group, sprites, texture, material, bodyMaterial: CLOUD_BODY_MATERIAL };
 }
 
 export interface PrecipitationHandle {

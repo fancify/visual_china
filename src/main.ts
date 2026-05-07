@@ -4792,6 +4792,11 @@ function update(deltaSeconds: number): void {
     return;
   }
 
+  // 防御性：每帧强制把 scenery / wildlife 可见性同步到当前 mount 状态。
+  // applyCustomization 时已调用一次，但 chunk 后续异步加载 / wildlife rebuild
+  // 可能让新的 group 默认 visible=true，绕过那次同步。
+  applyCloudModeVisibility();
+
   const environment = environmentController.update(deltaSeconds);
   const visuals = environmentController.computeVisuals();
   lastVisuals = visuals;
@@ -4911,6 +4916,10 @@ function update(deltaSeconds: number): void {
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
   cloudMaterial.opacity = visuals.cloudOpacity * 0.74;
   cloudMaterial.color.copy(visuals.cloudColor);
+  // 3D puff 用 MeshLambertMaterial：直接把 environment 的 cloudColor 套上去
+  // 让黎明/黄昏的橙红色顺着 lighting 影响云体。opacity 给云蓬松感留 0.92 上限。
+  cloudLayer.bodyMaterial.color.copy(visuals.cloudColor);
+  cloudLayer.bodyMaterial.opacity = MathUtils.clamp(visuals.cloudOpacity * 1.05, 0.4, 0.95);
   cloudSprites.forEach((cloud, index) => {
     const phase = Number(cloud.userData.phase) || 0;
     const speedFactor = Number(cloud.userData.driftSpeed) || 1;
@@ -5054,13 +5063,20 @@ function update(deltaSeconds: number): void {
     );
   });
 
-  const avatarTilt = computeAvatarTilt({
-    heading: player.rotation.y,
-    position: player.position,
-    sampler: terrainSampler
-  });
-  player.rotation.x = MathUtils.lerp(player.rotation.x, avatarTilt.pitch, 0.18);
-  player.rotation.z = MathUtils.lerp(player.rotation.z, avatarTilt.roll, 0.18);
+  // 筋斗云模式下跳过地形倾斜——飞行不跟地形坡度。否则 player 在云上还
+  // 会随山势歪头歪身，看着像被风吹倒。
+  if (currentMountId === "cloud") {
+    player.rotation.x = MathUtils.lerp(player.rotation.x, 0, 0.18);
+    player.rotation.z = MathUtils.lerp(player.rotation.z, 0, 0.18);
+  } else {
+    const avatarTilt = computeAvatarTilt({
+      heading: player.rotation.y,
+      position: player.position,
+      sampler: terrainSampler
+    });
+    player.rotation.x = MathUtils.lerp(player.rotation.x, avatarTilt.pitch, 0.18);
+    player.rotation.z = MathUtils.lerp(player.rotation.z, avatarTilt.roll, 0.18);
+  }
 
   const ground = terrainSampler.sampleHeight(player.position.x, player.position.z);
   cloudFlightAltitude = nextCloudFlightAltitude({

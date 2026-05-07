@@ -313,13 +313,12 @@ test("cloud layer spawns a denser randomized field with per-sprite drift metadat
     );
 
     cloudLayer.sprites.forEach((cloud, index) => {
+      // Phase 3 立体云：每朵 cloud 是 Object3D wrapper，下挂 4-6 个 puff mesh。
+      // 旧 sprite scale 检查不再有效（cluster 自身 scale=1，体积来自 puff
+      // geometry radius）。改成验证 children 数量 + 朵的 group 是 Object3D。
       assert.ok(
-        cloud.scale.x >= 30 && cloud.scale.x <= 90,
-        `cloud ${index} width should stay within 30-90, got ${cloud.scale.x}`
-      );
-      assert.ok(
-        cloud.scale.y >= 12 && cloud.scale.y <= 24,
-        `cloud ${index} height should stay within 12-24, got ${cloud.scale.y}`
+        cloud.children.length >= 4 && cloud.children.length <= 6,
+        `cloud ${index} should have 4-6 puff children, got ${cloud.children.length}`
       );
       assert.ok(
         Number(cloud.userData.baseX) >= -200 && Number(cloud.userData.baseX) <= 200,
