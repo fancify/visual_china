@@ -90,16 +90,14 @@ function meanNeighborDifference(values, column, row, columns, rows) {
 //
 // 关键：carving 是在 normalize 之后做的，所以 depth 是游戏单位 (-2..9 范围内)
 // 而不是真实米数。每个 cell 取 min(current, riverHeight - depth*falloff)。
+// Phase 3 全国 0.9 km cell + 1.6× 垂直夸张 + 3D river ribbons 同时存在：
+// 旧的 deep carving 把河谷搞成 1.4 unit 深沟，从空中看全是黑色阴影带，比河
+// 还宽。现在水带由 ribbon 直接渲染，carving 只需要让 ribbon 嵌进 mesh 不浮空，
+// 大幅压低 depth + radius。
 const RIVER_CARVE_BY_RANK = {
-  // 当前约束已经变了：城市贴地修复已完成、独立 river ribbon 也已删除，
-  // 因此可以安全回到 narrower + deeper 的峡谷雕刻，而不再触发"城市消失"
-  // 或 "低角度看不到 ribbon" 两个旧问题。
-  // grid 翻倍 + radius 1.0 cells 后还是看着 4-6km 宽水体（乌江 confluence 像湖）。
-  // 怀疑 NE 数据乌江包含支流分叉（多平行 stripe）。下一档：radius 砍到 0.5
-  // ≈ 1 km wide，stripe 之间不再几乎相连。如果还宽就动 NE 数据本身。
-  1: { radiusCells: 0.5, depth: 0.85 }, // 主干 ≈ 1 km wide
-  2: { radiusCells: 0.4, depth: 0.55 }, // 一级支流 ≈ 0.8 km wide
-  3: { radiusCells: 0.3, depth: 0.32 } // 二级支流 ≈ 0.6 km wide
+  1: { radiusCells: 0.6, depth: 0.18 }, // 主干 ≈ 1.1 km wide, 浅刻
+  2: { radiusCells: 0.5, depth: 0.12 }, // 一级支流 ≈ 0.9 km wide
+  3: { radiusCells: 0.4, depth: 0.08 } // 二级支流 ≈ 0.7 km wide
 };
 
 // 内部用：把 polyline 密化到 ~1 cell 间隔 (~0.012°, ~1.3km)，让 carving

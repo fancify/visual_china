@@ -867,6 +867,22 @@ function applyCustomization(mountId: MountId, avatarId: AvatarId): void {
   if (customizationPanelOpen) {
     hud.setCustomizationPanelOpen({ mountId, avatarId });
   }
+  applyCloudModeVisibility();
+}
+
+// 筋斗云模式：远景俯瞰画风，地面 scenery（树/草）+ 动物会让画面糊成噪点。
+// 全部隐藏；保留 cities/landmarks/scenic POIs/ancient sites/rivers。
+// 切回非云骑乘时全部恢复（chunk fade 路径会按需重新点亮）。
+function applyCloudModeVisibility(): void {
+  const flying = currentMountId === "cloud";
+  // wildlife group 整组开关
+  wildlifeGroup.visible = !flying;
+  // 每个 chunk 的 scenery group（树/灌丛）— 直接 toggle，不等 fade。
+  terrainChunkMeshes.forEach((terrainChunk) => {
+    if (terrainChunk.scenery) {
+      terrainChunk.scenery.visible = !flying && terrainChunk.mesh.visible;
+    }
+  });
 }
 
 // 4 个 procedural texture helper（圆形光晕、月亮、星空点云、云朵）已迁到

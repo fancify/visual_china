@@ -62,7 +62,45 @@ const NAME_TO_ID = {
   "赣江":   { id: "river-ganjiang",     flowDir: "lat-asc",  rank: 2, basin: "长江流域", displayName: "赣江" },
   // 北扩到太行-华北平原后新增海河流域骨架，按西→东排序即可保持主干连续。
   "海河":   { id: "river-haihe",        flowDir: "lon-asc",  rank: 1, basin: "海河流域", displayName: "海河" },
-  "漳河":   { id: "river-zhanghe",      flowDir: "lon-asc",  rank: 2, basin: "海河流域", displayName: "漳河" }
+  "漳河":   { id: "river-zhanghe",      flowDir: "lon-asc",  rank: 2, basin: "海河流域", displayName: "漳河" },
+  "阿克苏河": { id: "river-akesuhe",         flowDir: "lat-asc",  rank: 2, basin: "西北内陆流域", displayName: "阿克苏河" },
+  "北江":   { id: "river-beijiang",     flowDir: "lon-desc", rank: 2, basin: "珠江流域", displayName: "北江" },
+  "大渡河": { id: "river-daduhe",       flowDir: "lat-asc",  rank: 2, basin: "长江流域", displayName: "大渡河" },
+  "东江":   { id: "river-dongjiang",    flowDir: "lon-desc", rank: 2, basin: "珠江流域", displayName: "东江" },
+  "额尔齐斯河": { id: "river-eerqisihe",    flowDir: "lon-desc", rank: 1, basin: "西北内陆流域", displayName: "额尔齐斯河" },
+  "汾河":   { id: "river-fenhe",        flowDir: "lat-desc", rank: 2, basin: "黄河流域", displayName: "汾河" },
+  "韩江":   { id: "river-hanjiang-guangdong", flowDir: "lat-desc", rank: 2, basin: "东南沿海流域", displayName: "韩江" },
+  "和田河": { id: "river-hetianhe",     flowDir: "lat-asc",  rank: 2, basin: "西北内陆流域", displayName: "和田河" },
+  "黑河/弱水": { id: "river-heihe",         flowDir: "lat-asc",  rank: 1, basin: "西北内陆流域", displayName: "黑河", aliases: ["弱水"] },
+  "黑龙江": { id: "river-heilongjiang", flowDir: "lat-desc", rank: 1, basin: "东北流域", displayName: "黑龙江" },
+  "淮河":   { id: "river-huaihe",       flowDir: "lon-asc",  rank: 1, basin: "淮河流域", displayName: "淮河" },
+  "湟水":   { id: "river-huangshui",    flowDir: "lon-desc", rank: 2, basin: "黄河流域", displayName: "湟水" },
+  "京杭大运河": { id: "river-jinghangdayunhe", flowDir: "lat-asc", rank: 2, basin: "运河水系", displayName: "京杭大运河" },
+  "澜沧江": { id: "river-lancangjiang", flowDir: "lat-asc",  rank: 1, basin: "青藏高原流域", displayName: "澜沧江" },
+  "辽河":   { id: "river-liaohe",       flowDir: "lat-desc", rank: 1, basin: "辽河流域", displayName: "辽河" },
+  "柳江":   { id: "river-liujiang",     flowDir: "lat-asc",  rank: 2, basin: "珠江流域", displayName: "柳江" },
+  "滦河":   { id: "river-luanhe",       flowDir: "lat-desc", rank: 2, basin: "海河流域", displayName: "滦河" },
+  "洛河":   { id: "river-luohe",        flowDir: "lat-desc", rank: 2, basin: "黄河流域", displayName: "洛河" },
+  // 闽江与已有岷江同拼音，id 带地区后缀避免冲突。
+  "闽江":   { id: "river-minjiang-fujian", flowDir: "lon-desc", rank: 1, basin: "东南沿海流域", displayName: "闽江" },
+  "嫩江":   { id: "river-nenjiang",     flowDir: "lat-desc", rank: 1, basin: "东北流域", displayName: "嫩江" },
+  "怒江":   { id: "river-nujiang",      flowDir: "lat-asc",  rank: 1, basin: "青藏高原流域", displayName: "怒江" },
+  "瓯江":   { id: "river-oujiang",      flowDir: "lon-desc", rank: 2, basin: "东南沿海流域", displayName: "瓯江" },
+  "钱塘江": { id: "river-qiantangjiang", flowDir: "lon-desc", rank: 1, basin: "东南沿海流域", displayName: "钱塘江" },
+  "沁河":   { id: "river-qinhe",        flowDir: "lat-desc", rank: 3, basin: "黄河流域", displayName: "沁河" },
+  "疏勒河": { id: "river-shulehe",      flowDir: "lon-desc", rank: 2, basin: "西北内陆流域", displayName: "疏勒河" },
+  "松花江": { id: "river-songhuajiang", flowDir: "lon-desc", rank: 1, basin: "东北流域", displayName: "松花江" },
+  "塔里木河": { id: "river-talimuhe",      flowDir: "lon-desc", rank: 1, basin: "西北内陆流域", displayName: "塔里木河" },
+  "图们江": { id: "river-tumenjiang",   flowDir: "lat-desc", rank: 1, basin: "东北流域", displayName: "图们江" },
+  "乌伦古河": { id: "river-wulunguhe",     flowDir: "lon-desc", rank: 2, basin: "西北内陆流域", displayName: "乌伦古河" },
+  "乌苏里江": { id: "river-wusulijiang",   flowDir: "lat-desc", rank: 1, basin: "东北流域", displayName: "乌苏里江" },
+  "西江":   { id: "river-xijiang",      flowDir: "lon-desc", rank: 1, basin: "珠江流域", displayName: "西江" },
+  "鸭绿江": { id: "river-yalujiang",    flowDir: "lat-desc", rank: 1, basin: "东北流域", displayName: "鸭绿江" },
+  "雅砻江": { id: "river-yalongjiang",  flowDir: "lat-asc",  rank: 2, basin: "长江流域", displayName: "雅砻江" },
+  "雅鲁藏布江": { id: "river-yaluzangbujiang", flowDir: "lon-asc", rank: 1, basin: "青藏高原流域", displayName: "雅鲁藏布江" },
+  "叶尔羌河": { id: "river-yeerqianghe",   flowDir: "lat-asc",  rank: 2, basin: "西北内陆流域", displayName: "叶尔羌河" },
+  // 元江/红河 与已有沅江同拼音，id 保留红河后缀避免冲突。
+  "元江/红河": { id: "river-yuanjiang-honghe", flowDir: "lat-asc", rank: 1, basin: "青藏高原流域", displayName: "元江", aliases: ["红河"] }
 };
 
 // 南扩后用户点名的几条珠江系干支流，在当前本地数据里还缺源：
