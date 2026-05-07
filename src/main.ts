@@ -781,7 +781,10 @@ let lastMovementHeading: { x: number; z: number } | null = null;
 // 全国画幅下普通云高（50）显得低；用户要求 ×3 让筋斗云真能看到全景。
 const CLOUD_FLIGHT_ASCEND_STEP = 1.2; // 0.4 × 3
 const CLOUD_FLIGHT_MAX_ALTITUDE = 150; // 50 × 3
-const CLOUD_FLIGHT_MIN_CLEARANCE = 3; // 1 × 3
+// 筋斗云改全局绝对高度：飞行不跟地面坡度走，过山过河都是同一高度。
+// maxHeight 13.5 × 1.6 exag = 21.6（青藏/Everest），MIN 25 确保安全过所有
+// 中国地形而不会撞山（用户："不用照顾地面坡度"）。
+const CLOUD_FLIGHT_MIN_ABSOLUTE = 25;
 const CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET = 24; // 8 × 3 — 全国画幅起飞高度
 scene.add(player);
 
@@ -829,9 +832,12 @@ export function nextCloudFlightAltitude({
     nextAltitude -= CLOUD_FLIGHT_ASCEND_STEP;
   }
 
+  // 筋斗云全局绝对高度：clamp 用 absolute MIN，跟地面无关。过山时 player.y
+  // 由 resolvePlayerTargetY 直接 = cloudFlightAltitude（不加 ground offset）。
+  void ground;
   return MathUtils.clamp(
     nextAltitude,
-    ground + CLOUD_FLIGHT_MIN_CLEARANCE,
+    CLOUD_FLIGHT_MIN_ABSOLUTE,
     CLOUD_FLIGHT_MAX_ALTITUDE
   );
 }

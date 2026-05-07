@@ -234,7 +234,7 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
     12.35
   );
 
-  // Phase 3 全国画幅 ×3：MAX 50→150，MIN_CLEARANCE 1→3，ASCEND_STEP 0.4→1.2。
+  // Phase 3 全国画幅：MAX 150 / MIN_ABSOLUTE 25（绝对高度，跟地面无关）。
   assert.equal(
     nextCloudFlightAltitude({
       currentMountId: "cloud",
@@ -250,10 +250,10 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
       currentMountId: "cloud",
       keys: new Set(["x"]),
       ground: 10,
-      cloudFlightAltitude: 13.5
+      cloudFlightAltitude: 26
     }),
-    13,
-    "x descent should clamp to ground + 3"
+    25,
+    "x descent should clamp to absolute MIN 25 regardless of ground"
   );
   assert.equal(
     resolvePlayerTargetY({

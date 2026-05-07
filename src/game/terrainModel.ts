@@ -168,18 +168,12 @@ export function modeColor(
 
     color = new Color().setHSL(hue, sat, lum);
 
-    // 2026-05 重构：河面 / 河边一体化在 terrain shader 里画 (替代独立
-    // ribbon mesh，根除 z-buffer 冲突)。这次用户希望主干更细、边缘更硬，
-    // 所以把纯水色压缩到 riverMask 的最高值核心，仅保留一圈较弱湿岸。
-    if (river > 0.85) {
-      const waterColor = new Color().setHSL(0.55, 0.7, 0.5); // 鲜亮青蓝
-      // mask 0.85 → t=0; mask 1.0 → t=1.0，压缩进最窄的河芯。
-      const t = Math.min(1, (river - 0.85) / 0.15);
-      color.lerp(waterColor, t);
-    } else if (river > 0.1) {
-      const riparianTint = new Color().setHSL(0.30, 0.55, 0.42);
-      color.lerp(riparianTint, river * 0.20);
-    }
+    // 2026-05 Phase 3：删除 mesh-level riverMask tinting。河流改由独立
+    // 3D water ribbon mesh 渲染（rebuildHydrographyRibbons 创建）。
+    // 旧逻辑同时着色 + ribbon 会产生用户报的"浅蓝斑点"：riverMask 是连续
+    // 0-1 channel，>0.1 的所有 cell 都被涂浅蓝晕，跟 ribbon 风格冲突。
+    // 全部水统一由 ribbon + global water plane 表示，mesh 不再画水。
+    void river;
 
     // 聚落附近向耕地黄绿推（农田 + 灌丛 mix）。Gate by slope —— 真正的
     // 农田只长在缓坡，陡坡上即使 settlementMask 高也不应该被涂成农田色
