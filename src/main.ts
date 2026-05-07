@@ -774,9 +774,10 @@ let customizationPanelOpen = false;
 let avatarWalkPhase = 0;
 let currentVelocityScale = 0;
 let lastMovementHeading: { x: number; z: number } | null = null;
-const CLOUD_FLIGHT_ASCEND_STEP = 0.4;
-const CLOUD_FLIGHT_MAX_ALTITUDE = 50;
-const CLOUD_FLIGHT_MIN_CLEARANCE = 1;
+// 全国画幅下普通云高（50）显得低；用户要求 ×3 让筋斗云真能看到全景。
+const CLOUD_FLIGHT_ASCEND_STEP = 1.2; // 0.4 × 3
+const CLOUD_FLIGHT_MAX_ALTITUDE = 150; // 50 × 3
+const CLOUD_FLIGHT_MIN_CLEARANCE = 3; // 1 × 3
 const CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET = 8;
 scene.add(player);
 
@@ -3993,27 +3994,30 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
 // Chunk fade-in：每帧把刚切到 visible 的 chunk 从 opacity 0 涨到 1，
 // 1.2 秒走完。scenery（树）等 chunk fade 结束后再亮起来，避免地形还在
 // 半透明时树已经满 opacity 漂在空气里（codex fb57c87 P2）。
+// 筋斗云模式：scenery 全局关掉——高空俯瞰画风，地面树会让画面糊成一片。
 function updateChunkFadeIn(): void {
+  const sceneryEnabled = currentMountId !== "cloud";
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (!terrainChunk.mesh.visible) return;
     const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
     const material = terrainChunk.mesh.material as MeshPhongMaterial;
     if (fadeStart === undefined) {
       material.opacity = 1;
-      if (terrainChunk.scenery) terrainChunk.scenery.visible = true;
+      if (terrainChunk.scenery) terrainChunk.scenery.visible = sceneryEnabled;
       return;
     }
     const elapsed = clock.elapsedTime - fadeStart;
     if (elapsed >= CHUNK_FADE_DURATION) {
       material.opacity = 1;
       delete terrainChunk.mesh.userData.fadeStart;
-      if (terrainChunk.scenery) terrainChunk.scenery.visible = true;
+      if (terrainChunk.scenery) terrainChunk.scenery.visible = sceneryEnabled;
       return;
     }
     material.opacity = MathUtils.clamp(elapsed / CHUNK_FADE_DURATION, 0, 1);
     // scenery 在 fade 80% 之后再开始 visible，让树跟在 terrain 后面"长出来"。
     if (terrainChunk.scenery) {
-      terrainChunk.scenery.visible = elapsed >= CHUNK_FADE_DURATION * 0.8;
+      terrainChunk.scenery.visible =
+        sceneryEnabled && elapsed >= CHUNK_FADE_DURATION * 0.8;
     }
   });
 }
