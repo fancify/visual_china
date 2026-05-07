@@ -79,7 +79,7 @@ async function loadMainCloudFlightHelpers() {
   const snippet = extractMainNodes(source, [
     "CLOUD_FLIGHT_ASCEND_STEP",
     "CLOUD_FLIGHT_MAX_ALTITUDE",
-    "CLOUD_FLIGHT_MIN_CLEARANCE",
+    "CLOUD_FLIGHT_MIN_ABSOLUTE",
     "CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET",
     "resolvePlayerTargetY",
     "resetCloudFlightAltitudeForGround",

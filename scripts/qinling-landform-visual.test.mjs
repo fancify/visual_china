@@ -325,21 +325,19 @@ test("Qinling river carving keeps a narrow water footprint with sharper gorge wa
   );
 });
 
-test("terrain river tint thresholds stay narrowed for crisp water edges", () => {
-  assert.match(
+test("mesh no longer paints riverMask — rivers handled by 3D ribbon meshes", () => {
+  // Phase 3：mesh 一体化着色被删，避免 raster mask 跟 vector ribbon 风格冲突
+  // （用户报"浅蓝斑点"）。riverMask channel 仍然被 build pipeline 写入 chunks
+  // 用于河谷雕刻参考，但 modeColor() 不再读它做 tint。
+  assert.doesNotMatch(
     terrainModelSource,
     /if\s*\(river\s*>\s*0\.85\)/,
-    "terrain water tint should only kick in on the strongest river mask core"
+    "mesh-level river tint should be removed; rivers are 3D ribbons now"
   );
-  assert.match(
+  assert.doesNotMatch(
     terrainModelSource,
-    /\(river\s*-\s*0\.85\)\s*\/\s*0\.15/,
-    "terrain water tint ramp should compress into the 0.85-1.0 mask band"
-  );
-  assert.match(
-    terrainModelSource,
-    /river\s*\*\s*0\.20/,
-    "riparian tint should stay weaker so river banks do not look mushy"
+    /riparianTint/,
+    "riparian fuzzy tint should be removed; it caused the blue blob artefact"
   );
 });
 
