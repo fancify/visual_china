@@ -956,10 +956,15 @@ const asset = {
   minHeight: Number(minHeight.toFixed(3)),
   maxHeight: Number(maxHeight.toFixed(3)),
   presentation: {
-    waterLevel: Number((minHeight - 2.5).toFixed(3)),
-    underpaintLevel: Number((minHeight - 3.2).toFixed(3)),
+    // 全国扩张后必须显式渲染海洋。normalize 把所有真海洋 cells（raw 米数 <
+    // 海平面）clamp 到 visualMinHeight=-3；陆地最低洼（北京 -2.4、成都 -1.3）
+    // 都 > -2.85。设 waterLevel = -2.85 刚好盖住海洋 cells 而不淹没低洼陆地。
+    // 旧公式 (minHeight - 2.5 = -6.25) 是为 Qinling slice "不显海洋"特意把
+    // 水面藏到地下，全国画幅下不再适用。
+    waterLevel: -2.85,
+    underpaintLevel: -3.5,
     realPeakMeters,
-    visualIntent: "Readable Guanzhong/Hanzhong/Sichuan basin lowlands with Qinling as a wall, not a sea-surrounded mountain island."
+    visualIntent: "Full-China bounds: ocean cells (clamped to -3) covered by water surface; mainland low basins (e.g. Beijing -2.4) stay above water."
   },
   heights: Array.from(normalized, (value) => Number(value.toFixed(3))),
   riverMask,

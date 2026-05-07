@@ -189,6 +189,7 @@ import {
   waterVisualStyle
 } from "./game/waterSystemVisuals.js";
 import {
+  TERRAIN_VERTICAL_EXAGGERATION,
   TerrainSampler,
   loadDemAsset,
   resolveTerrainAssetRequest,
@@ -5198,7 +5199,13 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
             centerX: worldPoint.x,
             centerZ: worldPoint.z,
             radius: CITY_TIER_SPECS[city.tier].outerSide * 0.65,
-            groundY: sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z)
+            // sampleSurfaceHeight 已经把 raw × 1.6 返回；之后 setHeightOverride
+            // 会让 sampleHeight 把 zone.groundY 再 × 1.6 → 双倍夸张让城市陷进
+            // 抬高的 mesh。zone.groundY 必须存"未夸张"的 raw，让 sampleHeight
+            // 走 override 路径只夸张一次（统一与 zone 外 mesh 一致）。
+            groundY:
+              sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) /
+              TERRAIN_VERTICAL_EXAGGERATION
           };
         })
       : []
@@ -5314,8 +5321,12 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   const waterLevel = sampler.asset.presentation?.waterLevel ?? sampler.asset.minHeight - 2.5;
   const underpaintLevel =
     sampler.asset.presentation?.underpaintLevel ?? sampler.asset.minHeight - 3.2;
-  waterRibbon.position.y = waterLevel;
-  underpaint.position.y = underpaintLevel;
+  // mesh 顶点 Y 由 sampleHeight × 1.6 决定。waterLevel/underpaintLevel 是
+  // pre-exaggeration 的 normalized 值，必须同比 ×1.6 才跟 mesh 在同一空间。
+  // 不乘的话水面会沉到 mesh 之下永远看不见——之前全国扩张 + 1.6× 后用户看
+  // 到"该是大海的地方变成土地"的根因之一。
+  waterRibbon.position.y = waterLevel * TERRAIN_VERTICAL_EXAGGERATION;
+  underpaint.position.y = underpaintLevel * TERRAIN_VERTICAL_EXAGGERATION;
 
   landmarkGroup.children.forEach((child) => {
     if (child instanceof Sprite || child instanceof Mesh) {
