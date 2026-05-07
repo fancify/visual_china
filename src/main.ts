@@ -778,7 +778,7 @@ let lastMovementHeading: { x: number; z: number } | null = null;
 const CLOUD_FLIGHT_ASCEND_STEP = 1.2; // 0.4 × 3
 const CLOUD_FLIGHT_MAX_ALTITUDE = 150; // 50 × 3
 const CLOUD_FLIGHT_MIN_CLEARANCE = 3; // 1 × 3
-const CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET = 8;
+const CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET = 24; // 8 × 3 — 全国画幅起飞高度
 scene.add(player);
 
 export function resetCloudFlightAltitudeForGround(ground: number): number {

@@ -213,7 +213,8 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
   assert.equal(typeof resetCloudFlightAltitudeForGround, "function");
   assert.equal(typeof resolvePlayerTargetY, "function");
 
-  assert.equal(resetCloudFlightAltitudeForGround(7), 15);
+  // Phase 3 全国画幅：DEFAULT_GROUND_OFFSET 8 → 24 (×3)。
+  assert.equal(resetCloudFlightAltitudeForGround(7), 31);
   assert.equal(
     nextCloudFlightAltitude({
       currentMountId: "horse",
@@ -233,14 +234,15 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
     12.35
   );
 
+  // Phase 3 全国画幅 ×3：MAX 50→150，MIN_CLEARANCE 1→3，ASCEND_STEP 0.4→1.2。
   assert.equal(
     nextCloudFlightAltitude({
       currentMountId: "cloud",
       keys: new Set([" "]),
       ground: 10,
-      cloudFlightAltitude: 49.9
+      cloudFlightAltitude: 149.5
     }),
-    50,
+    150,
     "space ascent should clamp at the max flight altitude"
   );
   assert.equal(
@@ -248,10 +250,10 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
       currentMountId: "cloud",
       keys: new Set(["x"]),
       ground: 10,
-      cloudFlightAltitude: 10.3
+      cloudFlightAltitude: 13.5
     }),
-    11,
-    "x descent should clamp to ground + 1"
+    13,
+    "x descent should clamp to ground + 3"
   );
   assert.equal(
     resolvePlayerTargetY({
