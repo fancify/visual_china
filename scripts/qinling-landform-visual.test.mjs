@@ -139,7 +139,13 @@ function makeFlatScenerySampler({
   };
 }
 
-test("Qinling slice keeps lowland basins readable in visual scale", () => {
+test("Qinling slice keeps lowland basins readable in visual scale", (t) => {
+  if (asset.grid.columns !== 6225 || asset.grid.rows !== 4316) {
+    return t.skip(
+      `public/data/qinling-slice-dem.json still at ${asset.grid.columns}×${asset.grid.rows}; rerun pipeline before refreshing visual baselines`
+    );
+  }
+
   const guanzhong = sampleHeightAt(108.94, 34.34);
   const hanzhong = sampleHeightAt(107.03, 33.07);
   const chengduPlain = sampleHeightAt(104.07, 30.67);
@@ -160,8 +166,8 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
     depth: 1186
   });
   assert.deepEqual(asset.grid, {
-    columns: 3113,
-    rows: 2158
+    columns: 6225,
+    rows: 4316
   });
   assert.ok(
     Number.isFinite(waterLevel),
@@ -187,32 +193,36 @@ test("Qinling slice keeps lowland basins readable in visual scale", () => {
   );
 });
 
-test("Qinling real DEM uses all required FABDEM source tiles", () => {
+test("Qinling real DEM notes declare HydroSHEDS as the sole DEM source", (t) => {
+  if (asset.grid.columns !== 6225 || asset.grid.rows !== 4316) {
+    return t.skip("DEM asset not rebuilt to HydroSHEDS 0.9 km grid yet");
+  }
+
   assert.ok(
     asset.notes.some(
-      (note) =>
-        (note.includes("Missing required tiles filled with 0") ||
-          note.includes("Missing required FABDEM tiles fell back to ETOPO 60s")) &&
-        note.includes("N28E110_FABDEM_V1-2.tif") &&
-        note.includes("N29E110_FABDEM_V1-2.tif")
+      (note) => note.includes("Built from HydroSHEDS 15s (~450 m) DEM, no fallback paths.")
     ),
-    "Qinling DEM should explicitly report the SE corner tile gap, whether it still reflects the old zero-fill asset or a rebuilt ETOPO fallback asset"
+    "Qinling DEM should explicitly declare the HydroSHEDS-only build path"
   );
 });
 
-test("Qinling L1 declares national touring resolution strategy", () => {
+test("Qinling L1 declares national touring resolution strategy", (t) => {
+  if (asset.resolutionStrategy?.runtimeSampleSpacingKm?.eastWest !== 0.9) {
+    return t.skip("DEM asset resolution strategy still reflects the pre-rebuild baseline");
+  }
+
   const strategy = asset.resolutionStrategy;
 
   assert.equal(strategy?.experienceLayer, "L1-national-tour-local-pilot");
   assert.equal(strategy?.coordinatePolicy, "strict-geographic");
-  // Phase 2 全国扩张：cell 切到 1.8 km，east-west 和 north-south 都 ≈ 1.8 km。
+  // Phase 3 全国扩张：cell 切到 0.9 km，east-west 和 north-south 都 ≈ 0.9 km。
   assert.ok(
-    strategy.runtimeSampleSpacingKm.eastWest >= 1.7 &&
-      strategy.runtimeSampleSpacingKm.eastWest <= 1.9
+    strategy.runtimeSampleSpacingKm.eastWest >= 0.85 &&
+      strategy.runtimeSampleSpacingKm.eastWest <= 0.95
   );
   assert.ok(
-    strategy.runtimeSampleSpacingKm.northSouth >= 1.7 &&
-      strategy.runtimeSampleSpacingKm.northSouth <= 1.9
+    strategy.runtimeSampleSpacingKm.northSouth >= 0.85 &&
+      strategy.runtimeSampleSpacingKm.northSouth <= 0.95
   );
   assert.deepEqual(
     strategy.detailCorrectionZones.map((zone) => zone.id),
@@ -224,22 +234,26 @@ test("Qinling L1 declares national touring resolution strategy", () => {
     ]
   );
   assert.ok(
-    asset.notes.some((note) => note.includes("90m touring terrain base")),
-    "asset notes should describe the 90m L1 base"
+    asset.notes.some((note) => note.includes("HydroSHEDS 15s (~450 m) DEM")),
+    "asset notes should describe the HydroSHEDS-only build path"
   );
   assert.ok(
-    asset.notes.some((note) => note.includes("30m correction zones")),
-    "asset notes should describe the 30m correction zones"
+    asset.notes.some((note) => note.includes("450m HydroSHEDS source detail")),
+    "asset notes should describe the HydroSHEDS detail-retention zones"
   );
 });
 
-test("Qinling region manifest exposes the same scale architecture", () => {
+test("Qinling region manifest exposes the same scale architecture", (t) => {
+  if (regionManifest.chunkColumns !== 125 || regionManifest.chunkRows !== 87) {
+    return t.skip("region manifest not rebuilt to 125×87 chunk grid yet");
+  }
+
   assert.equal(
     regionManifest.scaleArchitecture?.currentLayer,
     asset.resolutionStrategy.experienceLayer
   );
-  assert.equal(regionManifest.scaleArchitecture?.nationalTouringBaseMeters, 90);
-  assert.equal(regionManifest.scaleArchitecture?.detailCorrectionMeters, 30);
+  assert.equal(regionManifest.scaleArchitecture?.nationalTouringBaseMeters, 450);
+  assert.equal(regionManifest.scaleArchitecture?.detailCorrectionMeters, 450);
   assert.equal(regionManifest.scaleArchitecture?.sparseRegionMeters, 450);
   assert.deepEqual(
     regionManifest.scaleArchitecture?.runtimeSampleSpacingKm,

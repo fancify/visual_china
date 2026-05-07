@@ -107,12 +107,12 @@ export interface LoadedDemAsset {
 
 type ChannelName = "heights" | "riverMask" | "passMask" | "settlementMask";
 
-// Phase 2 全国扩张：grid 升到 3113×2158 = 6.7M cells。原来的 1024×1024 上限
-// 是为旧 slice 设的，全国规模下会硬拒绝 L1 base map 加载。提到 4096×4096 +
-// 8M 总 cell，保留对崩溃 grid（譬如解析错误把 3113 写成 31130000）的防护。
-const MAX_GRID_COLUMNS = 4096;
-const MAX_GRID_ROWS = 4096;
-const MAX_TOTAL_CELLS = 8 * 1024 * 1024;
+// Phase 3 全国 0.9 km：grid 升到 6225×4316 = 26.87M cells。继续用 4096 / 8M
+// 会在运行期直接拒收合法资产。上限放宽到覆盖当前全国 slice，同时仍保留对
+// 失控输入（譬如把 6225 写成 62250000）的硬防护。
+const MAX_GRID_COLUMNS = 8192;
+const MAX_GRID_ROWS = 8192;
+const MAX_TOTAL_CELLS = 32 * 1024 * 1024;
 
 // 千里江山图风格垂直夸张系数。在 sampleHeight 里统一应用，让 mesh、
 // player.y、scenery、label 全部一致使用夸张后的高度，避免漂浮 / 下沉。

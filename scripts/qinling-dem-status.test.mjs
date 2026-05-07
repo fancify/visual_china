@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import "./etopo-fallback.test.mjs";
+import "./hydrosheds-sampler.test.mjs";
 
 import {
   collectQinlingDemStatus,
@@ -62,43 +61,24 @@ test("collects Qinling DEM download and asset status", async () => {
   assert.match(formatted, /Region manifest: present/);
 });
 
-test("build-qinling-real-dem exposes an explicit srtm90 CLI mode placeholder", async () => {
-  const isolatedRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qinling-dem-build-"));
-  const result = spawnSync(
-    process.execPath,
-    [buildRealDemScriptPath, "--source", "srtm90"],
-    {
-      cwd: isolatedRoot,
-      encoding: "utf8"
-    }
-  );
-  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-
-  assert.notEqual(result.status, 0, "srtm90 placeholder mode should exit non-zero until implemented");
-  assert.match(
-    output,
-    /srtm90 source not yet implemented; use --source fabdem \(default\)\./
-  );
-});
-
-test("build-qinling-real-dem warns when required FABDEM tiles fall back to ETOPO", async () => {
+test("build-qinling-real-dem is wired to a single HydroSHEDS source", async () => {
   const buildScript = await fs.readFile(buildRealDemScriptPath, "utf8");
 
-  assert.match(buildScript, /Missing tile \$\{tileName\}, fallback to ETOPO 60s/);
+  assert.match(buildScript, /getHydroShedsSampler/);
+  assert.doesNotMatch(buildScript, /getEtopoSampler/);
+  assert.doesNotMatch(buildScript, /SUPPORTED_DEM_SOURCES/);
+  assert.doesNotMatch(buildScript, /--source/);
 });
 
-test("Qinling DEM common config switches to the full-China 1.8km grid", () => {
+test("Qinling DEM common config switches to the full-China 0.9km grid", () => {
   assert.deepEqual(qinlingOutputGrid, {
-    columns: 3113,
-    rows: 2158
+    columns: 6225,
+    rows: 4316
   });
-  assert.equal(qinlingResolutionStrategy.target, "1800m-stride4-450m");
-  assert.equal(
-    qinlingResolutionStrategy.comment,
-    "Full China at 1.8 km cell with ETOPO 60s + future HydroSHEDS upgrade path"
-  );
+  assert.equal(qinlingResolutionStrategy.target, "900m-stride2-450m-hydrosheds15s");
+  assert.match(qinlingResolutionStrategy.comment, /HydroSHEDS 15s/);
   assert.deepEqual(qinlingResolutionStrategy.runtimeSampleSpacingKm, {
-    eastWest: 1.8,
-    northSouth: 1.8
+    eastWest: 0.9,
+    northSouth: 0.9
   });
 });

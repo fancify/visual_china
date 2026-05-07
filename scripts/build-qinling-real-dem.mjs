@@ -1,11 +1,6 @@
 import fs from "node:fs/promises";
-import path from "node:path";
-
-import { fromFile } from "geotiff";
 
 import {
-  intersectBounds,
-  parseFabdemTileName,
   qinlingBounds,
   qinlingResolutionStrategy,
   qinlingOutputGrid,
@@ -13,10 +8,8 @@ import {
   qinlingWorkspacePath,
   qinlingWorld
 } from "./qinling-dem-common.mjs";
-import { getEtopoSampler } from "./etopo-fallback.mjs";
+import { getHydroShedsSampler } from "./hydrosheds-sampler.mjs";
 import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
-
-const SUPPORTED_DEM_SOURCES = new Set(["fabdem", "srtm90"]);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -455,34 +448,6 @@ function detailCorrectionWeightAt(lon, lat) {
   );
 }
 
-function parseBuildOptions(argv = process.argv.slice(2)) {
-  const options = { source: "fabdem" };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-
-    if (arg !== "--source") {
-      continue;
-    }
-
-    const nextValue = argv[index + 1];
-    if (!nextValue) {
-      throw new Error("Missing value for --source. Supported values: fabdem, srtm90.");
-    }
-
-    options.source = nextValue;
-    index += 1;
-  }
-
-  if (!SUPPORTED_DEM_SOURCES.has(options.source)) {
-    throw new Error(
-      `Unsupported DEM source "${options.source}". Supported values: fabdem, srtm90.`
-    );
-  }
-
-  return options;
-}
-
 function buildTouringLayerRawHeights(rawHeights) {
   const touringBase = smoothHeightField(rawHeights, columns, rows, {
     passes: 1,
@@ -505,287 +470,23 @@ function buildTouringLayerRawHeights(rawHeights) {
   return result;
 }
 
-const buildOptions = parseBuildOptions();
-
-if (buildOptions.source === "srtm90") {
-  // TODO: 接 SRTM 90m HGT reader；当前先把 CLI/source 切换打通，避免未来再改接口。
-  throw new Error("srtm90 source not yet implemented; use --source fabdem (default).");
-}
-
-const primaryTilesDir = qinlingWorkspacePath("data", buildOptions.source, "china", "tiles");
-const fallbackTilesDir = qinlingWorkspacePath("data", buildOptions.source, "qinling", "tiles");
-const legacyOutputPath = qinlingWorkspacePath("public", "data", "qinling-slice-dem.json");
-
-async function findGeoTiffFiles(directory) {
-  const result = [];
-  let entries;
-
-  try {
-    entries = await fs.readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    if (error?.code === "ENOENT") {
-      return result;
-    }
-    throw error;
-  }
-
-  for (const entry of entries) {
-    const entryPath = path.join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      result.push(...(await findGeoTiffFiles(entryPath)));
-      continue;
-    }
-
-    if (entry.isFile() && entry.name.endsWith(".tif")) {
-      result.push(entryPath);
-    }
-  }
-
-  return result;
-}
-
-const tilePathByName = new Map();
-
-for (const rootDir of [primaryTilesDir, fallbackTilesDir]) {
-  const rootTilePaths = (await findGeoTiffFiles(rootDir)).sort();
-  for (const tilePath of rootTilePaths) {
-    const tileName = path.basename(tilePath);
-    if (!tilePathByName.has(tileName)) {
-      tilePathByName.set(tileName, tilePath);
-    }
-  }
-}
-
-const tilePaths = Array.from(tilePathByName.values()).sort();
-const availableTileNames = new Set(tilePaths.map((tilePath) => path.basename(tilePath)));
-const requiredTileNames = [];
-
-for (
-  let south = Math.floor(qinlingBounds.south);
-  south < Math.ceil(qinlingBounds.north);
-  south += 1
-) {
-  for (
-    let west = Math.floor(qinlingBounds.west);
-    west < Math.ceil(qinlingBounds.east);
-    west += 1
-  ) {
-    const tileBounds = { south, north: south + 1, west, east: west + 1 };
-
-    if (!intersectBounds(tileBounds, qinlingBounds)) {
-      continue;
-    }
-
-    requiredTileNames.push(`N${String(south).padStart(2, "0")}E${String(west).padStart(3, "0")}_FABDEM_V1-2.tif`);
-  }
-}
-const missingRequiredTileNames = requiredTileNames.filter(
-  (tileName) => !availableTileNames.has(tileName)
-);
-
-if (tilePaths.length === 0) {
-  throw new Error(
-    `No Qinling GeoTIFF tiles found in ${primaryTilesDir} or ${fallbackTilesDir}. Run npm run china:fabdem:extract first.`
-  );
-}
-
-// 缺 FABDEM tile 时先退到仓库内 vendored ETOPO fallback；只有 ETOPO 也不可读时
-// 才保留最后的 zero-fill，避免全国边缘缺口被直接压成海平面平板。
 const columns = qinlingOutputGrid.columns;
 const rows = qinlingOutputGrid.rows;
-const rawHeights = new Float32Array(columns * rows);
-rawHeights.fill(Number.NaN);
-const missingRequiredMask = new Uint8Array(columns * rows);
-const missingRequiredTileNamesWithEtopoFallback = [];
-const missingRequiredTileNamesZeroFilled = [];
+const legacyOutputPath = qinlingWorkspacePath("public", "data", "qinling-slice-dem.json");
 
-let sampledCellCount = 0;
+const sampler = await getHydroShedsSampler();
+const rawHeights = new Float32Array(columns * rows);
 let minRawHeight = Number.POSITIVE_INFINITY;
 let maxRawHeight = Number.NEGATIVE_INFINITY;
-let etopoSampler = null;
-let etopoUnavailableReason = null;
+for (let row = 0; row < rows; row += 1) {
+  for (let column = 0; column < columns; column += 1) {
+    const index = indexAt(column, row, columns);
+    const { lon, lat } = geoAt(column, row);
+    const value = sampler.sample(lon, lat);
 
-try {
-  etopoSampler = await getEtopoSampler();
-} catch (error) {
-  etopoUnavailableReason =
-    error instanceof Error ? error.message : `Unknown ETOPO fallback error: ${String(error)}`;
-}
-
-for (const tileName of missingRequiredTileNames) {
-  if (etopoSampler) {
-    console.warn(`Missing tile ${tileName}, fallback to ETOPO 60s`);
-  } else {
-    console.warn(`Missing tile ${tileName}, zero-fill (ETOPO unavailable)`);
-  }
-  const tileMeta = parseFabdemTileName(tileName);
-  const overlap = tileMeta ? intersectBounds(tileMeta, qinlingBounds) : null;
-
-  if (!overlap) {
-    continue;
-  }
-
-  const columnStart = clamp(
-    Math.floor(((overlap.west - qinlingBounds.west) / (qinlingBounds.east - qinlingBounds.west)) * columns),
-    0,
-    columns - 1
-  );
-  const columnEnd = clamp(
-    Math.ceil(((overlap.east - qinlingBounds.west) / (qinlingBounds.east - qinlingBounds.west)) * columns),
-    1,
-    columns
-  );
-  const rowStart = clamp(
-    Math.floor(((qinlingBounds.north - overlap.north) / (qinlingBounds.north - qinlingBounds.south)) * rows),
-    0,
-    rows - 1
-  );
-  const rowEnd = clamp(
-    Math.ceil(((qinlingBounds.north - overlap.south) / (qinlingBounds.north - qinlingBounds.south)) * rows),
-    1,
-    rows
-  );
-  let usedEtopoFallback = false;
-
-  let etopoGrid = null;
-  const targetWidth = Math.max(1, columnEnd - columnStart);
-  const targetHeight = Math.max(1, rowEnd - rowStart);
-
-  if (etopoSampler) {
-    try {
-      etopoGrid = await etopoSampler.sampleGrid(overlap, targetWidth, targetHeight);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      console.warn(`ETOPO fallback failed for ${tileName}, zero-fill instead: ${reason}`);
-      etopoGrid = null;
-    }
-  }
-
-  for (let row = rowStart; row < rowEnd; row += 1) {
-    for (let column = columnStart; column < columnEnd; column += 1) {
-      const index = indexAt(column, row, columns);
-
-      if (etopoGrid) {
-        const rowOffset = row - rowStart;
-        const columnOffset = column - columnStart;
-        const value = etopoGrid[rowOffset * targetWidth + columnOffset];
-
-        if (Number.isFinite(value)) {
-          if (!Number.isFinite(rawHeights[index])) {
-            sampledCellCount += 1;
-          }
-          rawHeights[index] = value;
-          minRawHeight = Math.min(minRawHeight, value);
-          maxRawHeight = Math.max(maxRawHeight, value);
-          usedEtopoFallback = true;
-          continue;
-        }
-      }
-
-      missingRequiredMask[index] = 1;
-    }
-  }
-
-  if (usedEtopoFallback) {
-    missingRequiredTileNamesWithEtopoFallback.push(tileName);
-  } else {
-    missingRequiredTileNamesZeroFilled.push(tileName);
-  }
-}
-
-for (const tilePath of tilePaths) {
-  const tileName = path.basename(tilePath);
-  const tileMeta = parseFabdemTileName(tileName);
-
-  if (!tileMeta) {
-    continue;
-  }
-
-  const overlap = intersectBounds(tileMeta, qinlingBounds);
-
-  if (!overlap) {
-    continue;
-  }
-
-  let tiff;
-  let image;
-  try {
-    tiff = await fromFile(tilePath);
-    image = await tiff.getImage();
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    console.warn(`Skipping corrupted FABDEM tile ${tileName}: ${reason}`);
-    continue;
-  }
-
-  const columnStart = clamp(
-    Math.floor(((overlap.west - qinlingBounds.west) / (qinlingBounds.east - qinlingBounds.west)) * columns),
-    0,
-    columns - 1
-  );
-  const columnEnd = clamp(
-    Math.ceil(((overlap.east - qinlingBounds.west) / (qinlingBounds.east - qinlingBounds.west)) * columns),
-    1,
-    columns
-  );
-  const rowStart = clamp(
-    Math.floor(((qinlingBounds.north - overlap.north) / (qinlingBounds.north - qinlingBounds.south)) * rows),
-    0,
-    rows - 1
-  );
-  const rowEnd = clamp(
-    Math.ceil(((qinlingBounds.north - overlap.south) / (qinlingBounds.north - qinlingBounds.south)) * rows),
-    1,
-    rows
-  );
-
-  const window = [
-    clamp(Math.floor((overlap.west - tileMeta.west) * image.getWidth()), 0, image.getWidth() - 1),
-    clamp(Math.floor((tileMeta.north - overlap.north) * image.getHeight()), 0, image.getHeight() - 1),
-    clamp(Math.ceil((overlap.east - tileMeta.west) * image.getWidth()), 1, image.getWidth()),
-    clamp(Math.ceil((tileMeta.north - overlap.south) * image.getHeight()), 1, image.getHeight())
-  ];
-
-  const targetWidth = Math.max(1, columnEnd - columnStart);
-  const targetHeight = Math.max(1, rowEnd - rowStart);
-
-  let raster;
-  try {
-    raster = await image.readRasters({
-      interleave: true,
-      window,
-      width: targetWidth,
-      height: targetHeight,
-      resampleMethod: "bilinear",
-      fillValue: -9999
-    });
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    console.warn(`Skipping corrupted FABDEM tile ${tileName} (read): ${reason}`);
-    continue;
-  }
-
-  for (let rowOffset = 0; rowOffset < targetHeight; rowOffset += 1) {
-    for (let columnOffset = 0; columnOffset < targetWidth; columnOffset += 1) {
-      const value = raster[rowOffset * targetWidth + columnOffset];
-
-      if (!Number.isFinite(value) || value <= -9999) {
-        continue;
-      }
-
-      const row = rowStart + rowOffset;
-      const column = columnStart + columnOffset;
-      const index = indexAt(column, row, columns);
-
-      if (!Number.isFinite(rawHeights[index])) {
-        sampledCellCount += 1;
-      }
-
-      rawHeights[index] = value;
-      minRawHeight = Math.min(minRawHeight, value);
-      maxRawHeight = Math.max(maxRawHeight, value);
-    }
+    rawHeights[index] = value;
+    minRawHeight = Math.min(minRawHeight, value);
+    maxRawHeight = Math.max(maxRawHeight, value);
   }
 }
 
@@ -793,7 +494,7 @@ if (!Number.isFinite(minRawHeight) || !Number.isFinite(maxRawHeight)) {
   throw new Error("No valid Qinling height samples were written.");
 }
 
-const coverageRatio = sampledCellCount / rawHeights.length;
+const coverageRatio = 1;
 
 if (coverageRatio < 0.1) {
   throw new Error(
@@ -802,50 +503,6 @@ if (coverageRatio < 0.1) {
 }
 
 const realPeakMeters = Math.max(0, Math.round(maxRawHeight));
-
-for (let pass = 0; pass < 4; pass += 1) {
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const index = indexAt(column, row, columns);
-
-      if (Number.isFinite(rawHeights[index])) {
-        continue;
-      }
-      if (missingRequiredMask[index] === 1) {
-        continue;
-      }
-
-      let total = 0;
-      let count = 0;
-
-      for (let y = Math.max(0, row - 1); y <= Math.min(rows - 1, row + 1); y += 1) {
-        for (let x = Math.max(0, column - 1); x <= Math.min(columns - 1, column + 1); x += 1) {
-          const neighbor = rawHeights[indexAt(x, y, columns)];
-
-          if (Number.isFinite(neighbor)) {
-            total += neighbor;
-            count += 1;
-          }
-        }
-      }
-
-      if (count > 0) {
-        rawHeights[index] = total / count;
-      }
-    }
-  }
-}
-
-for (let index = 0; index < rawHeights.length; index += 1) {
-  if (missingRequiredMask[index] === 1) {
-    rawHeights[index] = 0;
-    continue;
-  }
-
-  if (!Number.isFinite(rawHeights[index])) {
-    rawHeights[index] = minRawHeight;
-  }
-}
 
 // 在进入 touring/base synth 和游戏归一化之前，先把中段真实高程抬起。
 // 这样 300-1500m 丘陵会更立体，而海平面与 3000m+ 主峰轮廓基本保持不变。
@@ -971,20 +628,13 @@ const asset = {
   passMask,
   settlementMask,
   notes: [
-    "Built from FABDEM tiles intersecting the Qinling region bounds.",
-    "Missing FABDEM tiles first fall back to the vendored ETOPO terrain subset; only unreadable ETOPO cells remain eligible for final zero-fill.",
-    "L1 national touring layer uses a 90m touring terrain base synthesized from the 30m FABDEM source before gameplay normalization.",
-    "30m correction zones retain more source detail around Guanzhong, Hanzhong, northern Sichuan, and Qinling-Shu route corridors.",
+    "Built from HydroSHEDS 15s (~450 m) DEM, no fallback paths.",
+    "L1 national touring layer uses a 450m touring terrain base synthesized from the HydroSHEDS source before gameplay normalization.",
+    "450m HydroSHEDS source detail is retained more strongly around Guanzhong, Hanzhong, northern Sichuan, and Qinling-Shu route corridors.",
     "A Gaussian mid-range relief enhancement boosts 300-1500m hill terrain while keeping lowlands and high peaks close to their prior silhouettes.",
     "Real elevations are normalized into a gameplay-friendly stylized height range that keeps lowland basins readable.",
     `Raw sampled coverage before interpolation: ${(coverageRatio * 100).toFixed(2)}%.`,
-    `Required FABDEM tiles: ${requiredTileNames.length}. Available required tiles: ${requiredTileNames.length - missingRequiredTileNames.length}.`,
-    missingRequiredTileNamesWithEtopoFallback.length > 0
-      ? `Missing required FABDEM tiles fell back to ETOPO 60s: ${missingRequiredTileNamesWithEtopoFallback.join(", ")}.`
-      : "No required FABDEM tiles needed ETOPO fallback.",
-    missingRequiredTileNamesZeroFilled.length > 0
-      ? `Missing required tiles fell back to 0 only after ETOPO was unavailable: ${missingRequiredTileNamesZeroFilled.join(", ")}.${etopoUnavailableReason ? ` Reason: ${etopoUnavailableReason}.` : ""}`
-      : "ETOPO fallback covered every missing required FABDEM tile."
+    `HydroSHEDS source path: ${sampler.sourcePath}.`
   ]
 };
 

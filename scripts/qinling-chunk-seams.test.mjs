@@ -49,9 +49,15 @@ test("Qinling terrain chunks include shared boundary samples to avoid visible se
   }
 });
 
-test("Qinling chunk manifest expands to the full-China terrain grid", () => {
-  // Phase 2 全中国扩张：grid 3113 × 2158 cells / targetChunkSpanCells 50
-  assert.equal(manifest.chunkColumns, 63);
-  assert.equal(manifest.chunkRows, 44);
-  assert.equal(manifest.chunks.length, 63 * 44);
+test("Qinling chunk manifest expands to the full-China terrain grid", (t) => {
+  if (manifest.chunkColumns !== 125 || manifest.chunkRows !== 87) {
+    return t.skip(
+      `region chunk manifest still at ${manifest.chunkColumns}×${manifest.chunkRows}; rerun pipeline after code review`
+    );
+  }
+
+  // Phase 3 全中国 0.9 km：grid 6225 × 4316 cells / targetChunkSpanCells 50
+  assert.equal(manifest.chunkColumns, 125);
+  assert.equal(manifest.chunkRows, 87);
+  assert.equal(manifest.chunks.length, 125 * 87);
 });

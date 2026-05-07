@@ -26,17 +26,17 @@ export const qinlingGeographicFootprintKm = {
 };
 
 export const qinlingOutputGrid = {
-  columns: 3113,
-  rows: 2158
+  columns: 6225,
+  rows: 4316
 };
 
 export const qinlingResolutionStrategy = {
   experienceLayer: "L1-national-tour-local-pilot",
   coordinatePolicy: "strict-geographic",
-  target: "1800m-stride4-450m",
-  comment: "Full China at 1.8 km cell with ETOPO 60s + future HydroSHEDS upgrade path",
-  baseTerrainResolutionMeters: 90,
-  detailCorrectionResolutionMeters: 30,
+  target: "900m-stride2-450m-hydrosheds15s",
+  comment: "Full China at 0.9 km cell from HydroSHEDS 15s (~450 m) DEM",
+  baseTerrainResolutionMeters: 450,
+  detailCorrectionResolutionMeters: 450,
   sparseRegionResolutionMeters: 450,
   runtimeSampleSpacingKm: {
     eastWest: Number(

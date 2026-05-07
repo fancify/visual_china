@@ -53,13 +53,13 @@ test("hydrography diagnostics flag points that do not follow DEM river affinity"
   assert.equal(report.summary.issueCounts["low-river-affinity"], 1);
 });
 
-test("hydrography diagnostics expose interpolated DEM tile overlap", () => {
+test("hydrography diagnostics no longer expose DEM tile-overlap issues", () => {
   const diagnostics = hydrographyPointDemDiagnostics(
     { x: 9, y: 8 },
     demAsset,
     { minRiverAffinity: 0.5, maxSlope: 1 }
   );
 
-  assert.ok(diagnostics.issues.includes("interpolated-dem-tile"));
-  assert.equal(diagnostics.missingTileNames[0], "N01E001_FABDEM_V1-2.tif");
+  assert.ok(!diagnostics.issues.includes("interpolated-dem-tile"));
+  assert.deepEqual(diagnostics.missingTileNames, []);
 });
