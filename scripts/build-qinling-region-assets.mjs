@@ -73,6 +73,39 @@ await fs.mkdir(hydrographyRoot, { recursive: true });
 // 于把 slice-l1 直接交给浏览器加载——L1 只用于 atlas + 远景 fallback mesh，
 // 7.2 km/cell 够用，细节由 chunks (0.9 km/cell) 接管。
 const SLICE_L1_DOWNSAMPLE_STRIDE = 8;
+// Phase 3：海洋 cells 在 source 是 -3，但 8× nearest-center downsample 沿海经常
+// 抽到陆地（譬如渤海 L1 cell 里采到天津岸 → +0.59），让水面被陆地盖住。
+// 改用 "ocean-aware" downsample：8×8 source 块里只要有任何 ocean cell（< -2.5），
+// L1 cell 取该块 MIN（拉到 -3 让水盖过来）；否则取 AVERAGE 让山地不被打散。
+const OCEAN_THRESHOLD = -2.5;
+function downsampleHeightChannel(channel, srcCols, srcRows, dstCols, dstRows, stride) {
+  if (!Array.isArray(channel)) return channel;
+  const out = new Array(dstCols * dstRows);
+  for (let row = 0; row < dstRows; row += 1) {
+    const r0 = row * stride;
+    const r1 = Math.min(srcRows, r0 + stride);
+    for (let col = 0; col < dstCols; col += 1) {
+      const c0 = col * stride;
+      const c1 = Math.min(srcCols, c0 + stride);
+      let hasOcean = false;
+      let minV = Infinity;
+      let sum = 0;
+      let n = 0;
+      for (let rr = r0; rr < r1; rr += 1) {
+        for (let cc = c0; cc < c1; cc += 1) {
+          const v = channel[rr * srcCols + cc];
+          if (v < OCEAN_THRESHOLD) hasOcean = true;
+          if (v < minV) minV = v;
+          sum += v;
+          n += 1;
+        }
+      }
+      out[row * dstCols + col] = hasOcean ? minV : sum / Math.max(1, n);
+    }
+  }
+  return out;
+}
+// 非高度通道（mask）用中心点采样即可，不需要平滑。
 function downsampleChannel(channel, srcCols, srcRows, dstCols, dstRows) {
   if (!Array.isArray(channel)) return channel;
   const out = new Array(dstCols * dstRows);
@@ -93,8 +126,8 @@ function downsampleChannel(channel, srcCols, srcRows, dstCols, dstRows) {
   const downsampledAsset = {
     ...sliceAsset,
     grid: { columns: dstCols, rows: dstRows },
-    heights: downsampleChannel(
-      sliceAsset.heights, sliceAsset.grid.columns, sliceAsset.grid.rows, dstCols, dstRows
+    heights: downsampleHeightChannel(
+      sliceAsset.heights, sliceAsset.grid.columns, sliceAsset.grid.rows, dstCols, dstRows, stride
     ),
     riverMask: downsampleChannel(
       sliceAsset.riverMask, sliceAsset.grid.columns, sliceAsset.grid.rows, dstCols, dstRows

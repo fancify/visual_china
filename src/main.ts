@@ -159,6 +159,7 @@ import {
 } from "./game/osmHydrographyAtlas.js";
 import { hydrographyFeatureToAtlasFeature } from "./game/hydrographyAtlas.js";
 import type { HydrographyFeature } from "./game/hydrographyModel.js";
+import { qinlingModernHydrography } from "./game/qinlingHydrography.js";
 import {
   qinlingRoutes,
   routeAffinityAt,
@@ -947,6 +948,10 @@ scene.add(fragmentGroup);
 
 const waterSystemGroup = new Group();
 scene.add(waterSystemGroup);
+
+const hydrographyRibbonsGroup = new Group();
+hydrographyRibbonsGroup.name = "hydrography-ribbons";
+scene.add(hydrographyRibbonsGroup);
 
 const riverVegetationGroup = new Group();
 scene.add(riverVegetationGroup);
@@ -2479,6 +2484,55 @@ function createWaterSurfaceRibbon(
   return ribbon;
 }
 
+function rebuildHydrographyRibbons(): void {
+  clearGroup(hydrographyRibbonsGroup);
+
+  if (!terrainSampler) {
+    return;
+  }
+
+  // 主干更宽，支流逐级收细；全国画幅里 1.2 / 0.7 / 0.4 刚好能在远景读出
+  // 河级差，但又不会把岷江、汉水画成不真实的巨型蓝带。
+  const widthByRank: Record<number, number> = {
+    1: 1.2,
+    2: 0.7,
+    3: 0.4
+  };
+  const colorByRank: Record<number, number> = {
+    1: 0x3b6ea8,
+    2: 0x4a7eb8,
+    3: 0x5a8ec5
+  };
+
+  qinlingModernHydrography.features.forEach((feature) => {
+    const atlasFeature = hydrographyFeatureToAtlasFeature(feature);
+
+    // 只给 polyline 水系画 ribbon；point / area feature 以及缺失 points 的
+    // 数据都跳过，避免把单点 POI 误当成河面。
+    if (atlasFeature.geometry !== "polyline" || !("points" in atlasFeature.world)) {
+      return;
+    }
+
+    const points = featureWorldPoints(atlasFeature);
+    if (points.length < 2) {
+      return;
+    }
+
+    const rank = feature.rank ?? 2;
+    const ribbon = createWaterSurfaceRibbon(points, {
+      width: widthByRank[rank] ?? 0.6,
+      yOffset: 0.05,
+      color: colorByRank[rank] ?? 0x4a7eb8,
+      opacity: 0.85,
+      renderOrder: 5,
+      depthTest: true,
+      maxSegmentLength: 8
+    });
+    ribbon.userData.featureId = feature.id;
+    hydrographyRibbonsGroup.add(ribbon);
+  });
+}
+
 function registerWaterEnvironmentMaterial(
   material: MeshBasicMaterial | LineBasicMaterial,
   baseColor: number,
@@ -2630,9 +2684,8 @@ function rebuildWaterSystemVisuals(): void {
     Math.abs(p.y) < SLICE_HALF_D - INLAND_BORDER_MARGIN;
 
   rivers.forEach((river) => {
-    // 2026-05 重构：河面渲染移到 terrain shader (modeColor 里 riverMask
-    // > 0.6 → 蓝色)。这里不再单独建 ribbon mesh — 一层 mesh = 没有
-    // z-buffer 冲突 / bilinear vs triangle Y 不匹配。只保留 label + 河边植被。
+    // 地表 shader 仍保留 riverMask 着色做远景融合；真正的蓝色水面 ribbon
+    // 由 rebuildHydrographyRibbons() 单独重建。这个分支只负责 label 和河边植被。
 
     const labelPoint = waterLabelPoint(river);
 
@@ -5319,6 +5372,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   terrainGeometry.computeVertexNormals();
   rebuildWaterSystemVisuals();
   rebuildRouteVisuals();
+  rebuildHydrographyRibbons();
 
   // 真实城市 instanced mesh：用 region asset 的 bounds + world 投影坐标，
   // 跟 atlas / hydrography 同一个 mapOrientation 投影。地图内的城市才落
