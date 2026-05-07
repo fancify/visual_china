@@ -3,13 +3,15 @@ import path from "node:path";
 
 import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
 import { validateHydrographyAgainstDem } from "../src/game/hydrographyValidation.js";
+import { loadDemAssetWithChannels } from "./dem-asset-io.mjs";
 
 const demPath = path.resolve("public/data/qinling-slice-dem.json");
 const outputPath = path.resolve(
   "public/data/regions/qinling/hydrography/dem-mismatch-report.json"
 );
 
-const demAsset = JSON.parse(await fs.readFile(demPath, "utf8"));
+// Phase 3：channels 在 binary sidecar，必须 reassemble
+const demAsset = await loadDemAssetWithChannels(demPath);
 const report = validateHydrographyAgainstDem(
   qinlingModernHydrography.features,
   demAsset,

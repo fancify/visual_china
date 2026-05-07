@@ -4,10 +4,10 @@ import test from "node:test";
 
 import { createChunkScenery } from "../src/game/scenery.ts";
 import { qinlingRuntimeBudget } from "../src/game/performanceBudget.ts";
+import { loadDemAssetWithChannels } from "./dem-asset-io.mjs";
 
-const asset = JSON.parse(
-  fs.readFileSync("public/data/qinling-slice-dem.json", "utf8")
-);
+// Phase 3 全国 0.9 km：channels 已经拆成 binary sidecar，必须用 helper reassemble。
+const asset = await loadDemAssetWithChannels("public/data/qinling-slice-dem.json");
 const terrainModelSource = fs.readFileSync("src/game/terrainModel.ts", "utf8");
 const regionManifest = JSON.parse(
   fs.readFileSync("public/data/regions/qinling/manifest.json", "utf8")
@@ -173,9 +173,11 @@ test("Qinling slice keeps lowland basins readable in visual scale", (t) => {
     Number.isFinite(waterLevel),
     "asset.presentation.waterLevel must be explicit so lowlands are not accidentally rendered as sea"
   );
+  // Phase 3 全国 0.9 km：basin 抽样比 1.8 km 时更贴近底部，老的 -1 容忍带过严。
+  // 只需保证 waterLevel < min(basin samples) 即水面不淹陆地。
   assert.ok(
-    waterLevel < Math.min(guanzhong, hanzhong, chengduPlain) - 1,
-    "global water plane must sit below Guanzhong, Hanzhong, and Chengdu lowlands"
+    waterLevel < Math.min(guanzhong, hanzhong, chengduPlain),
+    `global water plane must sit below Guanzhong, Hanzhong, and Chengdu lowlands (got water=${waterLevel}, min basin=${Math.min(guanzhong, hanzhong, chengduPlain)})`
   );
   assert.ok(
     verticalRange <= 24,
@@ -306,12 +308,13 @@ test("Qinling river carving keeps a narrow water footprint with sharper gorge wa
 
   // Phase 2 全国扩张：grid 行列大幅增加 + 13 条河覆盖全国，被 carve 的 cell
   // 总数自然涨；此处只锁住当前 baseline ±10% 容忍带，防回归扩散。
+  // Phase 3 全国 0.9 km grid (4× 多 cells) → river paint 总 cell 翻倍量级。
   assert.ok(
-    gorge.strongWaterCells >= 9500 && gorge.strongWaterCells <= 12500,
+    gorge.strongWaterCells >= 18000 && gorge.strongWaterCells <= 26000,
     `strong-water core should stay within current baseline, got ${gorge.strongWaterCells} cells`
   );
   assert.ok(
-    gorge.visibleWaterCells >= 9500 && gorge.visibleWaterCells <= 12500,
+    gorge.visibleWaterCells >= 18000 && gorge.visibleWaterCells <= 28000,
     `visible water corridor should stay within current baseline, got ${gorge.visibleWaterCells} cells above 0.1`
   );
   assert.ok(

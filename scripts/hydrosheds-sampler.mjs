@@ -91,8 +91,14 @@ function buildSampler({
     const row = clamp(Math.round(v * (winHeight - 1)), 0, winHeight - 1);
     const meters = data[row * winWidth + column];
 
-    // HydroSHEDS nodata = -32768；海洋 / 出界统一回到 0。
-    return Number.isFinite(meters) && meters > -10000 ? meters : 0;
+    // 过滤 sentinel + spike：
+    //   - meters <= -10000：HydroSHEDS nodata（-32768）→ 海洋 / 出界回 0
+    //   - meters >= 9000：异常 spike（地球最高 8848m）。看到过 Int16 +32767
+    //     这种坏 cell，会把 realPeakMeters 拉到 32767 让 normalize 完全失真。
+    if (!Number.isFinite(meters) || meters <= -10000 || meters >= 9000) {
+      return 0;
+    }
+    return meters;
   }
 
   function sampleGrid(overlap, gridWidth, gridHeight) {

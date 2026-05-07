@@ -33,3 +33,4 @@ tmp/
 public/sfx/*/*.opus
 public/sfx/*/*.ogg
 data/hydrosheds/
+public/data/qinling-slice-dem.*.bin

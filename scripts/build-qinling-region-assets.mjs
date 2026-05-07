@@ -46,7 +46,10 @@ function buildChunkChannel(data, sourceColumns, startColumn, endColumn, startRow
   return result;
 }
 
-const asset = JSON.parse(await fs.readFile(legacyAssetPath, "utf8"));
+// Phase 3 全国 0.9 km grid 大于 V8 单字符串上限，DEM build 写成 meta JSON +
+// 4 个 binary sidecar。这个 helper 把它们 reassemble 成完整 asset 对象。
+const { loadDemAssetWithChannels } = await import("./dem-asset-io.mjs");
+const asset = await loadDemAssetWithChannels(legacyAssetPath);
 const chunkColumns = Math.max(1, Math.ceil((asset.grid.columns - 1) / targetChunkSpanCells));
 const chunkRows = Math.max(1, Math.ceil((asset.grid.rows - 1) / targetChunkSpanCells));
 const sliceAsset = {
@@ -64,7 +67,55 @@ const sliceOutputPath = path.join(regionRoot, sliceFileName);
 
 await fs.mkdir(chunksRoot, { recursive: true });
 await fs.mkdir(hydrographyRoot, { recursive: true });
-await fs.writeFile(sliceOutputPath, `${JSON.stringify(sliceAsset, null, 2)}\n`, "utf8");
+
+// Phase 3 全国 0.9 km grid：slice-l1 直接产出 downsample 后的版本（~17 MB），
+// 不再写 26.87M cells 的中间巨型 JSON（会撞 V8 string 上限）。downsample 等价
+// 于把 slice-l1 直接交给浏览器加载——L1 只用于 atlas + 远景 fallback mesh，
+// 7.2 km/cell 够用，细节由 chunks (0.9 km/cell) 接管。
+const SLICE_L1_DOWNSAMPLE_STRIDE = 8;
+function downsampleChannel(channel, srcCols, srcRows, dstCols, dstRows) {
+  if (!Array.isArray(channel)) return channel;
+  const out = new Array(dstCols * dstRows);
+  const stride = Math.max(1, Math.floor(srcCols / dstCols));
+  for (let row = 0; row < dstRows; row += 1) {
+    const srcRow = Math.min(srcRows - 1, Math.floor(row * stride + stride / 2));
+    for (let col = 0; col < dstCols; col += 1) {
+      const srcCol = Math.min(srcCols - 1, Math.floor(col * stride + stride / 2));
+      out[row * dstCols + col] = channel[srcRow * srcCols + srcCol];
+    }
+  }
+  return out;
+}
+{
+  const stride = SLICE_L1_DOWNSAMPLE_STRIDE;
+  const dstCols = Math.ceil(sliceAsset.grid.columns / stride);
+  const dstRows = Math.ceil(sliceAsset.grid.rows / stride);
+  const downsampledAsset = {
+    ...sliceAsset,
+    grid: { columns: dstCols, rows: dstRows },
+    heights: downsampleChannel(
+      sliceAsset.heights, sliceAsset.grid.columns, sliceAsset.grid.rows, dstCols, dstRows
+    ),
+    riverMask: downsampleChannel(
+      sliceAsset.riverMask, sliceAsset.grid.columns, sliceAsset.grid.rows, dstCols, dstRows
+    ),
+    passMask: downsampleChannel(
+      sliceAsset.passMask, sliceAsset.grid.columns, sliceAsset.grid.rows, dstCols, dstRows
+    ),
+    settlementMask: downsampleChannel(
+      sliceAsset.settlementMask, sliceAsset.grid.columns, sliceAsset.grid.rows, dstCols, dstRows
+    ),
+    notes: [
+      ...(sliceAsset.notes ?? []),
+      `Downsampled by ${stride}× from full grid for browser-friendly initial load. Detailed terrain from chunked LODs.`
+    ]
+  };
+  await fs.writeFile(
+    sliceOutputPath,
+    `${JSON.stringify(downsampledAsset, null, 2)}\n`,
+    "utf8"
+  );
+}
 await fs.writeFile(
   path.join(hydrographyRoot, "modern.json"),
   `${JSON.stringify(qinlingModernHydrography, null, 2)}\n`,

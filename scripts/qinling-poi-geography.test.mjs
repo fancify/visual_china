@@ -54,9 +54,9 @@ const REMOVED_PLACEHOLDER_LANDMARKS = [
   "成都平原"
 ];
 
-const asset = JSON.parse(
-  fs.readFileSync("public/data/qinling-slice-dem.json", "utf8")
-);
+// Phase 3 全国 0.9 km：channels 拆成 binary sidecar
+const { loadDemAssetWithChannels } = await import("./dem-asset-io.mjs");
+const asset = await loadDemAssetWithChannels("public/data/qinling-slice-dem.json");
 const content = JSON.parse(
   fs.readFileSync("public/data/regions/qinling/poi/content.json", "utf8")
 );

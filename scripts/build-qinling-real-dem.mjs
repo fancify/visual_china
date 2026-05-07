@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 
 import {
   qinlingBounds,
@@ -638,6 +639,40 @@ const asset = {
   ]
 };
 
-await fs.writeFile(legacyOutputPath, `${JSON.stringify(asset, null, 2)}\n`, "utf8");
+// Phase 3 全国 0.9 km grid (26.87M cells × 4 channels)：单字符串 JSON 超过
+// V8 string length (~512 MB)。改成 meta JSON + 4 个 binary channel 文件：
+//   qinling-slice-dem.json              小 metadata
+//   qinling-slice-dem.heights.bin       Float32LE × cells
+//   qinling-slice-dem.riverMask.bin     Float32LE × cells
+//   qinling-slice-dem.passMask.bin      Float32LE × cells
+//   qinling-slice-dem.settlementMask.bin Float32LE × cells
+// 所有读取方（region-assets / 测试）改用 loadDemAsset helper（见 dem-asset-io.mjs）。
+{
+  const { heights, riverMask, passMask, settlementMask, ...meta } = asset;
+  // 在 meta 里登记 binary sidecar 路径 + cells 数，让读取方能 verify
+  meta.cells = heights.length;
+  meta.binaryChannels = {
+    format: "float32-le",
+    heights: "qinling-slice-dem.heights.bin",
+    riverMask: "qinling-slice-dem.riverMask.bin",
+    passMask: "qinling-slice-dem.passMask.bin",
+    settlementMask: "qinling-slice-dem.settlementMask.bin"
+  };
+  await fs.writeFile(legacyOutputPath, `${JSON.stringify(meta, null, 2)}\n`, "utf8");
+
+  const baseDir = path.dirname(legacyOutputPath);
+  async function writeBinary(name, arr) {
+    const buf = Buffer.allocUnsafe(arr.length * 4);
+    for (let i = 0; i < arr.length; i += 1) {
+      buf.writeFloatLE(arr[i] ?? 0, i * 4);
+    }
+    await fs.writeFile(path.join(baseDir, name), buf);
+  }
+
+  await writeBinary("qinling-slice-dem.heights.bin", heights);
+  await writeBinary("qinling-slice-dem.riverMask.bin", riverMask);
+  await writeBinary("qinling-slice-dem.passMask.bin", passMask);
+  await writeBinary("qinling-slice-dem.settlementMask.bin", settlementMask);
+}
 
 console.log(`Generated real Qinling DEM asset at ${legacyOutputPath}`);
