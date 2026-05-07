@@ -747,7 +747,10 @@ const waterSurface = createWaterSurfaceMaterial();
 const waterRibbon = new Mesh(new PlaneGeometry(1, 1), waterSurface.material);
 waterRibbon.rotation.x = -Math.PI / 2;
 waterRibbon.position.y = -8;
-waterRibbon.visible = false;
+// 水面必须默认 visible：旧 slice 是 hidden 因为 Qinling 本来无海，全国画幅
+// 必须显示东海/南海/渤海。位置由 applyTerrainFromSampler 设到 waterLevel ×
+// TERRAIN_VERTICAL_EXAGGERATION，scale 铺满世界（rescaleTerrainGeometry）。
+waterRibbon.visible = true;
 scene.add(waterRibbon);
 const ambientWaterStyle: ReturnType<typeof waterVisualStyle> = {
   bankWidth: 0,
@@ -4684,7 +4687,10 @@ function rebuildTerrainGeometry(
   terrain.geometry = terrainGeometry;
 
   underpaint.scale.set(worldWidth * 1.5, worldDepth * 1.5, 1);
-  waterRibbon.scale.set(worldWidth * 0.34, worldDepth * 0.52, 1);
+  // Phase 3 全国扩张：旧 slice 把 waterRibbon 缩到 0.34×0.52 cover 局部水域，
+  // 全国画幅下海洋分布在四周，必须铺满整个世界（再加 10% 延伸防 camera 边缘
+  // 飞穿露出底色）。
+  waterRibbon.scale.set(worldWidth * 1.1, worldDepth * 1.1, 1);
 }
 
 function clampToWorld(position: Vector3): void {
