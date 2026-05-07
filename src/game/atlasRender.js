@@ -70,17 +70,20 @@ export function atlasCanvasPoint(point, world, canvas) {
 }
 
 export function parseMissingDemTileNames(notes = []) {
-  // 只关心真正没数据的 tile（zero-fill）。Phase 2 全国扩张后大部分 China 区域没
-  // FABDEM 但走了 ETOPO 60s fallback——这些 tile 的 note 含 "fell back to ETOPO"
-  // 字样，不该报红格警告。
+  // Phase 2 全国扩张：大部分 China 区域没 FABDEM，但走 ETOPO 60s fallback 拿到
+  // 有效数据，不该报红格警告。只标记真正质量降级的 note：zero-fill / 邻居插值。
   return notes
     .filter((note) => {
       if (typeof note !== "string") return false;
-      // ETOPO fallback 是合法填充，不算"missing"
+      // ETOPO fallback 是高质量填充（1.85km 全国覆盖），不算 missing
       if (note.includes("fell back to ETOPO")) return false;
-      // 只保留显式的 zero-fill / "filled with 0" notes
-      return note.includes("filled with 0") || note.includes("zero-fill") ||
-             note.includes("fell back to 0");
+      // 这些都是质量降级的标记
+      return (
+        note.includes("filled with 0") ||
+        note.includes("zero-fill") ||
+        note.includes("fell back to 0") ||
+        note.includes("filled by neighbor interpolation")
+      );
     })
     .flatMap((note) => note.match(/[NS]\d{2}[EW]\d{3}_FABDEM_V1-2\.tif/g) ?? [])
     .filter((tileName, index, list) => list.indexOf(tileName) === index);
