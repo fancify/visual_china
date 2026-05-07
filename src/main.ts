@@ -469,6 +469,15 @@ void loadAllBuffers(audioRuntime).then(({ loaded, failed }) => {
 const hoverRaycaster = new Raycaster();
 const hoverPointer = new Vector2();
 let hoverPointerActive = false;
+const CITY_LOD_OCCLUSION_INTERVAL = 4;
+const POI_HOVER_SYNC_INTERVAL = 4;
+let lodOcclusionFrameCounter = CITY_LOD_OCCLUSION_INTERVAL - 1;
+let hoverFrameCounter = POI_HOVER_SYNC_INTERVAL - 1;
+let hoverPointerDirty = false;
+let lastHoveredPoi: RuntimePoiInfo | null = null;
+let poiHoverTargetsDirty = true;
+const poiHoverTargetSources: Object3D[] = [];
+const poiHoverTargetScratch: Object3D[] = [];
 
 declare global {
   interface Window {
@@ -1065,6 +1074,8 @@ function refreshAudioDebugHud(): void {
 
 function hideHoverCard(): void {
   hoverPointerActive = false;
+  hoverPointerDirty = false;
+  lastHoveredPoi = null;
   poiHoverHud.hide();
 }
 
@@ -1111,12 +1122,7 @@ function findHoveredPoi(): RuntimePoiInfo | null {
 
   hoverRaycaster.setFromCamera(hoverPointer, camera);
 
-  const hoverTargets = [
-    ...(cityMarkersHandle?.group.children ?? []),
-    ...landmarkGroup.children,
-    ...scenicGroup.children,
-    ...ancientGroup.children
-  ];
+  const hoverTargets = getPoiHoverTargets();
   const intersections = hoverRaycaster.intersectObjects(hoverTargets, false);
   const hoveredPoi = findHoveredPoiFromIntersections(intersections, (object, instanceId) => {
     const nextCity = cityMarkersHandle
@@ -1141,11 +1147,27 @@ function findHoveredPoi(): RuntimePoiInfo | null {
 
 function syncPoiHoverHud(): void {
   if (!terrainSampler || isPoiHudSuppressed()) {
+    hoverPointerDirty = false;
+    lastHoveredPoi = null;
     poiHoverHud.hide();
     return;
   }
 
-  const hoverTarget = findHoveredPoi();
+  let hoverTarget: RuntimePoiInfo | null = null;
+  if (hoverPointerActive && !isDragging) {
+    hoverFrameCounter += 1;
+    const shouldRefreshHover =
+      hoverPointerDirty || hoverFrameCounter % POI_HOVER_SYNC_INTERVAL === 0;
+    if (shouldRefreshHover) {
+      lastHoveredPoi = findHoveredPoi();
+      hoverPointerDirty = false;
+    }
+    hoverTarget = lastHoveredPoi;
+  } else {
+    hoverPointerDirty = false;
+    lastHoveredPoi = null;
+  }
+
   const proximityTarget = findNearestProximityPoi(
     player.position.x,
     player.position.z,
@@ -1317,6 +1339,7 @@ function rebuildHudPoiCatalog(): void {
  * 让默认 118 距离已经在 fade 中段（69% opacity），按 O 直接消失。
  */
 function updateCityLodFade(): void {
+  lodOcclusionFrameCounter += 1;
   // 用渲染相机的实际位置算距离，而不是 target 的 cameraDistance——
   // cameraDistance 改变时（按 o/f 或滚轮）相机用 lerp 缓动跟过去，立即
   // 用 target 算 LOD 会让 city 在画面相机还没到位时就 fade 到 0，跳变
@@ -1437,15 +1460,24 @@ function updateCityLodFade(): void {
   if (terrainSampler) {
     const sampler = terrainSampler;
     const cameraWorld = camera.position;
+    const shouldRunOcclusion =
+      lodOcclusionFrameCounter % CITY_LOD_OCCLUSION_INTERVAL === 0;
     const occlude = (sprite: Sprite): void => {
+      const chunkId =
+        typeof sprite.userData.chunkId === "string" ? sprite.userData.chunkId : null;
+      if (chunkId && visibleChunkIds.size > 0 && !visibleChunkIds.has(chunkId)) {
+        sprite.visible = false;
+        return;
+      }
       if (!sprite.visible) return; // 已经被距离 fade 隐去就不必再算
-      if (
-        isSpriteOccludedByTerrain({
+      if (shouldRunOcclusion) {
+        sprite.userData.cachedTerrainOccluded = isSpriteOccludedByTerrain({
           camera: cameraWorld,
           target: sprite.position,
           sampler
-        })
-      ) {
+        });
+      }
+      if (sprite.userData.cachedTerrainOccluded === true) {
         sprite.visible = false;
       }
     };
@@ -1751,6 +1783,7 @@ function realCityLandmarksForHud(): Landmark[] {
 
 function rebuildLandmarkVisuals(): void {
   clearGroup(landmarkGroup);
+  invalidatePoiHoverTargets();
   landmarkChunkIds.clear();
   passLandmarkLabelSprites.length = 0;
 
@@ -1846,6 +1879,7 @@ function rebuildLandmarkVisuals(): void {
 // 标签数组（updateCityLodFade 闭包了 scenicLabelSprites 的引用）。
 function rebuildScenicVisuals(): void {
   clearGroup(scenicGroup);
+  invalidatePoiHoverTargets();
   scenicLabelSprites.length = 0;
 
   if (!terrainSampler?.asset.bounds) {
@@ -1908,6 +1942,7 @@ function rebuildScenicVisuals(): void {
 // 考古 POI 渲染：3 个遗址，独立 group 跟 ancient atlas 层对齐。
 function rebuildAncientVisuals(): void {
   clearGroup(ancientGroup);
+  invalidatePoiHoverTargets();
   ancientLabelSprites.length = 0;
 
   if (!terrainSampler?.asset.bounds) {
@@ -2212,6 +2247,32 @@ function rebuildWildlifeVisuals(force = false): void {
     eligibleChunks.map(([, terrainChunk]) => terrainChunk.sampler)
   );
   wildlifeGroup.add(wildlifeHandle.group);
+}
+
+function invalidatePoiHoverTargets(): void {
+  poiHoverTargetsDirty = true;
+}
+
+function getPoiHoverTargets(): Object3D[] {
+  if (poiHoverTargetsDirty) {
+    poiHoverTargetSources.length = 0;
+    if (cityMarkersHandle) {
+      poiHoverTargetSources.push(...cityMarkersHandle.group.children);
+    }
+    poiHoverTargetSources.push(...landmarkGroup.children);
+    poiHoverTargetSources.push(...scenicGroup.children);
+    poiHoverTargetSources.push(...ancientGroup.children);
+    poiHoverTargetsDirty = false;
+  }
+
+  poiHoverTargetScratch.length = 0;
+  poiHoverTargetSources.forEach((object) => {
+    if (object.visible) {
+      poiHoverTargetScratch.push(object);
+    }
+  });
+
+  return poiHoverTargetScratch;
 }
 
 function resetStoryGuide(): void {
@@ -3120,7 +3181,9 @@ function drawAtlasOverlay(
   // worldspace 单位 = asset.geographicFootprintKm.width / asset.world.width 公里。
   // 旧 slice (420km/180unit) → 全国 (5602km/1711unit ≈ 3.27 km/unit)，差 ~20×。
   // 必须从 asset 读，不能 hardcode。
-  const footprintKmWidth = asset.geographicFootprintKm?.width ?? asset.world.width;
+  const footprintKmWidth =
+    (asset as DemAsset & { geographicFootprintKm?: { width: number } }).geographicFootprintKm
+      ?.width ?? asset.world.width;
   const kmPerUnit = footprintKmWidth / asset.world.width;
   const scaleKm = 50;
   const scaleUnits = scaleKm / kmPerUnit;
@@ -3953,7 +4016,6 @@ function updateChunkFadeIn(): void {
       terrainChunk.scenery.visible = elapsed >= CHUNK_FADE_DURATION * 0.8;
     }
   });
-  rebuildWildlifeVisuals();
 }
 
 async function syncChunkTerrainWindow(nextVisibleChunkIds: Set<string>): Promise<void> {
@@ -4007,6 +4069,7 @@ function updateVisibleChunkState(nextChunkId: string | null): void {
 
   if (!regionChunkManifest) {
     visibleChunkIds = new Set();
+    invalidatePoiHoverTargets();
     hudDirty = true;
     return;
   }
@@ -4031,6 +4094,7 @@ function updateVisibleChunkState(nextChunkId: string | null): void {
       typeof child.userData?.chunkId === "string" ? child.userData.chunkId : null;
     child.visible = !chunkId || visibleChunkIds.has(chunkId);
   });
+  invalidatePoiHoverTargets();
   void syncChunkTerrainWindow(visibleChunkIds);
   hudDirty = true;
 }
@@ -4317,6 +4381,7 @@ renderer.domElement.addEventListener("pointermove", (event: PointerEvent) => {
     hoverPointer.x = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
     hoverPointer.y = -(((event.clientY - canvasRect.top) / canvasRect.height) * 2 - 1);
     hoverPointerActive = true;
+    hoverPointerDirty = true;
     if (window.HUD_DEBUG) {
       hudDebugWarn("pointermove hoverPointer", {
         x: Number(hoverPointer.x.toFixed(3)),
@@ -4350,6 +4415,8 @@ renderer.domElement.addEventListener("pointerup", (event: PointerEvent) => {
 renderer.domElement.addEventListener("pointerleave", () => {
   isDragging = false;
   hoverPointerActive = false;
+  hoverPointerDirty = false;
+  lastHoveredPoi = null;
 });
 
 renderer.domElement.addEventListener("wheel", (event: WheelEvent) => {
@@ -5252,6 +5319,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
     cityMarkersGroup.clear();
     cityMarkersHandle = null;
     hideHoverCard();
+    invalidatePoiHoverTargets();
   }
   if (sampler.asset.bounds) {
     cityMarkersHandle = createCityMarkers(
@@ -5280,11 +5348,15 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
           sampler.asset.world
         );
         const groundY = sampler.sampleHeight(wp.x, wp.z);
+        const chunkId = regionChunkManifest
+          ? findChunkForPosition(regionChunkManifest, new Vector2(wp.x, wp.z))?.id ?? null
+          : null;
         const label = createTextSprite(city.name, "#e8cb89");
         label.scale.multiplyScalar(0.78);
         label.position.set(wp.x, groundY + 2.6, wp.z);
         label.renderOrder = 13;
         label.visible = false;
+        label.userData.chunkId = chunkId;
         cityMarkersGroup.add(label);
         countyLabelSpriteByCityId.set(city.id, label);
         trackDistanceLimitedLabelSprite(label);
@@ -5299,6 +5371,9 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
           sampler.asset.world
         );
         const groundY = sampler.sampleHeight(wp.x, wp.z);
+        const chunkId = regionChunkManifest
+          ? findChunkForPosition(regionChunkManifest, new Vector2(wp.x, wp.z))?.id ?? null
+          : null;
         // tierTop 抬到 sprite center 应该在的高度——createTextSprite
         // 默认 ~3.8 单元高，乘 scale 后 capital ~4.5、prefecture ~3.6，
         // sprite 用中心定位，所以 y 偏移要等于"墙顶 + sprite 半高"才
@@ -5310,12 +5385,14 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
         label.scale.multiplyScalar(city.tier === "capital" ? 1.18 : 0.96);
         label.position.set(wp.x, groundY + tierTop, wp.z);
         label.renderOrder = 13;
+        label.userData.chunkId = chunkId;
         cityMarkersGroup.add(label);
         trackDistanceLimitedLabelSprite(label);
         if (city.tier === "capital" || city.tier === "prefecture") {
           cityLabelSpritesByTier[city.tier].push(label);
         }
       });
+    invalidatePoiHoverTargets();
   }
 
   const waterLevel = sampler.asset.presentation?.waterLevel ?? sampler.asset.minHeight - 2.5;

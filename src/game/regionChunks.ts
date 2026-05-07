@@ -27,6 +27,18 @@ export interface RegionChunkManifest {
   chunks: RegionChunkEntry[];
 }
 
+interface RegionChunkLookup {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  cellWidth: number;
+  cellDepth: number;
+  chunksByGridKey: Map<string, RegionChunkEntry>;
+}
+
+const manifestLookupCache = new WeakMap<RegionChunkManifest, RegionChunkLookup>();
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -129,17 +141,28 @@ export function findChunkForPosition(
   chunkManifest: RegionChunkManifest,
   position: Vector2
 ): RegionChunkEntry | null {
-  return (
-    chunkManifest.chunks.find((chunk) => {
-      const { minX, maxX, minZ, maxZ } = chunk.worldBounds;
+  const lookup = getRegionChunkLookup(chunkManifest);
 
-      return (
-        position.x >= minX &&
-        position.x <= maxX &&
-        position.y >= minZ &&
-        position.y <= maxZ
-      );
-    }) ?? null
+  if (!isPositionWithinLookupBounds(lookup, position)) {
+    return null;
+  }
+
+  const column = clampIndex(
+    Math.floor((position.x - lookup.minX) / lookup.cellWidth),
+    chunkManifest.chunkColumns
+  );
+  const row = clampIndex(
+    Math.floor((position.y - lookup.minZ) / lookup.cellDepth),
+    chunkManifest.chunkRows
+  );
+  const candidate = lookup.chunksByGridKey.get(chunkGridKey(column, row));
+
+  if (candidate && chunkContainsPosition(candidate, position)) {
+    return candidate;
+  }
+
+  return (
+    chunkManifest.chunks.find((chunk) => chunkContainsPosition(chunk, position)) ?? null
   );
 }
 
@@ -211,5 +234,68 @@ function buildChunkWindowIds(
           Math.abs(chunk.y - currentChunk.y) <= radius
       )
       .map((chunk) => chunk.id)
+  );
+}
+
+function getRegionChunkLookup(chunkManifest: RegionChunkManifest): RegionChunkLookup {
+  const cached = manifestLookupCache.get(chunkManifest);
+  if (cached) {
+    return cached;
+  }
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  const chunksByGridKey = new Map<string, RegionChunkEntry>();
+
+  chunkManifest.chunks.forEach((chunk) => {
+    minX = Math.min(minX, chunk.worldBounds.minX);
+    maxX = Math.max(maxX, chunk.worldBounds.maxX);
+    minZ = Math.min(minZ, chunk.worldBounds.minZ);
+    maxZ = Math.max(maxZ, chunk.worldBounds.maxZ);
+    chunksByGridKey.set(chunkGridKey(chunk.x, chunk.y), chunk);
+  });
+
+  const lookup = {
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    cellWidth: (maxX - minX) / Math.max(1, chunkManifest.chunkColumns),
+    cellDepth: (maxZ - minZ) / Math.max(1, chunkManifest.chunkRows),
+    chunksByGridKey
+  } satisfies RegionChunkLookup;
+  manifestLookupCache.set(chunkManifest, lookup);
+  return lookup;
+}
+
+function chunkGridKey(x: number, y: number): string {
+  return `${x}:${y}`;
+}
+
+function clampIndex(value: number, length: number): number {
+  return Math.max(0, Math.min(length - 1, value));
+}
+
+function chunkContainsPosition(chunk: RegionChunkEntry, position: Vector2): boolean {
+  const { minX, maxX, minZ, maxZ } = chunk.worldBounds;
+  return (
+    position.x >= minX &&
+    position.x <= maxX &&
+    position.y >= minZ &&
+    position.y <= maxZ
+  );
+}
+
+function isPositionWithinLookupBounds(
+  lookup: RegionChunkLookup,
+  position: Vector2
+): boolean {
+  return (
+    position.x >= lookup.minX &&
+    position.x <= lookup.maxX &&
+    position.y >= lookup.minZ &&
+    position.y <= lookup.maxZ
   );
 }
