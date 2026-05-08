@@ -2608,6 +2608,17 @@ function rebuildHydrographyRibbons(): void {
       maxSegmentLength: 1.5
     });
     ribbon.userData.featureId = feature.id;
+    // hover 显示河名：用 polyline 中点作 worldX/Z 锚点。
+    const midPoint = points[Math.floor(points.length / 2)];
+    attachHoverPoiMetadata(ribbon, {
+      id: `river-${feature.id}`,
+      name: feature.displayName ?? feature.name,
+      category: "scenic",
+      worldX: midPoint.x,
+      worldZ: midPoint.y,
+      elevation: 0,
+      description: `${feature.basin ?? ""}${feature.basin ? "·" : ""}rank ${rank} 河流`
+    });
     hydrographyRibbonsGroup.add(ribbon);
   });
 
@@ -2635,6 +2646,16 @@ function rebuildHydrographyRibbons(): void {
     // 湖面需要压在 terrain 之上而不是海平面高度，否则全国高程下内陆湖会被地形吞掉。
     const lakeY = sampler.sampleHeight(centerWorldPoint.x, centerWorldPoint.z) + 0.08;
     lakeMesh.position.y = lakeY;
+    // hover 显示湖名
+    attachHoverPoiMetadata(lakeMesh, {
+      id: `lake-${lake.id}`,
+      name: lake.name,
+      category: "scenic",
+      worldX: centerWorldPoint.x,
+      worldZ: centerWorldPoint.z,
+      elevation: 0,
+      description: "全国画幅五大湖"
+    });
     hydrographyRibbonsGroup.add(lakeMesh);
 
     // 用户："每个湖上面加个名字"。湖 polygon 跨度大，label scale ×3 让远处也读得到。
@@ -2645,6 +2666,10 @@ function rebuildHydrographyRibbons(): void {
     lakeLabel.userData.lakeId = lake.id;
     hydrographyRibbonsGroup.add(lakeLabel);
   });
+
+  // Hover targets 缓存了 group children 引用，重建后必须 invalidate 否则
+  // 旧的 dispose 过的 mesh 还出现在 raycaster 列表里。
+  invalidatePoiHoverTargets();
 }
 
 function registerWaterEnvironmentMaterial(
