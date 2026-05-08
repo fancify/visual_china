@@ -73,11 +73,13 @@ await fs.mkdir(hydrographyRoot, { recursive: true });
 // 于把 slice-l1 直接交给浏览器加载——L1 只用于 atlas + 远景 fallback mesh，
 // 7.2 km/cell 够用，细节由 chunks (0.9 km/cell) 接管。
 const SLICE_L1_DOWNSAMPLE_STRIDE = 8;
-// Phase 3：海洋 cells 在 source 是 -3，但 8× nearest-center downsample 沿海经常
-// 抽到陆地（譬如渤海 L1 cell 里采到天津岸 → +0.59），让水面被陆地盖住。
-// 改用 "ocean-aware" downsample：8×8 source 块里只要有任何 ocean cell（< -2.5），
-// L1 cell 取该块 MIN（拉到 -3 让水盖过来）；否则取 AVERAGE 让山地不被打散。
-const OCEAN_THRESHOLD = -2.5;
+// Phase 3 Step 8：ocean-aware downsample 必须用"多数决"避免少量沿海 ocean cell
+// 把整块 land 拉到 -3.5。算法：
+//   - 统计 8×8 块里 ocean cells (< OCEAN_THRESHOLD) 数量
+//   - 多数（> 50%）→ 块取 OCEAN_FLOOR（-3.5），整体当海
+//   - 少数 / 无 → 块取 land cells 的 AVERAGE（忽略沿岸的 ocean cell）
+const OCEAN_THRESHOLD = -3.0;  // 严格于 land MIN(-2.5)，仅 catch 真海
+const OCEAN_FLOOR = -3.5;
 function downsampleHeightChannel(channel, srcCols, srcRows, dstCols, dstRows, stride) {
   if (!Array.isArray(channel)) return channel;
   const out = new Array(dstCols * dstRows);
@@ -87,20 +89,27 @@ function downsampleHeightChannel(channel, srcCols, srcRows, dstCols, dstRows, st
     for (let col = 0; col < dstCols; col += 1) {
       const c0 = col * stride;
       const c1 = Math.min(srcCols, c0 + stride);
-      let hasOcean = false;
-      let minV = Infinity;
-      let sum = 0;
-      let n = 0;
+      let oceanCount = 0;
+      let landSum = 0;
+      let landN = 0;
+      let totalN = 0;
       for (let rr = r0; rr < r1; rr += 1) {
         for (let cc = c0; cc < c1; cc += 1) {
           const v = channel[rr * srcCols + cc];
-          if (v < OCEAN_THRESHOLD) hasOcean = true;
-          if (v < minV) minV = v;
-          sum += v;
-          n += 1;
+          totalN += 1;
+          if (v < OCEAN_THRESHOLD) {
+            oceanCount += 1;
+          } else {
+            landSum += v;
+            landN += 1;
+          }
         }
       }
-      out[row * dstCols + col] = hasOcean ? minV : sum / Math.max(1, n);
+      if (oceanCount * 2 > totalN) {
+        out[row * dstCols + col] = OCEAN_FLOOR;
+      } else {
+        out[row * dstCols + col] = landN > 0 ? landSum / landN : OCEAN_FLOOR;
+      }
     }
   }
   return out;

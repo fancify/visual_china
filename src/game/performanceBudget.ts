@@ -22,11 +22,15 @@ export interface RuntimePerformanceBudget {
 //   加 mesh + scenery ≈ 60 MB，可接受）
 //
 // 总三角形：49 × 50 × 50 × 2 = 245K triangles。比 121 chunks 时 605K 少 60%。
+// Phase 3 Step 9：用户报"卡 + Page Unresponsive"。
+// 每 chunk JSON 190 KB（0.9 km grid），49 visible × 190 = 9.3 MB parse 阻塞主线程。
+// 收紧到 visible=2 (5×5=25 chunks ≈ 4.7 MB)，retain=4 (9×9=81)，max=100。
+// 视野半径 = 2 × 45 km = 90 km diameter，步行/骑乘绰绰有余；筋斗云高空再说。
 export const qinlingRuntimeBudget: RuntimePerformanceBudget = {
   streaming: {
-    visibleChunkRadius: 3,
-    retainedChunkRadius: 5,
-    maxLoadedTerrainChunks: 140
+    visibleChunkRadius: 2,
+    retainedChunkRadius: 4,
+    maxLoadedTerrainChunks: 100
   },
   scenery: {
     maxTreesPerChunk: 46

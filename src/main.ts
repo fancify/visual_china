@@ -886,6 +886,8 @@ function applyCloudModeVisibility(): void {
   const flying = currentMountId === "cloud";
   // wildlife group 整组开关
   wildlifeGroup.visible = !flying;
+  // 河边植物（独立 group）— 跟 chunk scenery 同样在 cloud 模式藏起。
+  riverVegetationGroup.visible = !flying;
   // 每个 chunk 的 scenery group（树/灌丛）— 直接 toggle，不等 fade。
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (terrainChunk.scenery) {
