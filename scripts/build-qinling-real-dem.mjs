@@ -613,12 +613,12 @@ const asset = {
   minHeight: Number(minHeight.toFixed(3)),
   maxHeight: Number(maxHeight.toFixed(3)),
   presentation: {
-    // 全国扩张：ocean cells clamp 到 visualMinHeight=-3。L1 ocean-aware MIN
-    // downsample 让沿海 L1 cell 也读到 -3。但内陆河流 carving 把武汉等沿江
-    // 城市 push 到 -2.94 ish。
-    // waterLevel 必须严格在 ocean(-3) 跟 inland-river-low(-2.94) 之间。
-    // -2.97 给 ocean 0.03 显示空间，给 武汉/重庆 等沿江低洼地 0.03 buffer。
-    waterLevel: -2.97,
+    // 全国扩张：ocean cells clamp 到 visualMinHeight=-3。step 2 删 carving 后
+    // 内陆 cells 不再被人工 push 下去，但沿海平原（上海 -2.98 / 天津 -2.95）
+    // 仍跟海平面 cell 几乎齐平。-2.93 给 ocean 0.07 可见水带（×1.6 exag = 0.11
+    // 游戏单位），代价：上海/天津/盘锦等海拔 < 25m 的沿海冲积平原 mesh 会被
+    // 水面盖住，符合"沿海低地视觉上像滩"的写实。
+    waterLevel: -2.93,
     underpaintLevel: -3.5,
     realPeakMeters,
     visualIntent: "Full-China bounds: ocean cells (clamped to -3) covered by water surface; mainland low basins (e.g. Beijing -2.4) stay above water."

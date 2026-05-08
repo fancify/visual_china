@@ -1252,7 +1252,7 @@ function rebuildHudPoiCatalog(): void {
     .forEach((city) => {
       const worldPoint = projectGeoToWorld({ lat: city.lat, lon: city.lon }, bounds, world);
       const elevation = gameHeightToRealMeters(
-        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z),
+        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) / TERRAIN_VERTICAL_EXAGGERATION,
         sampler.asset
       );
       const poi: RuntimePoiInfo = {
@@ -1282,7 +1282,7 @@ function rebuildHudPoiCatalog(): void {
     .forEach((spot) => {
       const worldPoint = projectGeoToWorld({ lat: spot.lat, lon: spot.lon }, bounds, world);
       const elevation = gameHeightToRealMeters(
-        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z),
+        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) / TERRAIN_VERTICAL_EXAGGERATION,
         sampler.asset
       );
       const poi: RuntimePoiInfo = {
@@ -1311,7 +1311,7 @@ function rebuildHudPoiCatalog(): void {
     .forEach((site) => {
       const worldPoint = projectGeoToWorld({ lat: site.lat, lon: site.lon }, bounds, world);
       const elevation = gameHeightToRealMeters(
-        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z),
+        sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) / TERRAIN_VERTICAL_EXAGGERATION,
         sampler.asset
       );
       const poi: RuntimePoiInfo = {
@@ -1338,7 +1338,8 @@ function rebuildHudPoiCatalog(): void {
         world
       );
       const elevation = gameHeightToRealMeters(
-        sampler.sampleSurfaceHeight(landmark.position.x, landmark.position.y),
+        sampler.sampleSurfaceHeight(landmark.position.x, landmark.position.y) /
+          TERRAIN_VERTICAL_EXAGGERATION,
         sampler.asset
       );
       const poi: RuntimePoiInfo = {
