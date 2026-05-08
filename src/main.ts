@@ -2630,8 +2630,16 @@ function rebuildHydrographyRibbons(): void {
       sampler.asset.world
     );
     // 湖面需要压在 terrain 之上而不是海平面高度，否则全国高程下内陆湖会被地形吞掉。
-    lakeMesh.position.y = sampler.sampleHeight(centerWorldPoint.x, centerWorldPoint.z) + 0.08;
+    const lakeY = sampler.sampleHeight(centerWorldPoint.x, centerWorldPoint.z) + 0.08;
+    lakeMesh.position.y = lakeY;
     hydrographyRibbonsGroup.add(lakeMesh);
+
+    // 用户："每个湖上面加个名字"。createTextSprite 同名字 / 高亮的城市标签一致。
+    const lakeLabel = createTextSprite(lake.name, "rgba(160, 220, 255, 0.95)");
+    lakeLabel.position.set(centerWorldPoint.x, lakeY + 4, centerWorldPoint.z);
+    lakeLabel.userData.role = "lake-label";
+    lakeLabel.userData.lakeId = lake.id;
+    hydrographyRibbonsGroup.add(lakeLabel);
   });
 }
 

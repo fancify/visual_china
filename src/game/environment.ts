@@ -381,7 +381,10 @@ export class EnvironmentController {
   private weatherTransitionT = 1;
   private weatherTransitionTarget: Weather = weathers[0];
   private static readonly WEATHER_TRANSITION_SECONDS = 12;
-  private static readonly DAY_OF_YEAR_ADVANCE_PER_SECOND = 0.5;
+  // 用户："真实世界 20 分钟换一次季节"。
+  // 365 days / 4 seasons ≈ 91 days/season; 91 days / 1200 real seconds = 0.076 day/s。
+  // 1 整年 = 4 × 20 min = 80 min real time。
+  private static readonly DAY_OF_YEAR_ADVANCE_PER_SECOND = 0.076;
 
   state: EnvironmentState = {
     timeOfDay: 7.5,
