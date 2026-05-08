@@ -2599,7 +2599,10 @@ function rebuildHydrographyRibbons(): void {
       opacity: 0.85,
       renderOrder: 5,
       depthTest: true,
-      maxSegmentLength: 8
+      // 河流 polyline 数据点稀疏（海河 12 pt / 淮河 57 pt 等），每段 8 unit
+      // ≈ 26 km 让 ribbon 看着像点不像河。压到 1.5（~5 km），
+      // 让 buildWaterRibbonVertices 自己 densify 中间点。
+      maxSegmentLength: 1.5
     });
     ribbon.userData.featureId = feature.id;
     hydrographyRibbonsGroup.add(ribbon);
