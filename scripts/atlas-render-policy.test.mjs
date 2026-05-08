@@ -150,7 +150,8 @@ test("atlas render policy no longer exposes DEM tile-gap overlays", () => {
 });
 
 test("atlas render policy keeps compact overview to reviewed main rivers", () => {
-  assert.equal(atlasMinimumDisplayPriority({ fullscreen: false, scale: 1 }), 9);
+  // mini-map 优先级提到 11：全国画幅下原来 9 让所有城市挤一团，提到 11 只保留 top-tier。
+  assert.equal(atlasMinimumDisplayPriority({ fullscreen: false, scale: 1 }), 11);
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 1 }), 9);
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 1.5 }), 7);
   assert.equal(atlasMinimumDisplayPriority({ fullscreen: true, scale: 2 }), 4);

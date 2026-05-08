@@ -48,8 +48,10 @@ export function missingDemTileWorldRects(asset) {
 }
 
 export function atlasMinimumDisplayPriority({ fullscreen = false, scale = 1 } = {}) {
+  // 用户："mini-map 标签太密"。非全屏 mini-map 只保留 top 优先级（≥11，
+  // 通常是首都/河流主干）。原 9 全国画幅下还是太多城市挤一团。
   if (!fullscreen) {
-    return 9;
+    return 11;
   }
 
   if (scale >= 2) {

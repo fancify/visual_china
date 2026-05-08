@@ -2299,6 +2299,9 @@ function getPoiHoverTargets(): Object3D[] {
     poiHoverTargetSources.push(...landmarkGroup.children);
     poiHoverTargetSources.push(...scenicGroup.children);
     poiHoverTargetSources.push(...ancientGroup.children);
+    // 河流 ribbon + 湖泊 polygon 都在 hydrographyRibbonsGroup 里。
+    // 用户："hover 显示河名湖名"。
+    poiHoverTargetSources.push(...hydrographyRibbonsGroup.children);
     poiHoverTargetsDirty = false;
   }
 
