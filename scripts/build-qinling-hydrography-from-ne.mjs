@@ -386,44 +386,6 @@ function appendPolylineWithGap(stem, candidatePoints, densifyStep) {
   return [...stem, ...densifyGapBetween(stemTail, candidateHead, densifyStep), ...candidatePoints];
 }
 
-function prependPolylineWithGap(stem, candidatePoints, densifyStep) {
-  const stemHead = stem[0];
-  const candidateTail = candidatePoints[candidatePoints.length - 1];
-  if (pointsEqual(candidateTail, stemHead)) {
-    return [...candidatePoints.slice(0, -1), ...stem];
-  }
-  return [...candidatePoints, ...densifyGapBetween(candidateTail, stemHead, densifyStep), ...stem];
-}
-
-function findBestEndpointJoin(stemHead, stemTail, candidate) {
-  const candidateHead = candidate[0];
-  const candidateTail = candidate[candidate.length - 1];
-  const joins = [
-    {
-      distance: pointDistance(stemHead, candidateHead),
-      side: "head",
-      candidatePoints: candidate.slice().reverse()
-    },
-    {
-      distance: pointDistance(stemHead, candidateTail),
-      side: "head",
-      candidatePoints: candidate.slice()
-    },
-    {
-      distance: pointDistance(stemTail, candidateHead),
-      side: "tail",
-      candidatePoints: candidate.slice()
-    },
-    {
-      distance: pointDistance(stemTail, candidateTail),
-      side: "tail",
-      candidatePoints: candidate.slice().reverse()
-    }
-  ];
-  joins.sort((a, b) => a.distance - b.distance);
-  return joins[0];
-}
-
 function buildEndpointAdjacency(lines, thresholdDeg) {
   const adjacency = lines.map(() => new Set());
   for (let i = 0; i < lines.length; i += 1) {
@@ -471,19 +433,107 @@ function collectConnectedComponents(adjacency) {
   return components;
 }
 
-function compareComponents(lines, left, right) {
-  const leftTotal = left.reduce((sum, index) => sum + polylineLength(lines[index]), 0);
-  const rightTotal = right.reduce((sum, index) => sum + polylineLength(lines[index]), 0);
-  if (leftTotal !== rightTotal) return rightTotal - leftTotal;
-
-  const leftLongest = Math.max(...left.map((index) => polylineLength(lines[index])));
-  const rightLongest = Math.max(...right.map((index) => polylineLength(lines[index])));
-  return rightLongest - leftLongest;
+function orientPolyline(line, reversed) {
+  return reversed ? line.slice().reverse() : line.slice();
 }
 
-// 把同名河的多段 polyline 当成端点图里的节点，先找总长度最大的连通分量，
-// 再从其中最长一段出发向两端贪心延伸。只有端点距离在阈值内才允许接入；
-// 如果两个端点之间仍有可见 gap，则插入线性 bridge 点，避免主河看起来断裂。
+function isBetterPath(candidate, incumbent, epsilon = 1e-9) {
+  if (!incumbent) return true;
+  if (candidate.totalLength > incumbent.totalLength + epsilon) return true;
+  if (candidate.totalLength < incumbent.totalLength - epsilon) return false;
+  if (candidate.totalGap < incumbent.totalGap - epsilon) return true;
+  if (candidate.totalGap > incumbent.totalGap + epsilon) return false;
+  if (candidate.reversedCount !== incumbent.reversedCount) {
+    return candidate.reversedCount < incumbent.reversedCount;
+  }
+  if (candidate.segmentCount !== incumbent.segmentCount) {
+    return candidate.segmentCount > incumbent.segmentCount;
+  }
+  for (let i = 0; i < Math.min(candidate.sequence.length, incumbent.sequence.length); i += 1) {
+    const candidateStep = candidate.sequence[i];
+    const incumbentStep = incumbent.sequence[i];
+    if (candidateStep.index !== incumbentStep.index) return candidateStep.index < incumbentStep.index;
+    if (candidateStep.reversed !== incumbentStep.reversed) return candidateStep.reversed === false;
+  }
+  return candidate.sequence.length < incumbent.sequence.length;
+}
+
+function findLongestPathInComponent(lines, component, thresholdDeg) {
+  const componentLines = component.map((index) => lines[index]);
+  const componentLengths = componentLines.map((line) => polylineLength(line));
+  const memo = new Map();
+  const bitFor = (localIndex) => 1n << BigInt(localIndex);
+
+  function dfs(localIndex, reversed, usedMask) {
+    const memoKey = `${localIndex}:${reversed ? 1 : 0}:${usedMask.toString()}`;
+    const cached = memo.get(memoKey);
+    if (cached) return cached;
+
+    const line = componentLines[localIndex];
+    const tail = reversed ? line[0] : line[line.length - 1];
+    let best = {
+      totalLength: componentLengths[localIndex],
+      totalGap: 0,
+      reversedCount: reversed ? 1 : 0,
+      segmentCount: 1,
+      sequence: [{ index: component[localIndex], reversed }]
+    };
+
+    for (let candidateLocal = 0; candidateLocal < componentLines.length; candidateLocal += 1) {
+      if (usedMask & bitFor(candidateLocal)) continue;
+      const candidateLine = componentLines[candidateLocal];
+      const candidateOptions = [
+        { gap: pointDistance(tail, candidateLine[0]), reversed: false },
+        {
+          gap: pointDistance(tail, candidateLine[candidateLine.length - 1]),
+          reversed: true
+        }
+      ];
+
+      for (const option of candidateOptions) {
+        if (option.gap > thresholdDeg) continue;
+        const suffix = dfs(candidateLocal, option.reversed, usedMask | bitFor(candidateLocal));
+        const candidatePath = {
+          totalLength: componentLengths[localIndex] + suffix.totalLength,
+          totalGap: option.gap + suffix.totalGap,
+          reversedCount: (reversed ? 1 : 0) + suffix.reversedCount,
+          segmentCount: 1 + suffix.segmentCount,
+          sequence: [{ index: component[localIndex], reversed }, ...suffix.sequence]
+        };
+        if (isBetterPath(candidatePath, best)) {
+          best = candidatePath;
+        }
+      }
+    }
+
+    memo.set(memoKey, best);
+    return best;
+  }
+
+  let best = null;
+  for (let localIndex = 0; localIndex < component.length; localIndex += 1) {
+    const usedMask = bitFor(localIndex);
+    const forwardPath = dfs(localIndex, false, usedMask);
+    if (isBetterPath(forwardPath, best)) best = forwardPath;
+    const reversedPath = dfs(localIndex, true, usedMask);
+    if (isBetterPath(reversedPath, best)) best = reversedPath;
+  }
+  return best;
+}
+
+function buildStemFromSequence(lines, sequence, densifyStep) {
+  if (sequence.length === 0) return [];
+  let stem = orientPolyline(lines[sequence[0].index], sequence[0].reversed);
+  for (let i = 1; i < sequence.length; i += 1) {
+    const step = sequence[i];
+    stem = appendPolylineWithGap(stem, orientPolyline(lines[step.index], step.reversed), densifyStep);
+  }
+  return stem;
+}
+
+// 把同名河的多段 polyline 当成端点图里的节点。先按端点阈值拆成连通分量，
+// 再在每个分量内搜索总长度最长的简单路径作为候选主干；最后选全局最长那条。
+// 这样能避免“离得更近的短支流”抢走主干续段，同时保留 bridge densify。
 export function stitchPolylines(
   polylines,
   {
@@ -500,46 +550,12 @@ export function stitchPolylines(
 
   const lines = polylines.map((line) => line.slice());
   const adjacency = buildEndpointAdjacency(lines, gapThreshold);
-  const components = collectConnectedComponents(adjacency).sort((left, right) =>
-    compareComponents(lines, left, right)
-  );
-  const primaryComponent = components[0] ?? [0];
-  const seedIndex = primaryComponent.reduce((bestIndex, candidateIndex) =>
-    polylineLength(lines[candidateIndex]) > polylineLength(lines[bestIndex]) ? candidateIndex : bestIndex
-  );
-
-  const used = new Set([seedIndex]);
-  let stem = lines[seedIndex].slice();
-
-  while (used.size < primaryComponent.length) {
-    const stemHead = stem[0];
-    const stemTail = stem[stem.length - 1];
-    let best = null;
-
-    for (const index of primaryComponent) {
-      if (used.has(index)) continue;
-      const join = findBestEndpointJoin(stemHead, stemTail, lines[index]);
-      if (join.distance > gapThreshold) continue;
-      const candidateLength = polylineLength(lines[index]);
-      if (
-        !best ||
-        join.distance < best.join.distance ||
-        (join.distance === best.join.distance && candidateLength > best.candidateLength)
-      ) {
-        best = {
-          index,
-          join,
-          candidateLength
-        };
-      }
-    }
-    if (!best) break;
-    used.add(best.index);
-    stem =
-      best.join.side === "head"
-        ? prependPolylineWithGap(stem, best.join.candidatePoints, densifyStep)
-        : appendPolylineWithGap(stem, best.join.candidatePoints, densifyStep);
-  }
+  const components = collectConnectedComponents(adjacency);
+  const bestPath = components
+    .map((component) => findLongestPathInComponent(lines, component, gapThreshold))
+    .reduce((best, candidate) => (isBetterPath(candidate, best) ? candidate : best), null);
+  const used = new Set(bestPath?.sequence.map((step) => step.index) ?? []);
+  const stem = buildStemFromSequence(lines, bestPath?.sequence ?? [], densifyStep);
 
   return {
     stem,
