@@ -2634,9 +2634,10 @@ function rebuildHydrographyRibbons(): void {
     lakeMesh.position.y = lakeY;
     hydrographyRibbonsGroup.add(lakeMesh);
 
-    // 用户："每个湖上面加个名字"。createTextSprite 同名字 / 高亮的城市标签一致。
+    // 用户："每个湖上面加个名字"。湖 polygon 跨度大，label scale ×3 让远处也读得到。
     const lakeLabel = createTextSprite(lake.name, "rgba(160, 220, 255, 0.95)");
-    lakeLabel.position.set(centerWorldPoint.x, lakeY + 4, centerWorldPoint.z);
+    lakeLabel.scale.multiplyScalar(3.0);
+    lakeLabel.position.set(centerWorldPoint.x, lakeY + 8, centerWorldPoint.z);
     lakeLabel.userData.role = "lake-label";
     lakeLabel.userData.lakeId = lake.id;
     hydrographyRibbonsGroup.add(lakeLabel);
@@ -3381,18 +3382,19 @@ function drawAtlasOverlay(
   context.lineTo(barRight, baseY + 5);
   context.stroke();
 
-  context.font = "500 12px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  // 用户：把最小的字给我放大。所有 < 14px 的 atlas 文字提到 14-16 px。
+  context.font = "500 16px 'Noto Sans SC', 'PingFang SC', sans-serif";
   context.textAlign = "center";
   context.textBaseline = "alphabetic";
   context.fillStyle = "rgba(247, 234, 188, 0.9)";
   context.fillText(`${scaleKm} km`, (barLeft + barRight) / 2, baseY - 8);
 
   // Zoom 等级 + evidence 阈值提示（比例尺上方）
-  context.font = "600 13px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.font = "600 17px 'Noto Sans SC', 'PingFang SC', sans-serif";
   context.textAlign = "left";
   context.fillStyle = "rgba(247, 234, 188, 0.78)";
   context.fillText(`缩放 ${mapView.scale.toFixed(2)}x`, barLeft, baseY - 30);
-  context.font = "500 11px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.font = "500 14px 'Noto Sans SC', 'PingFang SC', sans-serif";
   context.fillStyle = "rgba(247, 234, 188, 0.55)";
   context.fillText(
     mapView.scale >= 1.45
@@ -3403,7 +3405,7 @@ function drawAtlasOverlay(
   );
 
   // 数据源标注（更下方，最低存在感）
-  context.font = "500 10px 'Noto Sans SC', 'PingFang SC', sans-serif";
+  context.font = "500 14px 'Noto Sans SC', 'PingFang SC', sans-serif";
   context.textAlign = "left";
   context.fillStyle = "rgba(247, 234, 188, 0.4)";
   context.fillText(
@@ -3433,7 +3435,13 @@ const qinlingRegionPlacemarks: RegionPlacemark[] = [
   { name: "汉中盆地",     lat: 33.20, lon: 107.05, fontSize: 24 },
   { name: "蜀道走廊",     lat: 32.55, lon: 106.05, fontSize: 22 },
   { name: "四川盆地北缘", lat: 31.55, lon: 105.30, fontSize: 22 },
-  { name: "成都平原",     lat: 30.65, lon: 104.65, fontSize: 24 }
+  { name: "成都平原",     lat: 30.65, lon: 104.65, fontSize: 24 },
+  // 五大湖：mini-map 上加湖名 placemark，让用户能识别 polygon 是哪个湖。
+  { name: "青海湖",       lat: 36.85, lon: 100.18, fontSize: 22 },
+  { name: "鄱阳湖",       lat: 29.10, lon: 116.20, fontSize: 22 },
+  { name: "洞庭湖",       lat: 29.20, lon: 112.85, fontSize: 22 },
+  { name: "太湖",         lat: 31.20, lon: 120.20, fontSize: 22 },
+  { name: "巢湖",         lat: 31.55, lon: 117.45, fontSize: 22 }
 ];
 
 function drawRegionPlacemarks(
