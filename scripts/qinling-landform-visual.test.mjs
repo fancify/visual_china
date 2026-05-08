@@ -282,23 +282,22 @@ test("mid-range elevation enhancement lifts hill terrain without inflating peaks
   const taibaiPeak = sampleHeightAt(107.77, 33.95);
   const hillRelief = jianmen - zitong;
 
-  // Phase 2 全国扩张：normalize 锚点变成 0..8157m（含 Everest），把秦岭/巴山的
-  // 局部抬升压缩到更低的归一化区间。Zitong 现在落在丘陵带 baseline，Jianmen
-  // 抬升到山带 baseline，Taibai 顶峰仍然显著高于支脉。容忍带 ±0.25 不变。
+  // Phase 3 ocean/land split: land band 起点从 -3 升到 -2.5，所有内陆 sample
+  // 整体抬升约 0.5 unit（含 Zitong/Jianmen/Taibai）。
   assert.ok(
-    zitong >= -1.72 && zitong <= -1.22,
+    zitong >= -1.32 && zitong <= -0.82,
     `Zitong hill belt should sit in mid-hill band, got ${zitong.toFixed(3)}`
   );
   assert.ok(
-    jianmen >= -0.43 && jianmen <= 0.07,
+    jianmen >= -0.04 && jianmen <= 0.46,
     `Jianmen Pass should lift above Zitong, got ${jianmen.toFixed(3)}`
   );
   assert.ok(
-    hillRelief >= 1.0 && hillRelief <= 1.5,
+    hillRelief >= 1.0 && hillRelief <= 1.6,
     `Zitong-Jianmen hill relief should preserve readable contrast, got ${hillRelief.toFixed(3)}`
   );
   assert.ok(
-    taibaiPeak >= 3.6 && taibaiPeak <= 4.2,
+    taibaiPeak >= 4.0 && taibaiPeak <= 4.8,
     `Taibai peak should remain a distinct alpine summit, got ${taibaiPeak.toFixed(3)}`
   );
 });

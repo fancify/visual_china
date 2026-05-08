@@ -10,6 +10,7 @@ import {
   qinlingWorld
 } from "./qinling-dem-common.mjs";
 import { getHydroShedsSampler } from "./hydrosheds-sampler.mjs";
+import { getEtopoOceanSampler } from "./etopo-ocean-mask.mjs";
 import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
 
 function clamp(value, min, max) {
@@ -384,22 +385,30 @@ function smoothHeightField(values, columns, rows, { passes = 1, blend = 0.5 } = 
   return current;
 }
 
-function normalizeHeights(rawHeights, minRawHeight, maxRawHeight) {
-  const range = maxRawHeight - minRawHeight || 1;
+function normalizeHeights(rawHeights, minRawHeight, maxRawHeight, oceanMask) {
   const normalized = new Float32Array(rawHeights.length);
   let minHeight = Number.POSITIVE_INFINITY;
   let maxHeight = Number.NEGATIVE_INFINITY;
-  // 2026-05 高度调试历程：原 [-4, 18]=22 → halved [-2, 9]=11 太平。
-  // 用户反馈再 ×1.5 → [-3, 13.5]=16.5。介于原版和 halved 之间，山形仍
-  // 比原版温和，但比 halved 立体。河谷雕刻深度同比 ×1.5。
-  const visualMinHeight = -3;
-  const visualMaxHeight = 13.5;
+  // 2026-05-08 重构：ocean 跟 land 两段式，避免华北平原被海淹 + 海面 Z-fighting。
+  // - oceanMask=1 (ETOPO bathymetry < -10m) → clamp 到 OCEAN_FLOOR(-3.5)
+  // - 其他 cells → normalize 到 [LAND_MIN(-2.5), LAND_MAX(13.5)]
+  // - waterLevel = -3.0 在两个 band 之间 → 海面可见 0.5 unit + land 安全
+  const OCEAN_FLOOR = -3.5;
+  const LAND_MIN = -2.5;
+  const LAND_MAX = 13.5;
+  const landMinRaw = Math.max(0, minRawHeight);
+  const landRange = (maxRawHeight - landMinRaw) || 1;
 
   for (let index = 0; index < rawHeights.length; index += 1) {
-    const value = rawHeights[index];
-    const t = clamp((value - minRawHeight) / range, 0, 1);
-    const eased = Math.pow(t, 0.95);
-    const stylized = visualMinHeight + eased * (visualMaxHeight - visualMinHeight);
+    let stylized;
+    if (oceanMask && oceanMask[index]) {
+      stylized = OCEAN_FLOOR;
+    } else {
+      const value = rawHeights[index];
+      const t = clamp((value - landMinRaw) / landRange, 0, 1);
+      const eased = Math.pow(t, 0.95);
+      stylized = LAND_MIN + eased * (LAND_MAX - LAND_MIN);
+    }
     normalized[index] = stylized;
     minHeight = Math.min(minHeight, stylized);
     maxHeight = Math.max(maxHeight, stylized);
@@ -475,7 +484,12 @@ const rows = qinlingOutputGrid.rows;
 const legacyOutputPath = qinlingWorkspacePath("public", "data", "qinling-slice-dem.json");
 
 const sampler = await getHydroShedsSampler();
+// HydroSHEDS 是 void-filled 陆地 DEM，海洋区域 raw=0，无法跟"沿海低地 0m"
+// 区分。同时调 ETOPO 1.85km 全球 bathymetry 做 ocean mask：海洋 cell 在
+// normalize 时强制 clamp 到 OCEAN_FLOOR(-3.5)，跟 land [-2.5, 13.5] 拉开。
+const oceanSampler = await getEtopoOceanSampler();
 const rawHeights = new Float32Array(columns * rows);
+const oceanMask = new Uint8Array(columns * rows);
 let minRawHeight = Number.POSITIVE_INFINITY;
 let maxRawHeight = Number.NEGATIVE_INFINITY;
 for (let row = 0; row < rows; row += 1) {
@@ -485,6 +499,9 @@ for (let row = 0; row < rows; row += 1) {
     const value = sampler.sample(lon, lat);
 
     rawHeights[index] = value;
+    if (oceanSampler.isOcean(lon, lat)) {
+      oceanMask[index] = 1;
+    }
     minRawHeight = Math.min(minRawHeight, value);
     maxRawHeight = Math.max(maxRawHeight, value);
   }
@@ -523,7 +540,8 @@ for (let row = 0; row < rows; row += 1) {
 let { normalized, minHeight, maxHeight } = normalizeHeights(
   buildTouringLayerRawHeights(rawHeights),
   minRawHeight,
-  maxRawHeight
+  maxRawHeight,
+  oceanMask
 );
 
 const smoothed = smoothHeightField(normalized, columns, rows, {
@@ -613,12 +631,10 @@ const asset = {
   minHeight: Number(minHeight.toFixed(3)),
   maxHeight: Number(maxHeight.toFixed(3)),
   presentation: {
-    // 全国扩张：ocean cells clamp 到 visualMinHeight=-3。step 2 删 carving 后
-    // 内陆 cells 不再被人工 push 下去，但沿海平原（上海 -2.98 / 天津 -2.95）
-    // 仍跟海平面 cell 几乎齐平。-2.93 给 ocean 0.07 可见水带（×1.6 exag = 0.11
-    // 游戏单位），代价：上海/天津/盘锦等海拔 < 25m 的沿海冲积平原 mesh 会被
-    // 水面盖住，符合"沿海低地视觉上像滩"的写实。
-    waterLevel: -2.93,
+    // 2026-05-08 重构：normalize 把 ocean (< -10m raw) clamp 到 -3.5；陆地
+    // [-2.5, 13.5]。waterLevel = -3.0 在两个 band 之间，海面跟 mesh 永远 0.5
+    // unit gap（×1.6 exag = 0.8 game units），既清晰可见又无 Z-fighting。
+    waterLevel: -3.0,
     underpaintLevel: -3.5,
     realPeakMeters,
     visualIntent: "Full-China bounds: ocean cells (clamped to -3) covered by water surface; mainland low basins (e.g. Beijing -2.4) stay above water."
