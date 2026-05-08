@@ -2648,17 +2648,18 @@ function applyWaterEnvironmentVisuals(visuals: EnvironmentVisuals): void {
   });
 }
 
-// 0x3d7d8c：把水的色相往真实河流的"深绿青"上推。原来的 0x6aa7b0 太接近
-// 灰白，叠在地形上几乎看不出色。现在饱和度足够，远眺时能立刻识别出河道。
-const ambientWaterBaseColor = new Color(0x3d7d8c);
+// 用户："海要非常明显的是蓝色的海水，而且要跟土地区分开"。
+// 0x1e6ec5（饱和蓝色）+ 高 opacity，使海洋远远就能识别出来，跟土黄/绿地清晰
+// 分隔。原 0x3d7d8c 偏青灰，全国画幅下被周边地形吃掉。
+const ambientWaterBaseColor = new Color(0x1e6ec5);
 function applyAmbientWaterSurfaceVisuals(visuals: EnvironmentVisuals): void {
   const environmentStyle = waterEnvironmentVisualStyle(ambientWaterStyle, visuals);
   const tintedBase = ambientWaterBaseColor
     .clone()
     .multiplyScalar(environmentStyle.colorMultiplier);
   waterSurface.setBaseColor(tintedBase);
-  // opacity 倍率从 1.4 → 1.9：水面更不透明，叠在地形上不再"洗白"。
-  waterSurface.setOpacity(Math.max(0.12, environmentStyle.ribbonOpacity * 1.9));
+  // opacity 强制 0.92：水面几乎不透明，海面不会被底下 mesh 颜色洗淡。
+  waterSurface.setOpacity(Math.max(0.85, environmentStyle.ribbonOpacity * 1.9));
   waterSurface.setSunDirection(visuals.sunDirection);
 }
 
