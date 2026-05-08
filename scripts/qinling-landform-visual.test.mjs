@@ -308,20 +308,21 @@ test("Qinling river carving keeps a narrow water footprint with sharper gorge wa
 
   // Phase 2 全国扩张：grid 行列大幅增加 + 13 条河覆盖全国，被 carve 的 cell
   // 总数自然涨；此处只锁住当前 baseline ±10% 容忍带，防回归扩散。
-  // Phase 3 全国 0.9 km grid (4× 多 cells) → river paint 总 cell 翻倍量级。
+  // Phase 3 Step 2：carving 删除（depth=0），但 paintDiscAt 仍写 riverMask
+  // channel；42 条河 + 0.9 km grid 的 mask cell 总数自然变多。
   assert.ok(
-    gorge.strongWaterCells >= 18000 && gorge.strongWaterCells <= 26000,
+    gorge.strongWaterCells >= 40000 && gorge.strongWaterCells <= 65000,
     `strong-water core should stay within current baseline, got ${gorge.strongWaterCells} cells`
   );
   assert.ok(
-    gorge.visibleWaterCells >= 18000 && gorge.visibleWaterCells <= 28000,
+    gorge.visibleWaterCells >= 40000 && gorge.visibleWaterCells <= 70000,
     `visible water corridor should stay within current baseline, got ${gorge.visibleWaterCells} cells above 0.1`
   );
-  // Phase 3 河流改成 ribbon 渲染后，carving 大幅压低（depth 0.85→0.18），
-  // bank rise 从 ~1 unit 降到 ~0.4 unit。河谷不再深沟，靠 ribbon 显水。
+  // Phase 3 Step 2：carving 完全删除（depth=0），mesh 不再凹陷。bank rise
+  // 接近 0（仍可能有微小相邻 cell 高度差），断言只检查不为负值。
   assert.ok(
-    gorge.bankRise90 >= 0.2 && gorge.bankRise90 <= 0.8,
-    `gorge banks should remain readable, got p90 rise ${gorge.bankRise90.toFixed(3)}`
+    gorge.bankRise90 >= -0.1 && gorge.bankRise90 <= 0.5,
+    `gorge banks no longer carved (depth=0), got p90 rise ${gorge.bankRise90.toFixed(3)}`
   );
 });
 

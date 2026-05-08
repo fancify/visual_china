@@ -309,23 +309,17 @@ function buildNeRiverGeometryFromClipped(
   clipped,
   {
     flowDir,
-    chainThresholdDeg = 0.5,
-    // 旧版 max=2 让 汉水 4 个 sub-polyline 接不全（Part 1 汉中源 被丢出 extras）。
-    // 上调到 8 → 长河（汉水/长江/嘉陵江）的所有上下游连续段都能 chain 进主干。
-    maxChainedExtras = 8,
+    chainThresholdDeg = 0.15,
     densifyMaxDeg = 0.018,
     simplifyToleranceDeg = 0.01
   }
 ) {
   if (clipped.length === 0) return null;
-  const oriented = clipped
-    .map((line) => orientPolylineByFlowDir(line, flowDir))
-    .sort((a, b) => polylineLength(b) - polylineLength(a));
-  const { primaryLine, extraLines } = chainNearbySubLines(
-    oriented,
-    chainThresholdDeg,
-    maxChainedExtras
-  );
+  const oriented = clipped.map((line) => orientPolylineByFlowDir(line, flowDir));
+  const { stem: primaryLine, extras: extraLines } = stitchPolylines(oriented, {
+    gapThreshold: chainThresholdDeg,
+    densifyStep: 0.012
+  });
   const toLatLon = (line) => line.map(([lon, lat]) => ({ lat, lon }));
   return {
     points: simplifyPolyline(
@@ -346,10 +340,7 @@ export function buildNeRiverGeometry(
   river,
   {
     flowDir,
-    chainThresholdDeg = 0.5,
-    // 旧版 max=2 让 汉水 4 个 sub-polyline 接不全（Part 1 汉中源 被丢出 extras）。
-    // 上调到 8 → 长河（汉水/长江/嘉陵江）的所有上下游连续段都能 chain 进主干。
-    maxChainedExtras = 8,
+    chainThresholdDeg = 0.15,
     clipBbox = SLICE_BBOX,
     densifyMaxDeg = 0.018,
     simplifyToleranceDeg = 0.01
@@ -362,35 +353,69 @@ export function buildNeRiverGeometry(
   return buildNeRiverGeometryFromClipped(clipped, {
     flowDir,
     chainThresholdDeg,
-    maxChainedExtras,
     densifyMaxDeg,
     simplifyToleranceDeg
   });
 }
 
-function findBestEndpointJoin(seed, candidate) {
-  const seedHead = seed[0];
-  const seedTail = seed[seed.length - 1];
+function pointsEqual([lonA, latA], [lonB, latB], epsilon = 1e-9) {
+  return Math.abs(lonA - lonB) <= epsilon && Math.abs(latA - latB) <= epsilon;
+}
+
+function densifyGapBetween(start, end, stepDeg) {
+  const dist = pointDistance(start, end);
+  if (dist <= stepDeg) return [];
+  const steps = Math.ceil(dist / stepDeg);
+  const out = [];
+  for (let i = 1; i < steps; i += 1) {
+    const t = i / steps;
+    out.push([
+      start[0] + (end[0] - start[0]) * t,
+      start[1] + (end[1] - start[1]) * t
+    ]);
+  }
+  return out;
+}
+
+function appendPolylineWithGap(stem, candidatePoints, densifyStep) {
+  const stemTail = stem[stem.length - 1];
+  const candidateHead = candidatePoints[0];
+  if (pointsEqual(stemTail, candidateHead)) {
+    return [...stem, ...candidatePoints.slice(1)];
+  }
+  return [...stem, ...densifyGapBetween(stemTail, candidateHead, densifyStep), ...candidatePoints];
+}
+
+function prependPolylineWithGap(stem, candidatePoints, densifyStep) {
+  const stemHead = stem[0];
+  const candidateTail = candidatePoints[candidatePoints.length - 1];
+  if (pointsEqual(candidateTail, stemHead)) {
+    return [...candidatePoints.slice(0, -1), ...stem];
+  }
+  return [...candidatePoints, ...densifyGapBetween(candidateTail, stemHead, densifyStep), ...stem];
+}
+
+function findBestEndpointJoin(stemHead, stemTail, candidate) {
   const candidateHead = candidate[0];
   const candidateTail = candidate[candidate.length - 1];
   const joins = [
     {
-      distance: pointDistance(seedHead, candidateHead),
+      distance: pointDistance(stemHead, candidateHead),
       side: "head",
       candidatePoints: candidate.slice().reverse()
     },
     {
-      distance: pointDistance(seedHead, candidateTail),
+      distance: pointDistance(stemHead, candidateTail),
       side: "head",
       candidatePoints: candidate.slice()
     },
     {
-      distance: pointDistance(seedTail, candidateHead),
+      distance: pointDistance(stemTail, candidateHead),
       side: "tail",
       candidatePoints: candidate.slice()
     },
     {
-      distance: pointDistance(seedTail, candidateTail),
+      distance: pointDistance(stemTail, candidateTail),
       side: "tail",
       candidatePoints: candidate.slice().reverse()
     }
@@ -399,37 +424,126 @@ function findBestEndpointJoin(seed, candidate) {
   return joins[0];
 }
 
-function chainNearbySubLines(lines, thresholdDeg, maxChainedExtras) {
-  if (lines.length === 0) {
-    return { primaryLine: null, extraLines: [] };
-  }
-  const [seedLine, ...remainingLines] = lines.map((line) => line.slice());
-  const primaryLine = seedLine.slice();
-  let chainedExtras = 0;
-
-  while (remainingLines.length > 0 && chainedExtras < maxChainedExtras) {
-    const rankedCandidates = remainingLines
-      .map((candidate, index) => ({
-        index,
-        candidate,
-        join: findBestEndpointJoin(primaryLine, candidate)
-      }))
-      .sort((a, b) => a.join.distance - b.join.distance);
-    const best = rankedCandidates[0];
-    if (!best || best.join.distance > thresholdDeg) break;
-
-    if (best.join.side === "head") {
-      primaryLine.unshift(...best.join.candidatePoints);
-    } else {
-      primaryLine.push(...best.join.candidatePoints);
+function buildEndpointAdjacency(lines, thresholdDeg) {
+  const adjacency = lines.map(() => new Set());
+  for (let i = 0; i < lines.length; i += 1) {
+    const lineA = lines[i];
+    const aHead = lineA[0];
+    const aTail = lineA[lineA.length - 1];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const lineB = lines[j];
+      const bHead = lineB[0];
+      const bTail = lineB[lineB.length - 1];
+      const minDistance = Math.min(
+        pointDistance(aHead, bHead),
+        pointDistance(aHead, bTail),
+        pointDistance(aTail, bHead),
+        pointDistance(aTail, bTail)
+      );
+      if (minDistance <= thresholdDeg) {
+        adjacency[i].add(j);
+        adjacency[j].add(i);
+      }
     }
-    remainingLines.splice(best.index, 1);
-    chainedExtras += 1;
+  }
+  return adjacency;
+}
+
+function collectConnectedComponents(adjacency) {
+  const visited = new Set();
+  const components = [];
+  for (let i = 0; i < adjacency.length; i += 1) {
+    if (visited.has(i)) continue;
+    const stack = [i];
+    const component = [];
+    visited.add(i);
+    while (stack.length > 0) {
+      const current = stack.pop();
+      component.push(current);
+      for (const neighbor of adjacency[current]) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        stack.push(neighbor);
+      }
+    }
+    components.push(component);
+  }
+  return components;
+}
+
+function compareComponents(lines, left, right) {
+  const leftTotal = left.reduce((sum, index) => sum + polylineLength(lines[index]), 0);
+  const rightTotal = right.reduce((sum, index) => sum + polylineLength(lines[index]), 0);
+  if (leftTotal !== rightTotal) return rightTotal - leftTotal;
+
+  const leftLongest = Math.max(...left.map((index) => polylineLength(lines[index])));
+  const rightLongest = Math.max(...right.map((index) => polylineLength(lines[index])));
+  return rightLongest - leftLongest;
+}
+
+// 把同名河的多段 polyline 当成端点图里的节点，先找总长度最大的连通分量，
+// 再从其中最长一段出发向两端贪心延伸。只有端点距离在阈值内才允许接入；
+// 如果两个端点之间仍有可见 gap，则插入线性 bridge 点，避免主河看起来断裂。
+export function stitchPolylines(
+  polylines,
+  {
+    gapThreshold = 0.15,
+    densifyStep = 0.012
+  } = {}
+) {
+  if (polylines.length === 0) {
+    return { stem: [], extras: [] };
+  }
+  if (polylines.length === 1) {
+    return { stem: polylines[0].slice(), extras: [] };
+  }
+
+  const lines = polylines.map((line) => line.slice());
+  const adjacency = buildEndpointAdjacency(lines, gapThreshold);
+  const components = collectConnectedComponents(adjacency).sort((left, right) =>
+    compareComponents(lines, left, right)
+  );
+  const primaryComponent = components[0] ?? [0];
+  const seedIndex = primaryComponent.reduce((bestIndex, candidateIndex) =>
+    polylineLength(lines[candidateIndex]) > polylineLength(lines[bestIndex]) ? candidateIndex : bestIndex
+  );
+
+  const used = new Set([seedIndex]);
+  let stem = lines[seedIndex].slice();
+
+  while (used.size < primaryComponent.length) {
+    const stemHead = stem[0];
+    const stemTail = stem[stem.length - 1];
+    let best = null;
+
+    for (const index of primaryComponent) {
+      if (used.has(index)) continue;
+      const join = findBestEndpointJoin(stemHead, stemTail, lines[index]);
+      if (join.distance > gapThreshold) continue;
+      const candidateLength = polylineLength(lines[index]);
+      if (
+        !best ||
+        join.distance < best.join.distance ||
+        (join.distance === best.join.distance && candidateLength > best.candidateLength)
+      ) {
+        best = {
+          index,
+          join,
+          candidateLength
+        };
+      }
+    }
+    if (!best) break;
+    used.add(best.index);
+    stem =
+      best.join.side === "head"
+        ? prependPolylineWithGap(stem, best.join.candidatePoints, densifyStep)
+        : appendPolylineWithGap(stem, best.join.candidatePoints, densifyStep);
   }
 
   return {
-    primaryLine,
-    extraLines: remainingLines
+    stem,
+    extras: lines.filter((_, index) => !used.has(index))
   };
 }
 

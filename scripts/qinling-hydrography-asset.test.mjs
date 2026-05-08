@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { buildNeRiverGeometry, simplifyPolyline } from "./build-qinling-hydrography-from-ne.mjs";
+import {
+  buildNeRiverGeometry,
+  simplifyPolyline,
+  stitchPolylines
+} from "./build-qinling-hydrography-from-ne.mjs";
 import { qinlingModernHydrography } from "../src/game/qinlingHydrography.js";
 import { qinlingNeRivers } from "../src/game/data/qinlingNeRivers.js";
 
@@ -43,6 +47,84 @@ test("simplifyPolyline keeps endpoints while collapsing dense collinear points",
     { lon: 104.0, lat: 30.0 },
     { lon: 104.3, lat: 30.3 }
   ]);
+});
+
+test("stitchPolylines connects all nearby same-river segments and densifies inter-segment gaps", () => {
+  const polylines = [
+    [[0.0, 0.0], [0.01, 0.0]],
+    [[0.05, 0.0], [0.06, 0.0]],
+    [[0.1, 0.0], [0.11, 0.0]],
+    [[1.0, 1.0], [1.01, 1.0]]
+  ];
+
+  const { stem, extras } = stitchPolylines(polylines, {
+    gapThreshold: 0.05,
+    densifyStep: 0.012
+  });
+
+  assert.equal(extras.length, 1, "far-away segment should remain an extra polyline");
+  assert.deepEqual(extras[0], [[1.0, 1.0], [1.01, 1.0]]);
+  assert.equal(stem.length, 12, `expected 3 stitched segments plus 6 bridge points, got ${stem.length}`);
+  assert.deepEqual(
+    stem,
+    [
+      [0.0, 0.0],
+      [0.01, 0.0],
+      [0.02, 0.0],
+      [0.03, 0.0],
+      [0.04, 0.0],
+      [0.05, 0.0],
+      [0.06, 0.0],
+      [0.07, 0.0],
+      [0.08, 0.0],
+      [0.09, 0.0],
+      [0.1, 0.0],
+      [0.11, 0.0]
+    ],
+    "stitch should bridge endpoint gaps instead of leaving discontinuities between segments"
+  );
+});
+
+test("stitchPolylines has no hard cap on how many connected segments can enter the stem", () => {
+  const polylines = Array.from({ length: 10 }, (_, index) => {
+    const start = index * 0.03;
+    return [[start, 0.0], [start + 0.01, 0.0]];
+  });
+
+  const { stem, extras } = stitchPolylines(polylines, {
+    gapThreshold: 0.05,
+    densifyStep: 0.012
+  });
+
+  assert.equal(extras.length, 0, "all 10 connected segments should be absorbed into the stem");
+  assert.deepEqual(stem[0], [0.0, 0.0]);
+  assert.deepEqual(stem[stem.length - 1], [0.28, 0.0]);
+});
+
+test("stitchPolylines prefers the longest connected trunk over a nearer short branch", () => {
+  const polylines = [
+    [[0.0, 0.0], [1.0, 0.0]],
+    [[1.05, 0.0], [2.0, 0.0]],
+    [[1.02, 0.0], [1.02, 0.2]]
+  ];
+
+  const { stem, extras } = stitchPolylines(polylines, {
+    gapThreshold: 0.1,
+    densifyStep: 0.03
+  });
+
+  assert.deepEqual(
+    stem[0],
+    [0.0, 0.0],
+    "main stem should still start from the western source segment"
+  );
+  assert.deepEqual(
+    stem[stem.length - 1],
+    [2.0, 0.0],
+    "main stem should continue into the longer eastern continuation instead of the nearby short branch"
+  );
+  assert.equal(extras.length, 1, "short side branch should remain an extra polyline");
+  assert.deepEqual(extras[0], [[1.02, 0.0], [1.02, 0.2]]);
 });
 
 test("NE hydrography build greedily chains southern Wujiang source branches into the main stem", () => {

@@ -90,14 +90,15 @@ function meanNeighborDifference(values, column, row, columns, rows) {
 //
 // 关键：carving 是在 normalize 之后做的，所以 depth 是游戏单位 (-2..9 范围内)
 // 而不是真实米数。每个 cell 取 min(current, riverHeight - depth*falloff)。
-// Phase 3 全国 0.9 km cell + 1.6× 垂直夸张 + 3D river ribbons 同时存在：
-// 旧的 deep carving 把河谷搞成 1.4 unit 深沟，从空中看全是黑色阴影带，比河
-// 还宽。现在水带由 ribbon 直接渲染，carving 只需要让 ribbon 嵌进 mesh 不浮空，
-// 大幅压低 depth + radius。
+// Phase 3 Step 2：完全废除 DEM 河谷雕刻。河流改由 createWaterSurfaceRibbon 在
+// mesh 上方画 3D ribbon，mesh 不再需要凹下去引导。depth=0 意味着 paintDiscAt
+// 仍写 riverMask 通道（其他系统依赖），但不动 heights。
+// 用户反馈："为什么咱们始终就出问题呢？" → 三套水系统并存（mask + carving +
+// ribbon）造成的视觉冲突，单源化（仅 ribbon）后干净。
 const RIVER_CARVE_BY_RANK = {
-  1: { radiusCells: 0.6, depth: 0.18 }, // 主干 ≈ 1.1 km wide, 浅刻
-  2: { radiusCells: 0.5, depth: 0.12 }, // 一级支流 ≈ 0.9 km wide
-  3: { radiusCells: 0.4, depth: 0.08 } // 二级支流 ≈ 0.7 km wide
+  1: { radiusCells: 0.6, depth: 0 },
+  2: { radiusCells: 0.5, depth: 0 },
+  3: { radiusCells: 0.4, depth: 0 }
 };
 
 // 内部用：把 polyline 密化到 ~1 cell 间隔 (~0.012°, ~1.3km)，让 carving

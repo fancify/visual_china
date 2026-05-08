@@ -31,6 +31,8 @@ import {
   Raycaster,
   Scene,
   SphereGeometry,
+  Shape,
+  ShapeGeometry,
   Sprite,
   SpriteMaterial,
   Vector2,
@@ -245,6 +247,7 @@ import { flattenedY, setCityFlattenZones } from "./game/cityFlattenZones.js";
 import { realQinlingCities } from "./data/realCities.js";
 import type { RealCity } from "./data/realCities.js";
 import { qinlingRegionWorld } from "./data/qinlingRegion.js";
+import { CHINA_LAKES, type ChinaLake } from "./game/data/chinaLakes";
 import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
   evaluateStoryGuide,
@@ -2506,10 +2509,47 @@ function createWaterSurfaceRibbon(
   return ribbon;
 }
 
+function createLakePolygon(
+  lake: ChinaLake,
+  bounds: NonNullable<DemAsset["bounds"]>,
+  world: DemAsset["world"]
+): Mesh<ShapeGeometry, MeshBasicMaterial> {
+  const shape = new Shape();
+
+  lake.polygon.forEach((point, index) => {
+    const worldPoint = projectGeoToWorld(
+      { lat: point.lat, lon: point.lon },
+      bounds,
+      world
+    );
+    if (index === 0) {
+      shape.moveTo(worldPoint.x, worldPoint.z);
+    } else {
+      shape.lineTo(worldPoint.x, worldPoint.z);
+    }
+  });
+  shape.closePath();
+
+  const geometry = new ShapeGeometry(shape);
+  geometry.rotateX(-Math.PI / 2);
+  const material = new MeshBasicMaterial({
+    color: 0x3b6ea8,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+    side: DoubleSide
+  });
+  const mesh = new Mesh(geometry, material);
+  mesh.renderOrder = 5;
+  mesh.userData.lakeId = lake.id;
+  return mesh;
+}
+
 function rebuildHydrographyRibbons(): void {
   clearGroup(hydrographyRibbonsGroup);
 
-  if (!terrainSampler) {
+  const sampler = terrainSampler;
+  if (!sampler) {
     return;
   }
 
@@ -2552,6 +2592,32 @@ function rebuildHydrographyRibbons(): void {
     });
     ribbon.userData.featureId = feature.id;
     hydrographyRibbonsGroup.add(ribbon);
+  });
+
+  const bounds = sampler.asset.bounds;
+  if (!bounds) {
+    return;
+  }
+
+  CHINA_LAKES.forEach((lake) => {
+    if (
+      lake.centerLat < bounds.south ||
+      lake.centerLat > bounds.north ||
+      lake.centerLon < bounds.west ||
+      lake.centerLon > bounds.east
+    ) {
+      return;
+    }
+
+    const lakeMesh = createLakePolygon(lake, bounds, sampler.asset.world);
+    const centerWorldPoint = projectGeoToWorld(
+      { lat: lake.centerLat, lon: lake.centerLon },
+      bounds,
+      sampler.asset.world
+    );
+    // 湖面需要压在 terrain 之上而不是海平面高度，否则全国高程下内陆湖会被地形吞掉。
+    lakeMesh.position.y = sampler.sampleHeight(centerWorldPoint.x, centerWorldPoint.z) + 0.08;
+    hydrographyRibbonsGroup.add(lakeMesh);
   });
 }
 
