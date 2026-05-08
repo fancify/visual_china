@@ -6,7 +6,7 @@
   "lod": "L2",
   "name": "qinling-chunk-33-5",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-08T08:19:25.694Z",
+  "generatedAt": "2026-05-08T11:03:36.979Z",
   "bounds": {
     "west": 89.368,
     "east": 89.864,
@@ -31,7 +31,7 @@
   "maxHeight": -2.5,
   "presentation": {
     "waterLevel": -3,
-    "underpaintLevel": -3.5,
+    "underpaintLevel": -4.5,
     "realPeakMeters": 8351,
     "visualIntent": "Full-China bounds: ocean cells (clamped to -3) covered by water surface; mainland low basins (e.g. Beijing -2.4) stay above water.",
     "globalMinHeight": -3.5,

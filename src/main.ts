@@ -2443,7 +2443,15 @@ function createWaterSurfaceRibbon(
         width: options.width,
         yOffset: options.yOffset,
         maxSegmentLength: options.maxSegmentLength,
-        sampleHeight: (x, z) => terrainSampler!.sampleSurfaceHeight(x, z)
+        // ribbon 高度 = max(mesh, waterLevel)：河流到达海岸时，mesh 下沉到
+        // ocean (-3.5×1.6=-5.6) 但 ribbon 应该停在 waterLevel (-3.0×1.6=-4.8)
+        // 之上而不是跟着 mesh 沉到水下，否则河消失在海里 / 跟海底 Z-fight。
+        sampleHeight: (x, z) => {
+          const mesh = terrainSampler!.sampleSurfaceHeight(x, z);
+          const water = (terrainSampler!.asset.presentation?.waterLevel ?? -3.0) *
+            TERRAIN_VERTICAL_EXAGGERATION;
+          return Math.max(mesh, water);
+        }
       }),
       3
     )

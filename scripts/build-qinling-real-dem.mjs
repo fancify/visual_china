@@ -635,7 +635,9 @@ const asset = {
     // [-2.5, 13.5]。waterLevel = -3.0 在两个 band 之间，海面跟 mesh 永远 0.5
     // unit gap（×1.6 exag = 0.8 game units），既清晰可见又无 Z-fighting。
     waterLevel: -3.0,
-    underpaintLevel: -3.5,
+    // underpaint 必须显著低于 ocean mesh (-3.5)，否则跟海底 Z-fight 闪烁。
+    // -4.5 给 ocean mesh 留 1 unit (×1.6=1.6 game units) margin。
+    underpaintLevel: -4.5,
     realPeakMeters,
     visualIntent: "Full-China bounds: ocean cells (clamped to -3) covered by water surface; mainland low basins (e.g. Beijing -2.4) stay above water."
   },
