@@ -2530,21 +2530,33 @@ function createLakePolygon(
 ): Mesh<ShapeGeometry, MeshBasicMaterial> {
   const shape = new Shape();
 
-  lake.polygon.forEach((point, index) => {
-    const worldPoint = projectGeoToWorld(
-      { lat: point.lat, lon: point.lon },
-      bounds,
-      world
-    );
-    if (index === 0) {
-      shape.moveTo(worldPoint.x, worldPoint.z);
-    } else {
-      shape.lineTo(worldPoint.x, worldPoint.z);
-    }
-  });
+  // ShapeGeometry 的 2D 平面（XY）通过 rotateX(-π/2) 转到世界 XZ 平面；
+  // 那一步会把 shape Y 翻成 -Z（世界），所以 shape 里要预先存 -worldZ
+  // 才能投到正确位置。之前没翻 Z 让 太湖/巢湖 跑到对称北方。
+  // 顺便用 quadraticCurveTo 把硬六边形折角改成圆角，让湖形状不再像砍出来的。
+  const projected = lake.polygon.map((point) =>
+    projectGeoToWorld({ lat: point.lat, lon: point.lon }, bounds, world)
+  );
+  if (projected.length === 0) {
+    return new Mesh(new ShapeGeometry(shape), new MeshBasicMaterial());
+  }
+  // 第一段从最后一个顶点到第一个顶点的 midpoint 起步，让闭合曲线无尖角。
+  const last = projected[projected.length - 1];
+  const first = projected[0];
+  const startX = (last.x + first.x) / 2;
+  const startZ = (last.z + first.z) / 2;
+  shape.moveTo(startX, -startZ);
+  for (let i = 0; i < projected.length; i += 1) {
+    const ctrl = projected[i];
+    const nextI = (i + 1) % projected.length;
+    const next = projected[nextI];
+    const endX = (ctrl.x + next.x) / 2;
+    const endZ = (ctrl.z + next.z) / 2;
+    shape.quadraticCurveTo(ctrl.x, -ctrl.z, endX, -endZ);
+  }
   shape.closePath();
 
-  const geometry = new ShapeGeometry(shape);
+  const geometry = new ShapeGeometry(shape, 24);
   geometry.rotateX(-Math.PI / 2);
   const material = new MeshBasicMaterial({
     color: 0x3b6ea8,
