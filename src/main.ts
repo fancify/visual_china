@@ -2534,13 +2534,44 @@ function createLakePolygon(
   // 那一步会把 shape Y 翻成 -Z（世界），所以 shape 里要预先存 -worldZ
   // 才能投到正确位置。之前没翻 Z 让 太湖/巢湖 跑到对称北方。
   // 顺便用 quadraticCurveTo 把硬六边形折角改成圆角，让湖形状不再像砍出来的。
-  const projected = lake.polygon.map((point) =>
+  const projectedRaw = lake.polygon.map((point) =>
     projectGeoToWorld({ lat: point.lat, lon: point.lon }, bounds, world)
   );
-  if (projected.length === 0) {
+  if (projectedRaw.length === 0) {
     return new Mesh(new ShapeGeometry(shape), new MeshBasicMaterial());
   }
-  // 第一段从最后一个顶点到第一个顶点的 midpoint 起步，让闭合曲线无尖角。
+
+  // 用户："形状太圆了，自然湖应该弯弯曲曲"。在原始 polygon 顶点之间插值
+  // 中间点，再叠确定性噪声扰动，让闭合曲线有自然 fingers + 凹陷，而不是
+  // 标准 N 边形 quadratic blob。
+  // 噪声基于 lake.id hash + 顶点 index，稳定可重现。
+  let hashSeed = 0;
+  for (const ch of lake.id) hashSeed = (hashSeed * 31 + ch.charCodeAt(0)) | 0;
+  const pseudoNoise = (i: number): number => {
+    const s = Math.sin((hashSeed + i * 9301) * 0.001);
+    return s - Math.floor(s); // 0-1
+  };
+
+  const projected: { x: number; z: number }[] = [];
+  for (let i = 0; i < projectedRaw.length; i += 1) {
+    const a = projectedRaw[i];
+    const b = projectedRaw[(i + 1) % projectedRaw.length];
+    projected.push({ x: a.x, z: a.z });
+    // 在 a-b 之间插 2 个中间点
+    for (let k = 1; k <= 2; k += 1) {
+      const t = k / 3;
+      const mx = a.x + (b.x - a.x) * t;
+      const mz = a.z + (b.z - a.z) * t;
+      // 垂直 a-b 方向的法线 nx,nz
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = -dz / len, nz = dx / len;
+      // 噪声幅度 = 该段长度的 ±15%
+      const offset = (pseudoNoise(i * 7 + k) - 0.5) * len * 0.3;
+      projected.push({ x: mx + nx * offset, z: mz + nz * offset });
+    }
+  }
+
   const last = projected[projected.length - 1];
   const first = projected[0];
   const startX = (last.x + first.x) / 2;
@@ -2556,7 +2587,7 @@ function createLakePolygon(
   }
   shape.closePath();
 
-  const geometry = new ShapeGeometry(shape, 24);
+  const geometry = new ShapeGeometry(shape, 12);
   geometry.rotateX(-Math.PI / 2);
   const material = new MeshBasicMaterial({
     color: 0x3b6ea8,
@@ -2606,8 +2637,29 @@ function rebuildHydrographyRibbons(): void {
       return;
     }
 
+    // 用户："这些江都没有入海"。NE polyline 末端往往落在内陆，跟海岸 mesh
+    // 之间留 5-50 km 空白。如果最后一点附近 mesh 已经接近 waterLevel（陆海
+    // 过渡带），沿最后一段方向延伸 ~30 km，让 ribbon 真正插进海面。
+    // 注意 featureWorldPoints 返回的是 feature.world.points 引用，不能 mutate；
+    // 这里 spread 出新数组再 push。
+    const waterLevelExag = (sampler.asset.presentation?.waterLevel ?? -3.0) *
+      TERRAIN_VERTICAL_EXAGGERATION;
+    let renderPoints: { x: number; y: number }[] = points.slice();
+    const tail = renderPoints[renderPoints.length - 1];
+    const tailMesh = sampler.sampleSurfaceHeight(tail.x, tail.y);
+    if (renderPoints.length >= 2 && tailMesh < waterLevelExag + 1.5) {
+      const prev = renderPoints[renderPoints.length - 2];
+      const dx = tail.x - prev.x, dy = tail.y - prev.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const stepX = (dx / len) * 9; // 1 world unit ≈ 3.27 km
+      const stepY = (dy / len) * 9;
+      for (let k = 1; k <= 3; k += 1) {
+        renderPoints.push({ x: tail.x + stepX * k, y: tail.y + stepY * k });
+      }
+    }
+
     const rank = feature.rank ?? 2;
-    const ribbon = createWaterSurfaceRibbon(points, {
+    const ribbon = createWaterSurfaceRibbon(renderPoints, {
       width: widthByRank[rank] ?? 0.6,
       yOffset: 0.05,
       color: colorByRank[rank] ?? 0x4a7eb8,
@@ -2621,7 +2673,7 @@ function rebuildHydrographyRibbons(): void {
     });
     ribbon.userData.featureId = feature.id;
     // hover 显示河名：用 polyline 中点作 worldX/Z 锚点。
-    const midPoint = points[Math.floor(points.length / 2)];
+    const midPoint = renderPoints[Math.floor(renderPoints.length / 2)];
     attachHoverPoiMetadata(ribbon, {
       id: `river-${feature.id}`,
       name: feature.displayName ?? feature.name,
@@ -5049,7 +5101,8 @@ function update(deltaSeconds: number): void {
   updateCityLodFade();
   updateChunkFadeIn();
   updateNearbyRealCity();
-  cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 60;
+  // 用户："天空云的速度降到 20%"。原 *60 → *12。
+  cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 12;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
   cloudMaterial.opacity = visuals.cloudOpacity * 0.74;
   cloudMaterial.color.copy(visuals.cloudColor);
