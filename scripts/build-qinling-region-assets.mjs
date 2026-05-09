@@ -72,10 +72,10 @@ await fs.mkdir(hydrographyRoot, { recursive: true });
 // 不再写 26.87M cells 的中间巨型 JSON（会撞 V8 string 上限）。downsample 等价
 // 于把 slice-l1 直接交给浏览器加载——L1 只用于 atlas + 远景 fallback mesh，
 // 7.2 km/cell 够用，细节由 chunks (0.9 km/cell) 接管。
-// 用户："分辨率看着低"。8× → 4×：L1 base mesh 从 779×540 (7.2km/cell) 提到
-// 1556×1079 (3.6km/cell)，远景山形细节翻 4 倍。代价：JSON 17 MB → ~70 MB，
-// parse ~1 秒可接受（已修复 V8 string 上限）。
-const SLICE_L1_DOWNSAMPLE_STRIDE = 4;
+// 用户讨论后定 16×：chunks（0.9 km/cell）在玩家 110 km 半径内渲染细节，
+// L1 只填远景"水彩底色"——14.4 km/cell 已经够用（100 km 外人眼分不出更细）。
+// JSON ~5 MB，parse ~50 ms，启动几乎无感。如果要俯瞰全国才考虑回退到 8。
+const SLICE_L1_DOWNSAMPLE_STRIDE = 16;
 // Phase 3 Step 8：ocean-aware downsample 必须用"多数决"避免少量沿海 ocean cell
 // 把整块 land 拉到 -3.5。算法：
 //   - 统计 8×8 块里 ocean cells (< OCEAN_THRESHOLD) 数量

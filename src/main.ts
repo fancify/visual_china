@@ -883,15 +883,19 @@ function applyCustomization(mountId: MountId, avatarId: AvatarId): void {
 // 全部隐藏；保留 cities/landmarks/scenic POIs/ancient sites/rivers。
 // 切回非云骑乘时全部恢复（chunk fade 路径会按需重新点亮）。
 function applyCloudModeVisibility(): void {
+  // 用户："暂时把所有的树木都隐藏掉吧"。强制 hide 所有 scenery + 河边植物，
+  // 不再受 mount mode 影响（之前是仅 cloud 模式才藏）。
+  const HIDE_ALL_VEGETATION = true;
   const flying = currentMountId === "cloud";
-  // wildlife group 整组开关
+  // wildlife group 整组开关（仍然 cloud 时藏；动物不属于"树木"，保留）
   wildlifeGroup.visible = !flying;
-  // 河边植物（独立 group）— 跟 chunk scenery 同样在 cloud 模式藏起。
-  riverVegetationGroup.visible = !flying;
-  // 每个 chunk 的 scenery group（树/灌丛）— 直接 toggle，不等 fade。
+  // 河边植物全程藏。
+  riverVegetationGroup.visible = !HIDE_ALL_VEGETATION;
+  // 每个 chunk 的 scenery group（树/灌丛）— 全程 hide。
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (terrainChunk.scenery) {
-      terrainChunk.scenery.visible = !flying && terrainChunk.mesh.visible;
+      terrainChunk.scenery.visible =
+        !HIDE_ALL_VEGETATION && !flying && terrainChunk.mesh.visible;
     }
   });
 }
