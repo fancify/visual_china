@@ -173,6 +173,6 @@ test("Phase A medium cities stay inside the current slice and include descriptio
 });
 
 test("real city total count includes coastal/borderland additions", () => {
-  // 71（Qinling/巴蜀/Phase A/F）+ 39（沿海 + 东北 + 西北 + 西南补全）= 110
-  assert.equal(realQinlingCities.length, 110);
+  // 71（Qinling/巴蜀/Phase A/F）+ 40（沿海 + 东北 + 西北 + 西南补全）= 111
+  assert.equal(realQinlingCities.length, 111);
 });
