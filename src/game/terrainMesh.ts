@@ -53,10 +53,9 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   // 流式加载时 mesh.visible 切换是硬跳）。main.ts 维护 fade timer。
   const material = new MeshPhongMaterial({
     vertexColors: true,
-    // 用户："分辨率看着低"。flatShading=true 让每三角面一个法线，棱角刺眼；
-    // smooth shading 用顶点 normal 插值，相邻面 colinear 视觉上"高分辨率"
-    // 2-3 倍——不动数据。computeVertexNormals 已经在 mesh build 时跑过。
-    flatShading: false,
+    // 用户实验：切回 flatShading 看 low-poly 块状画风。性能差 < 1%，
+    // 视觉决定。Smooth false → true 让每三角形清晰可辨，更"low-poly stylized"。
+    flatShading: true,
     shininess: 8,
     transparent: true,
     opacity: 0
