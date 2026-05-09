@@ -116,8 +116,8 @@ const MAX_TOTAL_CELLS = 32 * 1024 * 1024;
 
 // 千里江山图风格垂直夸张系数。在 sampleHeight 里统一应用，让 mesh、
 // player.y、scenery、label 全部一致使用夸张后的高度，避免漂浮 / 下沉。
-// 1.6× 让秦岭/巴山在 5600 km 画幅下仍然有山墙感，又不至于把 ridge 画成针。
-export const TERRAIN_VERTICAL_EXAGGERATION = 1.6;
+// 用户："地形夸张再高一倍"。1.6 → 3.2，山形比 1:1 真实拔高 220%。
+export const TERRAIN_VERTICAL_EXAGGERATION = 3.2;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
