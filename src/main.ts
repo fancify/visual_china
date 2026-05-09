@@ -4267,7 +4267,10 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
 // 半透明时树已经满 opacity 漂在空气里（codex fb57c87 P2）。
 // 筋斗云模式：scenery 全局关掉——高空俯瞰画风，地面树会让画面糊成一片。
 function updateChunkFadeIn(): void {
-  const sceneryEnabled = currentMountId !== "cloud";
+  // 跟 applyCloudModeVisibility 同一 flag。用户："暂时把所有树木都隐藏掉"。
+  const HIDE_ALL_VEGETATION = true;
+  const sceneryEnabled =
+    !HIDE_ALL_VEGETATION && currentMountId !== "cloud";
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (!terrainChunk.mesh.visible) return;
     const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
