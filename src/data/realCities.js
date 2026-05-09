@@ -661,5 +661,57 @@ export const realQinlingCities = [
     tier: "county",
     hint: "湘中山地，资水流域",
     description: "邵阳古称宝庆，资水与邵水交汇成市。明清以来是湘西南通往黔东、桂北的山地枢纽。"
-  }
+  },
+
+  // 2026-05 全国扩张：补沿海 / 边疆 / 历史名城，让全国画幅不只是关中-巴蜀
+  // 一带有 dot。tier 按当代行政地位 + 历史地位定档；省会一律 capital，
+  // 主要港口/古都 prefecture，剩下 county。
+  // 华东沿海 + 江南
+  { id: "shanghai", name: "上海", lat: 31.23, lon: 121.47, tier: "capital", hint: "近代金融与航运中心" },
+  { id: "nanjing", name: "南京", lat: 32.06, lon: 118.80, tier: "capital", hint: "六朝古都，明初都城" },
+  { id: "hangzhou", name: "杭州", lat: 30.27, lon: 120.16, tier: "capital", hint: "南宋都城，西湖" },
+  { id: "suzhou", name: "苏州", lat: 31.30, lon: 120.62, tier: "prefecture", hint: "江南园林，吴文化中心" },
+  { id: "ningbo", name: "宁波", lat: 29.87, lon: 121.55, tier: "prefecture", hint: "明州港，海上丝路起点之一" },
+  { id: "wuxi", name: "无锡", lat: 31.49, lon: 120.31, tier: "prefecture", hint: "太湖北岸，运河重镇" },
+  { id: "yangzhou", name: "扬州", lat: 32.39, lon: 119.42, tier: "prefecture", hint: "运河枢纽，唐时富甲东南" },
+  { id: "zhenjiang", name: "镇江", lat: 32.20, lon: 119.45, tier: "county", hint: "京口，长江与运河交汇" },
+  // 山东 / 中原
+  { id: "jinan", name: "济南", lat: 36.65, lon: 117.12, tier: "capital", hint: "山东省会，泉城" },
+  { id: "qingdao", name: "青岛", lat: 36.07, lon: 120.38, tier: "prefecture", hint: "胶州湾港城" },
+  { id: "yantai", name: "烟台", lat: 37.46, lon: 121.45, tier: "county", hint: "胶东半岛海港" },
+  { id: "qufu", name: "曲阜", lat: 35.59, lon: 116.99, tier: "county", hint: "孔子故里" },
+  { id: "zhengzhou", name: "郑州", lat: 34.75, lon: 113.62, tier: "capital", hint: "河南省会，中原腹地" },
+  // 华南 / 岭南
+  { id: "guangzhou", name: "广州", lat: 23.13, lon: 113.26, tier: "capital", hint: "岭南中心，珠江口" },
+  { id: "shenzhen", name: "深圳", lat: 22.54, lon: 114.06, tier: "capital", hint: "改革开放前沿" },
+  { id: "hongkong", name: "香港", lat: 22.32, lon: 114.17, tier: "capital", hint: "维多利亚港" },
+  { id: "macao", name: "澳门", lat: 22.20, lon: 113.55, tier: "prefecture", hint: "明清葡萄牙商埠" },
+  { id: "xiamen", name: "厦门", lat: 24.48, lon: 118.09, tier: "prefecture", hint: "鹭岛，闽南海港" },
+  { id: "fuzhou", name: "福州", lat: 26.07, lon: 119.30, tier: "capital", hint: "福建省会，闽江口" },
+  { id: "quanzhou", name: "泉州", lat: 24.87, lon: 118.68, tier: "prefecture", hint: "宋元东方第一大港" },
+  // 海南
+  { id: "haikou", name: "海口", lat: 20.04, lon: 110.20, tier: "capital", hint: "海南省会，琼州海峡南岸" },
+  { id: "sanya", name: "三亚", lat: 18.25, lon: 109.51, tier: "prefecture", hint: "海南最南端" },
+  { id: "danzhou", name: "儋州", lat: 19.52, lon: 109.58, tier: "county", hint: "苏轼晚年贬居之地" },
+  // 华北
+  { id: "tianjin", name: "天津", lat: 39.13, lon: 117.20, tier: "capital", hint: "北方海港，运河北端" },
+  { id: "dingzhou", name: "定州", lat: 38.52, lon: 114.99, tier: "county", hint: "中山国故地，宋辽边镇" },
+  // 东北
+  { id: "shenyang", name: "沈阳", lat: 41.81, lon: 123.43, tier: "capital", hint: "辽宁省会，盛京清初都城" },
+  { id: "dalian", name: "大连", lat: 38.91, lon: 121.61, tier: "prefecture", hint: "辽东半岛南端海港" },
+  { id: "changchun", name: "长春", lat: 43.82, lon: 125.32, tier: "capital", hint: "吉林省会，伪满故都" },
+  { id: "harbin", name: "哈尔滨", lat: 45.80, lon: 126.54, tier: "capital", hint: "黑龙江省会，松花江畔" },
+  // 西北
+  { id: "lanzhou", name: "兰州", lat: 36.06, lon: 103.83, tier: "capital", hint: "甘肃省会，黄河穿城" },
+  { id: "yinchuan", name: "银川", lat: 38.49, lon: 106.23, tier: "capital", hint: "宁夏省会，西夏故都" },
+  { id: "xining", name: "西宁", lat: 36.62, lon: 101.78, tier: "capital", hint: "青海省会，湟水之滨" },
+  { id: "urumqi", name: "乌鲁木齐", lat: 43.83, lon: 87.62, tier: "capital", hint: "新疆首府，天山北麓" },
+  { id: "kashgar", name: "喀什", lat: 39.47, lon: 75.99, tier: "prefecture", hint: "南疆古城，丝路重镇" },
+  { id: "dunhuang", name: "敦煌", lat: 40.14, lon: 94.66, tier: "prefecture", hint: "莫高窟，河西走廊西端" },
+  // 西南
+  { id: "kunming", name: "昆明", lat: 25.04, lon: 102.72, tier: "capital", hint: "云南省会，滇池北岸" },
+  { id: "dali", name: "大理", lat: 25.61, lon: 100.27, tier: "prefecture", hint: "南诏大理国故都" },
+  { id: "lijiang", name: "丽江", lat: 26.87, lon: 100.23, tier: "county", hint: "纳西古城" },
+  { id: "lhasa", name: "拉萨", lat: 29.65, lon: 91.13, tier: "capital", hint: "西藏首府，布达拉宫" },
+  { id: "shigatse", name: "日喀则", lat: 29.27, lon: 88.88, tier: "prefecture", hint: "后藏中心，扎什伦布寺" }
 ];
