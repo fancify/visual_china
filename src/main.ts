@@ -447,25 +447,9 @@ if (perfStats.element.hidden === false) {
 // 旧版 DOM sky overlay（96 个 span 星星 + 3 个 div 云朵）已被 WebGL sky dome
 // 完全替代，DOM 层删除以减少 compositor 负担。
 const hud = createHud(appRoot, terrainAssetRequest, knowledgeFragments.length);
-const audioMuteButton = document.createElement("button");
-audioMuteButton.type = "button";
-audioMuteButton.className = "audio-mute-toggle";
+// 用户："去掉静音按钮" — 改 keyboard M 切换。
 let audioMuted = safeReadAudioMuted();
 setMasterMuted(audioRuntime, audioMuted);
-audioMuteButton.textContent = audioMuted ? "🔇" : "🔊";
-audioMuteButton.ariaLabel = audioMuted ? "开启声音" : "静音";
-audioMuteButton.ariaPressed = String(audioMuted);
-audioMuteButton.title = audioMuted ? "开启声音" : "静音";
-audioMuteButton.addEventListener("click", () => {
-  audioMuted = !audioMuted;
-  setMasterMuted(audioRuntime, audioMuted);
-  safeWriteAudioMuted(audioMuted);
-  audioMuteButton.textContent = audioMuted ? "🔇" : "🔊";
-  audioMuteButton.ariaLabel = audioMuted ? "开启声音" : "静音";
-  audioMuteButton.ariaPressed = String(audioMuted);
-  audioMuteButton.title = audioMuted ? "开启声音" : "静音";
-});
-appRoot.appendChild(audioMuteButton);
 const audioDebugHud = createAudioDebugHud(appRoot);
 void loadAllBuffers(audioRuntime).then(({ loaded, failed }) => {
   console.info(`[audio] ${loaded} loaded, ${failed} missing`);
@@ -4469,6 +4453,15 @@ document.addEventListener("keydown", (event) => {
   // 用 normalizeInputKey(event) 而不是 event.key.toLowerCase()——它走 event.code
   // 路径，不受中文输入法 IME 影响。否则 macOS 中文用户按 Q/E/W/A/S/D 全部失效。
   const normalized = normalizeRuntimeInputKey(event);
+
+  // 用户："配音快捷键改成 m"。M 切换 mute/unmute（不再有屏上按钮）。
+  if (normalized === "m") {
+    event.preventDefault();
+    audioMuted = !audioMuted;
+    setMasterMuted(audioRuntime, audioMuted);
+    safeWriteAudioMuted(audioMuted);
+    return;
+  }
 
   // ESC 优先级：customization panel > city detail panel > atlas fullscreen。
   // 都是用户主动开的覆盖层，越靠近"刚开"越先关（栈式直觉）。

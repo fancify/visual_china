@@ -171,7 +171,7 @@ export function createHud(
       </details>
     </div>
     <details class="overview-block hud-drawer ${compactHudPanelConfig.overview.visible ? "" : hiddenClass}" ${compactHudPanelConfig.overview.openByDefault ? "open" : ""}>
-      <summary>地图 · M</summary>
+      <summary>地图</summary>
       <canvas id="overview-map" width="280" height="194"></canvas>
       <button class="atlas-open-button" id="open-atlas-fullscreen" type="button">
         全屏地图

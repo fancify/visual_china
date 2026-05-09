@@ -281,8 +281,10 @@ canvas {
   z-index: auto;
   display: none;
   margin-top: 10px;
-  width: 220px;
-  height: 270px;
+  /* 全国画幅 1711×1186 ≈ 1.44:1。canvas 必须按这个比例显示，否则地图被纵向
+   * 拉伸成竖图（用户："地图还是变形的"）。240×166 = 1.446:1，几乎完美。 */
+  width: 240px;
+  height: 166px;
   border-radius: 4px;
   border: 1px solid rgba(241, 210, 137, 0.14);
   background: rgba(0, 0, 0, 0.16);
