@@ -12,6 +12,7 @@ import {
   Mesh,
   MeshPhongMaterial,
   Object3D,
+  PlaneGeometry,
   Quaternion,
   SphereGeometry
 } from "three";
@@ -25,6 +26,10 @@ import type { RuntimePerformanceBudget } from "./performanceBudget.js";
 import type { BiomeId, SeasonalBlend } from "./biomeZones.js";
 import type { Season } from "./environment";
 import { attachSceneryShaderEnhancements } from "./sceneryShaderEnhancer.js";
+import {
+  GRASS_DENSITY_MULTIPLIER,
+  grassDensityAt
+} from "./grassBiome.js";
 
 export type PlantKind =
   | "conifer"
@@ -76,6 +81,11 @@ interface PlantInstanceState {
   bareLeafMatrix: Matrix4;
 }
 
+interface GrassInstanceState {
+  matrix: Matrix4;
+  seed: number;
+}
+
 interface PlantKindColorHandle {
   kind: PlantKind;
   trunkMesh: InstancedMesh;
@@ -92,6 +102,7 @@ export interface SceneryHandle {
   group: Group;
   meshesByKind: Record<PlantKind, PlantMeshPair>;
   colorHandlesByKind: Record<PlantKind, PlantKindColorHandle>;
+  grassMesh: InstancedMesh;
 }
 
 const SCENERY_HANDLE_KEY = "sceneryHandle";
@@ -120,7 +131,24 @@ attachSceneryShaderEnhancements(sharedTreeMaterial, {
   enableSeasonalTint: false
 });
 
+export const sharedGrassMaterial = new MeshPhongMaterial({
+  color: 0xa7c86b,
+  flatShading: true,
+  shininess: 3,
+  transparent: true,
+  depthWrite: false,
+  opacity: 1,
+  vertexColors: true
+});
+attachSceneryShaderEnhancements(sharedGrassMaterial, {
+  enableCelShading: false,
+  enableRim: false,
+  enableWindSway: true,
+  enableSeasonalTint: false
+});
+
 const sharedPlantPrototypes = createSharedPlantPrototypes();
+const sharedGrassGeometry = createGrassGeometry();
 
 // settlement markers（5 棱柱褐色块）已移除：用户反馈"看不出含义"，
 // 而且位置是 chunk 内伪随机，并不对应真实城镇。P4 城市存在感会换成
@@ -193,6 +221,20 @@ function createMergedGeometry(parts: BufferGeometry[]): BufferGeometry {
   if (!merged) {
     throw new Error("Failed to merge plant geometry.");
   }
+  merged.computeVertexNormals();
+  return merged;
+}
+
+function createGrassGeometry(): BufferGeometry {
+  const bladeA = new PlaneGeometry(0.11, 0.62, 1, 2);
+  bladeA.translate(0, 0.31, 0);
+  const bladeB = bladeA.clone();
+  bladeB.rotateY(Math.PI / 2);
+  const merged = BufferGeometryUtils.mergeGeometries([bladeA.toNonIndexed(), bladeB.toNonIndexed()]);
+  if (!merged) {
+    throw new Error("Failed to merge grass geometry.");
+  }
+  applyVerticalVertexRamp(merged, 0.72, 1.12);
   merged.computeVertexNormals();
   return merged;
 }
@@ -455,6 +497,22 @@ function setPlantMatrices(
   leafMesh.instanceMatrix.needsUpdate = true;
 }
 
+function setGrassMatrices(grassMesh: InstancedMesh, grasses: GrassInstanceState[]): void {
+  grasses.forEach((grass, index) => {
+    grassMesh.setMatrixAt(index, grass.matrix);
+    const color = new Color(0x9fbd63).offsetHSL(
+      (pseudoRandom(grass.seed + 19) - 0.5) * 0.025,
+      (pseudoRandom(grass.seed + 23) - 0.5) * 0.12,
+      (pseudoRandom(grass.seed + 29) - 0.5) * 0.1
+    );
+    grassMesh.setColorAt(index, color);
+  });
+  grassMesh.instanceMatrix.needsUpdate = true;
+  if (grassMesh.instanceColor) {
+    grassMesh.instanceColor.needsUpdate = true;
+  }
+}
+
 function applySeasonToKindHandle(handle: PlantKindColorHandle, season: Season): void {
   handle.plants.forEach((plant, index) => {
     const style = plantStyleForKind(handle.kind, season, plant.lat, plant.biomeId);
@@ -607,9 +665,24 @@ function createPlantState(
   };
 }
 
+function createGrassState(
+  x: number,
+  height: number,
+  z: number,
+  rotationY: number,
+  scale: number,
+  seed: number
+): GrassInstanceState {
+  return {
+    seed,
+    matrix: matrixForTreePart(x, height + 0.01, z, rotationY, scale, scale, scale)
+  };
+}
+
 function buildSceneryHandle(
   group: Group,
-  plantsByKind: Record<PlantKind, PlantInstanceState[]>
+  plantsByKind: Record<PlantKind, PlantInstanceState[]>,
+  grasses: GrassInstanceState[]
 ): SceneryHandle {
   const meshesByKind = {} as Record<PlantKind, PlantMeshPair>;
   const colorHandlesByKind = {} as Record<PlantKind, PlantKindColorHandle>;
@@ -645,10 +718,26 @@ function buildSceneryHandle(
     group.add(leafMesh);
   }
 
+  const grassInstanceCount = Math.max(1, grasses.length);
+  const grassMesh = new InstancedMesh(
+    sharedGrassGeometry,
+    sharedGrassMaterial,
+    grassInstanceCount
+  );
+  grassMesh.count = grasses.length;
+  ensureInstanceColorBuffer(grassMesh, grassInstanceCount);
+  setGrassMatrices(grassMesh, grasses);
+  grassMesh.computeBoundingSphere();
+  grassMesh.frustumCulled = false;
+  grassMesh.userData.sharedResources = true;
+  grassMesh.userData.role = "grass";
+  group.add(grassMesh);
+
   return {
     group,
     meshesByKind,
-    colorHandlesByKind
+    colorHandlesByKind,
+    grassMesh
   };
 }
 
@@ -712,6 +801,7 @@ export function createChunkScenery(
 ): Group {
   const group = new Group();
   const plantsByKind = emptyPlantStateRecord<PlantInstanceState[]>(() => []);
+  const grasses: GrassInstanceState[] = [];
   let totalPlants = 0;
   const bounds = sampler.asset.bounds;
   const { width, depth } = sampler.asset.world;
@@ -757,7 +847,9 @@ export function createChunkScenery(
       // 是农田 + 村落，长树合理。
       const forestBand = Math.max(0, 1 - Math.abs(h - 0.46) / 0.34);
       const lowlandGreen = Math.max(0, 1 - h / 0.44) * Math.max(0, 1 - slope / 0.72);
-      const geo = bounds ? unprojectWorldToGeo({ x, z }, bounds, sampler.asset.world) : null;
+      const geo = bounds
+        ? unprojectWorldToGeo({ x: world.x, z: world.z }, bounds, sampler.asset.world)
+        : null;
       const biome = geo ? biomeWeightsAt(geo) : null;
       const baseVegetationChance =
         0.12 + river * 0.22 + forestBand * 0.24 + lowlandGreen * 0.16;
@@ -788,12 +880,40 @@ export function createChunkScenery(
         );
         totalPlants += 1;
       }
+
+      if (geo && h > 0.04 && slope < 0.72 && river < 0.82) {
+        const density = grassDensityAt(world.x, world.z, height, geo.lat, geo.lon);
+        const densityMultiplier = GRASS_DENSITY_MULTIPLIER[density];
+        const grassChance = Math.min(
+          1,
+          (0.46 + forestBand * 0.2 + lowlandGreen * 0.24) * densityMultiplier
+        );
+        if (pseudoRandom(seed + 211) < grassChance) {
+          const tuftCount = density === "lush" ? 3 : density === "normal" ? 2 : 1;
+          for (let tuft = 0; tuft < tuftCount; tuft += 1) {
+            const tuftSeed = seed + tuft * 37;
+            const gx = x + (pseudoRandom(tuftSeed + 3) - 0.5) * (width / columns) * 0.5;
+            const gz = z + (pseudoRandom(tuftSeed + 5) - 0.5) * (depth / rows) * 0.5;
+            const gy = sampler.sampleSurfaceHeight(gx, gz);
+            grasses.push(
+              createGrassState(
+                gx,
+                gy,
+                gz,
+                pseudoRandom(tuftSeed + 7) * Math.PI * 2,
+                0.55 + pseudoRandom(tuftSeed + 11) * 0.55,
+                tuftSeed
+              )
+            );
+          }
+        }
+      }
     }
   }
 
   void seasonalBlend;
 
-  const handle = buildSceneryHandle(group, plantsByKind);
+  const handle = buildSceneryHandle(group, plantsByKind, grasses);
   group.userData[SCENERY_HANDLE_KEY] = handle;
   applySeasonToHandle(handle, season);
   return group;

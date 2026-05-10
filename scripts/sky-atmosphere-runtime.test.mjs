@@ -15,6 +15,7 @@ async function loadGameModules() {
   const sourceDir = path.resolve("src/game");
   const transpileTargets = [
     "atmosphereLayer.ts",
+    "cloudPlanes.ts",
     "environment.ts",
     "proceduralTextures.ts"
   ];
@@ -301,42 +302,21 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
   }
 });
 
-test("cloud layer spawns a denser randomized field with per-sprite drift metadata", async () => {
+test("cloud layer uses three low procedural planes instead of puff sprites", async () => {
   const restoreDocument = installCanvasStub();
   try {
     const { atmosphereLayer } = await loadGameModules();
     const cloudLayer = atmosphereLayer.createCloudLayer();
 
-    assert.ok(
-      cloudLayer.sprites.length >= 18 && cloudLayer.sprites.length <= 24,
-      `cloud sprite count should stay within 18-24, got ${cloudLayer.sprites.length}`
-    );
+    assert.equal(cloudLayer.sprites.length, 3);
+    assert.equal(cloudLayer.planes.length, 3);
+    assert.deepEqual(cloudLayer.planes.map((cloud) => cloud.userData.heightOffset), [8, 12, 16]);
 
-    cloudLayer.sprites.forEach((cloud, index) => {
-      // Phase 3 立体云：每朵 cloud 是 Object3D wrapper，下挂 4-6 个 puff mesh。
-      // 旧 sprite scale 检查不再有效（cluster 自身 scale=1，体积来自 puff
-      // geometry radius）。改成验证 children 数量 + 朵的 group 是 Object3D。
+    cloudLayer.planes.forEach((cloud, index) => {
+      assert.equal(cloud.children.length, 0);
       assert.ok(
-        cloud.children.length >= 4 && cloud.children.length <= 6,
-        `cloud ${index} should have 4-6 puff children, got ${cloud.children.length}`
-      );
-      assert.ok(
-        Number(cloud.userData.baseX) >= -200 && Number(cloud.userData.baseX) <= 200,
-        `cloud ${index} baseX should stay within +/-200, got ${cloud.userData.baseX}`
-      );
-      assert.ok(
-        Number(cloud.userData.baseZ) >= -200 && Number(cloud.userData.baseZ) <= 200,
-        `cloud ${index} baseZ should stay within +/-200, got ${cloud.userData.baseZ}`
-      );
-      assert.ok(
-        Number(cloud.userData.phase) >= 0 &&
-          Number(cloud.userData.phase) <= Math.PI * 2,
-        `cloud ${index} phase should stay within 0-2pi, got ${cloud.userData.phase}`
-      );
-      assert.ok(
-        Number(cloud.userData.driftSpeed) >= 0.4 &&
-          Number(cloud.userData.driftSpeed) <= 1.6,
-        `cloud ${index} drift speed should stay within 0.4-1.6, got ${cloud.userData.driftSpeed}`
+        Number(cloud.userData.driftSpeed) >= 0.4,
+        `cloud ${index} drift speed should be positive, got ${cloud.userData.driftSpeed}`
       );
     });
   } finally {

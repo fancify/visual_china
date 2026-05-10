@@ -219,9 +219,14 @@ import {
 import {
   createChunkScenery,
   disposeScenery,
+  sharedGrassMaterial,
   sharedTreeMaterial,
   updateSceneryColors
 } from "./game/scenery";
+import {
+  updateSceneryShaderPlayerPosition,
+  updateSceneryShaderWind
+} from "./game/sceneryShaderEnhancer";
 import {
   createWildlifeHandle,
   computeWildlifePose,
@@ -285,10 +290,13 @@ import { createPerfStats, isDevModeEnabled } from "./game/perfStats";
 import { createPerfMonitor } from "./game/perfMonitor";
 import {
   applySkyVisuals,
-  createCloudLayer,
   createPrecipitationLayer,
   createSkyDome
 } from "./game/atmosphereLayer";
+import {
+  createCloudLayer,
+  updateCloudLayer
+} from "./game/cloudPlanes";
 import {
   createCircleTexture,
   createCloudCookieTexture
@@ -893,11 +901,6 @@ function normalizeRuntimeInputKey(event: KeyboardEvent): string {
   return normalizeInputKey(event);
 }
 
-function wrapCloudDriftX(value: number, limit = 250): number {
-  const span = limit * 2;
-  return ((((value + limit) % span) + span) % span) - limit;
-}
-
 function applyCustomization(mountId: MountId, avatarId: AvatarId): void {
   if (mountId === currentMountId && avatarId === currentAvatarId) {
     return;
@@ -925,7 +928,7 @@ function applyCustomization(mountId: MountId, avatarId: AvatarId): void {
 function applyCloudModeVisibility(): void {
   // 用户："暂时把所有的树木都隐藏掉吧"。强制 hide 所有 scenery + 河边植物，
   // 不再受 mount mode 影响（之前是仅 cloud 模式才藏）。
-  const HIDE_ALL_VEGETATION = true;
+  const HIDE_ALL_VEGETATION = false;
   const flying = isFlyingMount(currentMountId);
   // wildlife group 整组开关（飞行时藏；动物不属于"树木"，保留）
   wildlifeGroup.visible = !flying;
@@ -2260,9 +2263,6 @@ const sunSkyDisc = skyDome.sunDisc;
 const sunSkyDiscMaterial = skyDome.sunDiscMaterial;
 const moonSkyDisc = skyDome.moonDisc;
 const moonSkyDiscMaterial = skyDome.moonDiscMaterial;
-const cloudGroup = cloudLayer.group;
-const cloudMaterial = cloudLayer.material;
-const cloudSprites = cloudLayer.sprites;
 const precipitation = precipitationLayer.points;
 const precipitationMaterial = precipitationLayer.material;
 const precipitationGeometry = precipitationLayer.geometry;
@@ -4487,9 +4487,25 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
 // 筋斗云模式：scenery 全局关掉——高空俯瞰画风，地面树会让画面糊成一片。
 function updateChunkFadeIn(): void {
   // 跟 applyCloudModeVisibility 同一 flag。用户："暂时把所有树木都隐藏掉"。
-  const HIDE_ALL_VEGETATION = true;
+  const HIDE_ALL_VEGETATION = false;
   const sceneryEnabled =
     !HIDE_ALL_VEGETATION && !isFlyingMount(currentMountId);
+  const applySceneryLod = (terrainChunk: TerrainMeshHandle): boolean => {
+    if (!terrainChunk.scenery) return false;
+    const chunkDistance = Math.hypot(
+      terrainChunk.mesh.position.x - player.position.x,
+      terrainChunk.mesh.position.z - player.position.z
+    );
+    const sceneryVisible = sceneryEnabled && chunkDistance <= 150;
+    terrainChunk.scenery.visible = terrainChunk.scenery.visible && sceneryVisible;
+    const grassVisible = sceneryVisible && chunkDistance <= 50;
+    terrainChunk.scenery.traverse((child) => {
+      if (child.userData.role === "grass") {
+        child.visible = grassVisible;
+      }
+    });
+    return sceneryVisible;
+  };
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (!terrainChunk.mesh.visible) return;
     const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
@@ -4497,6 +4513,7 @@ function updateChunkFadeIn(): void {
     if (fadeStart === undefined) {
       material.opacity = 1;
       if (terrainChunk.scenery) terrainChunk.scenery.visible = sceneryEnabled;
+      applySceneryLod(terrainChunk);
       return;
     }
     const elapsed = clock.elapsedTime - fadeStart;
@@ -4504,6 +4521,7 @@ function updateChunkFadeIn(): void {
       material.opacity = 1;
       delete terrainChunk.mesh.userData.fadeStart;
       if (terrainChunk.scenery) terrainChunk.scenery.visible = sceneryEnabled;
+      applySceneryLod(terrainChunk);
       return;
     }
     material.opacity = MathUtils.clamp(elapsed / CHUNK_FADE_DURATION, 0, 1);
@@ -4511,6 +4529,7 @@ function updateChunkFadeIn(): void {
     if (terrainChunk.scenery) {
       terrainChunk.scenery.visible =
         sceneryEnabled && elapsed >= CHUNK_FADE_DURATION * 0.8;
+      applySceneryLod(terrainChunk);
     }
   });
 }
@@ -5267,6 +5286,8 @@ function update(deltaSeconds: number): void {
   const environment = environmentController.update(deltaSeconds);
   const visuals = environmentController.computeVisuals();
   windManager.update(deltaSeconds, environmentController.getWindState());
+  updateSceneryShaderWind(sharedGrassMaterial, windManager.uniforms);
+  updateSceneryShaderPlayerPosition(sharedGrassMaterial, player.position);
   lastVisuals = visuals;
   sceneFog.color.copy(visuals.fogColor);
   // 用户反馈"看不到地形"——overview 镜头下 FogExp2 把远地形染成 fog 色
@@ -5388,24 +5409,12 @@ function update(deltaSeconds: number): void {
   updateNearbyRealCity();
   // 用户："天空云的速度降到 20%"。原 *60 → *12。
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 12;
-  cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
-  cloudMaterial.opacity = visuals.cloudOpacity * 0.74;
-  cloudMaterial.color.copy(atmosphericFarRuntimeColor);
-  // R5：远景云体也吃同一个 horizon farColor，terrain 远色 → 云 → sky
-  // 连成一套色温；亮度体积仍交给 Lambert lighting 和 opacity 负责。
-  cloudLayer.bodyMaterial.color.copy(atmosphericFarRuntimeColor);
-  cloudLayer.bodyMaterial.opacity = MathUtils.clamp(visuals.cloudOpacity * 1.05, 0.4, 0.95);
-  cloudSprites.forEach((cloud, index) => {
-    const phase = Number(cloud.userData.phase) || 0;
-    const speedFactor = Number(cloud.userData.driftSpeed) || 1;
-    const driftedX = wrapCloudDriftX(
-      Number(cloud.userData.baseX) + cloudDrift * (10 + index) * speedFactor
-    );
-    cloud.position.set(
-      driftedX,
-      12 + Math.sin(clock.elapsedTime * 0.18 + phase) * 2.5,
-      Number(cloud.userData.baseZ) + Math.cos(clock.elapsedTime * 0.13 + phase) * 8
-    );
+  updateCloudLayer(cloudLayer, {
+    playerPosition: player.position,
+    opacity: visuals.cloudOpacity * 0.58,
+    farColor: atmosphericFarRuntimeColor,
+    windDirection: windManager.uniforms.direction.value,
+    elapsedSeconds: cloudDrift
   });
 
   // 把 effective weather 的连续值离散化（步长 0.1）丢进 signature，让

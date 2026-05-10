@@ -4,6 +4,7 @@ import {
   MeshLambertMaterial,
   MeshPhongMaterial,
   Vector2,
+  Vector3,
   type WebGLProgramParametersWithUniforms
 } from "three";
 
@@ -41,6 +42,7 @@ interface SceneryShaderUniforms {
   uSceneryWindGust: { value: number };
   uSceneryWindTime: { value: number };
   uSceneryWindNoiseScale: { value: number };
+  uSceneryPlayerPos: { value: Vector3 };
   uScenerySeasonalTint: { value: Color };
   uSceneryRimStrength: { value: number };
   uSceneryCelBands: { value: number };
@@ -83,6 +85,7 @@ function createUniforms(options: SceneryShaderEnhancerOptions): SceneryShaderUni
     uSceneryWindGust: { value: wind?.gust.value ?? 0 },
     uSceneryWindTime: { value: wind?.time.value ?? 0 },
     uSceneryWindNoiseScale: { value: wind?.noiseScale.value ?? 80 },
+    uSceneryPlayerPos: { value: new Vector3(0, 0, 0) },
     uScenerySeasonalTint: { value: options.seasonalTint?.clone() ?? new Color(0xffffff) },
     uSceneryRimStrength: { value: clamp01(options.rimStrength ?? 0) },
     uSceneryCelBands: { value: Math.max(1, options.celBands ?? 3) }
@@ -98,10 +101,67 @@ export function attachSceneryShaderEnhancements(
       const uniforms = createUniforms(options);
       Object.assign(shader.uniforms, uniforms);
       enhancers.set(targetMaterial, { uniforms });
-      // R8 只建立 uniform 和 onBeforeCompile 框架；cel/rim/wind/tint 的实际
-      // shader 计算留给 Phase 2/5/6，避免本轮产生任何视觉差异。
+      if (options.enableWindSway) {
+        shader.vertexShader = shader.vertexShader
+          .replace(
+            "#include <common>",
+            `#include <common>
+uniform vec2 uSceneryWindDirection;
+uniform float uSceneryWindStrength;
+uniform float uSceneryWindGust;
+uniform float uSceneryWindTime;
+uniform float uSceneryWindNoiseScale;
+uniform vec3 uSceneryPlayerPos;`
+          )
+          .replace(
+            "#include <begin_vertex>",
+            `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  vec3 sceneryInstanceLocal = (instanceMatrix * vec4(position, 1.0)).xyz;
+#else
+  vec3 sceneryInstanceLocal = position;
+#endif
+  vec3 sceneryWorldPos = (modelMatrix * vec4(sceneryInstanceLocal, 1.0)).xyz;
+  float scenerySwayFactor = clamp(position.y / 0.5, 0.0, 1.0);
+  float sceneryWindPhase =
+    uSceneryWindTime * 2.0 +
+    sceneryWorldPos.x * 0.3 +
+    sceneryWorldPos.z * 0.4;
+  vec2 sceneryWindOffset =
+    uSceneryWindDirection *
+    (uSceneryWindStrength + uSceneryWindGust * 0.45) *
+    sin(sceneryWindPhase) *
+    0.15 *
+    scenerySwayFactor;
+  float sceneryPlayerDist = length(sceneryWorldPos.xz - uSceneryPlayerPos.xz);
+  vec2 sceneryPlayerOffset = vec2(0.0);
+  if (sceneryPlayerDist > 0.001 && sceneryPlayerDist < 3.0) {
+    vec2 sceneryPlayerDir = normalize(sceneryWorldPos.xz - uSceneryPlayerPos.xz);
+    sceneryPlayerOffset =
+      sceneryPlayerDir *
+      (1.0 - sceneryPlayerDist / 3.0) *
+      0.4 *
+      scenerySwayFactor;
+  }
+  transformed.x += sceneryWindOffset.x + sceneryPlayerOffset.x;
+  transformed.z += sceneryWindOffset.y + sceneryPlayerOffset.y;`
+          );
+      }
     };
     targetMaterial.needsUpdate = true;
+  }
+}
+
+export function updateSceneryShaderPlayerPosition(
+  material: SceneryShaderMaterialTarget,
+  playerPosition: Vector3
+): void {
+  for (const targetMaterial of sceneryMaterials(material)) {
+    const enhancer = enhancers.get(targetMaterial);
+    if (!enhancer) {
+      continue;
+    }
+    enhancer.uniforms.uSceneryPlayerPos.value.copy(playerPosition);
   }
 }
 

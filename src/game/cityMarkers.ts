@@ -64,6 +64,7 @@ const HOUSE_ROOF_HEIGHT = 0.18;
 const CITY_FLOOR_INSET = 1.02;
 const CITY_FLOOR_HEIGHT = 0.06;
 const CITY_FLOOR_LIFT = 0.03;
+const CITY_FLOOR_OPACITY = 0.22;
 const COLOR_RAMMED_EARTH = 0xa8927a;
 const COLOR_PALACE_RED = 0xa53a2c;
 const COLOR_TILE_GREY = 0x4f5253;
@@ -398,7 +399,10 @@ function makeFloorMaterial(): MeshPhongMaterial {
   const material = new MeshPhongMaterial({
     color: COLOR_RAMMED_EARTH,
     flatShading: true,
-    shininess: 2
+    shininess: 2,
+    transparent: true,
+    opacity: CITY_FLOOR_OPACITY,
+    depthWrite: false
   });
   attachSceneryShaderEnhancements(material, {
     enableCelShading: false,
@@ -544,6 +548,7 @@ export function createCityMarkers(
     const nextFloorMesh = new InstancedMesh(CITY_FLOOR_GEOMETRY, floorMaterial, cities.length);
     nextFloorMesh.name = "city-floors";
     nextFloorMesh.userData.kind = "city-floor";
+    nextFloorMesh.renderOrder = -1;
 
     const applyFloorMatrices = (currentSampler: TerrainSamplerLike): void => {
       cities.forEach((city, index) => {

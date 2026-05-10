@@ -26,6 +26,10 @@ import {
   createMoonTexture,
   createStarDome
 } from "./proceduralTextures";
+import {
+  createCloudLayer as createCloudPlaneLayer,
+  type CloudLayerHandle
+} from "./cloudPlanes";
 
 export interface SkyDomeHandle {
   group: Group;
@@ -312,17 +316,7 @@ export function applySkyVisuals(
   handle.starDome.visible = options.starOpacity > 0.02;
 }
 
-export interface CloudLayerHandle {
-  group: Group;
-  // 保留 sprites 字段名兼容 main.ts 既有 update loop（每个 sprite 现在是
-  // 一个 Object3D wrapper，下面挂着 4-6 个 mesh puff）；接口形态不变。
-  sprites: Object3D[];
-  texture: CanvasTexture;
-  // 3D puffs 用 MeshLambertMaterial；保留 SpriteMaterial 是 legacy。两者的
-  // opacity / color 由 main loop 通过 setVisuals 同步推过来。
-  material: SpriteMaterial;
-  bodyMaterial: MeshLambertMaterial;
-}
+export type { CloudLayerHandle } from "./cloudPlanes";
 
 /**
  * 3D 立体云朵：每朵 = 4-6 个 SphereGeometry "puff" 拼成的 cluster。
@@ -367,31 +361,7 @@ function createCloudCluster(): Object3D {
 }
 
 export function createCloudLayer(): CloudLayerHandle {
-  const group = new Group();
-  const texture = createCloudTexture();
-  // material 保留是为了 export 兼容；3D puff 自带 MeshLambert，跟它无关。
-  const material = new SpriteMaterial({
-    map: texture,
-    transparent: true,
-    depthTest: false,
-    depthWrite: false,
-    opacity: 0.18
-  });
-  const sprites: Object3D[] = [];
-  const cloudCount = Math.floor(18 + Math.random() * 7);
-
-  for (let index = 0; index < cloudCount; index += 1) {
-    const cluster = createCloudCluster();
-    cluster.renderOrder = 10;
-    cluster.userData.baseX = (Math.random() - 0.5) * 400;
-    cluster.userData.baseZ = (Math.random() - 0.5) * 400;
-    cluster.userData.phase = Math.random() * Math.PI * 2;
-    cluster.userData.driftSpeed = 0.4 + Math.random() * 1.2;
-    sprites.push(cluster);
-    group.add(cluster);
-  }
-
-  return { group, sprites, texture, material, bodyMaterial: CLOUD_BODY_MATERIAL };
+  return createCloudPlaneLayer();
 }
 
 export interface PrecipitationHandle {
