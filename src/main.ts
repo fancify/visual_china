@@ -37,7 +37,8 @@ import {
   SpriteMaterial,
   Vector2,
   Vector3,
-  WebGLRenderer
+  WebGLRenderer,
+  PCFSoftShadowMap
 } from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
@@ -462,6 +463,9 @@ const renderer = new WebGLRenderer({
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x081213);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+// TODO: Phase 4 enable shadow casting via applyCastShadowPolicy().
 appRoot.appendChild(renderer.domElement);
 
 const perfStats = createPerfStats({ enabled: isDevModeEnabled() });

@@ -1,4 +1,4 @@
-import { Group, Mesh } from "three";
+import { Group, Mesh, MeshLambertMaterial, MeshPhongMaterial } from "three";
 
 import { createAvatar } from "./avatars.js";
 import { createMount } from "./mounts.js";
@@ -8,6 +8,7 @@ import {
   type AvatarId,
   type MountId
 } from "./playerCustomization.js";
+import { attachSceneryShaderEnhancements } from "./sceneryShaderEnhancer.js";
 
 /**
  * 玩家 mesh 组合 = mount（坐骑）+ avatar（骑手），由 mount + avatar 各自 builder 装配。
@@ -61,6 +62,26 @@ function clearGroup(group: Group): void {
       }
     });
   }
+}
+
+function attachPlayerSceneryShaderEnhancements(player: Group): void {
+  player.traverse((node) => {
+    if ((node as Mesh).isMesh !== true) {
+      return;
+    }
+    const material = (node as Mesh).material;
+    const materials = Array.isArray(material) ? material : [material];
+    materials.forEach((entry) => {
+      if (entry instanceof MeshPhongMaterial || entry instanceof MeshLambertMaterial) {
+        attachSceneryShaderEnhancements(entry, {
+          enableCelShading: false,
+          enableRim: false,
+          enableWindSway: false,
+          enableSeasonalTint: false
+        });
+      }
+    });
+  });
 }
 
 // 御剑站姿：avatars.ts 默认 thighs 是骑姿（rotation.z ≈ π/2 - 0.2，水平横放
@@ -219,6 +240,10 @@ function assemble(
 
   player.add(mountHandle.mount);
   player.add(avatarHandle.avatar);
+  player.userData.kind = "avatar";
+  mountHandle.mount.userData.kind = "mount";
+  avatarHandle.avatar.userData.kind = "avatar";
+  attachPlayerSceneryShaderEnhancements(player);
 
   return {
     mountLegs: mountHandle.legsByName,

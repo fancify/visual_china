@@ -6,6 +6,7 @@ import type { WindState } from "./windManager";
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 export type Weather = "clear" | "windy" | "rain" | "storm" | "snow" | "mist";
+export type WeatherState = Weather;
 
 export interface EnvironmentState {
   timeOfDay: number;
@@ -13,6 +14,14 @@ export interface EnvironmentState {
   dayOfYear: number;
   season: Season;
   weather: Weather;
+}
+
+export interface WeatherTransition {
+  fromState: WeatherState;
+  toState: WeatherState;
+  startTime: number;
+  duration: number;
+  progress: number;
 }
 
 export interface EnvironmentVisuals {
@@ -398,6 +407,8 @@ function blendEffectiveWeather(
 export class EnvironmentController {
   private weatherTimer = 0;
   private nextWeatherDelay = 45;
+  private elapsedSeconds = 0;
+  private transition: WeatherTransition | null = null;
   // 平滑天气切换：保留"过渡前"和"过渡后"两个快照 + 一个 t（0→1，12 秒
   // 内走完）。所有 channel 用同一个 t lerp，避免不同 channel 范围不同导
   // 致收敛速度不同步（codex c66a54e P1 反例：rain 切 clear 时 sunCut 5s
@@ -435,6 +446,7 @@ export class EnvironmentController {
   }
 
   update(deltaSeconds: number): EnvironmentState {
+    this.elapsedSeconds += Math.max(0, deltaSeconds);
     const previousTime = this.state.timeOfDay;
     // 用户要求："改半小时一天"——24 game-hour ÷ 1800s = 0.01333
     // game-hour/realSec。1 game-hour ≈ 75s real，比 BotW 还慢一点。
@@ -459,15 +471,28 @@ export class EnvironmentController {
       this.nextWeatherDelay = 36 + Math.random() * 34;
     }
 
+    if (this.transition) {
+      this.transition.progress = MathUtils.clamp(
+        (this.elapsedSeconds - this.transition.startTime) / this.transition.duration,
+        0,
+        1
+      );
+      if (this.transition.progress >= 1) {
+        this.state.weather = this.transition.toState;
+        this.transition = null;
+      }
+    }
+
     // 同步过渡：t 在 12 秒内走完 0→1，所有 channel 用同一个 t lerp。
     // 每次 weather 切换 t reset 为 0：每段 blend 严格 12s 走完。
     // 中途被打断（rare，~36-70s 才自动切一次，K 键手动也罕见）会让
     // 总时间超过 12s（worst case 24s 来回），但每段 blend 时长可预期
     // —— 这比 mid-flight 距离 proxy 既要保证 12s blend 又要避免 dry-to-
     // dry 跳过的两难简单可控。
-    if (this.weatherTransitionTarget !== this.state.weather) {
+    const effectiveWeatherTarget = this.transition?.toState ?? this.state.weather;
+    if (this.weatherTransitionTarget !== effectiveWeatherTarget) {
       this.weatherTransitionFrom = { ...this.effectiveWeather };
-      this.weatherTransitionTarget = this.state.weather;
+      this.weatherTransitionTarget = effectiveWeatherTarget;
       this.weatherTransitionT = 0;
     }
     if (this.weatherTransitionT < 1) {
@@ -508,6 +533,29 @@ export class EnvironmentController {
     this.syncSeasonFromDayOfYear();
   }
 
+  setWeather(target: WeatherState, durationSec = 12): void {
+    const normalizedTarget =
+      this.state.season === "winter" && target === "rain" ? "snow" : target;
+    if (this.state.weather === normalizedTarget && !this.transition) {
+      return;
+    }
+    if (this.transition?.toState === normalizedTarget) {
+      return;
+    }
+    if (durationSec <= 0) {
+      this.state.weather = normalizedTarget;
+      this.transition = null;
+      return;
+    }
+    this.transition = {
+      fromState: this.state.weather,
+      toState: normalizedTarget,
+      startTime: this.elapsedSeconds,
+      duration: durationSec,
+      progress: 0
+    };
+  }
+
   advanceWeather(): void {
     const options =
       this.state.season === "winter"
@@ -516,9 +564,23 @@ export class EnvironmentController {
           ? (["clear", "windy", "rain", "storm", "mist"] as Weather[])
           : (["clear", "windy", "rain", "storm", "mist"] as Weather[]);
 
-    const currentIndex = options.indexOf(this.state.weather);
-    const nextIndex = (currentIndex + 1 + Math.floor(Math.random() * options.length)) % options.length;
-    this.state.weather = options[nextIndex]!;
+    const currentWeather = this.transition?.toState ?? this.state.weather;
+    const currentIndex = options.indexOf(currentWeather);
+    const nextIndex =
+      (currentIndex + 1 + Math.floor(Math.random() * (options.length - 1))) %
+      options.length;
+    this.setWeather(options[nextIndex]!);
+  }
+
+  getWeatherTransitionLerp(): { from: WeatherState; to: WeatherState; t: number } | null {
+    if (!this.transition) {
+      return null;
+    }
+    return {
+      from: this.transition.fromState,
+      to: this.transition.toState,
+      t: this.transition.progress
+    };
   }
 
   computeVisuals(): EnvironmentVisuals {

@@ -33,6 +33,7 @@ async function loadPlayerAvatarModules() {
     "src/game/mounts.ts",
     "src/game/mounts/mountCloud.ts",
     "src/game/playerCustomization.ts",
+    "src/game/sceneryShaderEnhancer.ts",
     "src/game/playerAvatarMesh.ts"
   ];
 

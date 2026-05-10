@@ -16,6 +16,7 @@ import type { TerrainSampler, TerrainSamplerLike } from "./demSampler";
 import type { DemBounds, DemWorld } from "./demSampler";
 import type { GroundAnchorRegistry } from "./groundAnchors";
 import { projectGeoToWorld } from "./mapOrientation.js";
+import { attachSceneryShaderEnhancements } from "./sceneryShaderEnhancer.js";
 
 /**
  * 在 3D 场景里把真实城市坐标摆出来。
@@ -372,7 +373,7 @@ const TIER_GEOMETRY: Record<CityTier, TierGeometry> = {
 // 每档独立 material，让 LOD 距离淡入 / 淡出可以分档控制 opacity——
 // county 远了先 fade，prefecture 中距 fade，capital 始终可见。
 function makeWallMaterial(): MeshPhongMaterial {
-  return new MeshPhongMaterial({
+  const material = new MeshPhongMaterial({
     color: 0xffffff,
     flatShading: true,
     shininess: 6,
@@ -384,14 +385,28 @@ function makeWallMaterial(): MeshPhongMaterial {
     // depthWrite=true 以保 solid 视觉，接受 fade 时可能轻微 z-fight。
     opacity: 1
   });
+  attachSceneryShaderEnhancements(material, {
+    enableCelShading: false,
+    enableRim: false,
+    enableWindSway: false,
+    enableSeasonalTint: false
+  });
+  return material;
 }
 
 function makeFloorMaterial(): MeshPhongMaterial {
-  return new MeshPhongMaterial({
+  const material = new MeshPhongMaterial({
     color: COLOR_RAMMED_EARTH,
     flatShading: true,
     shininess: 2
   });
+  attachSceneryShaderEnhancements(material, {
+    enableCelShading: false,
+    enableRim: false,
+    enableWindSway: false,
+    enableSeasonalTint: false
+  });
+  return material;
 }
 
 const CITY_FLOOR_GEOMETRY = (() => {
@@ -472,6 +487,7 @@ export function createCityMarkers(
     const tierGeom = TIER_GEOMETRY[tier];
     const wallMesh = new InstancedMesh(tierGeom.geom, tierMaterials[tier], tierCities.length);
     wallMesh.name = `city-walls-${tier}`;
+    wallMesh.userData.kind = "city-wall-instanced";
     tierMeshes[tier] = wallMesh;
 
     const applyWallMatrices = (currentSampler: TerrainSamplerLike): void => {
@@ -527,6 +543,7 @@ export function createCityMarkers(
     floorMaterial = makeFloorMaterial();
     const nextFloorMesh = new InstancedMesh(CITY_FLOOR_GEOMETRY, floorMaterial, cities.length);
     nextFloorMesh.name = "city-floors";
+    nextFloorMesh.userData.kind = "city-floor";
 
     const applyFloorMatrices = (currentSampler: TerrainSamplerLike): void => {
       cities.forEach((city, index) => {

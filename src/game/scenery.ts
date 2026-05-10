@@ -24,6 +24,7 @@ import { unprojectWorldToGeo } from "./mapOrientation.js";
 import type { RuntimePerformanceBudget } from "./performanceBudget.js";
 import type { BiomeId, SeasonalBlend } from "./biomeZones.js";
 import type { Season } from "./environment";
+import { attachSceneryShaderEnhancements } from "./sceneryShaderEnhancer.js";
 
 export type PlantKind =
   | "conifer"
@@ -111,6 +112,12 @@ export const sharedTreeMaterial = new MeshPhongMaterial({
   depthWrite: false,
   opacity: 1,
   vertexColors: true
+});
+attachSceneryShaderEnhancements(sharedTreeMaterial, {
+  enableCelShading: false,
+  enableRim: false,
+  enableWindSway: false, // TODO: Phase 5 启用草/树叶风摆。
+  enableSeasonalTint: false
 });
 
 const sharedPlantPrototypes = createSharedPlantPrototypes();

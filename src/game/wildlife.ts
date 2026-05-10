@@ -18,6 +18,7 @@ import { biomeWeightsAt, type BiomeWeights } from "./biomeZones.js";
 import { findZoneAt } from "./cityFlattenZones.js";
 import type { TerrainSampler } from "./demSampler.js";
 import { unprojectWorldToGeo } from "./mapOrientation.js";
+import { attachSceneryShaderEnhancements } from "./sceneryShaderEnhancer.js";
 
 export type WildlifeKind = "deer" | "goat" | "rabbit" | "crane";
 
@@ -298,6 +299,14 @@ const WILDLIFE_MATERIALS: Record<WildlifeKind, MeshPhongMaterial> = {
 };
 
 export const sharedWildlifeMaterials = Object.values(WILDLIFE_MATERIALS);
+sharedWildlifeMaterials.forEach((material) => {
+  attachSceneryShaderEnhancements(material, {
+    enableCelShading: false,
+    enableRim: false,
+    enableWindSway: false,
+    enableSeasonalTint: false
+  });
+});
 
 function computeChunkSeed(sampler: TerrainSampler): number {
   const chunkBounds = sampler.asset.worldBounds;
