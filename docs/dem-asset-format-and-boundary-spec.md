@@ -334,6 +334,7 @@ public/data/regions/qinling/chunks/
   "regionId": "qinling",
   "type": "chunk-manifest",
   "version": 1,
+  "schemaVersion": 1,
   "chunkColumns": 4,
   "chunkRows": 5,
   "chunks": [
@@ -366,6 +367,7 @@ public/data/regions/qinling/chunks/
   "id": "qinling_0_0",
   "type": "terrain-chunk",
   "version": 1,
+  "schemaVersion": 1,
   "regionId": "qinling",
   "lod": "L2",
   "bounds": {
@@ -392,6 +394,64 @@ public/data/regions/qinling/chunks/
   "settlementMask": []
 }
 ```
+
+### 7.3 chunk asset schema v2 预留契约
+
+Phase 0-6 会同时改动 chunk build pipeline。为避免雕河、城市压平、AO、biome 与 LOD height texture 各自发明字段，chunk asset 从下一轮管线改造开始统一使用 `schemaVersion: 2`。当前运行时仍只要求 v1 字段；本节只定义 v2 契约，不要求本轮实现写入或读取。
+
+v2 单个 chunk 文件在 v1 基础上增加以下字段：
+
+```ts
+{
+  schemaVersion: 2,
+  heights: Float32Array, // existing
+  waterMask?: Uint8Array,
+  cityFlattened?: {
+    footprintList: Array<{
+      id: string;
+      baseHeight: number;
+      polygon: Array<{ x: number; z: number }>;
+    }>;
+  },
+  vertexAo?: Uint8Array,
+  biomeId?: string,
+  speciesRecipe?: {
+    trees: Array<{ species: string; density: number }>;
+    wildlife: Array<{ species: string; density: number }>;
+  },
+  seasonalRecipe?: {
+    springColor: string;
+    autumnDrop: number;
+    winterSnowMask: Uint8Array;
+  },
+  lodHeights?: {
+    L1: Float32Array;
+    L2: Float32Array;
+    L3: Float32Array;
+  }
+}
+```
+
+字段责任表：
+
+| 字段 | 用途 | 写入脚本 | runtime 读取方式 |
+|---|---|---|---|
+| `schemaVersion` | 区分 chunk schema，避免 build pipeline 撞车 | 所有 chunk build script；v1 资产显式写 `1`，v2 管线写 `2` | `loadChunkAsset` / DEM loader 先检测版本；未知版本拒收或降级 |
+| `heights` | 主高度场，维持现有 terrain mesh / sampler 契约 | `build-qinling-region-assets.mjs` 及后续全国/区域 chunk build | v1/v2 都按现有 `TerrainSampler` 读取；v2 不改变语义 |
+| `waterMask` | Phase 1 雕河与贴地水面 mesh 的水域栅格 | Phase 1 hydrography carve build script | 缺失时默认全 0；水面生成只在 mask > threshold 时提取 |
+| `cityFlattened.footprintList` | Phase 0 城市基底压平记录，描述哪些城市 footprint 已写进 heightmap | Phase 0 city anchor / flatten build script | 缺失时视为未压平；GroundAnchor / city renderer 回退现有采样逻辑 |
+| `vertexAo` | Phase 2 顶点 AO 烘焙结果，供山谷和建筑接地阴影使用 | Phase 2 AO bake script | 缺失时默认 AO=255（无额外遮蔽）；terrain material 可作为 vertex alpha/attribute 读取 |
+| `biomeId` | Phase 6 地域 biome 查找主键，控制植被、动物和季节色彩 | Phase 6 biome assignment build script | 缺失时按 region 默认 biome；scenery/wildlife 不因字段缺失崩溃 |
+| `speciesRecipe` | Phase 6 分 chunk 树种与动物密度配方 | Phase 6 species recipe build script | 缺失时使用现有全局 scenery/wildlife recipe；density 按 chunk 面积归一 |
+| `seasonalRecipe` | Phase 6 季节色、落叶比例、积雪 mask 配方 | Phase 6 seasonal bake script | 缺失时使用 EnvironmentController 的区域默认季节参数 |
+| `lodHeights` | Phase 0 LOD geomorph 的 L1/L2/L3 高度源，供远景双级采样 | Phase 0 LOD height texture build script | 缺失时 runtime 只使用 `heights`，关闭该 chunk 的 geomorph 或用邻近 LOD 回退 |
+
+向后兼容策略：
+
+1. runtime 必须先读取 `schemaVersion`；字段缺失时按 `1` 处理，以兼容当前已生成的 v1 chunks。
+2. v1 chunks 仍可加载，`waterMask / cityFlattened / vertexAo / biomeId / speciesRecipe / seasonalRecipe / lodHeights` 全部使用默认值。
+3. v2 build scripts 可以逐步写入字段；runtime 不得假设 v2 的所有可选字段同时存在。
+4. build pipeline 修改同一字段时必须更新本表的“写入脚本”和默认值说明，避免后续 phase 隐式改格式。
 
 ## 8. 附加语义层规范
 
@@ -489,6 +549,7 @@ public/data/regions/qinling/chunks/
   "id": "qinling",
   "type": "terrain-slice",
   "version": 1,
+  "schemaVersion": 1,
   "regionId": "qinling",
   "lod": "L1",
   "sourceType": "processed-real-dem",

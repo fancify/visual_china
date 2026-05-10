@@ -33,6 +33,7 @@ export type MountId =
   | "fox"
   | "pig"
   | "cloud"
+  | "sword"
   | "chicken"
   | "boar";
 
@@ -53,6 +54,7 @@ export const MOUNT_DEFINITIONS: MountDefinition[] = [
   { id: "fox", name: "灵狐", description: "橙红长尾，山林灵兽。" },
   { id: "pig", name: "家猪", description: "粉灰肉色，乡土田园伙伴。" },
   { id: "cloud", name: "筋斗云", description: "祥云悬空，腾云疾行。" },
+  { id: "sword", name: "御剑", description: "青锋承足，御剑乘风。" },
   { id: "chicken", name: "灵鸡", description: "双足金羽，骑感独特。" },
   { id: "boar", name: "野猪", description: "獠牙竖耳，山林彪悍。" }
 ];
@@ -844,6 +846,101 @@ function buildCloud(): MountHandle {
   };
 }
 
+function buildSword(): MountHandle {
+  // 御剑：扁长剑身 + 三角剑尖 + 护手 + 剑柄 + 剑首 + 剑穗。剑沿 +X 方向，
+  // 剑面朝上骑手站立。
+  //
+  // 几何对齐（防"剑尖断裂"）：
+  //   blade: BoxGeometry(2.2, 0.1, 0.36) at x=0    → 跨 X[-1.1, 1.1]
+  //   tip:   ConeGeometry(0.18, 0.6, 4) lay down   → base 在 x=1.1, 尖 在 x=1.7
+  //   tip 横截面缩成扁菱形，匹配 blade 0.1 高 × 0.36 宽，看起来是延续。
+  const bladeMaterial = new MeshPhongMaterial({
+    color: 0xc8d4dc,
+    emissive: 0x6b8aa8,
+    emissiveIntensity: 0.42,
+    flatShading: true,
+    shininess: 64
+  });
+  const guardMaterial = new MeshPhongMaterial({
+    color: 0xc89758,
+    emissive: 0x664c2a,
+    emissiveIntensity: 0.32,
+    flatShading: true,
+    shininess: 32
+  });
+  const handleMaterial = new MeshPhongMaterial({
+    color: 0x322820,
+    emissive: 0x1a140f,
+    emissiveIntensity: 0.2,
+    flatShading: true
+  });
+  const tasselMaterial = new MeshPhongMaterial({
+    color: 0xa83838,
+    emissive: 0x4c1818,
+    emissiveIntensity: 0.5,
+    flatShading: true
+  });
+
+  const SURFACE_Y = 0.6;
+  const BLADE_LENGTH = 2.2;
+  const BLADE_HALF = BLADE_LENGTH / 2;
+  const BLADE_HEIGHT = 0.1;
+  const BLADE_WIDTH = 0.36;
+
+  const blade = new Mesh(
+    new BoxGeometry(BLADE_LENGTH, BLADE_HEIGHT, BLADE_WIDTH),
+    bladeMaterial
+  );
+  blade.name = "mount-sword-blade";
+  blade.position.set(0, SURFACE_Y, 0);
+
+  // 剑尖：4-segment cone。默认朝 +Y、length 0.6、base 半径 0.18。
+  // rotation.z = -π/2 把它放倒朝 +X。然后 scale.x = BLADE_HEIGHT / (2*0.18)
+  // 把 cone-local X (旋转后 = world Y) 压扁到剑身高度，让剑尖剖面贴合剑身。
+  // 不再加 rotation.y——避免 base 4 顶点与 blade box 顶点错位产生"断裂"
+  // 视错觉。
+  const tipLength = 0.6;
+  const tipGeometry = new ConeGeometry(BLADE_WIDTH / 2, tipLength, 4);
+  const tip = new Mesh(tipGeometry, bladeMaterial);
+  tip.name = "mount-sword-tip";
+  tip.rotation.z = -Math.PI / 2;
+  // 把 cone 4 段的 base 顶点旋成上下左右——刚好对齐 box 4 边。
+  // ConeGeometry(radius, h, 4) 默认 base 顶点在 0, π/2, π, 3π/2 (cone-local
+  // XZ)。Z rotation 把 cone-local X 映射成 world Y，cone-local Z 仍是 world Z。
+  // 所以 base 顶点已经在 (世界Y=±r, Z=0) 和 (Y=0, Z=±r) 四角——天然对齐 box。
+  // 进一步：scale.x（影响 world Y 后）压扁成剑身高度。
+  tip.scale.set(BLADE_HEIGHT / BLADE_WIDTH, 1, 1);
+  // base 中心在 cone center.x = -tipLength/2 (rotated)。要让 base x = +BLADE_HALF,
+  // 则 tip.position.x = BLADE_HALF + tipLength/2。
+  tip.position.set(BLADE_HALF + tipLength / 2, SURFACE_Y, 0);
+
+  const guard = new Mesh(new BoxGeometry(0.16, 0.24, 0.66), guardMaterial);
+  guard.position.set(-(BLADE_HALF + 0.08), SURFACE_Y, 0);
+
+  const handle = new Mesh(new BoxGeometry(0.5, 0.12, 0.14), handleMaterial);
+  handle.position.set(-(BLADE_HALF + 0.41), SURFACE_Y, 0);
+
+  const pommel = new Mesh(new SphereGeometry(0.1, 8, 6), guardMaterial);
+  pommel.position.set(-(BLADE_HALF + 0.7), SURFACE_Y, 0);
+
+  const tassel = new Mesh(new BoxGeometry(0.06, 0.36, 0.06), tasselMaterial);
+  tassel.position.set(-(BLADE_HALF + 0.7), SURFACE_Y - 0.26, 0);
+
+  const mount = new Group();
+  mount.name = "mount-sword";
+  mount.add(blade, tip, guard, handle, pommel, tassel);
+
+  // 站姿（playerAvatarMesh.applyStandingPose）下 avatar 脚底在 avatar-local
+  // y = -0.25。剑面顶 = SURFACE_Y + BLADE_HEIGHT/2 = 0.65。
+  // saddleHeight = 0.65 - (-0.25) = 0.90 → 把脚底放到剑面顶。
+  return {
+    mount,
+    legsByName: new Map(),
+    saddleHeight: 0.90,
+    saddleX: 0
+  };
+}
+
 function buildChicken(): MountHandle {
   const featherMaterial = new MeshPhongMaterial({
     color: 0xc04935,
@@ -978,6 +1075,7 @@ const MOUNT_BUILDERS: Record<MountId, () => MountHandle> = {
   fox: buildFox,
   pig: buildPig,
   cloud: buildCloud,
+  sword: buildSword,
   chicken: buildChicken,
   boar: buildBoar
 };

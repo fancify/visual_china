@@ -30,6 +30,7 @@ export function createPerfStats(
     const style = document.createElement("style");
     style.id = "perf-stats-style";
     style.textContent = `
+      /* 用户："左下角那个数字相关的，你就变颜色淡一点"——降不透明度 + 灰化文字 */
       .perf-stats {
         position: fixed;
         bottom: 10px;
@@ -37,17 +38,18 @@ export function createPerfStats(
         z-index: 9999;
         padding: 8px 10px;
         font: 11px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
-        color: #d8e6df;
-        background: rgba(8, 18, 19, 0.78);
-        border: 1px solid rgba(120, 200, 200, 0.18);
+        color: rgba(216, 230, 223, 0.42);
+        background: rgba(8, 18, 19, 0.32);
+        border: 1px solid rgba(120, 200, 200, 0.08);
         border-radius: 6px;
         pointer-events: none;
         min-width: 180px;
         white-space: pre;
+        opacity: 0.55;
       }
-      .perf-stats .label { color: rgba(216, 230, 223, 0.55); }
-      .perf-stats .value-warn { color: #f0b674; }
-      .perf-stats .value-bad { color: #e08267; }
+      .perf-stats .label { color: rgba(216, 230, 223, 0.3); }
+      .perf-stats .value-warn { color: rgba(240, 182, 116, 0.6); }
+      .perf-stats .value-bad { color: rgba(224, 130, 103, 0.65); }
     `;
     document.head.appendChild(style);
   }

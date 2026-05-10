@@ -263,16 +263,67 @@ canvas {
   content: "收起";
 }
 
+/* 用户："地图把名字去掉，直接在小图上嵌个框，收起也放到这个小地图里面"。
+   重做布局：默认展开（hudChrome.openByDefault: true）显示 canvas + 边框；
+   summary 文字隐藏，做成右上角小三角折叠按钮叠在 canvas 上。 */
 .overview-block {
   position: absolute;
   right: 18px;
   top: 18px;
-  width: 116px;
-  padding: 10px 14px;
+  /* 默认就是展开状态——尺寸 = canvas + padding；折叠时 details 自带把
+     非 summary 子元素藏掉，所以折叠态自动只剩 summary 按钮 size。 */
+  padding: 6px;
+  background: rgba(20, 24, 18, 0.55);
+  border: 1px solid rgba(212, 175, 102, 0.34);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 230, 170, 0.06);
 }
 
-.overview-block[open] {
-  width: 308px;
+.overview-block:not([open]) {
+  /* 折叠时只显示 summary 按钮 */
+  padding: 4px;
+  background: rgba(20, 24, 18, 0.7);
+}
+
+.overview-block summary.overview-toggle {
+  list-style: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  /* 用 ::before 画一个三角"展开/折叠"图标。
+     details[open] 时朝下，闭合时朝左。 */
+  background: rgba(20, 24, 18, 0.8);
+  border: 1px solid rgba(212, 175, 102, 0.5);
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.overview-block summary.overview-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.overview-block summary.overview-toggle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(241, 210, 137, 0.78);
+}
+
+.overview-block:not([open]) summary.overview-toggle::after {
+  /* 折叠态：朝右的箭头 */
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid rgba(241, 210, 137, 0.78);
+  border-right: none;
 }
 
 .overview-block canvas {
@@ -280,13 +331,11 @@ canvas {
   inset: auto;
   z-index: auto;
   display: none;
-  margin-top: 10px;
   /* 全国画幅 1711×1186 ≈ 1.44:1。canvas 必须按这个比例显示，否则地图被纵向
    * 拉伸成竖图（用户："地图还是变形的"）。240×166 = 1.446:1，几乎完美。 */
   width: 240px;
   height: 166px;
-  border-radius: 4px;
-  border: 1px solid rgba(241, 210, 137, 0.14);
+  border-radius: 3px;
   background: rgba(0, 0, 0, 0.16);
 }
 
@@ -614,17 +663,131 @@ canvas {
   color: rgba(237, 230, 204, 0.9);
 }
 
+/* 用户："指南针被挡住，可以放到左上角那个面板里面，用司南的形式"。
+   旧 compass-block 已从 hud.ts 删除，这条规则保留作 fallback（如果别处
+   还有 .compass-block 引用）但视觉默认 hidden。新的司南在 .sinan-block。 */
 .compass-block {
+  display: none;
+}
+
+/* 司南：嵌在 .overview-block 小地图右下角内部。
+   方铜盘 + 中国勺子（大圆勺头 + 弯细勺柄，不再像棒槌）。
+   compass-rosette / compass-needle id 沿用，hud.ts 钩子兼容。 */
+.sinan-block {
   position: absolute;
-  /* 用户："罗盘遮挡了标题" — 移到屏幕左下角，跟 title 不再竞争同一列空间 */
-  bottom: 24px;
-  left: 18px;
-  top: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px 8px 10px;
-  color: rgba(245, 236, 211, 0.9);
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.sinan-plate {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  /* 方盘——司南底盘方形铜盘，刻 24 山 / 八卦。这里简化为铜底色方块。 */
+  background:
+    linear-gradient(140deg, rgba(168, 124, 60, 0.5), rgba(94, 64, 28, 0.65)),
+    rgba(28, 18, 10, 0.82);
+  border: 1px solid rgba(212, 175, 102, 0.6);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 230, 170, 0.18),
+    inset 0 0 12px rgba(0, 0, 0, 0.5),
+    0 1px 4px rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+}
+
+.sinan-rosette {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+  /* rotation 跟 cameraHeading 同步：hud.ts updateCompass 走
+     `translate(-50%, -50%) rotate(angle)` 写入 inline transform。 */
+  transform-origin: 50% 50%;
+}
+
+.sinan-cardinal {
+  position: absolute;
+  font-family: "Songti SC", "STSong", "FangSong", serif;
+  font-size: 8px;
+  line-height: 1;
+  color: rgba(241, 210, 137, 0.78);
+  transform: rotate(var(--label-counter-rotation, 0rad));
+}
+
+.sinan-cardinal.sinan-north {
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%) rotate(var(--label-counter-rotation, 0rad));
+  color: #f5ecd3;
+  font-weight: 700;
+}
+
+.sinan-cardinal.sinan-east {
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%) rotate(var(--label-counter-rotation, 0rad));
+}
+
+.sinan-cardinal.sinan-south {
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%) rotate(var(--label-counter-rotation, 0rad));
+}
+
+.sinan-cardinal.sinan-west {
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%) rotate(var(--label-counter-rotation, 0rad));
+}
+
+/* 中国勺子（不是棒槌）：宽椭圆勺头 + 短弯勺柄。
+   sinan-spoon 容器作为旋转中心放盘心；勺头朝北、勺柄朝南。 */
+.sinan-spoon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  transform-origin: 50% 50%;
+}
+
+/* 勺头：扁圆椭圆，宽 > 长 ≈ 真实勺子的 bowl 形。
+   渐变高光让铜质感明显。 */
+.sinan-bowl {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 16px;
+  height: 12px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background:
+    radial-gradient(ellipse at 35% 28%, #f8e4a4 0%, #d4a35a 40%, #7a4f1c 78%, #3d2410);
+  transform: translateX(-50%);
+  box-shadow:
+    inset 0 -2px 3px rgba(0, 0, 0, 0.55),
+    inset 0 1px 1px rgba(255, 240, 200, 0.55),
+    0 0 6px rgba(241, 210, 137, 0.45);
+}
+
+/* 勺柄：从勺头底部斜下伸出的细长弧。用 border-radius 让两端圆滑，
+   配合 transform 微 skew 模拟手工铜柄的弧度。 */
+.sinan-handle {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 3px;
+  height: 10px;
+  border-radius: 1.5px 1.5px 3px 3px;
+  background: linear-gradient(180deg, #b78441 0%, #6c4419 60%, #3a2310);
+  transform: translateX(-50%);
+  box-shadow:
+    inset 0 0 1px rgba(255, 230, 170, 0.5),
+    0 0 3px rgba(241, 210, 137, 0.35);
 }
 
 .compass-dial {

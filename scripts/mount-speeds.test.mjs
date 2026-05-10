@@ -81,6 +81,7 @@ async function loadMainCloudFlightHelpers() {
     "CLOUD_FLIGHT_MAX_ALTITUDE",
     "CLOUD_FLIGHT_MIN_ABSOLUTE",
     "CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET",
+    "isFlyingMount",
     "resolvePlayerTargetY",
     "resetCloudFlightAltitudeForGround",
     "nextCloudFlightAltitude"
@@ -262,5 +263,26 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
       cloudFlightAltitude: 27.5
     }),
     27.5
+  );
+
+  // 御剑跟筋斗云共享 isFlyingMount → 应该接受相同的飞行控制。
+  assert.equal(
+    nextCloudFlightAltitude({
+      currentMountId: "sword",
+      keys: new Set([" "]),
+      ground: 10,
+      cloudFlightAltitude: 26
+    }),
+    26 + 1.2,
+    "sword should also ascend with space"
+  );
+  assert.equal(
+    resolvePlayerTargetY({
+      currentMountId: "sword",
+      ground: 12,
+      cloudFlightAltitude: 30
+    }),
+    30,
+    "sword target Y should track cloudFlightAltitude like cloud"
   );
 });

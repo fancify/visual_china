@@ -12,6 +12,8 @@ const MOUNT_SPEED_MULTIPLIER: Record<MountId, number> = {
   pig: 0.7,
   // 筋斗云 4.0 → 2.7（降 1/3），仍最快档但不夸张离谱。
   cloud: 2.7,
+  // 御剑：飞行型，跟筋斗云同档；但剑更"利"，给一点速度上限提升。
+  sword: 3.0,
   chicken: 1.1,
   boar: 0.9
 };
@@ -21,7 +23,7 @@ export function mountSpeedMultiplier(id: MountId): number {
 }
 
 export function mountInertiaFactor(id: MountId): number {
-  if (id === "cloud") {
+  if (id === "cloud" || id === "sword") {
     return 0.04;
   }
   if (id === "horse") {

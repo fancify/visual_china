@@ -136,18 +136,22 @@ export function modeColor(
       hue = MathUtils.lerp(0.22, 0.30, t);
       sat = MathUtils.lerp(0.40, 0.42, t);
       lum = MathUtils.lerp(0.52, 0.34, t);
-    } else if (h < 0.75) {
-      const t = (h - 0.45) / 0.30;
+    } else if (h < 0.62) {
+      const t = (h - 0.45) / 0.17;
       hue = MathUtils.lerp(0.30, 0.32, t);
       sat = MathUtils.lerp(0.42, 0.36, t);
       lum = MathUtils.lerp(0.34, 0.40, t);
-    } else if (h < 0.92) {
-      const t = (h - 0.75) / 0.17;
+    } else if (h < 0.78) {
+      const t = (h - 0.62) / 0.16;
       hue = 0.32;
       sat = MathUtils.lerp(0.36, 0.20, t);
       lum = MathUtils.lerp(0.40, 0.62, t);
     } else {
-      const t = (h - 0.92) / 0.08;
+      // 用户："青藏高原也没雪山了，得有"。
+      // exag 从 3.2 降到 1.07 后 normalized height 不再被夸张拉满，原雪线
+      // 0.92 让 Tibet (raw ~10/17 ≈ 0.79) 落不进雪带。把雪线下移到 0.78，
+      // Tibet plateau / 喜马拉雅 / 天山高峰都能上雪。
+      const t = MathUtils.clamp((h - 0.78) / 0.22, 0, 1);
       hue = MathUtils.lerp(0.32, 0.08, t);
       sat = MathUtils.lerp(0.20, 0.06, t);
       lum = MathUtils.lerp(0.62, 0.84, t);
@@ -168,12 +172,22 @@ export function modeColor(
 
     color = new Color().setHSL(hue, sat, lum);
 
-    // 2026-05 Phase 3：删除 mesh-level riverMask tinting。河流改由独立
-    // 3D water ribbon mesh 渲染（rebuildHydrographyRibbons 创建）。
-    // 旧逻辑同时着色 + ribbon 会产生用户报的"浅蓝斑点"：riverMask 是连续
-    // 0-1 channel，>0.1 的所有 cell 都被涂浅蓝晕，跟 ribbon 风格冲突。
-    // 全部水统一由 ribbon + global water plane 表示，mesh 不再画水。
-    void river;
+    // 用户："河水就在应该有水的地方染色，宽度尽可能贴近河水实际宽度"。
+    // 重新启用 mesh vertex 染河——用 riverMask 直接 tint 蓝色，依赖 chunks
+    // 的 1.8 km/cell + GPU 三角形内插得到 "1-2 km 宽河带"。
+    //
+    // L1 base 14 km/cell 太粗，染出来会是 14 km 宽 blob——按 cell 尺寸 gate：
+    // cellSpan > 1.5 game unit (≈ 5 km) 跳过染色（远景看不见水，OK）；
+    // chunks 的 cell ~0.55 unit (≈ 1.8 km) 远小于阈值 → 染色。
+    const cellSpan =
+      sampler.asset.world.width / Math.max(1, sampler.asset.grid.columns);
+    if (cellSpan < 1.5 && river > 0.25) {
+      // 染色强度：river ∈ [0.25, 1] 映射到 mix 因子 [0.35, 0.92]。
+      // 0.92 让深水段几乎纯蓝（仍保留一点底色透出，避免过于荧光）。
+      const intensity = MathUtils.clamp((river - 0.25) / 0.75, 0, 1);
+      const waterColor = new Color().setHSL(0.58, 0.45, 0.46);
+      color.lerp(waterColor, MathUtils.lerp(0.35, 0.92, intensity));
+    }
 
     // 聚落附近向耕地黄绿推（农田 + 灌丛 mix）。Gate by slope —— 真正的
     // 农田只长在缓坡，陡坡上即使 settlementMask 高也不应该被涂成农田色

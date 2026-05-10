@@ -117,7 +117,68 @@ const MAX_TOTAL_CELLS = 32 * 1024 * 1024;
 // 千里江山图风格垂直夸张系数。在 sampleHeight 里统一应用，让 mesh、
 // player.y、scenery、label 全部一致使用夸张后的高度，避免漂浮 / 下沉。
 // 用户："地形夸张再高一倍"。1.6 → 3.2，山形比 1:1 真实拔高 220%。
-export const TERRAIN_VERTICAL_EXAGGERATION = 3.2;
+// 用户："夸张程度再少一半"。2.13 / 2 ≈ 1.07，接近原始高度（无夸张）。
+export const TERRAIN_VERTICAL_EXAGGERATION = 1.07;
+
+/**
+ * 把 chunk asset 的 grid 缩成 1/N（N=2 → 1.8 km/cell）。
+ * world.width/depth 不变（同样面积），只是顶点变稀。
+ * heights 用 2×2 average（地形平滑），mask 用 max（保留河/关隘特征）。
+ *
+ * 用户："Chunks 分辨率可以再调低一倍。0.9 km → 1.8 km"。运行时下采样
+ * 不重建源文件——chunk JSON 还是 51×51，loaded 后 reduce 成 26×26。
+ * 三角数 ~5000 → ~1300/chunk，GPU 压力大幅降。
+ */
+export function downsampleChunkAsset(asset: DemAsset, factor = 2): DemAsset {
+  if (factor <= 1) return asset;
+  const srcCols = asset.grid.columns;
+  const srcRows = asset.grid.rows;
+  const dstCols = Math.max(2, Math.ceil(srcCols / factor));
+  const dstRows = Math.max(2, Math.ceil(srcRows / factor));
+
+  const newHeights = new Array<number>(dstCols * dstRows);
+  const newRiver = new Array<number>(dstCols * dstRows);
+  const newPass = new Array<number>(dstCols * dstRows);
+  const newSettle = new Array<number>(dstCols * dstRows);
+
+  for (let row = 0; row < dstRows; row += 1) {
+    const r0 = row * factor;
+    const r1 = Math.min(srcRows, r0 + factor);
+    for (let col = 0; col < dstCols; col += 1) {
+      const c0 = col * factor;
+      const c1 = Math.min(srcCols, c0 + factor);
+      let hSum = 0;
+      let n = 0;
+      let rMax = 0;
+      let pMax = 0;
+      let sMax = 0;
+      for (let rr = r0; rr < r1; rr += 1) {
+        for (let cc = c0; cc < c1; cc += 1) {
+          const idx = rr * srcCols + cc;
+          hSum += asset.heights[idx]!;
+          n += 1;
+          rMax = Math.max(rMax, asset.riverMask[idx]!);
+          pMax = Math.max(pMax, asset.passMask[idx]!);
+          sMax = Math.max(sMax, asset.settlementMask[idx]!);
+        }
+      }
+      const dstIdx = row * dstCols + col;
+      newHeights[dstIdx] = n > 0 ? hSum / n : 0;
+      newRiver[dstIdx] = rMax;
+      newPass[dstIdx] = pMax;
+      newSettle[dstIdx] = sMax;
+    }
+  }
+
+  return {
+    ...asset,
+    grid: { columns: dstCols, rows: dstRows },
+    heights: newHeights,
+    riverMask: newRiver,
+    passMask: newPass,
+    settlementMask: newSettle
+  };
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -513,6 +574,24 @@ export async function loadDemAsset(requestUrl: string): Promise<LoadedDemAsset> 
   };
 }
 
+/**
+ * 共同接口：TerrainSampler 和 CompositeTerrainSampler 都实现。
+ * 工具函数应接收这个 union，让 caller 想用哪种 sampler 都行。
+ */
+export interface TerrainSamplerLike {
+  readonly asset: DemAsset;
+  sampleHeight(x: number, z: number): number;
+  sampleSurfaceHeight(x: number, z: number): number;
+  sampleRiver(x: number, z: number): number;
+  samplePass(x: number, z: number): number;
+  sampleSettlement(x: number, z: number): number;
+  sampleSlope(x: number, z: number): number;
+  setHeightOverride(
+    fn: ((originalY: number, x: number, z: number) => number) | null
+  ): void;
+  worldPositionForSample(x: number, z: number): { x: number; z: number };
+}
+
 export class TerrainSampler {
   readonly asset: DemAsset;
   private heightOverride: ((originalY: number, x: number, z: number) => number) | null = null;
@@ -646,4 +725,201 @@ export class TerrainSampler {
 
     return lerp(lerp(a, b, tx), lerp(c, d, tx), ty);
   }
+}
+
+interface ChunkSamplerEntry {
+  sampler: TerrainSampler;
+  bounds: DemWorldBounds;
+  centerX: number;
+  centerZ: number;
+}
+
+/**
+ * 复合地形 sampler：base（L1/L2）+ 已装载 chunks 的统一查询门面。
+ *
+ * 调用 sampleHeight(worldX, worldZ) 时：
+ *   1. 遍历 chunks，找出 worldX/worldZ 落在哪个 chunk 的 worldBounds 内
+ *   2. 命中：world 坐标转 chunk-local 后调 chunk.sampler.sample*
+ *   3. 没命中：回落 base.sampler
+ *
+ * 解决"建筑/水/POI 用 L1 sampler 算高度，跟 chunks 实际渲染 mesh 不对齐"
+ * 的核心。所有外部消费者用 composite 后，无论 chunks 装/卸，sample 都返回
+ * 当前可见的最高分辨率高度。
+ *
+ * `setHeightOverride` 仍走 base（city flatten zones 是全局逻辑，不该被 chunk 切碎）。
+ * `worldPositionForSample` 走 base（POI ID hash 等需要稳定坐标）。
+ */
+// extends TerrainSampler 让 composite 在结构上 = TerrainSampler，
+// 所有现有 `function f(sampler: TerrainSampler)` 都接受 composite。
+// 覆盖 sample 方法走 chunk-aware 路径，未覆盖的（asset / private 内部）走 super。
+export class CompositeTerrainSampler extends TerrainSampler {
+  readonly base: TerrainSampler;
+  private chunkEntries = new Map<string, ChunkSamplerEntry>();
+  private lastHitChunk: ChunkSamplerEntry | null = null;
+  private debugResolveHits = 0;
+  private debugResolveMisses = 0;
+  private debugLastLogMs = 0;
+
+  constructor(base: TerrainSampler) {
+    super(base.asset);
+    this.base = base;
+  }
+
+  registerChunk(
+    chunkId: string,
+    sampler: TerrainSampler,
+    bounds: DemWorldBounds
+  ): void {
+    const centerX = (bounds.minX + bounds.maxX) * 0.5;
+    const centerZ = (bounds.minZ + bounds.maxZ) * 0.5;
+    this.chunkEntries.set(chunkId, { sampler, bounds, centerX, centerZ });
+  }
+
+  unregisterChunk(chunkId: string): void {
+    const entry = this.chunkEntries.get(chunkId) ?? null;
+    this.chunkEntries.delete(chunkId);
+    if (entry && this.lastHitChunk === entry) {
+      this.lastHitChunk = null;
+    }
+  }
+
+  /** 查 (worldX, worldZ) 是否在某个已装载 chunk 内，返回 chunk entry 或 null。 */
+  private resolveChunk(worldX: number, worldZ: number): ChunkSamplerEntry | null {
+    if (this.lastHitChunk && chunkEntryContains(this.lastHitChunk, worldX, worldZ)) {
+      this.debugResolveHits += 1;
+      this.maybeLogResolveCacheStats();
+      return this.lastHitChunk;
+    }
+
+  for (const entry of this.chunkEntries.values()) {
+      if (chunkEntryContainsHalfOpen(entry, worldX, worldZ)) {
+        this.lastHitChunk = entry;
+        this.debugResolveMisses += 1;
+        this.maybeLogResolveCacheStats();
+        return entry;
+      }
+    }
+    for (const entry of this.chunkEntries.values()) {
+      if (chunkEntryContains(entry, worldX, worldZ)) {
+        this.lastHitChunk = entry;
+        this.debugResolveMisses += 1;
+        this.maybeLogResolveCacheStats();
+        return entry;
+      }
+    }
+    this.lastHitChunk = null;
+    this.debugResolveMisses += 1;
+    this.maybeLogResolveCacheStats();
+    return null;
+  }
+
+  private maybeLogResolveCacheStats(): void {
+    if (!isDemSamplerDevMode()) {
+      return;
+    }
+    const now = performance.now();
+    if (now - this.debugLastLogMs < 5000) {
+      return;
+    }
+    const total = this.debugResolveHits + this.debugResolveMisses;
+    if (total === 0) {
+      return;
+    }
+    console.info(
+      `[terrain] resolveChunk lastHit cache: ${this.debugResolveHits}/${total} hits ` +
+        `(${Math.round((this.debugResolveHits / total) * 100)}%)`
+    );
+    this.debugResolveHits = 0;
+    this.debugResolveMisses = 0;
+    this.debugLastLogMs = now;
+  }
+
+  sampleHeight(x: number, z: number): number {
+    const chunk = this.resolveChunk(x, z);
+    if (chunk) {
+      return chunk.sampler.sampleHeight(x - chunk.centerX, z - chunk.centerZ);
+    }
+    return this.base.sampleHeight(x, z);
+  }
+
+  sampleSurfaceHeight(x: number, z: number): number {
+    const chunk = this.resolveChunk(x, z);
+    if (chunk) {
+      return chunk.sampler.sampleSurfaceHeight(x - chunk.centerX, z - chunk.centerZ);
+    }
+    return this.base.sampleSurfaceHeight(x, z);
+  }
+
+  sampleRiver(x: number, z: number): number {
+    const chunk = this.resolveChunk(x, z);
+    if (chunk) {
+      return chunk.sampler.sampleRiver(x - chunk.centerX, z - chunk.centerZ);
+    }
+    return this.base.sampleRiver(x, z);
+  }
+
+  samplePass(x: number, z: number): number {
+    const chunk = this.resolveChunk(x, z);
+    if (chunk) {
+      return chunk.sampler.samplePass(x - chunk.centerX, z - chunk.centerZ);
+    }
+    return this.base.samplePass(x, z);
+  }
+
+  sampleSettlement(x: number, z: number): number {
+    const chunk = this.resolveChunk(x, z);
+    if (chunk) {
+      return chunk.sampler.sampleSettlement(x - chunk.centerX, z - chunk.centerZ);
+    }
+    return this.base.sampleSettlement(x, z);
+  }
+
+  sampleSlope(x: number, z: number): number {
+    const delta = 0.75;
+    const dx =
+      this.sampleHeight(x + delta, z) - this.sampleHeight(x - delta, z);
+    const dz =
+      this.sampleHeight(x, z + delta) - this.sampleHeight(x, z - delta);
+    return Math.min(Math.hypot(dx, dz) / 4.2, 1);
+  }
+
+  setHeightOverride(
+    fn: ((originalY: number, x: number, z: number) => number) | null
+  ): void {
+    this.base.setHeightOverride(fn);
+  }
+
+  worldPositionForSample(x: number, z: number): { x: number; z: number } {
+    return this.base.worldPositionForSample(x, z);
+  }
+}
+
+function chunkEntryContains(
+  entry: ChunkSamplerEntry,
+  worldX: number,
+  worldZ: number
+): boolean {
+  return (
+    worldX >= entry.bounds.minX &&
+    worldX <= entry.bounds.maxX &&
+    worldZ >= entry.bounds.minZ &&
+    worldZ <= entry.bounds.maxZ
+  );
+}
+
+function chunkEntryContainsHalfOpen(
+  entry: ChunkSamplerEntry,
+  worldX: number,
+  worldZ: number
+): boolean {
+  return (
+    worldX >= entry.bounds.minX &&
+    worldX < entry.bounds.maxX &&
+    worldZ >= entry.bounds.minZ &&
+    worldZ < entry.bounds.maxZ
+  );
+}
+
+function isDemSamplerDevMode(): boolean {
+  return globalThis.window?.HUD_DEBUG === true;
 }

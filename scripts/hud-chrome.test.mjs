@@ -88,13 +88,16 @@ const styleCss = readFileSync(new URL("../src/style.css", import.meta.url), "utf
 
 test("compact HUD keeps only essential panels open by default", () => {
   assert.equal(compactHudPanelConfig.mode.visible, false);
-  assert.equal(compactHudPanelConfig.status.visible, true);
+  // 用户："右下角的当前旅程可以去掉了" → status.visible = false
+  assert.equal(compactHudPanelConfig.status.visible, false);
   assert.equal(compactHudPanelConfig.journal.visible, false);
   assert.equal(compactHudPanelConfig.overview.visible, true);
-  assert.equal(compactHudPanelConfig.controls.visible, true);
-  assert.equal(compactHudPanelConfig.overview.openByDefault, false);
+  // 用户："操作提示也可以去掉" → controls.visible = false
+  assert.equal(compactHudPanelConfig.controls.visible, false);
+  // 用户："右上角小地图默认展开" → overview.openByDefault = true
+  assert.equal(compactHudPanelConfig.overview.openByDefault, true);
   assert.equal(compactHudPanelConfig.controls.openByDefault, false);
-  assert.equal(compactHudPanelConfig.status.openByDefault, true);
+  assert.equal(compactHudPanelConfig.status.openByDefault, false);
 });
 
 test("natural exploration HUD does not pin journey or story lines", () => {

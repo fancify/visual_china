@@ -99,7 +99,7 @@ export interface CityDetailSnapshot {
 }
 
 const defaultStatusSnapshot: HudStatusSnapshot = {
-  zone: "地带：关中平原",
+  zone: "关中平原",
   mode: `视图：${modeMeta.terrain.title}`,
   environment: "时辰：07:30 · 春 · 晴",
   collection: "残简：0 / 0",
@@ -128,20 +128,13 @@ export function createHud(
   hud.innerHTML = `
     <div class="title-block">
       <div class="eyebrow">千里江山图</div>
-      <h1>秦岭 - 关中 - 四川盆地</h1>
-      <div class="loading-line" id="loading-line"></div>
+      <!-- 用户："标题不应该永远是秦岭关中四川盆地，应该直接说现在在什么位置"。
+           h1 现在用 zone-line（跟原 status-block 同一个钩子），main.ts refreshHud
+           已经把当前位置写进 snapshot.zone，hud.ts updateStatus 用 #zone-line
+           setText。loading-line 也去掉（不再 toast"已载入母版"）。 -->
+      <h1 id="zone-line">${defaultStatusSnapshot.zone}</h1>
+      <div class="loading-line" id="loading-line" hidden aria-hidden="true"></div>
       <div class="title-environment" id="title-environment-line"></div>
-    </div>
-    <div class="compass-block" aria-label="游戏方位">
-      <div class="compass-dial">
-        <div class="compass-rosette" id="compass-rosette">
-          <div class="compass-cardinal-anchor compass-north"><span class="compass-cardinal-label">北</span></div>
-          <div class="compass-cardinal-anchor compass-east"><span class="compass-cardinal-label">东</span></div>
-          <div class="compass-cardinal-anchor compass-south"><span class="compass-cardinal-label">南</span></div>
-          <div class="compass-cardinal-anchor compass-west"><span class="compass-cardinal-label">西</span></div>
-        </div>
-        <span class="compass-needle" id="compass-needle"></span>
-      </div>
     </div>
     <details class="mode-block hud-drawer ${compactHudPanelConfig.mode.visible ? "" : hiddenClass}" ${compactHudPanelConfig.mode.openByDefault ? "open" : ""}>
       <summary>视图 · <strong id="mode-summary">${modeMeta.terrain.title}</strong></summary>
@@ -160,7 +153,9 @@ export function createHud(
     </details>
     <div class="status-block ${compactHudPanelConfig.status.visible ? "" : hiddenClass} ${compactHudPanelConfig.status.openByDefault ? "visible" : ""}">
       <div class="status-title">当前旅程</div>
-      <div class="status-line" id="zone-line">${defaultStatusSnapshot.zone}</div>
+      <!-- 用户已让 zone-line 移到 title-block h1。这里换个 id 避免 dup。
+           status-block 当前 visible:false，相当于一直藏；保留 markup 以后可恢复。 -->
+      <div class="status-line" id="zone-line-status">${defaultStatusSnapshot.zone}</div>
       <div class="status-line story-line" id="story-line">${defaultStatusSnapshot.story}</div>
       <details class="status-extra hud-drawer">
         <summary>更多状态</summary>
@@ -171,23 +166,37 @@ export function createHud(
       </details>
     </div>
     <details class="overview-block hud-drawer ${compactHudPanelConfig.overview.visible ? "" : hiddenClass}" ${compactHudPanelConfig.overview.openByDefault ? "open" : ""}>
-      <summary>地图</summary>
+      <!-- 用户："地图把名字去掉，直接在小图小 map 上嵌个框，收起也放到这个小地图里面"
+           summary 必须存在（details 折叠 trigger），但去掉文字、CSS 把它做成右上角
+           小三角折叠按钮，叠在 canvas 上。 -->
+      <summary class="overview-toggle" aria-label="折叠 / 展开 地图"></summary>
       <canvas id="overview-map" width="280" height="194"></canvas>
-      <button class="atlas-open-button" id="open-atlas-fullscreen" type="button">
-        全屏地图
-      </button>
-      <div class="atlas-layer-list" id="atlas-layer-list"></div>
-      <div class="atlas-feature-card" id="atlas-feature-card">
-        <div class="atlas-card-kicker">点击地图</div>
-        <strong>选择一个地理要素</strong>
-        <p>可以查看河流、古道、城市、关隘和地貌的解释。</p>
-      </div>
-      <div class="overview-legend">
-        <span>北：关中</span>
-        <span>中：秦岭</span>
-        <span>南：汉中 / 巴蜀</span>
+      <!-- 用户："司南放到小地图内部的右下角，画个中国勺子型"。
+           方铜盘嵌右下角；勺子 = 大圆勺头 + 弯曲细勺柄；
+           compass-rosette / compass-needle id 保留让 hud.ts 旋转钩子继续生效。 -->
+      <div class="sinan-block" aria-label="司南方位">
+        <div class="sinan-plate">
+          <div class="sinan-rosette" id="compass-rosette">
+            <span class="sinan-cardinal sinan-north">北</span>
+            <span class="sinan-cardinal sinan-east">东</span>
+            <span class="sinan-cardinal sinan-south">南</span>
+            <span class="sinan-cardinal sinan-west">西</span>
+          </div>
+          <span class="sinan-spoon" id="compass-needle">
+            <span class="sinan-bowl"></span>
+            <span class="sinan-handle"></span>
+          </span>
+        </div>
       </div>
     </details>
+    <!-- 用户："这些部分也可以去掉" - 全屏地图按钮 / 图层切换 / 当前可见统计 / 北中南 legend
+         全部从可见 UI 移除。但 JS init 仍 requireElement 这些 id（图层切换还作为
+         atlas 层级状态来源），先放进 hidden stub 让 init 不挂。M 键打开全屏。 -->
+    <div class="hidden-atlas-stub" hidden aria-hidden="true">
+      <button class="atlas-open-button" id="open-atlas-fullscreen" type="button">全屏地图</button>
+      <div class="atlas-layer-list" id="atlas-layer-list"></div>
+      <div class="atlas-feature-card" id="atlas-feature-card"></div>
+    </div>
     <aside class="atlas-fullscreen" id="atlas-fullscreen" aria-hidden="true">
       <div class="atlas-fullscreen-shell">
         <header class="atlas-fullscreen-head">

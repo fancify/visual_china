@@ -23,6 +23,20 @@ export interface TerrainMeshHandle {
   scenery?: Group;
 }
 
+// Deterministic micro-bump：让 flat shading 在平原（成都平原、华北平原等
+// 地形几乎水平的区域）也露出三角划分。所有 vertex normal 一致 = 同色 = 看不出
+// 三角；±0.025 单位（≈ ±5m）随机扰动让相邻三角 normal 轻微错位 → flat shading
+// 颜色细微差 → "low-poly stylized" 三角格肉眼可辨。
+//
+// hash 必须 deterministic（chunk reload 时噪点不能 flicker）。基于 vertex
+// local x/z 的 sin-hash 足够便宜且无视觉 tile artifact。
+const MICRO_BUMP_AMPLITUDE = 0.025;
+function microBump(localX: number, localZ: number): number {
+  const seed = Math.sin(localX * 12.9898 + localZ * 78.233) * 43758.5453;
+  const fract = seed - Math.floor(seed);
+  return (fract - 0.5) * 2 * MICRO_BUMP_AMPLITUDE;
+}
+
 export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   const geometry = new PlaneGeometry(
     sampler.asset.world.width,
@@ -37,7 +51,7 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   for (let index = 0; index < positionAttribute.count; index += 1) {
     const x = positionAttribute.getX(index);
     const z = positionAttribute.getZ(index);
-    positionAttribute.setY(index, sampler.sampleHeight(x, z));
+    positionAttribute.setY(index, sampler.sampleHeight(x, z) + microBump(x, z));
   }
 
   geometry.computeVertexNormals();
@@ -67,6 +81,9 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
     atmosphericFarColor: new Color(0x5f8ba6)
   });
   const mesh = new Mesh(geometry, material);
+  // 方案 A：chunks 后绘，覆盖 base mesh。base 的 polygonOffset 推远 + 这里
+  // renderOrder 抬高，双重确保 chunks 在重叠区域永远显示在 base 之上。
+  mesh.renderOrder = 1;
   configureChunkTerrainFrustum(mesh, geometry);
 
   return {

@@ -63,6 +63,43 @@ function clearGroup(group: Group): void {
   }
 }
 
+// 御剑站姿：avatars.ts 默认 thighs 是骑姿（rotation.z ≈ π/2 - 0.2，水平横放
+// 跨在马背两侧）。御剑要求骑手"站立"：把 thigh 调成竖直、双腿并拢，arm 自然
+// 垂下（不再"握缰"）。改 mesh 现成节点的 rotation/position，不重建几何。
+//
+// 几何对齐（避免"剑横穿腰"）：
+//   thigh 长 0.55，竖直放，center.y = 0.025
+//     → 顶端 y ≈ 0.30（贴 torso 底 0.39 留 0.09 髋部空隙）
+//     → 脚底 y ≈ -0.25
+//   返回 -0.25 让 mounts.ts buildSword 的 saddleHeight 能算出剑面支撑点。
+export const STANDING_POSE_FOOT_Y = -0.25;
+function applyStandingPose(avatar: Group): void {
+  const thighLeft = avatar.getObjectByName("avatar-thigh-left") as Mesh | undefined;
+  const thighRight = avatar.getObjectByName("avatar-thigh-right") as Mesh | undefined;
+  if (thighLeft) {
+    thighLeft.rotation.set(0, 0, 0);
+    thighLeft.position.set(0.02, 0.025, 0.08);
+  }
+  if (thighRight) {
+    thighRight.rotation.set(0, 0, 0);
+    thighRight.position.set(0.02, 0.025, -0.08);
+  }
+  // 用户："站着时胳膊更靠肩近一点，而且向下"。
+  // arm 长 0.5，center.y = 0.62 → 顶端 0.87（顶进 torso 顶 0.85，相当于
+  // 肩头），底端 0.37（肘部）。Z 从 0.22 收到 0.18 让胳膊更贴身侧。
+  // rotation 0,0,0 = cylinder 沿 +Y 立着 → 自然垂下（手指地）。
+  const armLeft = avatar.getObjectByName("avatar-arm-left") as Mesh | undefined;
+  const armRight = avatar.getObjectByName("avatar-arm-right") as Mesh | undefined;
+  if (armLeft) {
+    armLeft.rotation.set(0, 0, 0);
+    armLeft.position.set(0.02, 0.62, 0.18);
+  }
+  if (armRight) {
+    armRight.rotation.set(0, 0, 0);
+    armRight.position.set(0.02, 0.62, -0.18);
+  }
+}
+
 function buildWalkingAvatarLegRig(avatar: Group): Map<string, Mesh> {
   const legCandidates = avatar.children
     .filter(
@@ -173,6 +210,11 @@ function assemble(
       mountHandle.saddleHeight,
       0
     );
+  }
+
+  // 御剑：把骑姿改成站姿（thighs 竖直、双腿并拢、双臂垂下）。
+  if (mountId === "sword") {
+    applyStandingPose(avatarHandle.avatar);
   }
 
   player.add(mountHandle.mount);

@@ -4,16 +4,19 @@ export const compactHudPanelConfig = {
     openByDefault: false
   },
   overview: {
+    // 用户："右上角小地图默认展开" → openByDefault: true
     visible: true,
-    openByDefault: false
+    openByDefault: true
   },
   controls: {
-    visible: true,
+    // 用户："操作提示也可以去掉"
+    visible: false,
     openByDefault: false
   },
   status: {
-    visible: true,
-    openByDefault: true
+    // 用户："右下角的当前旅程可以去掉了"
+    visible: false,
+    openByDefault: false
   },
   journal: {
     visible: false,

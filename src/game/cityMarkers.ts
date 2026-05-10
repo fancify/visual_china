@@ -12,8 +12,9 @@ import {
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import type { CityTier, RealCity } from "../data/realCities.js";
-import type { TerrainSampler } from "./demSampler";
+import type { TerrainSampler, TerrainSamplerLike } from "./demSampler";
 import type { DemBounds, DemWorld } from "./demSampler";
+import type { GroundAnchorRegistry } from "./groundAnchors";
 import { projectGeoToWorld } from "./mapOrientation.js";
 
 /**
@@ -438,7 +439,8 @@ export function createCityMarkers(
   cities: RealCity[],
   bounds: DemBounds,
   world: DemWorld,
-  sampler: TerrainSampler
+  sampler: TerrainSampler,
+  groundAnchors?: GroundAnchorRegistry
 ): CityMarkersHandle {
   const group = new Group();
   group.name = "city-markers";
@@ -472,39 +474,51 @@ export function createCityMarkers(
     wallMesh.name = `city-walls-${tier}`;
     tierMeshes[tier] = wallMesh;
 
-    tierCities.forEach((city, index) => {
-      const worldPoint = projectGeoToWorld(
-        { lat: city.lat, lon: city.lon },
-        bounds,
-        world
-      );
-      // 2026-05 codex 调查："特定角度看不见城市" 根因：city wall 用 region
-      // sampler 取 Y，但 chunk mesh 渲染时 setTerrainMeshWorldPosition 给
-      // 整个 chunk 加了 +0.12 yOffset (避免 chunk 流式加载视觉硬跳)。
-      // 城市 placed at Y = region_height，chunk 视觉表面在 Y = chunk_height
-      // + 0.12 ≈ region_height + 0.12 → wall base 卡在 chunk 表面以下
-      // ~0.12 unit，矮的 county wall (0.8 unit 高) 大半身 沉进 mesh。
-      // CHUNK_Y_OFFSET 跟 main.ts setTerrainMeshWorldPosition(...0.12) 同步。
-      const CHUNK_Y_OFFSET = 0.12;
-      const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
-      const cityIdHash = hashStr(city.id);
-      const scaleVar = 0.92 + (cityIdHash % 100) / 1000;
-      const rotVar = ((cityIdHash >> 7) & 3) * (Math.PI / 2);
+    const applyWallMatrices = (currentSampler: TerrainSamplerLike): void => {
+      tierCities.forEach((city, index) => {
+        const worldPoint = projectGeoToWorld(
+          { lat: city.lat, lon: city.lon },
+          bounds,
+          world
+        );
+        // 2026-05 codex 调查："特定角度看不见城市" 根因：city wall 用 region
+        // sampler 取 Y，但 chunk mesh 渲染时 setTerrainMeshWorldPosition 给
+        // 整个 chunk 加了 +0.12 yOffset (避免 chunk 流式加载视觉硬跳)。
+        // 城市 placed at Y = region_height，chunk 视觉表面在 Y = chunk_height
+        // + 0.12 ≈ region_height + 0.12 → wall base 卡在 chunk 表面以下
+        // ~0.12 unit，矮的 county wall (0.8 unit 高) 大半身 沉进 mesh。
+        // CHUNK_Y_OFFSET 跟 main.ts setTerrainMeshWorldPosition(...0.12) 同步。
+        const CHUNK_Y_OFFSET = 0.12;
+        const terrainY =
+          currentSampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
+        const cityIdHash = hashStr(city.id);
+        const scaleVar = 0.92 + (cityIdHash % 100) / 1000;
+        const rotVar = ((cityIdHash >> 7) & 3) * (Math.PI / 2);
 
-      // geom 现在保证 base y=0、top y=height，所以放到 (x, terrainY, z) 即可。
-      dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
-      dummy.rotation.set(0, rotVar, 0);
-      dummy.scale.set(scaleVar, scaleVar, scaleVar);
-      dummy.updateMatrix();
-      wallMesh.setMatrixAt(index, dummy.matrix);
+        // geom 现在保证 base y=0、top y=height，所以放到 (x, terrainY, z) 即可。
+        dummy.position.set(worldPoint.x, terrainY, worldPoint.z);
+        dummy.rotation.set(0, rotVar, 0);
+        dummy.scale.set(scaleVar, scaleVar, scaleVar);
+        dummy.updateMatrix();
+        wallMesh.setMatrixAt(index, dummy.matrix);
+      });
+      wallMesh.instanceMatrix.needsUpdate = true;
+      wallMesh.computeBoundingSphere();
+    };
+
+    applyWallMatrices(sampler);
+    groundAnchors?.register(`city:walls:${tier}`, {
+      object: wallMesh,
+      worldX: 0,
+      worldZ: 0,
+      baseOffset: 0,
+      category: "city",
+      customReanchor: applyWallMatrices
     });
-
-    wallMesh.instanceMatrix.needsUpdate = true;
     // ⚠ Three.js InstancedMesh frustum culling 有持续性 bug：computeBoundingSphere
     // 算出的 sphere 是包整组 instance 的大圆，但镜头某些倾斜角度下整组仍被
     // 误裁。安全做法：直接关掉 frustumCulled — 整组 city wall 实例数 < 30,
     // 渲染开销可忽略，比间歇消失体验好。
-    wallMesh.computeBoundingSphere();
     wallMesh.frustumCulled = false;
     group.add(wallMesh);
   });
@@ -514,32 +528,44 @@ export function createCityMarkers(
     const nextFloorMesh = new InstancedMesh(CITY_FLOOR_GEOMETRY, floorMaterial, cities.length);
     nextFloorMesh.name = "city-floors";
 
-    cities.forEach((city, index) => {
-      const worldPoint = projectGeoToWorld(
-        { lat: city.lat, lon: city.lon },
-        bounds,
-        world
-      );
-      const CHUNK_Y_OFFSET = 0.12;
-      const terrainY = sampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
-      const cityIdHash = hashStr(city.id);
-      const scaleVar = 0.92 + (cityIdHash % 100) / 1000;
-      const rotVar = ((cityIdHash >> 7) & 3) * (Math.PI / 2);
-      const floorSide = CITY_TIER_SPECS[city.tier].innerSide * CITY_FLOOR_INSET;
+    const applyFloorMatrices = (currentSampler: TerrainSamplerLike): void => {
+      cities.forEach((city, index) => {
+        const worldPoint = projectGeoToWorld(
+          { lat: city.lat, lon: city.lon },
+          bounds,
+          world
+        );
+        const CHUNK_Y_OFFSET = 0.12;
+        const terrainY =
+          currentSampler.sampleSurfaceHeight(worldPoint.x, worldPoint.z) + CHUNK_Y_OFFSET;
+        const cityIdHash = hashStr(city.id);
+        const scaleVar = 0.92 + (cityIdHash % 100) / 1000;
+        const rotVar = ((cityIdHash >> 7) & 3) * (Math.PI / 2);
+        const floorSide = CITY_TIER_SPECS[city.tier].innerSide * CITY_FLOOR_INSET;
 
-      dummy.position.set(worldPoint.x, terrainY + CITY_FLOOR_LIFT, worldPoint.z);
-      dummy.rotation.set(0, rotVar, 0);
-      dummy.scale.set(
-        floorSide * scaleVar,
-        CITY_FLOOR_HEIGHT * scaleVar,
-        floorSide * scaleVar
-      );
-      dummy.updateMatrix();
-      nextFloorMesh.setMatrixAt(index, dummy.matrix);
+        dummy.position.set(worldPoint.x, terrainY + CITY_FLOOR_LIFT, worldPoint.z);
+        dummy.rotation.set(0, rotVar, 0);
+        dummy.scale.set(
+          floorSide * scaleVar,
+          CITY_FLOOR_HEIGHT * scaleVar,
+          floorSide * scaleVar
+        );
+        dummy.updateMatrix();
+        nextFloorMesh.setMatrixAt(index, dummy.matrix);
+      });
+      nextFloorMesh.instanceMatrix.needsUpdate = true;
+      nextFloorMesh.computeBoundingSphere();
+    };
+
+    applyFloorMatrices(sampler);
+    groundAnchors?.register("city:floors", {
+      object: nextFloorMesh,
+      worldX: 0,
+      worldZ: 0,
+      baseOffset: 0,
+      category: "city",
+      customReanchor: applyFloorMatrices
     });
-
-    nextFloorMesh.instanceMatrix.needsUpdate = true;
-    nextFloorMesh.computeBoundingSphere();
     nextFloorMesh.frustumCulled = false;
     group.add(nextFloorMesh);
     floorMesh = nextFloorMesh;

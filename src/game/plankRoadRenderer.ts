@@ -7,7 +7,7 @@ import {
   Object3D
 } from "three";
 
-import type { TerrainSampler } from "./demSampler";
+import type { TerrainSampler, TerrainSamplerLike } from "./demSampler";
 // @ts-expect-error -- generated JS asset has no standalone .d.ts file.
 import { qinlingRoutePaths } from "./data/qinlingRoutePaths.js";
 
@@ -49,6 +49,7 @@ export interface PlankRoadHandle {
   group: Group;
   plankMesh: InstancedMesh;
   plankCount: number;
+  reanchor: (sampler: TerrainSamplerLike) => void;
 }
 
 export interface PlankRoadInput {
@@ -180,33 +181,40 @@ function buildHandleFromSlots(
   group.name = "plank-road";
   const plankMesh = createInstancedMesh(plankGeometry, plankMaterial, plankCount, "plank-road-deck");
   const dummy = new Object3D();
-  let plankIndex = 0;
 
-  slotsByRoute.forEach((slots) => {
-    slots.forEach((slot) => {
-      const surfaceY = sampler.sampleSurfaceHeight(slot.position.x, slot.position.z);
-      const riverMask = sampler.sampleRiver(slot.position.x, slot.position.z);
-      // 河床会被 DEM 雕低；栈道经过强水带时额外抬高，让视觉更接近"崖壁/桥跨"。
-      const waterLift = MathUtils.smoothstep(riverMask, 0.1, 0.5) * 0.45;
-      const plankY = surfaceY + liftAboveGround + waterLift;
+  const reanchor = (
+    currentSampler: Pick<TerrainSamplerLike, "sampleSurfaceHeight" | "sampleRiver">
+  ): void => {
+    let plankIndex = 0;
+    slotsByRoute.forEach((slots) => {
+      slots.forEach((slot) => {
+        const surfaceY = currentSampler.sampleSurfaceHeight(slot.position.x, slot.position.z);
+        const riverMask = currentSampler.sampleRiver(slot.position.x, slot.position.z);
+        // 每片栈道独立贴地；chunk 切换时重算，避免整条路用单个高度穿山。
+        const waterLift = MathUtils.smoothstep(riverMask, 0.1, 0.5) * 0.45;
+        const plankY = surfaceY + liftAboveGround + waterLift;
 
-      dummy.position.set(slot.position.x, plankY, slot.position.z);
-      dummy.rotation.set(0, -slot.tangentRad, 0);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      plankMesh.setMatrixAt(plankIndex, dummy.matrix);
-      plankIndex += 1;
+        dummy.position.set(slot.position.x, plankY, slot.position.z);
+        dummy.rotation.set(0, -slot.tangentRad, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        plankMesh.setMatrixAt(plankIndex, dummy.matrix);
+        plankIndex += 1;
+      });
     });
-  });
+    plankMesh.instanceMatrix.needsUpdate = true;
+    plankMesh.computeBoundingSphere();
+  };
 
-  plankMesh.instanceMatrix.needsUpdate = true;
+  reanchor(sampler);
   plankMesh.renderOrder = 11;
   group.add(plankMesh);
 
   return {
     group,
     plankMesh,
-    plankCount
+    plankCount,
+    reanchor
   };
 }
 

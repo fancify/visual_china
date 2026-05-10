@@ -86,6 +86,7 @@ import {
   seasonLabel,
   weatherLabel,
   formatTimeOfDay,
+  formatAncientTimeOfDay,
   skyBodyHorizonFade,
   sunDiscScaleForAltitude,
   type EnvironmentVisuals
@@ -194,10 +195,13 @@ import {
 import {
   TERRAIN_VERTICAL_EXAGGERATION,
   TerrainSampler,
+  CompositeTerrainSampler,
+  downsampleChunkAsset,
   loadDemAsset,
   resolveTerrainAssetRequest,
   type DemAsset
 } from "./game/demSampler";
+import { GroundAnchorRegistry } from "./game/groundAnchors";
 import { createHud } from "./game/hud";
 import { renderJournalView } from "./game/journal";
 import { qinlingRuntimeBudget } from "./game/performanceBudget";
@@ -258,7 +262,6 @@ import {
 import {
   createTerrainMesh,
   disposeTerrainMesh,
-  setTerrainMeshSurfaceVisible,
   setTerrainMeshWorldPosition,
   updateTerrainMeshColors,
   type TerrainMeshHandle
@@ -294,7 +297,11 @@ interface FragmentVisual {
   chunkId: string | null;
 }
 
-let terrainSampler: TerrainSampler | null = null;
+// CompositeTerrainSampler 替代 TerrainSampler：所有 sample 调用经过它，
+// 命中已装载的 chunk 用 chunk sampler，否则 fallback 到 base（L1）。
+// 解决"建筑/水/POI 用 L1 高度，跟 chunks 实际渲染脱钩"的问题。
+let terrainSampler: CompositeTerrainSampler | null = null;
+const groundAnchorRegistry = new GroundAnchorRegistry();
 const terrainAssetRequest = resolveTerrainAssetRequest(
   window.location.search,
   "/data/regions/qinling/manifest.json"
@@ -356,9 +363,9 @@ let storyGuideInitialized = false;
 let atlasWorkbench: AtlasWorkbenchState =
   createAtlasWorkbenchState(qinlingAtlasLayers);
 let atlasFeatures: QinlingAtlasFeature[] = [...qinlingAtlasFeatures];
-// 每次 atlasFeatures / evidenceFeatures 更新时 ++，atlasStaticCacheKey 用它
-// 让 cache 自动 invalidate。codex review d2eafde 抓到：异步 OSM 水系加载完
-// 后 cache 不知道数据变了，可能一直贴老底图。
+// 每次 atlasFeatures / evidenceFeatures 更新时 ++，atlasFeatureCacheKey 用它
+// 让 features cache 自动 invalidate。codex review d2eafde 抓到：异步 OSM 水系
+// 加载完后 cache 不知道数据变了，可能一直贴老要素层。
 let atlasFeaturesVersion = 0;
 let visibleWaterFeatures: QinlingAtlasFeature[] = [];
 // Evidence layer：OSM 命名水系（4639 条），按 rank 是 raw evidence，不是
@@ -712,7 +719,14 @@ terrainGeometry.setAttribute("color", colorAttribute);
 const terrainMaterial = new MeshPhongMaterial({
   vertexColors: true,
   flatShading: true,
-  shininess: 8
+  shininess: 8,
+  // 方案 A z-fight 解：base mesh（L1 14.4 km/cell）和 chunks (0.9 km/cell)
+  // 同位置时让 chunks 必赢 depth-test。polygonOffset 把 base 的 depth 值
+  // 整体推远，GPU 在像素 z-test 阶段就让 chunks 覆盖。chunks yOffset 已经
+  // 抬了 0.12（line 4228），加上这条 polygonOffset 双保险。
+  polygonOffset: true,
+  polygonOffsetFactor: 4,
+  polygonOffsetUnits: 4
 });
 attachTerrainShaderEnhancements(terrainMaterial, {
   heightFogColor: new Color(0xb6c4be),
@@ -721,6 +735,12 @@ attachTerrainShaderEnhancements(terrainMaterial, {
   atmosphericFarColor: new Color(0x5f8ba6)
 });
 const terrain = new Mesh(terrainGeometry, terrainMaterial);
+// renderOrder 0（默认）：base 先画。chunks 后面 createTerrainMesh 时显式
+// 设 mesh.renderOrder = 1，让 chunks 后画 → 同位置覆盖 base。
+terrain.renderOrder = 0;
+// 之前临时下沉 -1.5 防 z-fight，但 exag 降到 1.07 后高度范围本来就压扁，
+// 下沉让低地（华北/江汉）跌到 waterLevel 以下被淹。回退到 0；polygonOffset
+// + chunks 的 0.12 yOffset + renderOrder=1 三重已经够防 z-fight。
 scene.add(terrain);
 
 const terrainChunkGroup = new Group();
@@ -779,6 +799,12 @@ export function resetCloudFlightAltitudeForGround(ground: number): number {
   return ground + CLOUD_FLIGHT_DEFAULT_GROUND_OFFSET;
 }
 
+// 飞行型 mount：cloud (筋斗云) + sword (御剑)。共享相同的 absolute-altitude
+// 控制（space 上 / x 下，clamp [MIN_ABSOLUTE, MAX_ALTITUDE]）和 scenery hide 行为。
+export function isFlyingMount(id: MountId): boolean {
+  return id === "cloud" || id === "sword";
+}
+
 export function resolvePlayerTargetY({
   currentMountId,
   ground,
@@ -788,7 +814,7 @@ export function resolvePlayerTargetY({
   ground: number;
   cloudFlightAltitude: number;
 }): number {
-  if (currentMountId === "cloud") {
+  if (isFlyingMount(currentMountId)) {
     return cloudFlightAltitude;
   }
 
@@ -806,7 +832,7 @@ export function nextCloudFlightAltitude({
   ground: number;
   cloudFlightAltitude: number;
 }): number {
-  if (currentMountId !== "cloud") {
+  if (!isFlyingMount(currentMountId)) {
     return cloudFlightAltitude;
   }
 
@@ -870,8 +896,8 @@ function applyCloudModeVisibility(): void {
   // 用户："暂时把所有的树木都隐藏掉吧"。强制 hide 所有 scenery + 河边植物，
   // 不再受 mount mode 影响（之前是仅 cloud 模式才藏）。
   const HIDE_ALL_VEGETATION = true;
-  const flying = currentMountId === "cloud";
-  // wildlife group 整组开关（仍然 cloud 时藏；动物不属于"树木"，保留）
+  const flying = isFlyingMount(currentMountId);
+  // wildlife group 整组开关（飞行时藏；动物不属于"树木"，保留）
   wildlifeGroup.visible = !flying;
   // 河边植物全程藏。
   riverVegetationGroup.visible = !HIDE_ALL_VEGETATION;
@@ -1855,6 +1881,13 @@ function rebuildLandmarkVisuals(): void {
           });
         }
         landmarkGroup.add(piece);
+        groundAnchorRegistry.register(`pass:${landmark.name}:${piece.name}`, {
+          object: piece,
+          worldX: piece.position.x,
+          worldZ: piece.position.z,
+          baseOffset: (piece.userData.terrainYOffset as number | undefined) ?? 0,
+          category: "scenic"
+        });
       });
 
       const label = createTextSprite(landmark.name, "#efcf83");
@@ -1871,6 +1904,13 @@ function rebuildLandmarkVisuals(): void {
         });
       }
       landmarkGroup.add(label);
+      groundAnchorRegistry.register(`pass:${landmark.name}:label`, {
+        object: label,
+        worldX: landmark.position.x,
+        worldZ: landmark.position.y,
+        baseOffset: 1.38,
+        category: "label"
+      });
       passLandmarkLabelSprites.push(label);
       trackDistanceLimitedLabelSprite(label);
       return;
@@ -1893,9 +1933,23 @@ function rebuildLandmarkVisuals(): void {
       label.userData.chunkId = chunkId;
       label.userData.terrainYOffset = 6.4;
       landmarkGroup.add(label);
+      groundAnchorRegistry.register(`landmark:${landmark.name}:label`, {
+        object: label,
+        worldX: landmark.position.x,
+        worldZ: landmark.position.y,
+        baseOffset: 6.4,
+        category: "label"
+      });
     }
 
     landmarkGroup.add(marker);
+    groundAnchorRegistry.register(`landmark:${landmark.name}:marker`, {
+      object: marker,
+      worldX: landmark.position.x,
+      worldZ: landmark.position.y,
+      baseOffset: 1.8,
+      category: "scenic"
+    });
   });
 }
 
@@ -1927,7 +1981,6 @@ function rebuildScenicVisuals(): void {
       bounds,
       world
     );
-    const groundY = terrainSampler!.sampleHeight(wp.x, wp.z);
     const position = new Vector2(wp.x, wp.z);
     const chunkId = regionChunkManifest
       ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
@@ -1936,7 +1989,7 @@ function rebuildScenicVisuals(): void {
 
     buildScenicPoiMeshes({
       chunkId,
-      ground: groundY,
+      ground: 0,
       materials: scenicMaterials,
       position,
       role: spot.role
@@ -1945,6 +1998,13 @@ function rebuildScenicVisuals(): void {
         attachHoverPoiMetadata(mesh, hudPoi);
       }
       scenicGroup.add(mesh);
+      groundAnchorRegistry.register(`scenic:${spot.id}:${mesh.name}`, {
+        object: mesh,
+        worldX: mesh.position.x,
+        worldZ: mesh.position.z,
+        baseOffset: (mesh.userData.terrainYOffset as number | undefined) ?? 0,
+        category: "scenic"
+      });
     });
 
     // 名胜 label 用青金色——区别于 pass 的 #efcf83，更靠近"名山古迹"
@@ -1952,13 +2012,20 @@ function rebuildScenicVisuals(): void {
     const label = createTextSprite(spot.name, "#dde7c2");
     label.scale.multiplyScalar(1.05);
     const labelHeight = scenicPoiLabelHeights[spot.role] ?? scenicPoiLabelHeights["alpine-peak"];
-    label.position.set(wp.x, groundY + labelHeight, wp.z);
+    label.position.set(wp.x, labelHeight, wp.z);
     label.userData.terrainYOffset = labelHeight;
     label.userData.chunkId = chunkId;
     if (hudPoi) {
       attachHoverPoiMetadata(label, hudPoi);
     }
     scenicGroup.add(label);
+    groundAnchorRegistry.register(`scenic:${spot.id}:label`, {
+      object: label,
+      worldX: wp.x,
+      worldZ: wp.z,
+      baseOffset: labelHeight,
+      category: "label"
+    });
     scenicLabelSprites.push(label);
     trackDistanceLimitedLabelSprite(label);
   });
@@ -1990,12 +2057,14 @@ function rebuildAncientVisuals(): void {
       bounds,
       world
     );
-    const groundY = terrainSampler!.sampleHeight(wp.x, wp.z);
     const position = new Vector2(wp.x, wp.z);
     const hudPoi = hudPoiBySourceKey.get(poiSourceKey("ancient", site.id));
+    let pieceIndex = 0;
 
     const addPiece = (mesh: Mesh, yOffset: number, dx = 0, dz = 0): void => {
-      mesh.position.set(wp.x + dx, groundY + yOffset, wp.z + dz);
+      const anchorId = `ancient:${site.id}:piece:${pieceIndex}`;
+      pieceIndex += 1;
+      mesh.position.set(wp.x + dx, yOffset, wp.z + dz);
       mesh.userData.terrainYOffset = yOffset;
       mesh.userData.sharedResources = true;
       mesh.userData.chunkId = regionChunkManifest
@@ -2005,6 +2074,13 @@ function rebuildAncientVisuals(): void {
         attachHoverPoiMetadata(mesh, hudPoi);
       }
       ancientGroup.add(mesh);
+      groundAnchorRegistry.register(anchorId, {
+        object: mesh,
+        worldX: wp.x + dx,
+        worldZ: wp.z + dz,
+        baseOffset: yOffset,
+        category: "ancient"
+      });
     };
 
     let labelHeight = 4.4;
@@ -2064,7 +2140,7 @@ function rebuildAncientVisuals(): void {
     // 考古 label 用米白色，跟 scenic 的青金色稍区分；走 prefecture LOD。
     const label = createTextSprite(site.name, "#e7d8b3");
     label.scale.multiplyScalar(1.02);
-    label.position.set(wp.x, groundY + labelHeight, wp.z);
+    label.position.set(wp.x, labelHeight, wp.z);
     label.userData.terrainYOffset = labelHeight;
     label.userData.chunkId = regionChunkManifest
       ? findChunkForPosition(regionChunkManifest, position)?.id ?? null
@@ -2073,6 +2149,13 @@ function rebuildAncientVisuals(): void {
       attachHoverPoiMetadata(label, hudPoi);
     }
     ancientGroup.add(label);
+    groundAnchorRegistry.register(`ancient:${site.id}:label`, {
+      object: label,
+      worldX: wp.x,
+      worldZ: wp.z,
+      baseOffset: labelHeight,
+      category: "label"
+    });
     ancientLabelSprites.push(label);
     trackDistanceLimitedLabelSprite(label);
   });
@@ -2662,6 +2745,13 @@ function rebuildHydrographyRibbons(): void {
     ribbon.userData.featureId = feature.id;
     // hover 显示河名：用 polyline 中点作 worldX/Z 锚点。
     const midPoint = renderPoints[Math.floor(renderPoints.length / 2)];
+    const midGeo = sampler.asset.bounds
+      ? unprojectWorldToGeo(
+          { x: midPoint.x, z: midPoint.y },
+          sampler.asset.bounds,
+          sampler.asset.world
+        )
+      : { lat: 0, lon: 0 };
     attachHoverPoiMetadata(ribbon, {
       id: `river-${feature.id}`,
       name: feature.displayName ?? feature.name,
@@ -2669,6 +2759,8 @@ function rebuildHydrographyRibbons(): void {
       worldX: midPoint.x,
       worldZ: midPoint.y,
       elevation: 0,
+      realLat: midGeo.lat,
+      realLon: midGeo.lon,
       description: `${feature.basin ?? ""}${feature.basin ? "·" : ""}rank ${rank} 河流`
     });
     hydrographyRibbonsGroup.add(ribbon);
@@ -2706,6 +2798,8 @@ function rebuildHydrographyRibbons(): void {
       worldX: centerWorldPoint.x,
       worldZ: centerWorldPoint.z,
       elevation: 0,
+      realLat: lake.centerLat,
+      realLon: lake.centerLon,
       description: "全国画幅五大湖"
     });
     hydrographyRibbonsGroup.add(lakeMesh);
@@ -2928,13 +3022,16 @@ function rebuildRouteVisuals(): void {
     if (route.labelPoint && route.label) {
       const routeLabel = createTextSprite(route.label, "#f6d783");
       routeLabel.scale.multiplyScalar(1.16);
-      routeLabel.position.set(
-        route.labelPoint.x,
-        terrainSampler!.sampleHeight(route.labelPoint.x, route.labelPoint.y) + 6.2,
-        route.labelPoint.y
-      );
+      routeLabel.position.set(route.labelPoint.x, 6.2, route.labelPoint.y);
       routeLabel.renderOrder = 14;
       routeGroup.add(routeLabel);
+      groundAnchorRegistry.register(`route:${route.id}:label`, {
+        object: routeLabel,
+        worldX: route.labelPoint.x,
+        worldZ: route.labelPoint.y,
+        baseOffset: 6.2,
+        category: "label"
+      });
       routeLabelSprites.push(routeLabel);
     }
   });
@@ -2948,6 +3045,14 @@ function rebuildRouteVisuals(): void {
   );
 
   routeGroup.add(routePlankRoadHandle.group);
+  groundAnchorRegistry.register("path:plank-road", {
+    object: routePlankRoadHandle.group,
+    worldX: 0,
+    worldZ: 0,
+    baseOffset: 0,
+    category: "path",
+    customReanchor: routePlankRoadHandle.reanchor
+  });
 }
 
 function resizeAtlasCanvasToDisplaySize(canvas: HTMLCanvasElement): void {
@@ -3212,31 +3317,44 @@ function drawCameraAlignedAtlasBaseMap(
   context.putImageData(image, 0, 0);
 }
 
-// Atlas 静态底图缓存——内容（地形 hillshade、河流、城市、地标、placemark）
-// 在玩家移动期间完全不变。每帧都重画 ~12ms 是浪费；缓存到 OffscreenCanvas 后
-// 每帧只 drawImage（GPU-accelerated，~0.1ms）+ 画 player dot。
-//
-// 缓存按 target canvas 区分（mini-map 跟全屏 atlas 各有自己的 cache）。失效条件
-// 是 cacheKey 任一字段变：canvas 尺寸 / mapView / 可见图层集合 / 选中要素 /
-// 模式。普通游戏视图下 mapView/可见图层 不变，cache 几乎永远命中。
+// Atlas 底图与 features 分层缓存。base map 的 hillshade 已经按 DemAsset 缓存；
+// 这里再把 canvas 尺寸 / mapView 相关的底图 blit 与 features 绘制分开缓存。
+// 玩家点和 fullscreen 比例尺属于便宜的高频 overlay，每次 redraw 现场画。
 interface AtlasStaticCache {
   surface: HTMLCanvasElement;
   key: string;
 }
 const atlasStaticCaches = new WeakMap<HTMLCanvasElement, AtlasStaticCache>();
+const atlasFeatureCaches = new WeakMap<HTMLCanvasElement, AtlasStaticCache>();
 
 function atlasStaticCacheKey(
   canvas: HTMLCanvasElement,
   mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: string },
   useWorkbenchView: boolean,
+  mode: string
+): string {
+  return [
+    canvas.width,
+    canvas.height,
+    useWorkbenchView ? 1 : 0,
+    mapView.scale.toFixed(3),
+    mapView.offsetX.toFixed(2),
+    mapView.offsetY.toFixed(2),
+    mapView.fitMode ?? "default",
+    mode
+  ].join("|");
+}
+
+function atlasFeatureCacheKey(
+  canvas: HTMLCanvasElement,
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: string },
+  useWorkbenchView: boolean,
   selectedFeatureId: string | null,
   layerIds: Set<string>,
-  mode: string,
-  featuresVersion: number
+  featuresVersion: number,
+  playerChunkId: string | null,
+  mode: string
 ): string {
-  // 把所有影响 base 渲染的状态打成一个 string——下次进 drawAtlasMapCanvas
-  // 直接对比，相同就跳过 ~12ms canvas2d 重画。featuresVersion 让异步加载的
-  // OSM 水系一旦换了 atlasFeatures 就强制重画（codex review d2eafde 抓到）。
   const layers = [...layerIds].sort().join("/");
   return [
     canvas.width,
@@ -3248,8 +3366,9 @@ function atlasStaticCacheKey(
     mapView.fitMode ?? "default",
     selectedFeatureId ?? "-",
     layers,
-    mode,
-    featuresVersion
+    featuresVersion,
+    playerChunkId ?? "-",
+    mode
   ].join("|");
 }
 
@@ -3257,8 +3376,7 @@ function renderAtlasStaticInto(
   surface: HTMLCanvasElement,
   asset: DemAsset,
   mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" },
-  useWorkbenchView: boolean,
-  selectedFeatureId: string | null
+  useWorkbenchView: boolean
 ): void {
   const context = surface.getContext("2d");
   if (!context) return;
@@ -3271,6 +3389,21 @@ function renderAtlasStaticInto(
   context.fillStyle = "rgba(247, 230, 174, 0.12)";
   context.fillRect(0, 0, width, height);
   drawDemQualityOverlay(context, asset, surface, projection, useWorkbenchView);
+}
+
+function renderAtlasFeaturesInto(
+  surface: HTMLCanvasElement,
+  asset: DemAsset,
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" },
+  useWorkbenchView: boolean,
+  selectedFeatureId: string | null
+): void {
+  const context = surface.getContext("2d");
+  if (!context) return;
+
+  const { width, height } = surface;
+  context.clearRect(0, 0, width, height);
+  const projection = strictAtlasProjection(asset, surface, mapView);
 
   const atlasLayers = qinlingAtlasLayers.map((layer) => ({
     ...layer,
@@ -3290,7 +3423,6 @@ function renderAtlasStaticInto(
   });
 
   drawRegionPlacemarks(context, projection, useWorkbenchView);
-  drawAtlasOverlay(context, surface, asset, mapView, useWorkbenchView);
 
   if (selectedFeatureId) {
     const selected = featuresForView.find((f) => f.id === selectedFeatureId) ?? null;
@@ -3325,10 +3457,7 @@ function drawAtlasMapCanvas(
     canvas,
     mapView,
     useWorkbenchView,
-    atlasWorkbench.selectedFeatureId ?? null,
-    atlasWorkbench.visibleLayerIds,
-    currentMode,
-    atlasFeaturesVersion
+    currentMode
   );
   if (!cache) {
     const surface = document.createElement("canvas");
@@ -3346,15 +3475,53 @@ function drawAtlasMapCanvas(
       cache.surface,
       asset,
       mapView,
-      useWorkbenchView,
-      atlasWorkbench.selectedFeatureId ?? null
+      useWorkbenchView
     );
     cache.key = cacheKey;
   }
-  // 把缓存 blit 到目标 canvas——浏览器 drawImage canvas→canvas 走 GPU
-  // 路径，~0.1ms 即使全屏 1200×800。
+
+  let featureCache = atlasFeatureCaches.get(canvas);
+  const featureCacheKey = atlasFeatureCacheKey(
+    canvas,
+    mapView,
+    useWorkbenchView,
+    atlasWorkbench.selectedFeatureId ?? null,
+    atlasWorkbench.visibleLayerIds,
+    atlasFeaturesVersion,
+    activeChunkId,
+    currentMode
+  );
+  if (!featureCache) {
+    const surface = document.createElement("canvas");
+    surface.width = width;
+    surface.height = height;
+    featureCache = { surface, key: "" };
+    atlasFeatureCaches.set(canvas, featureCache);
+  } else if (
+    featureCache.surface.width !== width ||
+    featureCache.surface.height !== height
+  ) {
+    featureCache.surface.width = width;
+    featureCache.surface.height = height;
+    featureCache.key = "";
+  }
+  if (featureCache.key !== featureCacheKey) {
+    renderAtlasFeaturesInto(
+      featureCache.surface,
+      asset,
+      mapView,
+      useWorkbenchView,
+      atlasWorkbench.selectedFeatureId ?? null
+    );
+    featureCache.key = featureCacheKey;
+  }
+
+  // 把缓存 blit 到目标 canvas。玩家位置和 fullscreen overlay 变化频繁但成本低，
+  // 所以不进 features cache。
   context.clearRect(0, 0, width, height);
   context.drawImage(cache.surface, 0, 0);
+  context.drawImage(featureCache.surface, 0, 0);
+  drawAtlasOverlay(context, canvas, asset, mapView, useWorkbenchView);
 
   const playerPoint = projection.worldToCanvas({
     x: playerPosition.x,
@@ -3386,7 +3553,8 @@ function drawAtlasMapCanvas(
   // 玩家朝 -Z（南）时 heading=0，要让箭头指向 atlas 上的"南"=画布 +y 方向。
   // forward (world) = (-sin h, -cos h)；atlas 上 +world.z → -canvas.y，
   // 所以 atlas 屏幕方向 = (-sin h, +cos h)。
-  if (useWorkbenchView) {
+  // 用户："代表人物的圆点加一个方向" → minimap 也画三角，跟全屏一起显示。
+  {
     const arrowAngle = Math.atan2(-Math.sin(cameraHeading), Math.cos(cameraHeading));
     const tipDistance = dotRadius * 2.2;
     const baseHalf = dotRadius * 0.95;
@@ -3645,11 +3813,32 @@ function drawDemQualityOverlay(
 
 function drawOverviewMap(asset: DemAsset, playerPosition: Vector3): void {
   drawAtlasMapCanvas(hud.overviewCanvas, asset, playerPosition);
+  recordHudRedrawForDev();
 
   if (atlasWorkbench.isFullscreen) {
     resizeAtlasCanvasToDisplaySize(hud.atlasFullscreenCanvas);
     drawAtlasMapCanvas(hud.atlasFullscreenCanvas, asset, playerPosition, true);
   }
+}
+
+let hudRedrawCountForDev = 0;
+let hudRedrawLastLogMs = 0;
+
+function recordHudRedrawForDev(): void {
+  if (!isDevModeEnabled()) {
+    return;
+  }
+  hudRedrawCountForDev += 1;
+  const now = performance.now();
+  if (now - hudRedrawLastLogMs < 5000) {
+    return;
+  }
+  const elapsedSeconds = Math.max((now - hudRedrawLastLogMs) / 1000, 0.001);
+  console.info(
+    `[hud] atlas redraw frequency: ${(hudRedrawCountForDev / elapsedSeconds).toFixed(2)} Hz`
+  );
+  hudRedrawCountForDev = 0;
+  hudRedrawLastLogMs = now;
 }
 
 function nearestLandmarkText(): string {
@@ -4021,7 +4210,9 @@ function refreshHud(): void {
     lastDrawnPlayerZ = player.position.z;
   }
   hud.setActiveMode(currentMode);
-  const chunkSuffix = activeChunkId ? ` · 区块 ${activeChunkId}` : "";
+  // 用户："标题应该直接说现在在什么位置"——zone 字段已经简化为纯地名（无前缀
+  // 无 chunk 后缀），写到 title-block h1。chunkSuffix 不再用。
+  void activeChunkId;
   const routeInfluence = routeAffinityAt({
     x: player.position.x,
     y: player.position.z
@@ -4032,9 +4223,9 @@ function refreshHud(): void {
 
   if (!nearby) {
     hud.updateStatus({
-      zone: `地带：${zoneNameAt(player.position.x, player.position.z, terrainSampler)}${chunkSuffix}`,
+      zone: zoneNameAt(player.position.x, player.position.z, terrainSampler),
       mode: `视图：${modeMeta[currentMode].title}`,
-      environment: `时辰：${formatTimeOfDay(environmentController.state.timeOfDay)} · ${seasonLabel(environmentController.state.season)} · ${weatherLabel(environmentController.state.weather)}`,
+      environment: `时辰：${formatAncientTimeOfDay(environmentController.state.timeOfDay)} · ${seasonLabel(environmentController.state.season)} · ${weatherLabel(environmentController.state.weather)}`,
       collection: `残简：${collectedIds.size} / ${knowledgeFragments.length}`,
       nearby: `附近：风声已经安静下来。 · ${routeLine}`,
       story: storyLine
@@ -4044,9 +4235,9 @@ function refreshHud(): void {
 
   if (nearby.distance < 9) {
     hud.updateStatus({
-      zone: `地带：${zoneNameAt(player.position.x, player.position.z, terrainSampler)}${chunkSuffix}`,
+      zone: zoneNameAt(player.position.x, player.position.z, terrainSampler),
       mode: `视图：${modeMeta[currentMode].title}`,
-      environment: `时辰：${formatTimeOfDay(environmentController.state.timeOfDay)} · ${seasonLabel(environmentController.state.season)} · ${weatherLabel(environmentController.state.weather)}`,
+      environment: `时辰：${formatAncientTimeOfDay(environmentController.state.timeOfDay)} · ${seasonLabel(environmentController.state.season)} · ${weatherLabel(environmentController.state.weather)}`,
       collection: `残简：${collectedIds.size} / ${knowledgeFragments.length}`,
       nearby: `附近：微光残简「${nearby.fragment.title}」 · ${routeLine}`,
       story: storyLine
@@ -4055,9 +4246,9 @@ function refreshHud(): void {
   }
 
   hud.updateStatus({
-    zone: `地带：${zoneNameAt(player.position.x, player.position.z, terrainSampler)}${chunkSuffix}`,
+    zone: zoneNameAt(player.position.x, player.position.z, terrainSampler),
     mode: `视图：${modeMeta[currentMode].title}`,
-    environment: `时辰：${formatTimeOfDay(environmentController.state.timeOfDay)} · ${seasonLabel(environmentController.state.season)} · ${weatherLabel(environmentController.state.weather)}`,
+    environment: `时辰：${formatAncientTimeOfDay(environmentController.state.timeOfDay)} · ${seasonLabel(environmentController.state.season)} · ${weatherLabel(environmentController.state.weather)}`,
     collection: `残简：${collectedIds.size} / ${knowledgeFragments.length}`,
     nearby: `附近：${nearestLandmarkText()} · ${routeLine}`,
     story: storyLine
@@ -4194,9 +4385,16 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
       const loadPromise = (async () => {
         const chunkAssetUrl = new URL(chunk.file, chunkManifestBaseUrl).toString();
         const loadedChunk = await loadDemAsset(chunkAssetUrl);
-        const chunkSampler = new TerrainSampler(loadedChunk.asset);
+        // 用户："Chunks 分辨率再调低一倍。0.9 km → 1.8 km"。运行时下采样
+        // 2× → 51×51 cell 变 26×26，三角数 5000 → 1300/chunk，仍密于 base
+        // 14.4 km/cell 一档。源文件不变。
+        const downsampledAsset = downsampleChunkAsset(loadedChunk.asset, 2);
+        const chunkSampler = new TerrainSampler(downsampledAsset);
         const terrainChunk = createTerrainMesh(chunkSampler);
-        setTerrainMeshSurfaceVisible(terrainChunk, false);
+        // 之前这里 setTerrainMeshSurfaceVisible(chunk, false) 把 material.visible
+        // 设成 false，但代码里再也没人把它设回 true → chunk 永远不渲染，全屏
+        // 只剩 L1 base 的大三角。createTerrainMesh 已经 transparent + opacity 0，
+        // fade-in 路径会把 opacity 渐进到 1，不需要再压 material.visible。
         const scenery = createChunkScenery(
           chunkSampler,
           scaledSceneryBudget(),
@@ -4221,6 +4419,13 @@ async function ensureVisibleChunkTerrain(chunkIds: Set<string>): Promise<void> {
         terrainChunk.mesh.userData.fadeStart = clock.elapsedTime;
         terrainChunkGroup.add(terrainChunk.mesh);
         terrainChunkMeshes.set(chunk.id, terrainChunk);
+        // 把 chunk sampler 注册进 composite。之后所有 terrainSampler.sample*
+        // (建筑/水/POI 都在用) 在该 chunk 区域内的查询会优先走这个 sampler，
+        // 高度跟 chunk mesh 一致。
+        if (terrainSampler) {
+          terrainSampler.registerChunk(chunk.id, chunkSampler, chunk.worldBounds);
+          groundAnchorRegistry.reanchor(terrainSampler, chunk.worldBounds);
+        }
       })()
         .catch((error) => {
           console.warn(`Failed to load terrain chunk ${chunk.id}.`, error);
@@ -4254,7 +4459,7 @@ function updateChunkFadeIn(): void {
   // 跟 applyCloudModeVisibility 同一 flag。用户："暂时把所有树木都隐藏掉"。
   const HIDE_ALL_VEGETATION = true;
   const sceneryEnabled =
-    !HIDE_ALL_VEGETATION && currentMountId !== "cloud";
+    !HIDE_ALL_VEGETATION && !isFlyingMount(currentMountId);
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (!terrainChunk.mesh.visible) return;
     const fadeStart = terrainChunk.mesh.userData.fadeStart as number | undefined;
@@ -4305,6 +4510,10 @@ async function syncChunkTerrainWindow(nextVisibleChunkIds: Set<string>): Promise
       }
       disposeTerrainMesh(terrainChunk);
       terrainChunkMeshes.delete(chunkId);
+      // 卸载时把 chunk 从 composite sampler 摘掉，回落 base。
+      if (terrainSampler) {
+        terrainSampler.unregisterChunk(chunkId);
+      }
       return;
     }
 
@@ -4314,12 +4523,15 @@ async function syncChunkTerrainWindow(nextVisibleChunkIds: Set<string>): Promise
 }
 
 function disposeChunkTerrain(): void {
-  terrainChunkMeshes.forEach((terrainChunk) => {
+  terrainChunkMeshes.forEach((terrainChunk, chunkId) => {
       terrainChunkGroup.remove(terrainChunk.mesh);
       if (terrainChunk.scenery) {
         disposeScenery(terrainChunk.scenery);
       }
       disposeTerrainMesh(terrainChunk);
+      if (terrainSampler) {
+        terrainSampler.unregisterChunk(chunkId);
+      }
   });
   terrainChunkMeshes.clear();
   chunkLoadPromises.clear();
@@ -4371,9 +4583,8 @@ function syncStoryGuideState(silent = false): void {
 
   if (snapshot.completedBeat && !completedStoryBeatIds.has(snapshot.completedBeat.id)) {
     completedStoryBeatIds.add(snapshot.completedBeat.id);
-    if (!silent) {
-      showToast(`主线推进：${snapshot.completedBeat.completionLine}`);
-    }
+    // 用户："把主线推进什么这些显示全都给我去掉"——保留 storyBeat 完成的状态记录
+    // （成就 / 进度仍在跑），但屏幕上不再 toast 主线推进文本。
   }
 
   const latestSnapshot = evaluateStoryGuide(
@@ -4412,8 +4623,10 @@ const OPPOSITE_DIRECTION_KEY: Record<string, string> = {
   arrowright: "arrowleft"
 };
 let cameraHeading = qinlingCameraRig.initialHeading;
-let cameraElevation = 0.52;
-let cameraDistance = qinlingCameraRig.minDistance + 10;
+// 用户："网页一进来就是进入到 F 的那个状态，直接对准小人"。
+// F 键把视角拉到 minDistance+2 距离 + elevation 0.34（接近肩后跟随）。
+let cameraElevation = 0.34;
+let cameraDistance = qinlingCameraRig.minDistance + 2;
 // 默认 follow（之前 overview）——overview 视角离地形太远 + FogExp2 衰减
 // 让首屏看不到地形细节，用户反馈"看不到地形"。follow 是常用游戏视角，
 // 玩家想看大地图按 O 切 overview。
@@ -4454,14 +4667,8 @@ document.addEventListener("keydown", (event) => {
   // 路径，不受中文输入法 IME 影响。否则 macOS 中文用户按 Q/E/W/A/S/D 全部失效。
   const normalized = normalizeRuntimeInputKey(event);
 
-  // 用户："配音快捷键改成 m"。M 切换 mute/unmute（不再有屏上按钮）。
-  if (normalized === "m") {
-    event.preventDefault();
-    audioMuted = !audioMuted;
-    setMasterMuted(audioRuntime, audioMuted);
-    safeWriteAudioMuted(audioMuted);
-    return;
-  }
+  // 用户：M 重新变回"全屏地图"（之前临时挂了 mute，现在收回）。
+  // 真正的 M handler 在下面 atlas 区段（line ~4508）；不需要在这里 short-circuit。
 
   // ESC 优先级：customization panel > city detail panel > atlas fullscreen。
   // 都是用户主动开的覆盖层，越靠近"刚开"越先关（栈式直觉）。
@@ -4606,7 +4813,7 @@ document.addEventListener("keydown", (event) => {
 
   const isCloudFlightKey = normalized === " " || normalized === "x";
 
-  if (isGameplayInputKey(event) || (currentMountId === "cloud" && isCloudFlightKey)) {
+  if (isGameplayInputKey(event) || (isFlyingMount(currentMountId) && isCloudFlightKey)) {
     // 反方向键互相取消（codex 0a8e1b9 和用户反馈的"按反方向只能暂停，松手
     // 后还继续走"）。原本按 w + s 同时 forward = 0 cancel，松开 s 后只剩 w，
     // 玩家又开始往前走——感受像"我让它停它没听"。改成：按 s 时如果 w 还在，
@@ -5253,9 +5460,9 @@ function update(deltaSeconds: number): void {
     );
   });
 
-  // 筋斗云模式下跳过地形倾斜——飞行不跟地形坡度。否则 player 在云上还
-  // 会随山势歪头歪身，看着像被风吹倒。
-  if (currentMountId === "cloud") {
+  // 飞行模式（筋斗云 / 御剑）下跳过地形倾斜——飞行不跟地形坡度。否则
+  // player 在云/剑上还会随山势歪头歪身，看着像被风吹倒。
+  if (isFlyingMount(currentMountId)) {
     player.rotation.x = MathUtils.lerp(player.rotation.x, 0, 0.18);
     player.rotation.z = MathUtils.lerp(player.rotation.z, 0, 0.18);
   } else {
@@ -5280,10 +5487,17 @@ function update(deltaSeconds: number): void {
     ground,
     cloudFlightAltitude
   });
-  if (currentMountId !== "cloud") {
+  if (!isFlyingMount(currentMountId)) {
     cloudFlightAltitude = resetCloudFlightAltitudeForGround(ground);
   }
-  player.position.y = MathUtils.lerp(player.position.y, targetY, 0.16);
+  // 飞行 mount：player.y 直接锁到 cloudFlightAltitude，避免 lerp 渐进过程
+  // 跟 chunk 装载/CSS lerp/camera follow 复合产生"颠簸"感。
+  // 非飞行：保留 lerp 让 player 跟 ground 平滑跟随。
+  if (isFlyingMount(currentMountId)) {
+    player.position.y = targetY;
+  } else {
+    player.position.y = MathUtils.lerp(player.position.y, targetY, 0.16);
+  }
 
   // 用户反馈"没在走路也有脚步声"——把门槛从 movementSpeed > 0.5 提到 1.5，
   // 而且要求 isMoving=true（防止 lerp 余速触发）。停下立刻 reset timer，
@@ -5398,11 +5612,16 @@ function update(deltaSeconds: number): void {
     return Math.max(y, terrainAt + cameraTerrainClearance);
   }
 
-  nextCameraPosition.y = clampAboveTerrain(
-    nextCameraPosition.x,
-    nextCameraPosition.z,
-    nextCameraPosition.y
-  );
+  // 飞行 mount（筋斗云 / 御剑）跳过 clampAboveTerrain：玩家是 absolute
+  // 高度（cloudFlightAltitude），相机本来就该跟玩家齐高甚至更高。不跳过的话
+  // camera.y 飞过山峰时被 pop 抬升，过峰后又落回 → 用户感知"颠簸"。
+  if (!isFlyingMount(currentMountId)) {
+    nextCameraPosition.y = clampAboveTerrain(
+      nextCameraPosition.x,
+      nextCameraPosition.z,
+      nextCameraPosition.y
+    );
+  }
 
   targetCameraPosition.set(
     nextCameraPosition.x,
@@ -5410,12 +5629,21 @@ function update(deltaSeconds: number): void {
     nextCameraPosition.z
   );
 
-  camera.position.lerp(targetCameraPosition, qinlingCameraRig.followLerp);
-  camera.position.y = clampAboveTerrain(
-    camera.position.x,
-    camera.position.z,
-    camera.position.y
-  );
+  if (isFlyingMount(currentMountId)) {
+    // 飞行 mount：相机刚性跟随，不走 lerp。
+    // 之前 followLerp(0.12) 在 60fps 下的 smoothing time constant ~130ms 配合
+    // 浏览器 frame 时间抖动（16ms vs 17ms），每帧 lerp 系数变了，camera 收敛
+    // 速度跟着抖 → 用户感知"相机颠"。飞行态 player.y/x/z 都是确定值，
+    // 直接拷给 camera.position 即可，零滞后零抖动。
+    camera.position.copy(targetCameraPosition);
+  } else {
+    camera.position.lerp(targetCameraPosition, qinlingCameraRig.followLerp);
+    camera.position.y = clampAboveTerrain(
+      camera.position.x,
+      camera.position.z,
+      camera.position.y
+    );
+  }
   // 始终用 +Y 作为 up：overview 模式现在改成"从南方斜俯视北"而不是纯顶视，
   // 不需要再用 -Z 翻转 up。
   camera.up.set(0, 1, 0);
@@ -5507,10 +5735,10 @@ function frame(): void {
   }
   updateFragmentVisuals(elapsedTime);
   hudRefreshTimer += deltaSeconds;
-  // 静态底图缓存（drawAtlasMapCanvas 内）让 mini-map / 全屏 atlas 重绘成本
-  // 从 ~12ms 降到 ~0.2ms（GPU drawImage cache + 玩家 dot）。所以 timer 可以
-  // 收紧到 0.1s 让玩家 dot 看上去丝滑。dirty 路径仍然即时刷。
-  if (hudDirty || hudRefreshTimer >= 0.1) {
+  // mini-map 只需要 0.5s 级别刷新；fullscreen atlas 保持更高频，避免 M 键
+  // 打开后玩家位置和缩放反馈发粘。dirty 路径仍然即时刷。
+  const hudRefreshInterval = atlasWorkbench.isFullscreen ? 0.1 : 0.5;
+  if (hudDirty || hudRefreshTimer >= hudRefreshInterval) {
     refreshHud();
     hudRefreshTimer = 0;
     hudDirty = false;
@@ -5534,7 +5762,8 @@ function frame(): void {
 
 function applyTerrainFromSampler(sampler: TerrainSampler): void {
   disposeChunkTerrain();
-  terrainSampler = sampler;
+  // 包成 composite，让 chunks 注册后所有 sampleHeight 等自动用 chunk 数据。
+  terrainSampler = new CompositeTerrainSampler(sampler);
   const visibleCities = sampler.asset.bounds
     ? realQinlingCities.filter(
         (city) =>
@@ -5618,7 +5847,8 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
       visibleCities,
       sampler.asset.bounds,
       sampler.asset.world,
-      sampler
+      sampler,
+      groundAnchorRegistry
     );
     cityMarkersGroup.add(cityMarkersHandle.group);
 
@@ -5639,17 +5869,23 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
           sampler.asset.bounds!,
           sampler.asset.world
         );
-        const groundY = sampler.sampleHeight(wp.x, wp.z);
         const chunkId = regionChunkManifest
           ? findChunkForPosition(regionChunkManifest, new Vector2(wp.x, wp.z))?.id ?? null
           : null;
         const label = createTextSprite(city.name, "#e8cb89");
         label.scale.multiplyScalar(0.78);
-        label.position.set(wp.x, groundY + 2.6, wp.z);
+        label.position.set(wp.x, 2.6, wp.z);
         label.renderOrder = 13;
         label.visible = false;
         label.userData.chunkId = chunkId;
         cityMarkersGroup.add(label);
+        groundAnchorRegistry.register(`city:${city.id}:county-label`, {
+          object: label,
+          worldX: wp.x,
+          worldZ: wp.z,
+          baseOffset: 2.6,
+          category: "label"
+        });
         countyLabelSpriteByCityId.set(city.id, label);
         trackDistanceLimitedLabelSprite(label);
       });
@@ -5662,7 +5898,6 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
           sampler.asset.bounds!,
           sampler.asset.world
         );
-        const groundY = sampler.sampleHeight(wp.x, wp.z);
         const chunkId = regionChunkManifest
           ? findChunkForPosition(regionChunkManifest, new Vector2(wp.x, wp.z))?.id ?? null
           : null;
@@ -5675,10 +5910,17 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
         const accent = city.tier === "capital" ? "#fbe0a8" : "#f3d692";
         const label = createTextSprite(city.name, accent);
         label.scale.multiplyScalar(city.tier === "capital" ? 1.18 : 0.96);
-        label.position.set(wp.x, groundY + tierTop, wp.z);
+        label.position.set(wp.x, tierTop, wp.z);
         label.renderOrder = 13;
         label.userData.chunkId = chunkId;
         cityMarkersGroup.add(label);
+        groundAnchorRegistry.register(`city:${city.id}:label`, {
+          object: label,
+          worldX: wp.x,
+          worldZ: wp.z,
+          baseOffset: tierTop,
+          category: "label"
+        });
         trackDistanceLimitedLabelSprite(label);
         if (city.tier === "capital" || city.tier === "prefecture") {
           cityLabelSpritesByTier[city.tier].push(label);
@@ -5697,31 +5939,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   waterRibbon.position.y = waterLevel * TERRAIN_VERTICAL_EXAGGERATION;
   underpaint.position.y = underpaintLevel * TERRAIN_VERTICAL_EXAGGERATION;
 
-  landmarkGroup.children.forEach((child) => {
-    if (child instanceof Sprite || child instanceof Mesh) {
-      const x = child.position.x;
-      const z = child.position.z;
-      // 优先用 mesh.userData.terrainYOffset；否则按类型用默认（Sprite=6.4 标签，
-      // Mesh=1.8 marker）。Stele 三件套各自记了自己的 yOffset，避免被一刀切平。
-      const fallback = child instanceof Sprite ? 6.4 : 1.8;
-      const yOffset = (child.userData.terrainYOffset as number | undefined) ?? fallback;
-      child.position.y = sampler.sampleHeight(x, z) + yOffset;
-    }
-  });
-  // 名胜 group 跟 landmark 同样把每件子物体重新贴到当前 sampler 的高度。
-  scenicGroup.children.forEach((child) => {
-    if (child instanceof Sprite || child instanceof Mesh) {
-      const yOffset = (child.userData.terrainYOffset as number | undefined) ?? 1.8;
-      child.position.y = sampler.sampleHeight(child.position.x, child.position.z) + yOffset;
-    }
-  });
-  // 考古 group 同上。
-  ancientGroup.children.forEach((child) => {
-    if (child instanceof Sprite || child instanceof Mesh) {
-      const yOffset = (child.userData.terrainYOffset as number | undefined) ?? 1.8;
-      child.position.y = sampler.sampleHeight(child.position.x, child.position.z) + yOffset;
-    }
-  });
+  groundAnchorRegistry.reanchorAll(terrainSampler);
 
   knowledgeFragments.forEach((fragment) => {
     const visual = fragmentVisuals.get(fragment.id);
@@ -5741,6 +5959,12 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
     sampler.sampleHeight(routeStart.x, routeStart.y) + 0.35,
     routeStart.y
   );
+  // 用户："默认进入游戏时镜头应该在人物的正背后，而不是侧面"。
+  // 默认 cameraHeading = 0（相机在 +Z 侧）+ player.rotation.y = 0（avatar 面朝 +X）
+  // 二者互不一致，相机就在角色侧面。把 player 转到 π/2，让 avatar 面朝 -Z，
+  // 跟相机正对面（相机在 +Z，看 -Z）→ 相机正背后看玩家背影。π/2 也正是按 W
+  // 移动时 avatarHeadingForMovement 给的角度，启动姿势=随时往前走的姿势。
+  player.rotation.y = Math.PI / 2;
 
   const visuals = environmentController.computeVisuals();
   lastVisuals = visuals;
@@ -5769,7 +5993,10 @@ async function init(): Promise<void> {
   // cameraDistance / scenery 密度的缩放系数。如果 manifest 没声明，所有
   // multiplier 默认 1（high-focus 行为不变）。
   experienceProfile = regionBundle.experienceProfile ?? null;
-  cameraDistance = qinlingCameraRig.initialDistance * cameraScaleMultiplier();
+  // 用户："一进来就是 F 状态"。F = minDistance + 2，elevation 0.34。
+  // 不再用 initialDistance × multiplier（会被 cameraScaleMultiplier 拉大）。
+  cameraDistance = qinlingCameraRig.minDistance + 2;
+  cameraElevation = 0.34;
 
   regionChunkManifest = regionBundle.chunkManifest;
   regionChunkManifestUrl = regionBundle.chunkManifestUrl;

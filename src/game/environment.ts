@@ -323,6 +323,29 @@ export function formatTimeOfDay(timeOfDay: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+/** 古十二时辰映射：每个时辰 2 小时，子时跨午夜。 */
+const ANCIENT_HOUR_NAMES = [
+  "子", "丑", "寅", "卯", "辰", "巳",
+  "午", "未", "申", "酉", "戌", "亥"
+] as const;
+
+/**
+ * 把 0-24 小时映射成古时辰 + 括号现代时间。
+ * 例如 0:30 → "子时 (00:30)"；13:45 → "未时 (13:45)"。
+ *
+ * 子时跨 23:00–01:00：23 点和 0 点都算子时。
+ * (h + 1) % 24 / 2 把"子时中心 0 点"对齐到 index 0：
+ *   23 → 0（子）, 0 → 0（子）, 1 → 1（丑）, 2 → 1（丑）, 3 → 2（寅）...
+ */
+export function formatAncientTimeOfDay(timeOfDay: number): string {
+  const hours = Math.floor(timeOfDay);
+  const minutes = Math.floor((timeOfDay - hours) * 60);
+  const idx = Math.floor(((hours + 1) % 24) / 2);
+  const ancientName = ANCIENT_HOUR_NAMES[idx];
+  const modern = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return `${ancientName}时（${modern}）`;
+}
+
 interface EffectiveWeather {
   wind: number;
   rain: number;

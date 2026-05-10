@@ -119,15 +119,16 @@ function buildSeatedTorso(
   const armGeometry = new CylinderGeometry(0.07, 0.08, 0.5, 5);
   const armLeft = new Mesh(armGeometry, materials.garment);
   armLeft.name = "avatar-arm-left";
-  // 胳膊位置三轮迭代：0.62 → 0.55 → 0.45 → 0.32。
-  // 用户反馈"肩膀不要超过躯干最高处" — torso 顶 ≈ 0.85，position.y 0.32 后
-  // arm cylinder 上端最高点 ≈ 0.32 + 0.12 = 0.44，远低于 torso 顶。
-  // rotation 也调到 π/2 - 0.7（更斜往下），让 arm 自然 hang 而不是前伸。
-  armLeft.position.set(0.22, 0.32, 0.22);
+  // 用户："坐在坐骑上时胳膊太靠下，应该跟肩一样高"。
+  // torso 顶 ≈ 0.85（torso center 0.62 + 半高 0.23），肩膀就在 torso 顶附近。
+  // 之前 position.y = 0.32 让 arm 中心在腰部高度，前伸的话还是腰高，看起来"低"。
+  // 改 position.y = 0.65 → 旋转后水平段约在 0.65 附近，跟肩同高（torso 顶 0.85
+  // 减去 cylinder 上端余量 ≈ 0.65）。rotation 保持 π/2 - 0.7 让前臂稍下垂。
+  armLeft.position.set(0.22, 0.65, 0.22);
   armLeft.rotation.set(0, 0, Math.PI / 2 - 0.7);
   const armRight = new Mesh(armGeometry, materials.garment);
   armRight.name = "avatar-arm-right";
-  armRight.position.set(0.22, 0.32, -0.22);
+  armRight.position.set(0.22, 0.65, -0.22);
   armRight.rotation.set(0, 0, Math.PI / 2 - 0.7);
   group.add(armLeft, armRight);
 
