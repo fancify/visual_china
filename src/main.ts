@@ -273,6 +273,12 @@ import {
 } from "./game/terrainModel";
 import { isSpriteOccludedByTerrain } from "./game/labelOcclusion";
 import { textSpriteLayout } from "./game/textLabel.js";
+import {
+  computeLodMorph,
+  formatTerrainLodBreakdown,
+  resolveLodMorphOverride,
+  summarizeChunkLodMorphs
+} from "./game/terrainLodMorph.js";
 import { createPerfStats, isDevModeEnabled } from "./game/perfStats";
 import { createPerfMonitor } from "./game/perfMonitor";
 import {
@@ -528,9 +534,8 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function lodMorphDemoValue(): number {
-  const value = window.LOD_MORPH_DEMO;
-  return typeof value === "number" && Number.isFinite(value) ? clamp01(value) : 0;
+function lodMorphDemoValue(): number | null {
+  return resolveLodMorphOverride(window.LOD_MORPH_DEMO);
 }
 
 function ambientWeatherForState(weather: EnvironmentController["state"]["weather"]): AmbientContext["weather"] {
@@ -4498,6 +4503,48 @@ function updateChunkFadeIn(): void {
   });
 }
 
+function updateTerrainLodMorphs(): void {
+  const demoMorph = lodMorphDemoValue();
+  const baseMorph = demoMorph ?? 0;
+  const visibleMorphs: number[] = [];
+  let hiddenChunks = 0;
+
+  updateTerrainShaderLodMorph(terrainMaterial, baseMorph);
+
+  terrainChunkMeshes.forEach((terrainChunk) => {
+    if (Array.isArray(terrainChunk.mesh.material)) {
+      return;
+    }
+
+    const morph =
+      demoMorph ??
+      computeLodMorph(
+        Math.hypot(
+          terrainChunk.mesh.position.x - camera.position.x,
+          terrainChunk.mesh.position.z - camera.position.z
+        )
+      );
+
+    updateTerrainShaderLodMorph(
+      terrainChunk.mesh.material as MeshPhongMaterial,
+      morph
+    );
+    terrainChunk.mesh.userData.lodMorph = morph;
+
+    if (terrainChunk.mesh.visible) {
+      visibleMorphs.push(morph);
+    } else {
+      hiddenChunks += 1;
+    }
+  });
+
+  perfStats.setLodBreakdown(
+    formatTerrainLodBreakdown(
+      summarizeChunkLodMorphs(visibleMorphs, hiddenChunks)
+    )
+  );
+}
+
 async function syncChunkTerrainWindow(nextVisibleChunkIds: Set<string>): Promise<void> {
   if (!regionChunkManifest) {
     return;
@@ -5272,8 +5319,6 @@ function update(deltaSeconds: number): void {
     visuals.terrainSaturationMul,
     visuals.terrainLightnessMul
   );
-  const lodMorphDemo = lodMorphDemoValue();
-  updateTerrainShaderLodMorph(terrainMaterial, lodMorphDemo);
   terrainChunkMeshes.forEach((chunk) => {
     if (!Array.isArray(chunk.mesh.material)) {
       updateTerrainShaderHeightFog(
@@ -5290,12 +5335,9 @@ function update(deltaSeconds: number): void {
         visuals.terrainSaturationMul,
         visuals.terrainLightnessMul
       );
-      updateTerrainShaderLodMorph(
-        chunk.mesh.material as MeshPhongMaterial,
-        lodMorphDemo
-      );
     }
   });
+  updateTerrainLodMorphs();
 
   const sunDomeVector = celestialDomeVector({
     timeOfDay: environment.timeOfDay,

@@ -4,6 +4,7 @@ interface PerfStatsHandle {
   element: HTMLElement;
   beginFrame(): void;
   endFrame(renderer: WebGLRenderer): void;
+  setLodBreakdown(line: string | null): void;
   dispose(): void;
 }
 
@@ -58,6 +59,7 @@ export function createPerfStats(
   let frameCount = 0;
   let frameMsAccum = 0;
   let lastUpdate = performance.now();
+  let lodBreakdown: string | null = null;
 
   function format(): string {
     return "frame ……";
@@ -86,7 +88,10 @@ export function createPerfStats(
       `<span class="label">tris  </span><span class="${trianglesClass}">${triangles.toLocaleString().padStart(8)}</span>`,
       `<span class="label">geom  </span>${info.memory.geometries.toString().padStart(5)}`,
       `<span class="label">tex   </span>${info.memory.textures.toString().padStart(5)}`,
-      `<span class="label">prog  </span>${(info.programs?.length ?? 0).toString().padStart(5)}`
+      `<span class="label">prog  </span>${(info.programs?.length ?? 0).toString().padStart(5)}`,
+      lodBreakdown === null
+        ? null
+        : `<span class="label">lod   </span>${lodBreakdown}`
     ].join("\n");
   }
 
@@ -111,6 +116,10 @@ export function createPerfStats(
         frameMsAccum = 0;
         lastUpdate = now;
       }
+    },
+    setLodBreakdown(line) {
+      if (!config.enabled) return;
+      lodBreakdown = line;
     },
     dispose() {
       element.remove();
