@@ -1,7 +1,8 @@
-import { Color, MathUtils, Vector3 } from "three";
+import { Color, MathUtils, Vector2, Vector3 } from "three";
 
 import type { SeasonalBlend } from "./biomeZones";
 import { celestialCycle } from "./celestial.js";
+import type { WindState } from "./windManager";
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 export type Weather = "clear" | "windy" | "rain" | "storm" | "snow" | "mist";
@@ -414,6 +415,7 @@ export class EnvironmentController {
   // 365 days / 4 seasons ≈ 91 days/season; 91 days / 1200 real seconds = 0.076 day/s。
   // 1 整年 = 4 × 20 min = 80 min real time。
   private static readonly DAY_OF_YEAR_ADVANCE_PER_SECOND = 0.076;
+  private readonly windDirection = new Vector2(0.86, 0.5).normalize();
 
   state: EnvironmentState = {
     timeOfDay: 7.5,
@@ -484,6 +486,20 @@ export class EnvironmentController {
     }
 
     return this.state;
+  }
+
+  getWindState(): WindState {
+    const wind = this.effectiveWeather.wind;
+    const gustPulse =
+      Math.sin(this.weatherTimer * 0.72) * 0.5 +
+      Math.sin(this.weatherTimer * 1.37 + 1.8) * 0.5;
+    const gust = MathUtils.smoothstep(gustPulse, 0.48, 0.98) * Math.max(0, wind - 0.35);
+
+    return {
+      direction: this.windDirection,
+      wind,
+      gust
+    };
   }
 
   advanceSeason(): void {

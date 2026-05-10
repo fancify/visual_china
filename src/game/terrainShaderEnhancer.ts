@@ -1,4 +1,12 @@
-import type { Color, MeshPhongMaterial, WebGLProgramParametersWithUniforms } from "three";
+import {
+  Vector2,
+  type Color,
+  type MeshPhongMaterial,
+  type Texture,
+  type WebGLProgramParametersWithUniforms
+} from "three";
+
+import type { WindUniforms } from "./windManager";
 
 // 与 terrainLodMorph.ts 的 HUD 估算阈值保持一致；shader 文件本地保留常量，
 // 避免 Node 直接跑 .ts 测试时解析未编译的 .js 运行时 import。
@@ -42,6 +50,12 @@ export interface TerrainShaderEnhancerOptions {
   atmosphericFarColor: Color;
   /** 大气透视最大替换比例 */
   atmosphericMaxStrength: number;
+  /** R7 地表云影 cookie 贴图，按 world XZ 投影采样。 */
+  cloudCookieTexture: Texture | null;
+  /** world units per cookie tile。 */
+  cloudCookieScale: number;
+  /** 0..1，云影最大暗化比例。 */
+  cloudCookieStrength: number;
   /** Time-of-day HSL 调色参数——之前每 1.85s 触发全顶点 JS recolor，现在
    * 走 shader uniform 改 fragment HSL，时间变化零 CPU 工作。 */
   terrainHueShift: number;
@@ -70,6 +84,9 @@ const defaults: TerrainShaderEnhancerOptions = {
   atmosphericFarDistance: terrainAtmosphericHazeDefaults.endDistance,
   atmosphericFarColor: undefined as unknown as Color,
   atmosphericMaxStrength: terrainAtmosphericHazeDefaults.strength,
+  cloudCookieTexture: null,
+  cloudCookieScale: 80,
+  cloudCookieStrength: 0.5,
   terrainHueShift: 0,
   terrainSaturationMul: 1,
   terrainLightnessMul: 1
@@ -87,6 +104,12 @@ interface ActiveEnhancer {
     uAtmosphericFarEnd: { value: number };
     uAtmosphericFarColor: { value: Color };
     uAtmosphericStrength: { value: number };
+    uCloudCookie: { value: Texture | null };
+    uWindDirection: { value: Vector2 };
+    uWindStrength: { value: number };
+    uWindTime: { value: number };
+    uCloudCookieScale: { value: number };
+    uCloudCookieStrength: { value: number };
     uTerrainHueShift: { value: number };
     uTerrainSaturationMul: { value: number };
     uTerrainLightnessMul: { value: number };
@@ -179,6 +202,12 @@ export function attachTerrainShaderEnhancements(
       uAtmosphericFarEnd: { value: config.atmosphericFarDistance },
       uAtmosphericFarColor: { value: config.atmosphericFarColor.clone() },
       uAtmosphericStrength: { value: config.atmosphericMaxStrength },
+      uCloudCookie: { value: config.cloudCookieTexture },
+      uWindDirection: { value: new Vector2(0.86, 0.5).normalize() },
+      uWindStrength: { value: 0.4 },
+      uWindTime: { value: 0 },
+      uCloudCookieScale: { value: config.cloudCookieScale },
+      uCloudCookieStrength: { value: config.cloudCookieStrength },
       uTerrainHueShift: { value: config.terrainHueShift },
       uTerrainSaturationMul: { value: config.terrainSaturationMul },
       uTerrainLightnessMul: { value: config.terrainLightnessMul },
@@ -241,6 +270,12 @@ export function attachTerrainShaderEnhancements(
         uniform float uAtmosphericFarEnd;
         uniform vec3 uAtmosphericFarColor;
         uniform float uAtmosphericStrength;
+        uniform sampler2D uCloudCookie;
+        uniform vec2 uWindDirection;
+        uniform float uWindStrength;
+        uniform float uWindTime;
+        uniform float uCloudCookieScale;
+        uniform float uCloudCookieStrength;
         uniform float uTerrainHueShift;
         uniform float uTerrainSaturationMul;
         uniform float uTerrainLightnessMul;
@@ -250,7 +285,8 @@ export function attachTerrainShaderEnhancements(
       `
     );
 
-    // 在最终输出前注入 noise + HSL + height fog + 大气透视
+    // 在最终输出前统一注入 terrain 增强，顺序保持：base/noise → height fog →
+    // 云影 cookie → 大气透视 → HSL。云影先于 haze，远处投影自然被空气感淡化。
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <output_fragment>",
       /* glsl */ `
@@ -259,16 +295,7 @@ export function attachTerrainShaderEnhancements(
         float ttn = th_noise(vWorldPosition.xz * uNoiseFrequency);
         outgoingLight += ttn * uNoiseStrength * vec3(0.42, 0.45, 0.32);
 
-        // 2. HSL 时间/季节调色——以前 environment.terrainHueShift/SaturationMul/
-        // LightnessMul 走 JS 每顶点 setHSL 重染（10000+ vertex / 帧），现在
-        // shader 里做：转 HSL → shift hue → mul s/l → 转回 RGB。每帧零 CPU 工作。
-        vec3 hsl = th_rgb2hsl(outgoingLight);
-        hsl.x = mod(hsl.x + uTerrainHueShift + 1.0, 1.0);
-        hsl.y = clamp(hsl.y * uTerrainSaturationMul, 0.0, 1.0);
-        hsl.z = clamp(hsl.z * uTerrainLightnessMul, 0.0, 1.0);
-        outgoingLight = th_hsl2rgb(hsl);
-
-        // 3. height fog：高处往天空色融
+        // 2. height fog：高处往天空色融
         float heightT = clamp(
           (vWorldPosition.y - uHeightFogStart) /
             max(0.001, uHeightFogEnd - uHeightFogStart),
@@ -280,6 +307,17 @@ export function attachTerrainShaderEnhancements(
           uHeightFogColor,
           heightT * uHeightFogMaxStrength
         );
+
+        // 3. R7 云影 cookie：用 world-space XZ 采样，让阴影不跟 UV/mesh 绑定。
+        // R7.1 调参 (Claude post-Playwright)：
+        // - scroll 速度乘 uWindStrength → 风强度影响云移动快慢，弱风 0.4 仍有可见漂移
+        // - shadowFactor 不再乘 uWindStrength → clouds 总在，风只控速度不控存在
+        // - smoothstep 阈值 0.35→0.65 → cookie noise 中段也产生阴影，contrast 更明显
+        vec2 cookieUV = vWorldPosition.xz / uCloudCookieScale
+          + uWindDirection * uWindTime * 0.05 * (0.4 + uWindStrength);
+        float cookieValue = texture2D(uCloudCookie, cookieUV).r;
+        float shadowFactor = smoothstep(0.35, 0.65, cookieValue) * uCloudCookieStrength;
+        outgoingLight *= (1.0 - shadowFactor);
 
         // 4. R6 大气透视：按 view-space depth 在 fragment 末端向 sky horizon
         // 共享色融，让远 chunk 的 L1 形态和 chunk 边界被天色吞掉。
@@ -295,12 +333,38 @@ export function attachTerrainShaderEnhancements(
           atmosphericT * uAtmosphericStrength
         );
 
+        // 5. HSL 时间/季节调色——以前 environment.terrainHueShift/SaturationMul/
+        // LightnessMul 走 JS 每顶点 setHSL 重染（10000+ vertex / 帧），现在
+        // shader 里做：转 HSL → shift hue → mul s/l → 转回 RGB。每帧零 CPU 工作。
+        vec3 hsl = th_rgb2hsl(outgoingLight);
+        hsl.x = mod(hsl.x + uTerrainHueShift + 1.0, 1.0);
+        hsl.y = clamp(hsl.y * uTerrainSaturationMul, 0.0, 1.0);
+        hsl.z = clamp(hsl.z * uTerrainLightnessMul, 0.0, 1.0);
+        outgoingLight = th_hsl2rgb(hsl);
+
         #include <output_fragment>
       `
     );
   };
 
   material.needsUpdate = true;
+}
+
+/** 每帧调用：把 WindManager 的统一风 uniform 推进 terrain 云影 cookie。 */
+export function updateTerrainShaderCloudCookie(
+  material: MeshPhongMaterial,
+  cloudCookieTexture: Texture,
+  windUniforms: WindUniforms
+): void {
+  const enhancer = enhancers.get(material);
+  if (!enhancer) {
+    return;
+  }
+  enhancer.uniforms.uCloudCookie.value = cloudCookieTexture;
+  enhancer.uniforms.uWindDirection.value.copy(windUniforms.direction.value);
+  enhancer.uniforms.uWindStrength.value = windUniforms.strength.value;
+  enhancer.uniforms.uWindTime.value = windUniforms.time.value;
+  enhancer.uniforms.uCloudCookieScale.value = windUniforms.noiseScale.value;
 }
 
 /**

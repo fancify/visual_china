@@ -288,15 +288,20 @@ import {
   createPrecipitationLayer,
   createSkyDome
 } from "./game/atmosphereLayer";
-import { createCircleTexture } from "./game/proceduralTextures";
+import {
+  createCircleTexture,
+  createCloudCookieTexture
+} from "./game/proceduralTextures";
 import {
   attachTerrainShaderEnhancements,
   updateTerrainShaderAtmosphericFar,
+  updateTerrainShaderCloudCookie,
   updateTerrainShaderHeightFog,
   updateTerrainShaderHsl,
   updateTerrainShaderLodMorph
 } from "./game/terrainShaderEnhancer";
 import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
+import { WindManager } from "./game/windManager";
 
 interface FragmentVisual {
   sprite: Sprite;
@@ -322,6 +327,7 @@ const terrainAssetRequest = resolveTerrainAssetRequest(
   "/data/regions/qinling/manifest.json"
 );
 const environmentController = new EnvironmentController();
+const windManager = new WindManager();
 const audioRuntime = createAudioRuntime();
 unlockOnUserGesture(audioRuntime);
 const ambientMixer = createAmbientMixer(audioRuntime);
@@ -735,6 +741,7 @@ let colorAttribute = new BufferAttribute(
 );
 terrainGeometry.setAttribute("color", colorAttribute);
 
+const cloudCookieTexture = createCloudCookieTexture(256);
 const terrainMaterial = new MeshPhongMaterial({
   vertexColors: true,
   flatShading: true,
@@ -750,7 +757,8 @@ const terrainMaterial = new MeshPhongMaterial({
 attachTerrainShaderEnhancements(terrainMaterial, {
   heightFogColor: new Color(0xb6c4be),
   // R5 远景初始色：runtime 每帧用 sky horizon 共享色覆盖，初值只服务首帧。
-  atmosphericFarColor: new Color(0xb6c4be)
+  atmosphericFarColor: new Color(0xb6c4be),
+  cloudCookieTexture
 });
 const terrain = new Mesh(terrainGeometry, terrainMaterial);
 // renderOrder 0（默认）：base 先画。chunks 后面 createTerrainMesh 时显式
@@ -5254,6 +5262,7 @@ function update(deltaSeconds: number): void {
 
   const environment = environmentController.update(deltaSeconds);
   const visuals = environmentController.computeVisuals();
+  windManager.update(deltaSeconds, environmentController.getWindState());
   lastVisuals = visuals;
   sceneFog.color.copy(visuals.fogColor);
   // 用户反馈"看不到地形"——overview 镜头下 FogExp2 把远地形染成 fog 色
@@ -5305,6 +5314,11 @@ function update(deltaSeconds: number): void {
     terrainMaterial,
     atmosphericFarRuntimeColor
   );
+  updateTerrainShaderCloudCookie(
+    terrainMaterial,
+    cloudCookieTexture,
+    windManager.uniforms
+  );
   // 时间/季节/天气 HSL 调色：之前每 1.85s 触发全顶点 JS recolor (~440ms hitch)，
   // 现在直接推 shader uniform，零 CPU 工作。
   updateTerrainShaderHsl(
@@ -5322,6 +5336,11 @@ function update(deltaSeconds: number): void {
       updateTerrainShaderAtmosphericFar(
         chunk.mesh.material as MeshPhongMaterial,
         atmosphericFarRuntimeColor
+      );
+      updateTerrainShaderCloudCookie(
+        chunk.mesh.material as MeshPhongMaterial,
+        cloudCookieTexture,
+        windManager.uniforms
       );
       updateTerrainShaderHsl(
         chunk.mesh.material as MeshPhongMaterial,

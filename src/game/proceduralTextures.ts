@@ -1,4 +1,8 @@
-import { CanvasTexture } from "three";
+import {
+  CanvasTexture,
+  LinearFilter,
+  RepeatWrapping
+} from "three";
 
 /**
  * 这一组 helper 用 Canvas2D 离屏画一些简单贴图（光晕、月亮、云朵），
@@ -301,6 +305,91 @@ export function createCloudTexture(size = 512): CanvasTexture {
   }
 
   const texture = new CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function cloudCookieHash(x: number, y: number): number {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 0xffffffff;
+}
+
+function cloudCookieValueNoise(x: number, y: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+  const sx = xf * xf * (3 - 2 * xf);
+  const sy = yf * yf * (3 - 2 * yf);
+  const v00 = cloudCookieHash(xi, yi);
+  const v10 = cloudCookieHash(xi + 1, yi);
+  const v01 = cloudCookieHash(xi, yi + 1);
+  const v11 = cloudCookieHash(xi + 1, yi + 1);
+  const vx0 = v00 + (v10 - v00) * sx;
+  const vx1 = v01 + (v11 - v01) * sx;
+  return vx0 + (vx1 - vx0) * sy;
+}
+
+function cloudCookieFractalNoise(x: number, y: number): number {
+  let amplitude = 0.55;
+  let frequency = 1;
+  let value = 0;
+  let amplitudeSum = 0;
+
+  for (let octave = 0; octave < 5; octave += 1) {
+    value += cloudCookieValueNoise(x * frequency, y * frequency) * amplitude;
+    amplitudeSum += amplitude;
+    amplitude *= 0.52;
+    frequency *= 2;
+  }
+
+  return value / amplitudeSum;
+}
+
+/**
+ * R7 云影 cookie：一次性生成的 256² 单通道感知噪声。
+ * 贴图本身只负责"云团覆盖度"，真正的世界空间投影与风向 scroll 在 terrain
+ * shader 里完成，避免天空 sprite 和地表投影互相耦合。
+ */
+export function createCloudCookieTexture(size = 256): CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Failed to create cloud cookie texture context");
+  }
+
+  const image = context.createImageData(size, size);
+  const data = image.data;
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const nx = x / size;
+      const ny = y / size;
+      const low = cloudCookieFractalNoise(nx * 4.2, ny * 4.2);
+      const broad = cloudCookieFractalNoise(nx * 1.45 + 18.2, ny * 1.45 - 7.4);
+      const shaped = Math.pow(Math.max(0, low * 0.72 + broad * 0.42 - 0.08), 1.18);
+      const value = Math.max(0, Math.min(255, Math.round(shaped * 255)));
+      const index = (y * size + x) * 4;
+
+      data[index] = value;
+      data[index + 1] = value;
+      data[index + 2] = value;
+      data[index + 3] = 255;
+    }
+  }
+
+  context.putImageData(image, 0, 0);
+
+  const texture = new CanvasTexture(canvas);
+  texture.wrapS = RepeatWrapping;
+  texture.wrapT = RepeatWrapping;
+  texture.minFilter = LinearFilter;
+  texture.magFilter = LinearFilter;
   texture.needsUpdate = true;
   return texture;
 }
