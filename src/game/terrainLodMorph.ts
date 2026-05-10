@@ -6,10 +6,14 @@ export interface TerrainLodBreakdown {
 }
 
 // chunk 实际尺寸 ~15u/边（real-DEM build 113×96 grid, world 1711×1186）。
-// R6 改为 vertex shader 按每个顶点 world distance morph，阈值保留 R4 语义：
-// <30u 完全 L0，>90u 完全 L1。HUD 只用 chunk 中心点估算当前可见区分布。
-export const TERRAIN_LOD_MORPH_START = 30;
-export const TERRAIN_LOD_MORPH_END = 90;
+// R6 改为 vertex shader 按每个顶点 world distance morph。
+// R10a-fix: morph start 30 → 60, end 90 → 120。
+// 理由：scenery (草/树) spawn 半径 50u，anchor 用 L0 sampler。如果 morph 在
+// scenery zone 内启动，terrain 渲染面 = morphed (≠ L0)，scenery 仍 L0 → 浮/埋。
+// 把 morph 推到 60u (scenery zone 外)，scenery 范围内 terrain 永远 L0，
+// 跟所有 anchor 对齐。远景 (60-120u) 仍走 morph + atmospheric haze fade。
+export const TERRAIN_LOD_MORPH_START = 60;
+export const TERRAIN_LOD_MORPH_END = 120;
 
 export function computeLodMorph(distance: number): number {
   if (!Number.isFinite(distance) || distance <= TERRAIN_LOD_MORPH_START) {

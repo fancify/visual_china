@@ -10,8 +10,10 @@ import type { WindUniforms } from "./windManager";
 
 // 与 terrainLodMorph.ts 的 HUD 估算阈值保持一致；shader 文件本地保留常量，
 // 避免 Node 直接跑 .ts 测试时解析未编译的 .js 运行时 import。
-const TERRAIN_LOD_MORPH_START = 30;
-const TERRAIN_LOD_MORPH_END = 90;
+// R10a-fix: 跟 terrainLodMorph.ts 同步。Scenery spawn radius 50u, morph 必须在外面起跑
+// 才能让 scenery anchor (L0) 跟 terrain 渲染面对齐。
+const TERRAIN_LOD_MORPH_START = 60;
+const TERRAIN_LOD_MORPH_END = 120;
 
 /**
  * 给现有 MeshPhongMaterial 注入两层 fragment 增强：

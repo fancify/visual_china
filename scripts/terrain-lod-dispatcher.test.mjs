@@ -8,11 +8,12 @@ import {
   summarizeChunkLodMorphs
 } from "../src/game/terrainLodMorph.ts";
 
-test("computeLodMorph mirrors the per-vertex shader smoothstep from 30u to 90u", () => {
-  assert.equal(computeLodMorph(29.99), 0);
-  assert.equal(computeLodMorph(30), 0);
-  assert.equal(computeLodMorph(60), 0.5);
-  assert.equal(computeLodMorph(90), 1);
+test("computeLodMorph mirrors the per-vertex shader smoothstep from 60u to 120u", () => {
+  // R10a-fix: morph zone 推到 scenery spawn radius (50u) 之外，避免 scenery anchor 浮埋。
+  assert.equal(computeLodMorph(59.99), 0);
+  assert.equal(computeLodMorph(60), 0);
+  assert.equal(computeLodMorph(90), 0.5);
+  assert.equal(computeLodMorph(120), 1);
 });
 
 test("computeLodMorph saturates distant vertices at L1", () => {

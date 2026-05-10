@@ -5564,22 +5564,13 @@ function update(deltaSeconds: number): void {
   }
 
   const ground = terrainSampler.sampleHeight(player.position.x, player.position.z);
-  const groundSurfaceLod0 = terrainSampler.sampleSurfaceHeight(
+  // R10a-revert: 不再做 LOD morph 高度混合。R10a 试图让 player y 跟 morphed terrain
+  // 同步，但 scenery (草/树) anchor 仍用 L0 sampler，结果 player 正确 / scenery 浮埋。
+  // R10a-fix: 改为把 morph zone 推到 scenery spawn 半径 50u 之外（TERRAIN_LOD_MORPH_START 30→60），
+  // 让 scenery 范围内 terrain 永远 L0，所有 anchor 都对齐 L0 sampler。
+  const groundSurface = terrainSampler.sampleSurfaceHeight(
     player.position.x,
     player.position.z
-  );
-  const playerTerrainMorph =
-    lodMorphDemoValue() ??
-    computeLodMorph(
-      Math.hypot(
-        camera.position.x - player.position.x,
-        camera.position.z - player.position.z
-      )
-    );
-  const groundSurface = MathUtils.lerp(
-    groundSurfaceLod0,
-    terrainSampler.sampleSurfaceHeightLod(player.position.x, player.position.z, 1),
-    playerTerrainMorph
   );
   cloudFlightAltitude = nextCloudFlightAltitude({
     currentMountId,
@@ -5608,8 +5599,7 @@ function update(deltaSeconds: number): void {
     console.info(
       `[sink] player.y=${player.position.y.toFixed(3)} ` +
       `ground=${groundSurface.toFixed(3)} ` +
-      `delta=${(player.position.y - groundSurface).toFixed(3)} ` +
-      `morph=${playerTerrainMorph.toFixed(3)}`
+      `delta=${(player.position.y - groundSurface).toFixed(3)}`
     );
   }
 

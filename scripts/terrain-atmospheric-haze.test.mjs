@@ -44,8 +44,9 @@ test("terrain shader computes LOD morph per vertex and steepens atmospheric fade
 
   material.onBeforeCompile(shader);
 
-  assert.equal(shader.uniforms.uMorphStart.value, 30);
-  assert.equal(shader.uniforms.uMorphEnd.value, 90);
+  // R10a-fix: morph 推到 60-120u (scenery spawn radius 50u 之外)
+  assert.equal(shader.uniforms.uMorphStart.value, 60);
+  assert.equal(shader.uniforms.uMorphEnd.value, 120);
   assert.match(shader.vertexShader, /uniform float uMorphStart;/);
   assert.match(shader.vertexShader, /uniform float uMorphEnd;/);
   assert.match(shader.vertexShader, /distance\(cameraPosition\.xz, worldPos\.xz\)/);
