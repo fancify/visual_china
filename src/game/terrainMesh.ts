@@ -18,6 +18,8 @@ export interface TerrainMeshHandle {
   mesh: Mesh;
   geometry: PlaneGeometry;
   positionAttribute: BufferAttribute;
+  positionLod0Attribute: BufferAttribute;
+  positionLod1Attribute: BufferAttribute;
   colorAttribute: BufferAttribute;
   sampler: TerrainSampler;
   scenery?: Group;
@@ -37,6 +39,40 @@ function microBump(localX: number, localZ: number): number {
   return (fract - 0.5) * 2 * MICRO_BUMP_AMPLITUDE;
 }
 
+export function applyTerrainLodMorphAttributes(
+  geometry: PlaneGeometry,
+  sampler: TerrainSampler,
+  positionAttribute: BufferAttribute
+): {
+  positionLod0Attribute: BufferAttribute;
+  positionLod1Attribute: BufferAttribute;
+} {
+  const positionLod0Attribute = new BufferAttribute(
+    new Float32Array(positionAttribute.count * 3),
+    3
+  );
+  const positionLod1Attribute = new BufferAttribute(
+    new Float32Array(positionAttribute.count * 3),
+    3
+  );
+  const hasL1 = sampler.asset.lodHeights?.L1 !== undefined;
+
+  for (let index = 0; index < positionAttribute.count; index += 1) {
+    const x = positionAttribute.getX(index);
+    const y = positionAttribute.getY(index);
+    const z = positionAttribute.getZ(index);
+    const lod1Y = hasL1 ? sampler.sampleHeightLod(x, z, 1) : y;
+
+    positionLod0Attribute.setXYZ(index, x, y, z);
+    positionLod1Attribute.setXYZ(index, x, lod1Y, z);
+  }
+
+  geometry.setAttribute("positionLod0", positionLod0Attribute);
+  geometry.setAttribute("positionLod1", positionLod1Attribute);
+
+  return { positionLod0Attribute, positionLod1Attribute };
+}
+
 export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   const geometry = new PlaneGeometry(
     sampler.asset.world.width,
@@ -53,6 +89,8 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
     const z = positionAttribute.getZ(index);
     positionAttribute.setY(index, sampler.sampleHeight(x, z) + microBump(x, z));
   }
+  const { positionLod0Attribute, positionLod1Attribute } =
+    applyTerrainLodMorphAttributes(geometry, sampler, positionAttribute);
 
   geometry.computeVertexNormals();
 
@@ -90,6 +128,8 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
     mesh,
     geometry,
     positionAttribute,
+    positionLod0Attribute,
+    positionLod1Attribute,
     colorAttribute,
     sampler
   };

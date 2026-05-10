@@ -1,13 +1,14 @@
 {
   "id": "qinling",
   "type": "region-manifest",
+  "schemaVersion": 2,
   "version": 1,
   "displayName": "秦岭 - 关中 - 汉中 - 四川盆地",
   "densityClass": "high-focus",
   "coordinatePolicy": "strict-geographic",
   "parentWorldId": "china-mainland",
   "sourceType": "processed-real-dem",
-  "generatedAt": "2026-05-08T11:03:36.979Z",
+  "generatedAt": "2026-05-10T06:33:02.118Z",
   "bounds": {
     "west": 73,
     "east": 135,

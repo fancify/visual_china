@@ -8,6 +8,7 @@ import {
   qinlingGeographicFootprintKm,
   qinlingResolutionStrategy
 } from "./qinling-dem-common.mjs";
+import { buildChunkLodHeights } from "./chunk-lod-heights.mjs";
 
 const root = process.cwd();
 const legacyAssetPath = path.join(root, "public", "data", "qinling-slice-dem.json");
@@ -170,6 +171,7 @@ await fs.writeFile(
 const chunkManifest = {
   regionId: "qinling",
   type: "chunk-manifest",
+  schemaVersion: 2,
   version: 1,
   chunkColumns,
   chunkRows,
@@ -249,6 +251,7 @@ for (let chunkRow = 0; chunkRow < chunkRows; chunkRow += 1) {
     const fileName = `${chunkId}.json`;
 
     const chunkAsset = {
+      schemaVersion: 2,
       id: chunkId,
       type: "terrain-chunk",
       version: 1,
@@ -282,6 +285,10 @@ for (let chunkRow = 0; chunkRow < chunkRows; chunkRow += 1) {
           }
         : undefined,
       heights,
+      lodHeights: buildChunkLodHeights({
+        grid: { columns, rows },
+        heights
+      }),
       riverMask,
       passMask,
       settlementMask,
@@ -308,6 +315,7 @@ for (let chunkRow = 0; chunkRow < chunkRows; chunkRow += 1) {
 const regionManifest = {
   id: "qinling",
   type: "region-manifest",
+  schemaVersion: 2,
   version: 1,
   displayName: "秦岭 - 关中 - 汉中 - 四川盆地",
   densityClass,

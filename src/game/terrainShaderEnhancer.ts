@@ -77,6 +77,7 @@ interface ActiveEnhancer {
     uTerrainHueShift: { value: number };
     uTerrainSaturationMul: { value: number };
     uTerrainLightnessMul: { value: number };
+    uTerrainLodMorph: { value: number };
   };
 }
 
@@ -165,7 +166,8 @@ export function attachTerrainShaderEnhancements(
       uAtmosphericMaxStrength: { value: config.atmosphericMaxStrength },
       uTerrainHueShift: { value: config.terrainHueShift },
       uTerrainSaturationMul: { value: config.terrainSaturationMul },
-      uTerrainLightnessMul: { value: config.terrainLightnessMul }
+      uTerrainLightnessMul: { value: config.terrainLightnessMul },
+      uTerrainLodMorph: { value: 0 }
     };
     Object.assign(shader.uniforms, uniforms);
     enhancers.set(material, { uniforms });
@@ -175,7 +177,17 @@ export function attachTerrainShaderEnhancements(
       "#include <common>",
       /* glsl */ `
         #include <common>
+        attribute vec3 positionLod0;
+        attribute vec3 positionLod1;
+        uniform float uTerrainLodMorph;
         varying vec3 vWorldPosition;
+      `
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      /* glsl */ `
+        #include <begin_vertex>
+        transformed.y = mix(positionLod0.y, positionLod1.y, clamp(uTerrainLodMorph, 0.0, 1.0));
       `
     );
     shader.vertexShader = shader.vertexShader.replace(
@@ -313,4 +325,19 @@ export function updateTerrainShaderHsl(
   enhancer.uniforms.uTerrainHueShift.value = hueShift;
   enhancer.uniforms.uTerrainSaturationMul.value = saturationMul;
   enhancer.uniforms.uTerrainLightnessMul.value = lightnessMul;
+}
+
+/**
+ * R3 LOD geomorph PoC：手动把 terrain vertex height 从 L0 混到 L1。
+ * 默认 0，由 main.ts 读取 window.LOD_MORPH_DEMO 后推进。
+ */
+export function updateTerrainShaderLodMorph(
+  material: MeshPhongMaterial,
+  morph: number
+): void {
+  const enhancer = enhancers.get(material);
+  if (!enhancer) {
+    return;
+  }
+  enhancer.uniforms.uTerrainLodMorph.value = Math.max(0, Math.min(1, morph));
 }

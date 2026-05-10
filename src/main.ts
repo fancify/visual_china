@@ -260,6 +260,7 @@ import {
   type StoryBeat
 } from "./game/storyGuide";
 import {
+  applyTerrainLodMorphAttributes,
   createTerrainMesh,
   disposeTerrainMesh,
   setTerrainMeshWorldPosition,
@@ -285,7 +286,8 @@ import {
   attachTerrainShaderEnhancements,
   updateTerrainShaderAtmosphericFar,
   updateTerrainShaderHeightFog,
-  updateTerrainShaderHsl
+  updateTerrainShaderHsl,
+  updateTerrainShaderLodMorph
 } from "./game/terrainShaderEnhancer";
 import { createWaterSurfaceMaterial } from "./game/waterSurfaceShader";
 
@@ -295,6 +297,12 @@ interface FragmentVisual {
   baseY: number;
   phase: number;
   chunkId: string | null;
+}
+
+declare global {
+  interface Window {
+    LOD_MORPH_DEMO?: number;
+  }
 }
 
 // CompositeTerrainSampler 替代 TerrainSampler：所有 sample 调用经过它，
@@ -520,6 +528,11 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function lodMorphDemoValue(): number {
+  const value = window.LOD_MORPH_DEMO;
+  return typeof value === "number" && Number.isFinite(value) ? clamp01(value) : 0;
+}
+
 function ambientWeatherForState(weather: EnvironmentController["state"]["weather"]): AmbientContext["weather"] {
   if (weather === "storm") {
     return "storm";
@@ -709,7 +722,7 @@ scene.add(underpaint);
 
 let terrainGeometry = new PlaneGeometry(1, 1, 1, 1);
 terrainGeometry.rotateX(-Math.PI / 2);
-let positionAttribute = terrainGeometry.attributes.position;
+let positionAttribute = terrainGeometry.attributes.position as BufferAttribute;
 let colorAttribute = new BufferAttribute(
   new Float32Array(positionAttribute.count * 3),
   3
@@ -5149,7 +5162,7 @@ function rebuildTerrainGeometry(
   );
   terrainGeometry.rotateX(-Math.PI / 2);
 
-  positionAttribute = terrainGeometry.attributes.position;
+  positionAttribute = terrainGeometry.attributes.position as BufferAttribute;
   colorAttribute = new BufferAttribute(
     new Float32Array(positionAttribute.count * 3),
     3
@@ -5259,6 +5272,8 @@ function update(deltaSeconds: number): void {
     visuals.terrainSaturationMul,
     visuals.terrainLightnessMul
   );
+  const lodMorphDemo = lodMorphDemoValue();
+  updateTerrainShaderLodMorph(terrainMaterial, lodMorphDemo);
   terrainChunkMeshes.forEach((chunk) => {
     if (!Array.isArray(chunk.mesh.material)) {
       updateTerrainShaderHeightFog(
@@ -5274,6 +5289,10 @@ function update(deltaSeconds: number): void {
         visuals.terrainHueShift,
         visuals.terrainSaturationMul,
         visuals.terrainLightnessMul
+      );
+      updateTerrainShaderLodMorph(
+        chunk.mesh.material as MeshPhongMaterial,
+        lodMorphDemo
       );
     }
   });
@@ -5825,6 +5844,7 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
     const z = positionAttribute.getZ(index);
     positionAttribute.setY(index, sampler.sampleHeight(x, z));
   }
+  applyTerrainLodMorphAttributes(terrainGeometry, sampler, positionAttribute);
 
   terrainGeometry.computeVertexNormals();
   rebuildWaterSystemVisuals();

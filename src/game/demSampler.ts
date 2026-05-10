@@ -24,6 +24,17 @@ export interface DemGrid {
   rows: number;
 }
 
+export interface DemLodHeightGrid {
+  grid: DemGrid;
+  heights: number[];
+}
+
+export interface DemLodHeights {
+  L1?: DemLodHeightGrid;
+  L2?: DemLodHeightGrid;
+  L3?: DemLodHeightGrid;
+}
+
 export interface DemPresentation {
   waterLevel?: number;
   underpaintLevel?: number;
@@ -34,6 +45,7 @@ export interface DemPresentation {
 }
 
 export interface DemAsset {
+  schemaVersion?: number;
   id?: string;
   type?: string;
   version?: number;
@@ -50,6 +62,7 @@ export interface DemAsset {
   maxHeight: number;
   presentation?: DemPresentation;
   heights: number[];
+  lodHeights?: DemLodHeights;
   riverMask: number[];
   passMask: number[];
   settlementMask: number[];
@@ -174,9 +187,59 @@ export function downsampleChunkAsset(asset: DemAsset, factor = 2): DemAsset {
     ...asset,
     grid: { columns: dstCols, rows: dstRows },
     heights: newHeights,
+    lodHeights:
+      asset.lodHeights === undefined
+        ? undefined
+        : buildRuntimeLodHeights(newHeights, dstCols, dstRows),
     riverMask: newRiver,
     passMask: newPass,
     settlementMask: newSettle
+  };
+}
+
+function downsampleHeightsForLod(
+  heights: number[],
+  srcCols: number,
+  srcRows: number,
+  factor: number
+): DemLodHeightGrid {
+  const dstCols = Math.max(2, Math.ceil(srcCols / factor));
+  const dstRows = Math.max(2, Math.ceil(srcRows / factor));
+  const out = new Array<number>(dstCols * dstRows);
+
+  for (let row = 0; row < dstRows; row += 1) {
+    const r0 = row * factor;
+    const r1 = Math.min(srcRows, r0 + factor);
+    for (let col = 0; col < dstCols; col += 1) {
+      const c0 = col * factor;
+      const c1 = Math.min(srcCols, c0 + factor);
+      let hSum = 0;
+      let n = 0;
+      for (let rr = r0; rr < r1; rr += 1) {
+        for (let cc = c0; cc < c1; cc += 1) {
+          hSum += heights[rr * srcCols + cc] ?? 0;
+          n += 1;
+        }
+      }
+      out[row * dstCols + col] = n > 0 ? hSum / n : 0;
+    }
+  }
+
+  return {
+    grid: { columns: dstCols, rows: dstRows },
+    heights: out
+  };
+}
+
+function buildRuntimeLodHeights(
+  heights: number[],
+  columns: number,
+  rows: number
+): DemLodHeights {
+  return {
+    L1: downsampleHeightsForLod(heights, columns, rows, 2),
+    L2: downsampleHeightsForLod(heights, columns, rows, 4),
+    L3: downsampleHeightsForLod(heights, columns, rows, 8)
   };
 }
 
@@ -290,7 +353,7 @@ function validateGrid(raw: unknown): DemGrid {
 
 function validateNumericChannel(
   raw: unknown,
-  fieldName: ChannelName,
+  fieldName: ChannelName | "lodHeights",
   expectedLength: number
 ): number[] {
   if (!Array.isArray(raw)) {
@@ -306,6 +369,38 @@ function validateNumericChannel(
   return raw.map((value, index) =>
     asFiniteNumber(value, `${fieldName}[${index}]`)
   );
+}
+
+function validateOptionalLodHeights(raw: unknown): DemLodHeights | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  if (!isRecord(raw)) {
+    throw new Error('DEM asset field "lodHeights" must be an object.');
+  }
+
+  const result: DemLodHeights = {};
+  for (const key of ["L1", "L2", "L3"] as const) {
+    const entry = raw[key];
+    if (entry === undefined) {
+      continue;
+    }
+    if (!isRecord(entry)) {
+      throw new Error(`DEM asset field "lodHeights.${key}" must be an object.`);
+    }
+    const grid = validateGrid(entry.grid);
+    result[key] = {
+      grid,
+      heights: validateNumericChannel(
+        entry.heights,
+        "lodHeights",
+        grid.columns * grid.rows
+      )
+    };
+  }
+
+  return result;
 }
 
 function validateOptionalNotes(raw: unknown): string[] | undefined {
@@ -395,6 +490,8 @@ function validateDemAsset(raw: unknown): DemAsset {
   }
 
   return {
+    schemaVersion:
+      typeof raw.schemaVersion === "number" ? raw.schemaVersion : undefined,
     id: typeof raw.id === "string" ? raw.id : undefined,
     type: typeof raw.type === "string" ? raw.type : undefined,
     version: typeof raw.version === "number" ? raw.version : undefined,
@@ -414,6 +511,7 @@ function validateDemAsset(raw: unknown): DemAsset {
     maxHeight,
     presentation: validateOptionalPresentation(raw.presentation),
     heights,
+    lodHeights: validateOptionalLodHeights(raw.lodHeights),
     riverMask,
     passMask,
     settlementMask,
@@ -581,6 +679,7 @@ export async function loadDemAsset(requestUrl: string): Promise<LoadedDemAsset> 
 export interface TerrainSamplerLike {
   readonly asset: DemAsset;
   sampleHeight(x: number, z: number): number;
+  sampleHeightLod(x: number, z: number, lod: 0 | 1 | 2 | 3): number;
   sampleSurfaceHeight(x: number, z: number): number;
   sampleRiver(x: number, z: number): number;
   samplePass(x: number, z: number): number;
@@ -608,6 +707,24 @@ export class TerrainSampler {
     // 抬升 player.y / scenery / label，让所有渲染层保持一致。
     // 改这个常量同步影响：mesh, player.position.y, 树/城贴地, 标签高度。
     return overridden * TERRAIN_VERTICAL_EXAGGERATION;
+  }
+
+  /**
+   * 按指定 LOD 采样高度。lod=0 是 full mesh；lod=1/2/3 使用 chunk
+   * asset schema v2 的 lodHeights。旧 schema 没有 lodHeights 时回退 L0。
+   */
+  sampleHeightLod(x: number, z: number, lod: 0 | 1 | 2 | 3): number {
+    if (lod === 0) {
+      return this.sampleHeight(x, z);
+    }
+
+    const grid = this.lodGrid(lod);
+    if (!grid) {
+      return this.sampleHeight(x, z);
+    }
+
+    const rawY = this.sampleHeightGrid(grid, x, z);
+    return this.applyHeightOverride(rawY, x, z) * TERRAIN_VERTICAL_EXAGGERATION;
   }
 
   // 跟 Three.js PlaneGeometry 一致的 triangular interp。
@@ -700,6 +817,25 @@ export class TerrainSampler {
   private sampleChannel(channel: ChannelName, x: number, z: number): number {
     const data = this.asset[channel];
     const { columns, rows } = this.asset.grid;
+    return this.sampleGrid(data, columns, rows, x, z);
+  }
+
+  private lodGrid(lod: 1 | 2 | 3): DemLodHeightGrid | null {
+    const key = `L${lod}` as keyof DemLodHeights;
+    return this.asset.lodHeights?.[key] ?? null;
+  }
+
+  private sampleHeightGrid(grid: DemLodHeightGrid, x: number, z: number): number {
+    return this.sampleGrid(grid.heights, grid.grid.columns, grid.grid.rows, x, z);
+  }
+
+  private sampleGrid(
+    data: number[],
+    columns: number,
+    rows: number,
+    x: number,
+    z: number
+  ): number {
     const halfWidth = this.asset.world.width * 0.5;
     const halfDepth = this.asset.world.depth * 0.5;
 
@@ -791,7 +927,7 @@ export class CompositeTerrainSampler extends TerrainSampler {
       return this.lastHitChunk;
     }
 
-  for (const entry of this.chunkEntries.values()) {
+    for (const entry of this.chunkEntries.values()) {
       if (chunkEntryContainsHalfOpen(entry, worldX, worldZ)) {
         this.lastHitChunk = entry;
         this.debugResolveMisses += 1;
@@ -840,6 +976,14 @@ export class CompositeTerrainSampler extends TerrainSampler {
       return chunk.sampler.sampleHeight(x - chunk.centerX, z - chunk.centerZ);
     }
     return this.base.sampleHeight(x, z);
+  }
+
+  sampleHeightLod(x: number, z: number, lod: 0 | 1 | 2 | 3): number {
+    const chunk = this.resolveChunk(x, z);
+    if (chunk) {
+      return chunk.sampler.sampleHeightLod(x - chunk.centerX, z - chunk.centerZ, lod);
+    }
+    return this.base.sampleHeightLod(x, z, lod);
   }
 
   sampleSurfaceHeight(x: number, z: number): number {
