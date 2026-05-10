@@ -121,9 +121,9 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   });
   attachTerrainShaderEnhancements(material, {
     heightFogColor: new Color(0xb6c4be),
-    // 跟主 terrainMaterial 同款远山初始色（千里江山图 石青）。每帧 main loop
-    // 会 updateTerrainShaderAtmosphericFar 把它跟天色 mix 后写回。
-    atmosphericFarColor: new Color(0x5f8ba6)
+    // 跟主 terrainMaterial 同款远景初始色；每帧 main loop 会用 sky horizon
+    // 共享 farColor 覆盖，避免 chunk 和天空之间出现额外色带。
+    atmosphericFarColor: new Color(0xb6c4be)
   });
   const mesh = new Mesh(geometry, material);
   // 方案 A：chunks 后绘，覆盖 base mesh。base 的 polygonOffset 推远 + 这里

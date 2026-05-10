@@ -88,6 +88,7 @@ import {
   formatTimeOfDay,
   formatAncientTimeOfDay,
   skyBodyHorizonFade,
+  sharedAtmosphericFarColor,
   sunDiscScaleForAltitude,
   type EnvironmentVisuals
 } from "./game/environment";
@@ -748,9 +749,8 @@ const terrainMaterial = new MeshPhongMaterial({
 });
 attachTerrainShaderEnhancements(terrainMaterial, {
   heightFogColor: new Color(0xb6c4be),
-  // 远山初始色：千里江山图 石青调（#5f8ba6 偏冷）。runtime 每帧根据
-  // environmentVisuals.skyZenithColor 改写它，让远山色随时间/天气一致。
-  atmosphericFarColor: new Color(0x5f8ba6)
+  // R5 远景初始色：runtime 每帧用 sky horizon 共享色覆盖，初值只服务首帧。
+  atmosphericFarColor: new Color(0xb6c4be)
 });
 const terrain = new Mesh(terrainGeometry, terrainMaterial);
 // renderOrder 0（默认）：base 先画。chunks 后面 createTerrainMesh 时显式
@@ -5299,14 +5299,9 @@ function update(deltaSeconds: number): void {
     terrainMaterial,
     visuals.skyHorizonColor
   );
-  // 远山逐青：用 skyZenithColor（深邃天色）跟一个石青基调 mix。zenithColor
-  // 已经反映了 dawn/dusk/夜晚 的色温。codex review d30759b 抓到夜里 zenith
-  // ≈ #000 跟 #5f8ba6 mix 0.55 = mid-teal，远山反而变亮。改成按 daylight
-  // 加权：白天 0.55 mix（远山饱和石青），夜里 0.05 mix（基本跟天色齐黑）。
-  const atmosphericMixT = 0.05 + visuals.daylight * 0.50;
-  const atmosphericFarRuntimeColor = visuals.skyZenithColor
-    .clone()
-    .lerp(new Color(0x5f8ba6), atmosphericMixT);
+  // R5 共享远景色：terrain/cloud/远景 silhouette 都从 sky horizon 派生，
+  // 避免 zenith/石青混色在远 chunk 边缘形成另一条色带。
+  const atmosphericFarRuntimeColor = sharedAtmosphericFarColor(visuals);
   updateTerrainShaderAtmosphericFar(
     terrainMaterial,
     atmosphericFarRuntimeColor
@@ -5373,10 +5368,10 @@ function update(deltaSeconds: number): void {
   cloudDrift += deltaSeconds * visuals.cloudDriftSpeed * 12;
   cloudGroup.position.set(player.position.x * 0.18, player.position.y + 54, player.position.z * 0.18);
   cloudMaterial.opacity = visuals.cloudOpacity * 0.74;
-  cloudMaterial.color.copy(visuals.cloudColor);
-  // 3D puff 用 MeshLambertMaterial：直接把 environment 的 cloudColor 套上去
-  // 让黎明/黄昏的橙红色顺着 lighting 影响云体。opacity 给云蓬松感留 0.92 上限。
-  cloudLayer.bodyMaterial.color.copy(visuals.cloudColor);
+  cloudMaterial.color.copy(atmosphericFarRuntimeColor);
+  // R5：远景云体也吃同一个 horizon farColor，terrain 远色 → 云 → sky
+  // 连成一套色温；亮度体积仍交给 Lambert lighting 和 opacity 负责。
+  cloudLayer.bodyMaterial.color.copy(atmosphericFarRuntimeColor);
   cloudLayer.bodyMaterial.opacity = MathUtils.clamp(visuals.cloudOpacity * 1.05, 0.4, 0.95);
   cloudSprites.forEach((cloud, index) => {
     const phase = Number(cloud.userData.phase) || 0;

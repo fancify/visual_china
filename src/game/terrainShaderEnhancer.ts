@@ -29,13 +29,13 @@ export interface TerrainShaderEnhancerOptions {
   noiseStrength: number;
   /** noise 在世界空间的频率，越大越细 */
   noiseFrequency: number;
-  /** 远山逐青：水平距离 < 此值时无空气散射 */
+  /** 大气透视：view-space depth < 此值时无空气散射 */
   atmosphericNearDistance: number;
-  /** 远山逐青：水平距离 ≥ 此值时空气散射饱和 */
+  /** 大气透视：view-space depth ≥ 此值时空气散射饱和 */
   atmosphericFarDistance: number;
-  /** 远山色（千里江山图 远景色，调用方按 environmentVisuals 给） */
+  /** 远景色（sky horizon 共享色，调用方按 environmentVisuals 给） */
   atmosphericFarColor: Color;
-  /** 远山最大替换比例 */
+  /** 大气透视最大替换比例 */
   atmosphericMaxStrength: number;
   /** Time-of-day HSL 调色参数——之前每 1.85s 触发全顶点 JS recolor，现在
    * 走 shader uniform 改 fragment HSL，时间变化零 CPU 工作。 */
@@ -44,6 +44,17 @@ export interface TerrainShaderEnhancerOptions {
   terrainLightnessMul: number;
 }
 
+// Haze 调参（Claude review 后校准）：
+// - startDistance 从 30 拉到 80：default-follow 视深 ~65u 时近景完全无 haze；
+//   overview 视深 ~170u 时近 chunks 也几乎无 haze，只远景才 fade。
+// - strength 从 0.7 降到 0.55：避免跟 colorGradeShader split-tone 双重扭曲后远色脏。
+// - endDistance 250 保留：>250u 区域达到最大 fade（基本溶进天色）。
+export const terrainAtmosphericHazeDefaults = {
+  startDistance: 80,
+  endDistance: 250,
+  strength: 0.55
+} as const;
+
 const defaults: TerrainShaderEnhancerOptions = {
   heightFogStartY: -2,
   heightFogEndY: 22,
@@ -51,12 +62,12 @@ const defaults: TerrainShaderEnhancerOptions = {
   heightFogMaxStrength: 0.55,
   noiseStrength: 0.06,
   noiseFrequency: 0.18,
-  // 千里江山图 远山逐青：以 80 单元（约一个主峰直径）开始空气散射，180 完全融。
-  // farColor 默认是冷调 teal，runtime 用 environmentVisuals.skyHorizonColor 跟天色保持一致。
-  atmosphericNearDistance: 80,
-  atmosphericFarDistance: 180,
+  // R5 大气透视：从 LOD morph 边界附近开始，把远 chunk 在 250u 处明显溶进天色。
+  // farColor 由 runtime 每帧写入 sky horizon 共享色，避免 terrain/cloud/远山色带。
+  atmosphericNearDistance: terrainAtmosphericHazeDefaults.startDistance,
+  atmosphericFarDistance: terrainAtmosphericHazeDefaults.endDistance,
   atmosphericFarColor: undefined as unknown as Color,
-  atmosphericMaxStrength: 0.42,
+  atmosphericMaxStrength: terrainAtmosphericHazeDefaults.strength,
   terrainHueShift: 0,
   terrainSaturationMul: 1,
   terrainLightnessMul: 1
@@ -70,10 +81,10 @@ interface ActiveEnhancer {
     uHeightFogMaxStrength: { value: number };
     uNoiseStrength: { value: number };
     uNoiseFrequency: { value: number };
-    uAtmosphericNear: { value: number };
-    uAtmosphericFar: { value: number };
+    uAtmosphericFarStart: { value: number };
+    uAtmosphericFarEnd: { value: number };
     uAtmosphericFarColor: { value: Color };
-    uAtmosphericMaxStrength: { value: number };
+    uAtmosphericStrength: { value: number };
     uTerrainHueShift: { value: number };
     uTerrainSaturationMul: { value: number };
     uTerrainLightnessMul: { value: number };
@@ -160,10 +171,10 @@ export function attachTerrainShaderEnhancements(
       uHeightFogMaxStrength: { value: config.heightFogMaxStrength },
       uNoiseStrength: { value: config.noiseStrength },
       uNoiseFrequency: { value: config.noiseFrequency },
-      uAtmosphericNear: { value: config.atmosphericNearDistance },
-      uAtmosphericFar: { value: config.atmosphericFarDistance },
+      uAtmosphericFarStart: { value: config.atmosphericNearDistance },
+      uAtmosphericFarEnd: { value: config.atmosphericFarDistance },
       uAtmosphericFarColor: { value: config.atmosphericFarColor.clone() },
-      uAtmosphericMaxStrength: { value: config.atmosphericMaxStrength },
+      uAtmosphericStrength: { value: config.atmosphericMaxStrength },
       uTerrainHueShift: { value: config.terrainHueShift },
       uTerrainSaturationMul: { value: config.terrainSaturationMul },
       uTerrainLightnessMul: { value: config.terrainLightnessMul },
@@ -181,6 +192,7 @@ export function attachTerrainShaderEnhancements(
         attribute vec3 positionLod1;
         uniform float uTerrainLodMorph;
         varying vec3 vWorldPosition;
+        varying float vTerrainViewDepth;
       `
     );
     shader.vertexShader = shader.vertexShader.replace(
@@ -195,6 +207,7 @@ export function attachTerrainShaderEnhancements(
       /* glsl */ `
         #include <fog_vertex>
         vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vTerrainViewDepth = abs((modelViewMatrix * vec4(transformed, 1.0)).z);
       `
     );
 
@@ -209,19 +222,20 @@ export function attachTerrainShaderEnhancements(
         uniform float uHeightFogMaxStrength;
         uniform float uNoiseStrength;
         uniform float uNoiseFrequency;
-        uniform float uAtmosphericNear;
-        uniform float uAtmosphericFar;
+        uniform float uAtmosphericFarStart;
+        uniform float uAtmosphericFarEnd;
         uniform vec3 uAtmosphericFarColor;
-        uniform float uAtmosphericMaxStrength;
+        uniform float uAtmosphericStrength;
         uniform float uTerrainHueShift;
         uniform float uTerrainSaturationMul;
         uniform float uTerrainLightnessMul;
+        varying float vTerrainViewDepth;
         ${NOISE_GLSL}
         ${HSL_GLSL}
       `
     );
 
-    // 在最终输出前注入 noise + HSL + height fog + 远山逐青
+    // 在最终输出前注入 noise + HSL + height fog + 大气透视
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <output_fragment>",
       /* glsl */ `
@@ -252,20 +266,17 @@ export function attachTerrainShaderEnhancements(
           heightT * uHeightFogMaxStrength
         );
 
-        // 4. 远山逐青（千里江山图 air perspective）：水平距离越远越向冷青色融。
-        // 跟 height fog 不同——它不挑高度，平地远处也跟着变青。这是王希孟原画
-        // 最经典的笔法：近山深绿，远山转石青/石绿。
-        float horizDist = length(vWorldPosition.xz - cameraPosition.xz);
-        float atmosphericT = clamp(
-          (horizDist - uAtmosphericNear) /
-            max(0.001, uAtmosphericFar - uAtmosphericNear),
-          0.0,
-          1.0
+        // 4. R5 大气透视：按 view-space depth 在 fragment 末端向 sky horizon
+        // 共享色融，让远 chunk 的 L1 形态和 chunk 边界被天色吞掉。
+        float atmosphericT = smoothstep(
+          uAtmosphericFarStart,
+          uAtmosphericFarEnd,
+          vTerrainViewDepth
         );
         outgoingLight = mix(
           outgoingLight,
           uAtmosphericFarColor,
-          atmosphericT * uAtmosphericMaxStrength
+          atmosphericT * uAtmosphericStrength
         );
 
         #include <output_fragment>
@@ -291,11 +302,7 @@ export function updateTerrainShaderHeightFog(
   enhancer.uniforms.uHeightFogColor.value.copy(fogColor);
 }
 
-/**
- * 每帧调用：把远山色更新——白天用冷青、黄昏用暖橙混冷色（让远山有 dawn/dusk
- * 一致的色温），夜里近黑。runtime 直接拿 environmentVisuals.skyZenithColor
- * 跟一个 region "石青色" mix 一下出结果。
- */
+/** 每帧调用：把 sky horizon 共享 farColor 推进 terrain 大气透视 uniform。 */
 export function updateTerrainShaderAtmosphericFar(
   material: MeshPhongMaterial,
   atmosphericFarColor: Color

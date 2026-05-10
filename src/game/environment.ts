@@ -56,6 +56,12 @@ export interface EnvironmentVisuals {
   seasonalBlend: SeasonalBlend;
 }
 
+export function sharedAtmosphericFarColor(
+  visuals: Pick<EnvironmentVisuals, "skyHorizonColor">
+): Color {
+  return visuals.skyHorizonColor.clone();
+}
+
 interface SeasonConfig {
   label: string;
   skyDay: string;
