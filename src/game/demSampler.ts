@@ -681,6 +681,7 @@ export interface TerrainSamplerLike {
   sampleHeight(x: number, z: number): number;
   sampleHeightLod(x: number, z: number, lod: 0 | 1 | 2 | 3): number;
   sampleSurfaceHeight(x: number, z: number): number;
+  sampleSurfaceHeightLod(x: number, z: number, lod: 0 | 1 | 2 | 3): number;
   sampleRiver(x: number, z: number): number;
   samplePass(x: number, z: number): number;
   sampleSettlement(x: number, z: number): number;
@@ -736,33 +737,34 @@ export class TerrainSampler {
   // PlaneGeometry 三角剖分（src 实测）：每 cell 对角线 (0,1)→(1,0)，
   // 上三角 = a,b,d = (0,0)(0,1)(1,0)；下三角 = b,c,d = (0,1)(1,1)(1,0)。
   sampleSurfaceHeight(x: number, z: number): number {
-    const data = this.asset.heights;
-    const { columns, rows } = this.asset.grid;
-    const halfWidth = this.asset.world.width * 0.5;
-    const halfDepth = this.asset.world.depth * 0.5;
-    const u = clamp((x + halfWidth) / this.asset.world.width, 0, 1);
-    const v = clamp((z + halfDepth) / this.asset.world.depth, 0, 1);
-    const gx = u * (columns - 1);
-    const gy = v * (rows - 1);
-    const x0 = Math.floor(gx);
-    const y0 = Math.floor(gy);
-    const x1 = Math.min(x0 + 1, columns - 1);
-    const y1 = Math.min(y0 + 1, rows - 1);
-    const tx = gx - x0;
-    const ty = gy - y0;
-    const A = data[y0 * columns + x0] ?? 0; // (0,0)
-    const B = data[y1 * columns + x0] ?? A; // (0,1)
-    const C = data[y1 * columns + x1] ?? A; // (1,1)
-    const D = data[y0 * columns + x1] ?? A; // (1,0)
-    let raw;
-    if (tx + ty <= 1) {
-      // 上三角 a,b,d = (0,0)(0,1)(1,0)
-      raw = (1 - tx - ty) * A + ty * B + tx * D;
-    } else {
-      // 下三角 b,c,d = (0,1)(1,1)(1,0)
-      raw = (1 - tx) * B + (tx + ty - 1) * C + (1 - ty) * D;
-    }
+    const raw = this.sampleSurfaceGrid(
+      this.asset.heights,
+      this.asset.grid.columns,
+      this.asset.grid.rows,
+      x,
+      z
+    );
     // 跟 sampleHeight 同步应用垂直夸张，让贴地物（树/城/牌位）跟 mesh 一致。
+    return this.applyHeightOverride(raw, x, z) * TERRAIN_VERTICAL_EXAGGERATION;
+  }
+
+  sampleSurfaceHeightLod(x: number, z: number, lod: 0 | 1 | 2 | 3): number {
+    if (lod === 0) {
+      return this.sampleSurfaceHeight(x, z);
+    }
+
+    const grid = this.lodGrid(lod);
+    if (!grid) {
+      return this.sampleSurfaceHeight(x, z);
+    }
+
+    const raw = this.sampleSurfaceGrid(
+      grid.heights,
+      grid.grid.columns,
+      grid.grid.rows,
+      x,
+      z
+    );
     return this.applyHeightOverride(raw, x, z) * TERRAIN_VERTICAL_EXAGGERATION;
   }
 
@@ -827,6 +829,39 @@ export class TerrainSampler {
 
   private sampleHeightGrid(grid: DemLodHeightGrid, x: number, z: number): number {
     return this.sampleGrid(grid.heights, grid.grid.columns, grid.grid.rows, x, z);
+  }
+
+  private sampleSurfaceGrid(
+    data: number[],
+    columns: number,
+    rows: number,
+    x: number,
+    z: number
+  ): number {
+    const halfWidth = this.asset.world.width * 0.5;
+    const halfDepth = this.asset.world.depth * 0.5;
+    const u = clamp((x + halfWidth) / this.asset.world.width, 0, 1);
+    const v = clamp((z + halfDepth) / this.asset.world.depth, 0, 1);
+    const gx = u * (columns - 1);
+    const gy = v * (rows - 1);
+    const x0 = Math.floor(gx);
+    const y0 = Math.floor(gy);
+    const x1 = Math.min(x0 + 1, columns - 1);
+    const y1 = Math.min(y0 + 1, rows - 1);
+    const tx = gx - x0;
+    const ty = gy - y0;
+    const A = data[y0 * columns + x0] ?? 0; // (0,0)
+    const B = data[y1 * columns + x0] ?? A; // (0,1)
+    const C = data[y1 * columns + x1] ?? A; // (1,1)
+    const D = data[y0 * columns + x1] ?? A; // (1,0)
+
+    if (tx + ty <= 1) {
+      // 上三角 a,b,d = (0,0)(0,1)(1,0)
+      return (1 - tx - ty) * A + ty * B + tx * D;
+    }
+
+    // 下三角 b,c,d = (0,1)(1,1)(1,0)
+    return (1 - tx) * B + (tx + ty - 1) * C + (1 - ty) * D;
   }
 
   private sampleGrid(
@@ -992,6 +1027,14 @@ export class CompositeTerrainSampler extends TerrainSampler {
       return chunk.sampler.sampleSurfaceHeight(x - chunk.centerX, z - chunk.centerZ);
     }
     return this.base.sampleSurfaceHeight(x, z);
+  }
+
+  sampleSurfaceHeightLod(x: number, z: number, lod: 0 | 1 | 2 | 3): number {
+    const chunk = this.resolveChunk(x, z);
+    if (chunk) {
+      return chunk.sampler.sampleSurfaceHeightLod(x - chunk.centerX, z - chunk.centerZ, lod);
+    }
+    return this.base.sampleSurfaceHeightLod(x, z, lod);
   }
 
   sampleRiver(x: number, z: number): number {

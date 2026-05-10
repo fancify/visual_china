@@ -8,7 +8,8 @@ import {
   PLANT_KINDS,
   buildPlantGeometrySet,
   createChunkScenery,
-  plantKindForCell
+  plantKindForCell,
+  sharedGrassGeometry
 } from "../src/game/scenery.ts";
 
 function geometrySize(geometry) {
@@ -168,6 +169,20 @@ test("lowland scenery emits separate instanced meshes per plant kind", () => {
 
   const bushScaleY = collectScaleY(bushLeaves);
   assert.ok(bushScaleY.every((scaleY) => scaleY < 1.1), "bush canopies should stay compact");
+});
+
+test("grass geometry uses a narrow five-blade fan cluster", () => {
+  const geometry = sharedGrassGeometry;
+  const position = geometry.getAttribute("position");
+  geometry.computeBoundingBox();
+  const size = geometry.boundingBox.getSize(new Vector3());
+
+  assert.equal(position.count, 90, "five segmented non-indexed blades should produce 90 vertices");
+  assert.ok(size.y > 0.53 && size.y < 0.57, `grass height should stay near 0.55, got ${size.y}`);
+  assert.ok(size.x > 0.08, `fan cluster should spread across X, got ${size.x}`);
+  assert.ok(size.z > 0.08, `fan cluster should spread across Z, got ${size.z}`);
+  assert.ok(size.x < 0.14, `individual blades should stay narrow, got X spread ${size.x}`);
+  assert.ok(size.z < 0.14, `individual blades should stay narrow, got Z spread ${size.z}`);
 });
 
 function countKinds(height, biomeId, sampleCount = 1000) {

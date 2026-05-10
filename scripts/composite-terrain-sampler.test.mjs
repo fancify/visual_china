@@ -115,6 +115,14 @@ test("TerrainSampler.sampleHeightLod bilinearly samples downsampled LOD grids", 
   assert.equal(Math.abs(sampler.sampleHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
 });
 
+test("TerrainSampler.sampleSurfaceHeightLod samples LOD grids with terrain triangle interpolation", () => {
+  const sampler = new TerrainSampler(makeLodAsset());
+
+  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(-5, -5, 1) - 2.5 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(5, 5, 1) - 12.5 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
+});
+
 test("TerrainSampler.sampleHeightLod falls back to L0 when lodHeights are absent", () => {
   const sampler = new TerrainSampler(makeAsset("v1", 3, undefined));
 
@@ -136,4 +144,6 @@ test("CompositeTerrainSampler.sampleHeightLod uses chunk LOD before base fallbac
 
   assert.equal(Math.abs(composite.sampleHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
   assert.equal(Math.abs(composite.sampleHeightLod(20, 0, 1) - 1 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleSurfaceHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleSurfaceHeightLod(20, 0, 1) - 1 * 1.07) < 1e-9, true);
 });

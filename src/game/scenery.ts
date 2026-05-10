@@ -144,11 +144,12 @@ attachSceneryShaderEnhancements(sharedGrassMaterial, {
   enableCelShading: false,
   enableRim: false,
   enableWindSway: true,
-  enableSeasonalTint: false
+  enableSeasonalTint: false,
+  enableGrassDistanceFade: true
 });
 
 const sharedPlantPrototypes = createSharedPlantPrototypes();
-const sharedGrassGeometry = createGrassGeometry();
+export const sharedGrassGeometry = createGrassGeometry();
 
 // settlement markers（5 棱柱褐色块）已移除：用户反馈"看不出含义"，
 // 而且位置是 chunk 内伪随机，并不对应真实城镇。P4 城市存在感会换成
@@ -226,11 +227,27 @@ function createMergedGeometry(parts: BufferGeometry[]): BufferGeometry {
 }
 
 function createGrassGeometry(): BufferGeometry {
-  const bladeA = new PlaneGeometry(0.11, 0.62, 1, 2);
-  bladeA.translate(0, 0.31, 0);
-  const bladeB = bladeA.clone();
-  bladeB.rotateY(Math.PI / 2);
-  const merged = BufferGeometryUtils.mergeGeometries([bladeA.toNonIndexed(), bladeB.toNonIndexed()]);
+  const blades: BufferGeometry[] = [];
+  const bladeCount = 5;
+  for (let index = 0; index < bladeCount; index += 1) {
+    const blade = new PlaneGeometry(0.05, 0.55, 1, 3);
+    blade.translate(0, 0.275, 0);
+
+    const positions = blade.attributes.position;
+    for (let vertex = 0; vertex < positions.count; vertex += 1) {
+      const y = positions.getY(vertex);
+      if (y > 0.35) {
+        positions.setX(vertex, positions.getX(vertex) * 1.4);
+        positions.setZ(vertex, positions.getZ(vertex) + 0.045);
+      }
+    }
+    positions.needsUpdate = true;
+
+    blade.rotateY((index / bladeCount) * Math.PI * 2);
+    blades.push(blade.toNonIndexed());
+  }
+
+  const merged = BufferGeometryUtils.mergeGeometries(blades);
   if (!merged) {
     throw new Error("Failed to merge grass geometry.");
   }

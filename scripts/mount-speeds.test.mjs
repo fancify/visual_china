@@ -226,13 +226,15 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
     21,
     "space should not affect altitude when the player is not on the cloud mount"
   );
-  assert.equal(
-    resolvePlayerTargetY({
-      currentMountId: "horse",
-      ground: 12,
-      cloudFlightAltitude: 30
-    }),
-    12.35
+  assert.ok(
+    Math.abs(
+      resolvePlayerTargetY({
+        currentMountId: "horse",
+        ground: 12,
+        groundSurface: 13.2,
+        cloudFlightAltitude: 30
+      }) - 13.55
+    ) < 1e-9
   );
 
   // Phase 3 全国画幅：MAX 150 / MIN_ABSOLUTE 25（绝对高度，跟地面无关）。

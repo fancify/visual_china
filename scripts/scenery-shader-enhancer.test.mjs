@@ -89,6 +89,30 @@ test("scenery shader updater pushes wind and seasonal uniforms after compile", (
   assert.deepEqual(shader.uniforms.uScenerySeasonalTint.value.toArray(), new Color("#abcdef").toArray());
 });
 
+test("grass wind shader applies per-instance circular fade around the player", () => {
+  const material = new MeshPhongMaterial();
+  attachSceneryShaderEnhancements(material, {
+    enableCelShading: false,
+    enableRim: false,
+    enableWindSway: true,
+    enableSeasonalTint: false,
+    enableGrassDistanceFade: true
+  });
+  const shader = {
+    uniforms: {},
+    vertexShader: "#include <common>\n#include <begin_vertex>",
+    fragmentShader: "#include <common>\n#include <color_fragment>"
+  };
+  material.onBeforeCompile(shader);
+
+  assert.equal(shader.uniforms.uSceneryGrassFadeStart.value, 40);
+  assert.equal(shader.uniforms.uSceneryGrassFadeEnd.value, 50);
+  assert.match(shader.vertexShader, /sceneryGrassFade/);
+  assert.match(shader.vertexShader, /smoothstep\(uSceneryGrassFadeStart, uSceneryGrassFadeEnd, sceneryPlayerDist\)/);
+  assert.match(shader.vertexShader, /transformed\.y -= 100\.0 \* \(1\.0 - sceneryGrassFade\)/);
+  assert.match(shader.fragmentShader, /diffuseColor\.a \*= vSceneryGrassFade/);
+});
+
 test("R8 wires scenery shader enhancer into scenery, wildlife, city, and avatar materials", async () => {
   const [scenery, wildlife, cityMarkers, playerAvatarMesh] = await Promise.all([
     readFile(new URL("../src/game/scenery.ts", import.meta.url), "utf8"),
@@ -101,4 +125,10 @@ test("R8 wires scenery shader enhancer into scenery, wildlife, city, and avatar 
   assert.match(wildlife, /attachSceneryShaderEnhancements\(material/);
   assert.match(cityMarkers, /attachSceneryShaderEnhancements\(material/);
   assert.match(playerAvatarMesh, /attachPlayerSceneryShaderEnhancements/);
+});
+
+test("main no longer toggles grass by chunk-center distance", async () => {
+  const main = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+
+  assert.doesNotMatch(main, /grassVisible\s*=\s*sceneryVisible\s*&&\s*chunkDistance\s*<=\s*50/);
 });

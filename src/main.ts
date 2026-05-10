@@ -846,17 +846,19 @@ export function isFlyingMount(id: MountId): boolean {
 export function resolvePlayerTargetY({
   currentMountId,
   ground,
+  groundSurface,
   cloudFlightAltitude
 }: {
   currentMountId: MountId;
   ground: number;
+  groundSurface?: number;
   cloudFlightAltitude: number;
 }): number {
   if (isFlyingMount(currentMountId)) {
     return cloudFlightAltitude;
   }
 
-  return ground + 0.35;
+  return (groundSurface ?? ground) + 0.35;
 }
 
 export function nextCloudFlightAltitude({
@@ -4498,10 +4500,9 @@ function updateChunkFadeIn(): void {
     );
     const sceneryVisible = sceneryEnabled && chunkDistance <= 150;
     terrainChunk.scenery.visible = terrainChunk.scenery.visible && sceneryVisible;
-    const grassVisible = sceneryVisible && chunkDistance <= 50;
     terrainChunk.scenery.traverse((child) => {
       if (child.userData.role === "grass") {
-        child.visible = grassVisible;
+        child.visible = sceneryVisible;
       }
     });
     return sceneryVisible;
@@ -5563,19 +5564,37 @@ function update(deltaSeconds: number): void {
   }
 
   const ground = terrainSampler.sampleHeight(player.position.x, player.position.z);
+  const groundSurfaceLod0 = terrainSampler.sampleSurfaceHeight(
+    player.position.x,
+    player.position.z
+  );
+  const playerTerrainMorph =
+    lodMorphDemoValue() ??
+    computeLodMorph(
+      Math.hypot(
+        camera.position.x - player.position.x,
+        camera.position.z - player.position.z
+      )
+    );
+  const groundSurface = MathUtils.lerp(
+    groundSurfaceLod0,
+    terrainSampler.sampleSurfaceHeightLod(player.position.x, player.position.z, 1),
+    playerTerrainMorph
+  );
   cloudFlightAltitude = nextCloudFlightAltitude({
     currentMountId,
     keys,
-    ground,
+    ground: groundSurface,
     cloudFlightAltitude
   });
   const targetY = resolvePlayerTargetY({
     currentMountId,
     ground,
+    groundSurface,
     cloudFlightAltitude
   });
   if (!isFlyingMount(currentMountId)) {
-    cloudFlightAltitude = resetCloudFlightAltitudeForGround(ground);
+    cloudFlightAltitude = resetCloudFlightAltitudeForGround(groundSurface);
   }
   // 飞行 mount：player.y 直接锁到 cloudFlightAltitude，避免 lerp 渐进过程
   // 跟 chunk 装载/CSS lerp/camera follow 复合产生"颠簸"感。
@@ -5584,6 +5603,14 @@ function update(deltaSeconds: number): void {
     player.position.y = targetY;
   } else {
     player.position.y = MathUtils.lerp(player.position.y, targetY, 0.16);
+  }
+  if (window.HUD_DEBUG) {
+    console.info(
+      `[sink] player.y=${player.position.y.toFixed(3)} ` +
+      `ground=${groundSurface.toFixed(3)} ` +
+      `delta=${(player.position.y - groundSurface).toFixed(3)} ` +
+      `morph=${playerTerrainMorph.toFixed(3)}`
+    );
   }
 
   // 用户反馈"没在走路也有脚步声"——把门槛从 movementSpeed > 0.5 提到 1.5，
