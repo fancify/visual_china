@@ -4505,34 +4505,33 @@ function updateChunkFadeIn(): void {
 
 function updateTerrainLodMorphs(): void {
   const demoMorph = lodMorphDemoValue();
-  const baseMorph = demoMorph ?? 0;
-  const visibleMorphs: number[] = [];
+  const visibleCenterMorphs: number[] = [];
   let hiddenChunks = 0;
 
-  updateTerrainShaderLodMorph(terrainMaterial, baseMorph);
+  updateTerrainShaderLodMorph(terrainMaterial, demoMorph);
 
   terrainChunkMeshes.forEach((terrainChunk) => {
     if (Array.isArray(terrainChunk.mesh.material)) {
       return;
     }
 
-    const morph =
-      demoMorph ??
-      computeLodMorph(
-        Math.hypot(
-          terrainChunk.mesh.position.x - camera.position.x,
-          terrainChunk.mesh.position.z - camera.position.z
-        )
-      );
-
+    // R6：实际 morph 在 vertex shader 按顶点 world distance 算，这里只保留
+    // LOD_MORPH_DEMO 的全局 override。HUD 用 chunk 中心点估算可见区分布，
+    // 不再把每个 chunk 当作单一 LOD 档位。
     updateTerrainShaderLodMorph(
       terrainChunk.mesh.material as MeshPhongMaterial,
-      morph
+      demoMorph
     );
-    terrainChunk.mesh.userData.lodMorph = morph;
+    const centerMorph = computeLodMorph(
+      Math.hypot(
+        terrainChunk.mesh.position.x - camera.position.x,
+        terrainChunk.mesh.position.z - camera.position.z
+      )
+    );
+    terrainChunk.mesh.userData.lodMorph = demoMorph ?? centerMorph;
 
     if (terrainChunk.mesh.visible) {
-      visibleMorphs.push(morph);
+      visibleCenterMorphs.push(demoMorph ?? centerMorph);
     } else {
       hiddenChunks += 1;
     }
@@ -4540,7 +4539,7 @@ function updateTerrainLodMorphs(): void {
 
   perfStats.setLodBreakdown(
     formatTerrainLodBreakdown(
-      summarizeChunkLodMorphs(visibleMorphs, hiddenChunks)
+      summarizeChunkLodMorphs(visibleCenterMorphs, hiddenChunks)
     )
   );
 }

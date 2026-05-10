@@ -9,11 +9,10 @@ import {
 
 import type { ViewMode } from "../data/qinlingSlice";
 import type { EnvironmentState, EnvironmentVisuals } from "./environment";
-import { TerrainSampler } from "./demSampler";
+import type { TerrainSampler } from "./demSampler";
 import { configureChunkTerrainFrustum } from "./terrainMeshFrustum.js";
 import { modeColor } from "./terrainModel";
 import { attachTerrainShaderEnhancements } from "./terrainShaderEnhancer";
-import { shouldKeepTerrainLodVertexAtL0 } from "./terrainLodMorph.js";
 
 export interface TerrainMeshHandle {
   mesh: Mesh;
@@ -62,13 +61,7 @@ export function applyTerrainLodMorphAttributes(
     const x = positionAttribute.getX(index);
     const y = positionAttribute.getY(index);
     const z = positionAttribute.getZ(index);
-    const keepL0Height = shouldKeepTerrainLodVertexAtL0(
-      x,
-      z,
-      sampler.asset.world.width,
-      sampler.asset.world.depth
-    );
-    const lod1Y = hasL1 && !keepL0Height ? sampler.sampleHeightLod(x, z, 1) : y;
+    const lod1Y = hasL1 ? sampler.sampleHeightLod(x, z, 1) : y;
 
     positionLod0Attribute.setXYZ(index, x, y, z);
     positionLod1Attribute.setXYZ(index, x, lod1Y, z);

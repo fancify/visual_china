@@ -1,27 +1,29 @@
 export interface TerrainLodBreakdown {
   L0: number;
+  blend: number;
   L1: number;
-  L2: number;
   hidden: number;
 }
 
 // chunk 实际尺寸 ~15u/边（real-DEM build 113×96 grid, world 1711×1186）。
-// 视野半径 2 个 chunk → 视野内最远 chunk 中心约 30-35u。
-// 阈值按 chunk-size proportional：L0_DISTANCE = 2 chunk radii (close 不 morph),
-// L1_DISTANCE = 4 chunk radii (full morph)。morph 区间约 30→42u，玩家慢移就能看到过渡。
-const L0_DISTANCE = 30;
-const L1_DISTANCE = 90;
-const L0_TO_L1_MORPH_WIDTH = (L1_DISTANCE - L0_DISTANCE) * 0.2;
+// R6 改为 vertex shader 按每个顶点 world distance morph，阈值保留 R4 语义：
+// <30u 完全 L0，>90u 完全 L1。HUD 只用 chunk 中心点估算当前可见区分布。
+export const TERRAIN_LOD_MORPH_START = 30;
+export const TERRAIN_LOD_MORPH_END = 90;
 
 export function computeLodMorph(distance: number): number {
-  if (!Number.isFinite(distance) || distance <= L0_DISTANCE) {
+  if (!Number.isFinite(distance) || distance <= TERRAIN_LOD_MORPH_START) {
     return 0;
   }
 
-  return Math.max(
-    0,
-    Math.min(1, (distance - L0_DISTANCE) / L0_TO_L1_MORPH_WIDTH)
-  );
+  if (distance >= TERRAIN_LOD_MORPH_END) {
+    return 1;
+  }
+
+  const t =
+    (distance - TERRAIN_LOD_MORPH_START) /
+    (TERRAIN_LOD_MORPH_END - TERRAIN_LOD_MORPH_START);
+  return t * t * (3 - 2 * t);
 }
 
 export function resolveLodMorphOverride(value: unknown): number | null {
@@ -30,39 +32,25 @@ export function resolveLodMorphOverride(value: unknown): number | null {
     : null;
 }
 
-export function shouldKeepTerrainLodVertexAtL0(
-  x: number,
-  z: number,
-  width: number,
-  depth: number
-): boolean {
-  const halfWidth = width * 0.5;
-  const halfDepth = depth * 0.5;
-  const epsilon = 1e-5;
-
-  return (
-    Math.abs(Math.abs(x) - halfWidth) <= epsilon ||
-    Math.abs(Math.abs(z) - halfDepth) <= epsilon
-  );
-}
-
 export function summarizeChunkLodMorphs(
   visibleMorphs: readonly number[],
   hidden: number
 ): TerrainLodBreakdown {
   return visibleMorphs.reduce<TerrainLodBreakdown>(
     (summary, morph) => {
-      if (morph < 0.5) {
+      if (morph <= 0) {
         summary.L0 += 1;
-      } else {
+      } else if (morph >= 1) {
         summary.L1 += 1;
+      } else {
+        summary.blend += 1;
       }
       return summary;
     },
-    { L0: 0, L1: 0, L2: 0, hidden }
+    { L0: 0, blend: 0, L1: 0, hidden }
   );
 }
 
 export function formatTerrainLodBreakdown(summary: TerrainLodBreakdown): string {
-  return `LOD: L0=${summary.L0} L1=${summary.L1} L2=${summary.L2} hidden=${summary.hidden}`;
+  return `LOD(center): L0=${summary.L0} blend=${summary.blend} L1=${summary.L1} hidden=${summary.hidden}`;
 }

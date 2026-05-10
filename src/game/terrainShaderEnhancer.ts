@@ -1,5 +1,10 @@
 import type { Color, MeshPhongMaterial, WebGLProgramParametersWithUniforms } from "three";
 
+// 与 terrainLodMorph.ts 的 HUD 估算阈值保持一致；shader 文件本地保留常量，
+// 避免 Node 直接跑 .ts 测试时解析未编译的 .js 运行时 import。
+const TERRAIN_LOD_MORPH_START = 30;
+const TERRAIN_LOD_MORPH_END = 90;
+
 /**
  * 给现有 MeshPhongMaterial 注入两层 fragment 增强：
  *
@@ -44,15 +49,12 @@ export interface TerrainShaderEnhancerOptions {
   terrainLightnessMul: number;
 }
 
-// Haze 调参（Claude review 后校准）：
-// - startDistance 从 30 拉到 80：default-follow 视深 ~65u 时近景完全无 haze；
-//   overview 视深 ~170u 时近 chunks 也几乎无 haze，只远景才 fade。
-// - strength 从 0.7 降到 0.55：避免跟 colorGradeShader split-tone 双重扭曲后远色脏。
-// - endDistance 250 保留：>250u 区域达到最大 fade（基本溶进天色）。
+// R6：用户实测远景和地平线 fade 不明显，收窄 ramp 并提高替换比例。
+// start=60 保留 default-follow 近景清晰；end=200 让 overview 远山更快融进天色。
 export const terrainAtmosphericHazeDefaults = {
-  startDistance: 80,
-  endDistance: 250,
-  strength: 0.55
+  startDistance: 60,
+  endDistance: 200,
+  strength: 0.75
 } as const;
 
 const defaults: TerrainShaderEnhancerOptions = {
@@ -62,7 +64,7 @@ const defaults: TerrainShaderEnhancerOptions = {
   heightFogMaxStrength: 0.55,
   noiseStrength: 0.06,
   noiseFrequency: 0.18,
-  // R5 大气透视：从 LOD morph 边界附近开始，把远 chunk 在 250u 处明显溶进天色。
+  // R6 大气透视：从 60u 开始，把远 chunk 在 200u 处明显溶进天色。
   // farColor 由 runtime 每帧写入 sky horizon 共享色，避免 terrain/cloud/远山色带。
   atmosphericNearDistance: terrainAtmosphericHazeDefaults.startDistance,
   atmosphericFarDistance: terrainAtmosphericHazeDefaults.endDistance,
@@ -88,6 +90,8 @@ interface ActiveEnhancer {
     uTerrainHueShift: { value: number };
     uTerrainSaturationMul: { value: number };
     uTerrainLightnessMul: { value: number };
+    uMorphStart: { value: number };
+    uMorphEnd: { value: number };
     uTerrainLodMorph: { value: number };
   };
 }
@@ -178,7 +182,10 @@ export function attachTerrainShaderEnhancements(
       uTerrainHueShift: { value: config.terrainHueShift },
       uTerrainSaturationMul: { value: config.terrainSaturationMul },
       uTerrainLightnessMul: { value: config.terrainLightnessMul },
-      uTerrainLodMorph: { value: 0 }
+      uMorphStart: { value: TERRAIN_LOD_MORPH_START },
+      uMorphEnd: { value: TERRAIN_LOD_MORPH_END },
+      // <0 表示用 per-vertex distance morph；0..1 仅作为 LOD_MORPH_DEMO 强制覆盖。
+      uTerrainLodMorph: { value: -1 }
     };
     Object.assign(shader.uniforms, uniforms);
     enhancers.set(material, { uniforms });
@@ -190,6 +197,8 @@ export function attachTerrainShaderEnhancements(
         #include <common>
         attribute vec3 positionLod0;
         attribute vec3 positionLod1;
+        uniform float uMorphStart;
+        uniform float uMorphEnd;
         uniform float uTerrainLodMorph;
         varying vec3 vWorldPosition;
         varying float vTerrainViewDepth;
@@ -199,7 +208,13 @@ export function attachTerrainShaderEnhancements(
       "#include <begin_vertex>",
       /* glsl */ `
         #include <begin_vertex>
-        transformed.y = mix(positionLod0.y, positionLod1.y, clamp(uTerrainLodMorph, 0.0, 1.0));
+        vec3 worldPos = (modelMatrix * vec4(positionLod0, 1.0)).xyz;
+        float vDist = distance(cameraPosition.xz, worldPos.xz);
+        float vMorph = smoothstep(uMorphStart, uMorphEnd, vDist);
+        if (uTerrainLodMorph >= 0.0) {
+          vMorph = clamp(uTerrainLodMorph, 0.0, 1.0);
+        }
+        transformed.y = mix(positionLod0.y, positionLod1.y, vMorph);
       `
     );
     shader.vertexShader = shader.vertexShader.replace(
@@ -266,13 +281,14 @@ export function attachTerrainShaderEnhancements(
           heightT * uHeightFogMaxStrength
         );
 
-        // 4. R5 大气透视：按 view-space depth 在 fragment 末端向 sky horizon
+        // 4. R6 大气透视：按 view-space depth 在 fragment 末端向 sky horizon
         // 共享色融，让远 chunk 的 L1 形态和 chunk 边界被天色吞掉。
         float atmosphericT = smoothstep(
           uAtmosphericFarStart,
           uAtmosphericFarEnd,
           vTerrainViewDepth
         );
+        atmosphericT = pow(atmosphericT, 0.7);
         outgoingLight = mix(
           outgoingLight,
           uAtmosphericFarColor,
@@ -335,15 +351,19 @@ export function updateTerrainShaderHsl(
 }
 
 /**
- * R3 LOD geomorph PoC：手动把 terrain vertex height 从 L0 混到 L1。
- * 默认 0，由 main.ts 读取 window.LOD_MORPH_DEMO 后推进。
+ * R6 per-vertex LOD geomorph：默认由 shader 按每个顶点到 camera 的距离计算。
+ * morph=null 表示关闭 dev override；数字 0..1 只服务 window.LOD_MORPH_DEMO。
  */
 export function updateTerrainShaderLodMorph(
   material: MeshPhongMaterial,
-  morph: number
+  morph: number | null
 ): void {
   const enhancer = enhancers.get(material);
   if (!enhancer) {
+    return;
+  }
+  if (morph === null) {
+    enhancer.uniforms.uTerrainLodMorph.value = -1;
     return;
   }
   enhancer.uniforms.uTerrainLodMorph.value = Math.max(0, Math.min(1, morph));
