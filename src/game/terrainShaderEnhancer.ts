@@ -315,10 +315,20 @@ export function attachTerrainShaderEnhancements(
         // - scroll 速度乘 uWindStrength → 风强度影响云移动快慢，弱风 0.4 仍有可见漂移
         // - shadowFactor 不再乘 uWindStrength → clouds 总在，风只控速度不控存在
         // - smoothstep 阈值 0.35→0.65 → cookie noise 中段也产生阴影，contrast 更明显
+        // Audit-fix B6 (2026-05-11): cookie 跟 atmospheric haze 远景双重暗化（远云影
+        // 被 haze 吃掉看不见）。加 nearAttn = 1 - 远景占比，让 cookie 在中近景全强、
+        // 远景渐弱（远景靠 haze 接管）。
         vec2 cookieUV = vWorldPosition.xz / uCloudCookieScale
           + uWindDirection * uWindTime * 0.05 * (0.4 + uWindStrength);
         float cookieValue = texture2D(uCloudCookie, cookieUV).r;
-        float shadowFactor = smoothstep(0.35, 0.65, cookieValue) * uCloudCookieStrength;
+        float nearCookieAttn = 1.0 - smoothstep(
+          uAtmosphericFarStart * 0.5,
+          uAtmosphericFarStart,
+          vTerrainViewDepth
+        );
+        float shadowFactor = smoothstep(0.35, 0.65, cookieValue)
+          * uCloudCookieStrength
+          * nearCookieAttn;
         outgoingLight *= (1.0 - shadowFactor);
 
         // 4. R6 大气透视：按 view-space depth 在 fragment 末端向 sky horizon

@@ -227,23 +227,38 @@ function createMergedGeometry(parts: BufferGeometry[]): BufferGeometry {
 }
 
 function createGrassGeometry(): BufferGeometry {
+  // Audit-fix B2: 重做草丛 mesh — 之前 5 片直立 PlaneGeometry rectangle 还是像葱。
+  // 现在: 7 片 blade，每片 (1) 三角形 taper (顶尖底宽 0.07→0.0)，(2) 顶部弯向某随机方向
+  // (避免直挺挺像葱)，(3) 高度有 jitter (0.35-0.65 不一致)，(4) 角度乱不均匀分布。
+  const bladeCount = 7;
   const blades: BufferGeometry[] = [];
-  const bladeCount = 5;
+
   for (let index = 0; index < bladeCount; index += 1) {
-    const blade = new PlaneGeometry(0.05, 0.55, 1, 3);
-    blade.translate(0, 0.275, 0);
+    // 伪随机：用 index 派生稳定参数
+    const heightJitter = 0.35 + ((index * 13) % 7) * 0.045; // 0.35-0.62
+    const bendDir = ((index * 71) % 360) * (Math.PI / 180);
+    const bendAmount = 0.08 + ((index * 17) % 5) * 0.025; // 0.08-0.18
+    const baseAngle = ((index * 51) % 360) * (Math.PI / 180); // 角度乱不均匀
+
+    // PlaneGeometry 4 段，方便 vertex-by-vertex 改形态
+    const blade = new PlaneGeometry(0.07, heightJitter, 1, 4);
+    blade.translate(0, heightJitter * 0.5, 0);
 
     const positions = blade.attributes.position;
-    for (let vertex = 0; vertex < positions.count; vertex += 1) {
-      const y = positions.getY(vertex);
-      if (y > 0.35) {
-        positions.setX(vertex, positions.getX(vertex) * 1.4);
-        positions.setZ(vertex, positions.getZ(vertex) + 0.045);
-      }
+    for (let v = 0; v < positions.count; v += 1) {
+      const x = positions.getX(v);
+      const y = positions.getY(v);
+      // (1) Taper：顶部窄底部宽 — y 0→1 maps width 1→0
+      const tapered = (1 - y / heightJitter) * 0.6 + 0.4;
+      positions.setX(v, x * tapered);
+      // (2) 顶部弯：y 越高，往 bendDir 方向偏 (sin/cos 投影)
+      const bendT = Math.max(0, (y - heightJitter * 0.3) / heightJitter); // 30% 高度起开始弯
+      positions.setX(v, positions.getX(v) + Math.cos(bendDir) * bendT * bendAmount);
+      positions.setZ(v, positions.getZ(v) + Math.sin(bendDir) * bendT * bendAmount);
     }
     positions.needsUpdate = true;
 
-    blade.rotateY((index / bladeCount) * Math.PI * 2);
+    blade.rotateY(baseAngle);
     blades.push(blade.toNonIndexed());
   }
 

@@ -132,11 +132,14 @@ export function createCloudPlaneTexture(size = 256): CanvasTexture {
 export function createCloudLayer(): CloudLayerHandle {
   const group = new Group();
   const texture = createCloudPlaneTexture(256);
+  // Audit-fix B1: 用户没看到云。原因 (1) opacity 0.42 太透明 (2) size 600 视野上方覆盖小
+  // (3) 颜色完全跟 sky horizon 同色 → 视觉融入. 修: opacity 0.55, size 1500 (覆盖 follow
+  // camera 整个上方视域), color 保留少量 highlight 跟 horizon mix 而不是直接覆盖.
   const material = new MeshBasicMaterial({
     map: texture,
-    color: 0xf6fbff,
+    color: 0xf8fcff,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.55,
     depthTest: true,
     depthWrite: false,
     side: DoubleSide,
@@ -145,7 +148,7 @@ export function createCloudLayer(): CloudLayerHandle {
 
   const heights = [8, 12, 16] as const;
   const planes = heights.map((heightOffset, index) => {
-    const plane = new Mesh(new PlaneGeometry(600, 600, 1, 1), material) as unknown as CloudPlane;
+    const plane = new Mesh(new PlaneGeometry(1500, 1500, 1, 1), material) as unknown as CloudPlane;
     plane.name = `cloud-plane-${index + 1}`;
     plane.rotation.x = -Math.PI / 2;
     plane.position.y = heightOffset;
@@ -169,7 +172,9 @@ export function updateCloudLayer(layer: CloudLayerHandle, update: CloudLayerUpda
     update.playerPosition.z * 0.18
   );
   layer.material.opacity = update.opacity;
-  layer.material.color.copy(update.farColor);
+  // Audit-fix B1: 不直接 copy farColor (会让云完全融入天空), 而是 lerp 到 horizon 60% +
+  // 保留 40% 自身近白色, 让云在天空背景前仍然可见.
+  layer.material.color.set(0xf8fcff).lerp(update.farColor, 0.6);
 
   const wind = update.windDirection.lengthSq() > 0.000001
     ? update.windDirection.clone().normalize()

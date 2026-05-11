@@ -171,18 +171,20 @@ test("lowland scenery emits separate instanced meshes per plant kind", () => {
   assert.ok(bushScaleY.every((scaleY) => scaleY < 1.1), "bush canopies should stay compact");
 });
 
-test("grass geometry uses a narrow five-blade fan cluster", () => {
+test("grass geometry uses tapered seven-blade tuft with jittered heights and bent tips", () => {
+  // Audit-fix B2 (2026-05-11): R10a 5-blade rectangle 还像葱。重做为 7 片三角形 taper +
+  // 高度 jitter (0.35-0.62) + 顶部弯向某随机方向 + 角度乱不均匀分布。
   const geometry = sharedGrassGeometry;
   const position = geometry.getAttribute("position");
   geometry.computeBoundingBox();
   const size = geometry.boundingBox.getSize(new Vector3());
 
-  assert.equal(position.count, 90, "five segmented non-indexed blades should produce 90 vertices");
-  assert.ok(size.y > 0.53 && size.y < 0.57, `grass height should stay near 0.55, got ${size.y}`);
-  assert.ok(size.x > 0.08, `fan cluster should spread across X, got ${size.x}`);
-  assert.ok(size.z > 0.08, `fan cluster should spread across Z, got ${size.z}`);
-  assert.ok(size.x < 0.14, `individual blades should stay narrow, got X spread ${size.x}`);
-  assert.ok(size.z < 0.14, `individual blades should stay narrow, got Z spread ${size.z}`);
+  // 7 blades × PlaneGeometry(1, 4) → (1+1)*(4+1)=10 verts indexed → 4 cells × 6 verts = 24 verts non-indexed
+  // 7 × 24 = 168 verts.
+  assert.equal(position.count, 168, "seven segmented non-indexed blades should produce 168 vertices");
+  assert.ok(size.y > 0.45 && size.y < 0.75, `grass height should jitter around 0.35-0.62 with vertex ramp, got ${size.y}`);
+  assert.ok(size.x > 0.08, `tuft should spread across X (with bend), got ${size.x}`);
+  assert.ok(size.z > 0.08, `tuft should spread across Z (with bend), got ${size.z}`);
 });
 
 function countKinds(height, biomeId, sampleCount = 1000) {
