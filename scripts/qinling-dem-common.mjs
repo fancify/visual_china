@@ -1,24 +1,13 @@
 import path from "node:path";
 
 import { fabdemDataset } from "./china-dem-common.mjs";
+// SSOT (2026-05-11): bounds/world 唯一事实源在 src/data/qinlingRegion.js。
+// 构建脚本 import 这一份，禁止再独立维护副本——这是 codex SSOT 审计修复。
+import { qinlingRegionBounds, qinlingRegionWorld } from "../src/data/qinlingRegion.js";
 
-// 2026-05 Phase 2：bounds 扩到全中国。跟 src/data/qinlingRegion.js 必须同值
-// （构建期 + 运行期一致）。
-export const qinlingBounds = {
-  west: 73.0,
-  east: 135.0,
-  south: 18.0,
-  north: 53.0
-};
-
-export const qinlingRegionManifestBounds = { ...qinlingBounds };
-
-export const qinlingWorld = {
-  // 保持 u/°lon = 27.6，不拉长东西向比例。
-  width: 1711,
-  // 用 cos(midLat=35.5°) 校正物理纵横比；必须跟运行期 source of truth 一致。
-  depth: 1186
-};
+export const qinlingBounds = qinlingRegionBounds;
+export const qinlingRegionManifestBounds = { ...qinlingRegionBounds };
+export const qinlingWorld = qinlingRegionWorld;
 
 export const qinlingGeographicFootprintKm = {
   width: 5602.74,

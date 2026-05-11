@@ -6,17 +6,16 @@
 
 // Types extracted from qinlingAtlas.d.ts — merged inline with implementation.
 
+// SSOT (2026-05-11)：与 qinlingAtlasLayers 注册表保持 1-to-1。
+// 之前 union 含 landform/road/military/culture 4 个废弃 layer，registry 里早已删除——
+// codex SSOT 审计修复：union 也对齐到当前 6 个 active layer。
 export type QinlingAtlasLayerId =
-  | "landform"
   | "water"
   | "city"
   | "pass"
-  | "road"
-  | "military"
-  | "livelihood"
-  | "culture"
   | "scenic"
-  | "ancient";
+  | "ancient"
+  | "livelihood";
 
 export type QinlingScenicRole =
   | "alpine-peak"

@@ -4004,38 +4004,8 @@ function drawAtlasFeature(
       feature.source?.verification === "verified"
     );
 
-  if (feature.layer === "landform") {
-    drawAtlasPath(context, feature, projection);
-    if (feature.geometry === "area") {
-      const isBasin = feature.terrainRole.includes("basin");
-      const isGorge = feature.terrainRole.includes("gorge");
-      context.fillStyle = isGorge
-        ? "rgba(130, 73, 39, 0.22)"
-        : isBasin
-          ? "rgba(76, 122, 89, 0.24)"
-          : "rgba(116, 100, 54, 0.18)";
-      context.strokeStyle = isGorge
-        ? "rgba(107, 52, 28, 0.34)"
-        : "rgba(55, 70, 43, 0.24)";
-      context.lineWidth = isGorge ? 2.1 : 1.2;
-      // draft 意象 area 用虚线边界
-      if (isDraftImagery) {
-        context.setLineDash([6, 4]);
-      }
-      context.closePath();
-      context.fill();
-      context.stroke();
-      context.setLineDash([]);
-    } else if (feature.geometry === "polyline") {
-      context.strokeStyle = "rgba(87, 65, 35, 0.58)";
-      context.lineWidth = 2.4;
-      if (isDraftImagery) {
-        context.setLineDash([6, 4]);
-      }
-      context.stroke();
-      context.setLineDash([]);
-    }
-  }
+  // SSOT (2026-05-11): landform layer 在 codex audit 中删除（手画意象与 3D 不一致），
+  // 对应 render 分支也一并删除。road 分支同理删除——古道现在用 routeRibbon 系统。
 
   if (feature.layer === "water") {
     // 按 source / displayPriority 做四级视觉权重：
@@ -4084,19 +4054,6 @@ function drawAtlasFeature(
     }
   }
 
-  if (feature.layer === "road") {
-    drawAtlasPath(context, feature, projection);
-    context.setLineDash([5, 4]);
-    context.strokeStyle = "rgba(93, 52, 18, 0.44)";
-    context.lineWidth = 2.4;
-    context.stroke();
-    drawAtlasPath(context, feature, projection);
-    context.strokeStyle = "rgba(229, 168, 82, 0.76)";
-    context.lineWidth = 1.25;
-    context.stroke();
-    context.setLineDash([]);
-  }
-
   if (feature.geometry === "point") {
     const center = atlasFeatureCenterInView(feature, projection);
     const isPass = feature.layer === "pass";
@@ -4119,15 +4076,11 @@ function drawAtlasFeature(
     const center = atlasFeatureCenterInView(feature, projection);
     // 全屏字号大幅放大——之前 12/10 在 1144x720 的全屏地图上太小看不清。
     // 小窗 minimap 仍用紧凑字号。
-    const baseLandformPx = fullscreen ? 17 : 12;
     const baseOtherPx = fullscreen ? 15 : 10;
-    context.font =
-      feature.layer === "landform"
-        ? `600 ${baseLandformPx}px 'Noto Sans SC', 'PingFang SC', sans-serif`
-        : `600 ${baseOtherPx}px 'Noto Sans SC', 'PingFang SC', sans-serif`;
+    context.font = `600 ${baseOtherPx}px 'Noto Sans SC', 'PingFang SC', sans-serif`;
     context.fillStyle = feature.layer === "water"
       ? "rgba(24, 82, 92, 0.86)"
-      : feature.layer === "road" || feature.layer === "pass"
+      : feature.layer === "pass"
         ? "rgba(92, 45, 18, 0.84)"
         : "rgba(45, 35, 20, 0.8)";
     // 手画意象在名字后追加" · 意象"提示，防止用户误读为事实数据。

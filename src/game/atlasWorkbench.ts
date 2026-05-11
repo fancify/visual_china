@@ -38,7 +38,9 @@ interface CanvasDims {
   height: number;
 }
 
-const LOCKED_LAYER_IDS = new Set<QinlingAtlasLayerId>(["landform" as QinlingAtlasLayerId]);
+// SSOT (2026-05-11): landform layer 已删（codex audit），locked set 暂为空但保留语义；
+// 未来如需锁某一层始终可见，直接添加 id。
+const LOCKED_LAYER_IDS = new Set<QinlingAtlasLayerId>();
 const DEFAULT_MAP_VIEW: AtlasMapView = { scale: 1, offsetX: 0, offsetY: 0 };
 const MIN_MAP_SCALE = 1;
 const MAX_MAP_SCALE = 8;

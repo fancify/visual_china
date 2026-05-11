@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createChunkScenery } from "../src/game/scenery.ts";
 import { qinlingRuntimeBudget } from "../src/game/performanceBudget.ts";
-import { TerrainSampler } from "../src/game/demSampler.ts";
+import { TerrainSampler, TERRAIN_VERTICAL_EXAGGERATION as EXAG } from "../src/game/demSampler.ts";
 import {
   findZoneAt,
   flattenedY,
@@ -102,8 +102,8 @@ test("terrain sampler height override flattens heights and hides rivers inside c
   sampler.setHeightOverride((rawY, x, z) => flattenedY(rawY, x, z));
 
   // 用户："夸张程度再少一半" → 2.13 → 1.07。
-  assert.equal(sampler.sampleHeight(0, 0), 1.5 * 1.07);
-  assert.equal(sampler.sampleSurfaceHeight(0, 0), 1.5 * 1.07);
+  assert.equal(sampler.sampleHeight(0, 0), 1.5 * EXAG);
+  assert.equal(sampler.sampleSurfaceHeight(0, 0), 1.5 * EXAG);
   assert.equal(sampler.sampleRiver(0, 0), 0);
   assert.notEqual(sampler.sampleHeight(4.5, 4.5), 1.5);
 });

@@ -17,17 +17,26 @@
   - SurfaceProvider 接口：`sampleGround / sampleWater / classifyDistance`
   - SurfaceState：`material / wetness / snowCover / dust / waterDepth / reflectivity / traction / footstep`
   - DistanceBand policy：terrain 最后退，actors/植被/POI 先退；view-cone cull
+  - **SSOT** (codex 5 审计 deferred)：`SurfaceProvider.sample()` 成为 `inWater / wet bank / grass footstep / river mask / road lift` 等判断的唯一入口；删 main.ts / waterSystemVisuals / audio/triggerSystem / scenery / plankRoadRenderer 里各自局部 heuristic
 - ⏳ **S4 Epoch Schema v3** (2-4d)
   - EpochManifest：`worldId / regionId / epochId / projection / terrain / hydrography / settlements / routes / poi / visualProfile / sourceQuality`
   - LandmarkHierarchy (Triangle Rule)：`gravityWell / large / medium / small` + `visualForm / visibilityBand / revealRole`
   - 第一份实例：`epochs/tang-tianbao-14/manifest.json`
   - Tang 水系重做：黄河北流 / 济水 / 隋唐运河 / 淮河独流 / 桑干河
+  - **SSOT** (codex 5 审计 deferred)：
+    - RouteManifest 唯一源（删 routes / routeAnchors / routePaths 三处独立 author）
+    - `docs/tang-epoch-755-poi-database.md` 数据迁到 `epochs/tang-tianbao-14/cities.json`，md 只留 research notes
+    - City ID rename：`xian` → `changan` 等 30+；hardcoded test 引用一起改
+    - Hydrography `RELATIONS_BY_ID` 改 typed registry 校验 city/route id
 - ⏳ **S5 Runtime Split** (5-7d, 高风险 step)
   - main.ts 6263 → 6 runtime (Terrain / Surface / Water / Content / Environment / Player)
   - main.ts 留 boot + input wiring + frame scheduler
   - 加 AudioDirector（ambient bed + sparse music + stinger）
   - 固定 render layering: terrain→water→weather→content→player→post
   - 同时修 `qinlingAtlas.ts` ts-nocheck + `data/*.js` 类型补全
+  - **SSOT** (codex 5 审计 deferred)：
+    - MountDefinition 扩 `speedMultiplier / isFlying / inertia / audioProfile`（删 mounts / mountRuntime / playerCustomization / mount-speeds.test 各自副本）
+    - RenderLayerPolicy 集中 `renderOrder / depthWrite / depthTest / polygonOffset`（删 main.ts + terrainMesh + cityMarkers + cloudPlanes + waterSurfaceShader + castShadowPolicy 六处散落）
 - ⏳ **S6 Hero Visual Slice** (3-7d)
   - 选一条唐风山水路线（建议长安-终南-子午谷 或 长安-潼关）
   - 1-2u 半宽 pilot → 扩到 3-5u

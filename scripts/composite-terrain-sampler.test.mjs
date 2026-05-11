@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { CompositeTerrainSampler, TerrainSampler } from "../src/game/demSampler.ts";
+import {
+  CompositeTerrainSampler,
+  TerrainSampler,
+  TERRAIN_VERTICAL_EXAGGERATION as EXAG
+} from "../src/game/demSampler.ts";
 
 function makeAsset(id, height, worldBounds) {
   return {
@@ -81,8 +85,8 @@ test("CompositeTerrainSampler reuses the last chunk hit for nearby samples", () 
     return originalValues();
   };
 
-  assert.equal(Math.abs(composite.sampleHeight(2, 0) - 3 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(composite.sampleSurfaceHeight(3, 1) - 3 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleHeight(2, 0) - 3 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleSurfaceHeight(3, 1) - 3 * EXAG) < 1e-9, true);
   assert.equal(scans, 1);
 });
 
@@ -101,26 +105,26 @@ test("CompositeTerrainSampler keeps a boundary point on the cached chunk until i
     { minX: 0, maxX: 10, minZ: -5, maxZ: 5 }
   );
 
-  assert.equal(Math.abs(composite.sampleHeight(-0.1, 0) - 2 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(composite.sampleHeight(0, 0) - 2 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(composite.sampleHeight(0.1, 0) - 3 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(composite.sampleHeight(0, 0) - 3 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleHeight(-0.1, 0) - 2 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleHeight(0, 0) - 2 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleHeight(0.1, 0) - 3 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleHeight(0, 0) - 3 * EXAG) < 1e-9, true);
 });
 
 test("TerrainSampler.sampleHeightLod bilinearly samples downsampled LOD grids", () => {
   const sampler = new TerrainSampler(makeLodAsset());
 
-  assert.equal(Math.abs(sampler.sampleHeightLod(-5, -5, 1) - 2.5 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(sampler.sampleHeightLod(5, 5, 1) - 12.5 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(sampler.sampleHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleHeightLod(-5, -5, 1) - 2.5 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleHeightLod(5, 5, 1) - 12.5 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleHeightLod(0, 0, 1) - 7.5 * EXAG) < 1e-9, true);
 });
 
 test("TerrainSampler.sampleSurfaceHeightLod samples LOD grids with terrain triangle interpolation", () => {
   const sampler = new TerrainSampler(makeLodAsset());
 
-  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(-5, -5, 1) - 2.5 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(5, 5, 1) - 12.5 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(-5, -5, 1) - 2.5 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(5, 5, 1) - 12.5 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(sampler.sampleSurfaceHeightLod(0, 0, 1) - 7.5 * EXAG) < 1e-9, true);
 });
 
 test("TerrainSampler.sampleHeightLod falls back to L0 when lodHeights are absent", () => {
@@ -142,8 +146,8 @@ test("CompositeTerrainSampler.sampleHeightLod uses chunk LOD before base fallbac
     { minX: -5, maxX: 5, minZ: -5, maxZ: 5 }
   );
 
-  assert.equal(Math.abs(composite.sampleHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(composite.sampleHeightLod(20, 0, 1) - 1 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(composite.sampleSurfaceHeightLod(0, 0, 1) - 7.5 * 1.07) < 1e-9, true);
-  assert.equal(Math.abs(composite.sampleSurfaceHeightLod(20, 0, 1) - 1 * 1.07) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleHeightLod(0, 0, 1) - 7.5 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleHeightLod(20, 0, 1) - 1 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleSurfaceHeightLod(0, 0, 1) - 7.5 * EXAG) < 1e-9, true);
+  assert.equal(Math.abs(composite.sampleSurfaceHeightLod(20, 0, 1) - 1 * EXAG) < 1e-9, true);
 });
