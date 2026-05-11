@@ -3137,7 +3137,7 @@ interface AtlasCanvasProjection {
 function strictAtlasProjection(
   asset: DemAsset,
   canvas: HTMLCanvasElement,
-  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" }
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" | "contain" }
 ): AtlasCanvasProjection {
   return {
     worldToCanvas: (point) =>
@@ -3309,7 +3309,7 @@ function drawAtlasBaseMap(
   context: CanvasRenderingContext2D,
   asset: DemAsset,
   canvas: HTMLCanvasElement,
-  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" }
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" | "contain" }
 ): void {
   const baseMap = createAtlasBaseMapCanvas(asset);
   const topLeft = atlasMapWorldToCanvasPoint(
@@ -3430,7 +3430,7 @@ function atlasFeatureCacheKey(
 function renderAtlasStaticInto(
   surface: HTMLCanvasElement,
   asset: DemAsset,
-  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" },
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" | "contain" },
   useWorkbenchView: boolean
 ): void {
   const context = surface.getContext("2d");
@@ -3449,7 +3449,7 @@ function renderAtlasStaticInto(
 function renderAtlasFeaturesInto(
   surface: HTMLCanvasElement,
   asset: DemAsset,
-  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" },
+  mapView: { scale: number; offsetX: number; offsetY: number; fitMode?: "stretch" | "cover" | "contain" },
   useWorkbenchView: boolean,
   selectedFeatureId: string | null
 ): void {

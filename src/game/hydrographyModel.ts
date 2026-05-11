@@ -27,6 +27,8 @@ export interface HydrographyFeature {
   source: {
     name: string;
     confidence: HydrographyConfidence;
+    verification?: string;
+    license?: string;
   };
   relations: string[];
   geometry: {
@@ -34,14 +36,35 @@ export interface HydrographyFeature {
   };
 }
 
+const LOD_MAX_RANK: Record<HydrographyLod, number> = {
+  l0: 1,
+  l1: 3,
+  l2: 6
+};
+
 export function normalizeHydrographyFeature(
   raw: Omit<HydrographyFeature, "aliases" | "relations"> &
     Partial<Pick<HydrographyFeature, "aliases" | "relations">>
-): HydrographyFeature;
+): HydrographyFeature {
+  return {
+    aliases: [],
+    relations: [],
+    ...raw,
+    eraId: raw.eraId ?? "modern",
+    source: {
+      name: raw.source.name,
+      confidence: raw.source.confidence
+    }
+  };
+}
 
-export function hydrographyFeatureKey(feature: HydrographyFeature): string;
+export function hydrographyFeatureKey(feature: HydrographyFeature): string {
+  return `${feature.eraId}:${feature.id}`;
+}
 
 export function hydrographyVisibleAtLod(
   feature: HydrographyFeature,
   lod: HydrographyLod
-): boolean;
+): boolean {
+  return feature.rank <= LOD_MAX_RANK[lod];
+}

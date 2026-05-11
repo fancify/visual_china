@@ -13,13 +13,17 @@ async function loadGameModules() {
   await mkdir(tempRoot, { recursive: true });
   const tempDir = await mkdtemp(path.join(tempRoot, "sky-atmosphere-"));
   const sourceDir = path.resolve("src/game");
+  // S2 (2026-05-11)：skyDome 和 celestial 从 .js+.d.ts 迁到 .ts + .js shim 后，
+  // 直接 copyFile 会拿到 shim (`export * from "./skyDome.ts"`)，但 temp 目录里没
+  // .ts。改成跟其他模块一样走 transpile。
   const transpileTargets = [
     "atmosphereLayer.ts",
     "cloudPlanes.ts",
     "environment.ts",
-    "proceduralTextures.ts"
+    "proceduralTextures.ts",
+    "skyDome.ts",
+    "celestial.ts"
   ];
-  const copyTargets = ["skyDome.js", "celestial.js"];
 
   for (const fileName of transpileTargets) {
     const source = await readFile(path.join(sourceDir, fileName), "utf8");
@@ -40,10 +44,6 @@ async function loadGameModules() {
       rewritten,
       "utf8"
     );
-  }
-
-  for (const fileName of copyTargets) {
-    await copyFile(path.join(sourceDir, fileName), path.join(tempDir, fileName));
   }
 
   const atmosphereLayer = await import(

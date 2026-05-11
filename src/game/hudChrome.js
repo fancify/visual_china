@@ -1,27 +1,2 @@
-export const compactHudPanelConfig = {
-  mode: {
-    visible: false,
-    openByDefault: false
-  },
-  overview: {
-    // 用户："右上角小地图默认展开" → openByDefault: true
-    visible: true,
-    openByDefault: true
-  },
-  controls: {
-    // 用户："操作提示也可以去掉"
-    visible: false,
-    openByDefault: false
-  },
-  status: {
-    // 用户："右下角的当前旅程可以去掉了"
-    visible: false,
-    openByDefault: false
-  },
-  journal: {
-    visible: false,
-    openByDefault: false
-  }
-};
-
-export const visibleStatusLineIds = [];
+// Shim：让 raw-node ESM 通过 .js 后缀 import 到 .ts 源。详见 compass.js。
+export * from "./hudChrome.ts";
