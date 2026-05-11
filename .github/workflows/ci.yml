@@ -1,0 +1,40 @@
+name: CI
+
+# 轻量 CI：typecheck + test:fast + test:audio + build
+# 不跑 visual/data（38s 总），因为它们依赖 build:dem 资产生成
+# Future: build:dem + visual + data 留给 nightly workflow
+
+on:
+  push:
+    branches: [main, feature/**]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Fast tests (contract + SSOT guards)
+        run: npm run test:fast
+
+      - name: Audio tests
+        run: npm run test:audio
+
+      - name: Build (vite production)
+        run: npm run build
