@@ -79,6 +79,10 @@ import {
 } from "./game/cameraView.js";
 import { qinlingCameraRig } from "./game/cameraRig.js";
 import {
+  QinlingSurfaceProvider,
+  type SurfaceProvider
+} from "./game/surfaceProvider.js";
+import {
   EnvironmentController,
   seasonLabel,
   weatherLabel,
@@ -321,6 +325,10 @@ declare global {
 // 命中已装载的 chunk 用 chunk sampler，否则 fallback 到 base（L1）。
 // 解决"建筑/水/POI 用 L1 高度，跟 chunks 实际渲染脱钩"的问题。
 let terrainSampler: CompositeTerrainSampler | null = null;
+// S3 SurfaceProvider —— 默认实现 wrap terrainSampler + environment。
+// S3a 阶段只创建实例不迁移 callsite；S3b 时把 main.ts/water/audio/scenery/road
+// 各处局部 sampleHeight + 启发式 wet/footstep 全部走 surfaceProvider.sampleX()。
+let surfaceProvider: SurfaceProvider | null = null;
 const groundAnchorRegistry = new GroundAnchorRegistry();
 const terrainAssetRequest = resolveTerrainAssetRequest(
   window.location.search,
@@ -5892,6 +5900,12 @@ function applyTerrainFromSampler(sampler: TerrainSampler): void {
   disposeChunkTerrain();
   // 包成 composite，让 chunks 注册后所有 sampleHeight 等自动用 chunk 数据。
   terrainSampler = new CompositeTerrainSampler(sampler);
+  // S3 SurfaceProvider 同步创建/重建——所有 surface query 的 SSOT。
+  // S3b 时迁移现有 callsite。
+  surfaceProvider = new QinlingSurfaceProvider({
+    sampler: terrainSampler,
+    environment: environmentController
+  });
   const visibleCities = sampler.asset.bounds
     ? realQinlingCities.filter(
         (city) =>
