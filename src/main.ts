@@ -858,12 +858,13 @@ export function resolvePlayerTargetY({
     return cloudFlightAltitude;
   }
 
-  // Audit-fix (2026-05-11): 之前 +0.35 让 player.position.y 在 ground 上 0.35u。
-  // avatar STANDING_POSE_FOOT_Y = -0.25 (脚底在 mesh local y=-0.25)，所以脚底实际在
-  // ground + 0.10u (浮空 0.1u)，slope 下行+前景 scenery 遮挡时用户视觉感觉"陷"。
-  // 改 +0.35 → +0.25 让脚底正好踩在 ground 上 (player.y - 0.25 = ground)。
-  // mount 骑乘时 mount 系统额外提升 saddle，本函数 +0.25 是walk/foot baseline。
-  return (groundSurface ?? ground) + 0.25;
+  // Codex review (2026-05-11) 纠正：第一次 audit fix 我用 STANDING_POSE_FOOT_Y=-0.25
+  // 算 +0.25。但 playerAvatarMesh.ts:125 把腿 center 改 0.1 + scale 0.78 + line 227
+  // 整 group 抬 0.08，实际脚底 mesh local y ≈ -0.03 (不是 -0.25)。所以 +0.25 仍让脚浮
+  // 0.21u。mount 蹄底 local y ≈ 0，同 +0.25 让 mount 浮 0.25u。
+  // 校准 +0.25 → +0.03 (foot 真踩 ground)。mount 也用 +0.03 (蹄微浮 0.03u 视觉可忽略)。
+  // 长期方案: createPlayerAvatar/createMount 返回 groundContactY，dispatch 表 mount-aware。
+  return (groundSurface ?? ground) + 0.03;
 }
 
 export function nextCloudFlightAltitude({
@@ -5595,10 +5596,13 @@ function update(deltaSeconds: number): void {
   // 飞行 mount：player.y 直接锁到 cloudFlightAltitude，避免 lerp 渐进过程
   // 跟 chunk 装载/CSS lerp/camera follow 复合产生"颠簸"感。
   // 非飞行：保留 lerp 让 player 跟 ground 平滑跟随。
+  // Codex review (2026-05-11)：lerp 0.16 上坡时 player.y 数帧追不上 targetY → 沉地穿模 →
+  // 用户截图"陷入大三角"还有这一份。修：上行 snap (Math.max 取上限)，下行 lerp (平滑)。
   if (isFlyingMount(currentMountId)) {
     player.position.y = targetY;
   } else {
-    player.position.y = MathUtils.lerp(player.position.y, targetY, 0.16);
+    const nextY = MathUtils.lerp(player.position.y, targetY, 0.16);
+    player.position.y = nextY < targetY ? targetY : nextY;
   }
   if (window.HUD_DEBUG) {
     console.info(

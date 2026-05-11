@@ -318,14 +318,14 @@ export function attachTerrainShaderEnhancements(
         // Audit-fix B6 (2026-05-11): cookie 跟 atmospheric haze 远景双重暗化（远云影
         // 被 haze 吃掉看不见）。加 nearAttn = 1 - 远景占比，让 cookie 在中近景全强、
         // 远景渐弱（远景靠 haze 接管）。
+        // Codex review (2026-05-11) 纠正: 之前 smoothstep(haze_start*0.5, haze_start) =
+        // smoothstep(30, 60) 让中景 30-60u cookie 快速吃掉。default-follow camera 距 player
+        // 9u (不是 65u)，但视野中景就在 30-60u 范围 → 云影最常看的距离正好被 attn 干掉。
+        // 改 60-120u 独立常量，比 haze 起步晚，让中景全强、只远景 fade。
         vec2 cookieUV = vWorldPosition.xz / uCloudCookieScale
           + uWindDirection * uWindTime * 0.05 * (0.4 + uWindStrength);
         float cookieValue = texture2D(uCloudCookie, cookieUV).r;
-        float nearCookieAttn = 1.0 - smoothstep(
-          uAtmosphericFarStart * 0.5,
-          uAtmosphericFarStart,
-          vTerrainViewDepth
-        );
+        float nearCookieAttn = 1.0 - smoothstep(60.0, 120.0, vTerrainViewDepth);
         float shadowFactor = smoothstep(0.35, 0.65, cookieValue)
           * uCloudCookieStrength
           * nearCookieAttn;
