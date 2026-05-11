@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [pipeline, dem, ingestion]
+updated: 2026-05-12
+---
+
 # 山河中国 · DEM 资产格式与地理边界规范
 
 ## 1. 这份规范解决什么问题

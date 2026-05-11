@@ -1,3 +1,10 @@
+---
+type: reference
+status: reference
+tags: [doc]
+updated: 2026-05-01
+---
+
 # 多尺度地图与历史年代层架构设计
 
 日期：2026-05-01

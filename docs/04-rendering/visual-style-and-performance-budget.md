@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [rendering, visual]
+updated: 2026-05-12
+---
+
 # 山河中国 · 视觉风格与性能预算原则
 
 ## 1. 这份规则解决什么问题

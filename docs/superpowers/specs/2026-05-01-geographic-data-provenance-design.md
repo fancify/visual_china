@@ -1,3 +1,10 @@
+---
+type: reference
+status: reference
+tags: [doc]
+updated: 2026-05-01
+---
+
 # Geographic Data Provenance Design
 
 ## Goal

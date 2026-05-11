@@ -1,3 +1,10 @@
+---
+type: spec
+status: shipped
+tags: [rendering, visual]
+updated: 2026-05-12
+---
+
 # S1 Baseline Regression Gate — 首次快照
 
 **日期**: 2026-05-11

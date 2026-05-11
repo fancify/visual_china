@@ -1,3 +1,10 @@
+---
+type: plan
+status: reference
+tags: [architecture, design]
+updated: 2026-05-12
+---
+
 # 山河中国 · 开放世界地理资产流式加载方案
 
 ## 1. 方案目标

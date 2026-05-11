@@ -1,3 +1,10 @@
+---
+type: archive
+status: superseded
+tags: [archive, superseded]
+updated: 2026-05-12
+---
+
 # BotW-Like 视觉路线图 · r3 修订版
 
 更新时间：2026-05-10

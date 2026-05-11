@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [product, requirements]
+updated: 2026-05-12
+---
+
 # 山河中国开发任务看板
 
 更新时间：2026-05-01

@@ -1,3 +1,10 @@
+---
+type: plan
+status: reference
+tags: [architecture, design]
+updated: 2026-05-12
+---
+
 # Geographic Coordinate And Experience Compression
 
 更新时间：2026-05-01

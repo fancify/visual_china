@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [product, requirements]
+updated: 2026-05-12
+---
+
 # 山河中国 · BotW 沉浸感技术学习与移植路线图
 
 更新时间：2026-05-10

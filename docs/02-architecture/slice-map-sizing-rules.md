@@ -1,3 +1,10 @@
+---
+type: plan
+status: reference
+tags: [architecture, design]
+updated: 2026-05-12
+---
+
 # 山河中国 · 切片地图尺寸设计规则
 
 ## 1. 这份规则解决什么问题

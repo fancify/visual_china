@@ -1,3 +1,10 @@
+---
+type: archive
+status: superseded
+tags: [archive, superseded]
+updated: 2026-05-12
+---
+
 # 山河中国 · 下一阶段执行方案
 
 ## 1. 执行目标

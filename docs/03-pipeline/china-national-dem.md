@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [pipeline, dem, ingestion]
+updated: 2026-05-12
+---
+
 # 全国中国 DEM 母版方案
 
 ## 目标

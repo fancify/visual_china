@@ -42,3 +42,5 @@ public/data/regions/qinling/slice-l1.json
 
 # Test runner temp dirs (sky-atmosphere, avatar, mount, scenic-poi 测试用)
 .codex-temp-tests/
+logs/
+.obsidian/

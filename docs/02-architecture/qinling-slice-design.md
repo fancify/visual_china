@@ -1,3 +1,10 @@
+---
+type: plan
+status: reference
+tags: [architecture, design]
+updated: 2026-05-12
+---
+
 # 秦岭 - 关中 - 四川盆地 · 首版切片设计
 
 ## 区域目标

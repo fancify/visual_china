@@ -1,3 +1,10 @@
+---
+type: reference
+status: reference
+tags: [doc]
+updated: 2026-05-01
+---
+
 # 现代水系数据管线设计
 
 日期：2026-05-01

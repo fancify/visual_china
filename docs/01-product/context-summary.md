@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [product, requirements]
+updated: 2026-05-12
+---
+
 # 上下文压缩摘要
 
 更新时间：2026-05-11

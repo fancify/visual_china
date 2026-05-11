@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [pipeline, dem, ingestion]
+updated: 2026-05-12
+---
+
 # 秦岭切片 2D Atlas Pipeline
 
 ## 目标

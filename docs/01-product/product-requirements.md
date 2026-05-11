@@ -1,3 +1,10 @@
+---
+type: spec
+status: reference
+tags: [product, requirements]
+updated: 2026-05-12
+---
+
 # 山河中国 · 第一阶段产品需求定稿
 
 ## 1. 产品定义

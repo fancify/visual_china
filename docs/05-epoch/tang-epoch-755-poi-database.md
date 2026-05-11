@@ -1,3 +1,10 @@
+---
+type: reference
+status: reference
+tags: [epoch, tang, historical]
+updated: 2026-05-12
+---
+
 # 唐玄宗 天宝十四年 (755 AD) POI 数据库
 
 > **用途**：项目 Epoch v1 数据源参考。当前 `src/data/realCities.js` 大量使用现代地名，本文档记录每个城市的 Tang 755 真名 + 状态，S4 (Epoch Schema) 落地时按此清单迁移：保留现有 modern epoch + 新建 `epochs/tang-tianbao-14/` 含 Tang-correct names。

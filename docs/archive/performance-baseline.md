@@ -1,3 +1,10 @@
+---
+type: archive
+status: superseded
+tags: [archive, superseded]
+updated: 2026-05-12
+---
+
 # 千里江山图 · 性能基线（2026-05-02）
 
 记录当前秦岭切片在不同场景下的 fps / ms / draw-calls / tris 基线，标记热路径，

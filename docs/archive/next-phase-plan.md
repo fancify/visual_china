@@ -1,3 +1,10 @@
+---
+type: archive
+status: superseded
+tags: [archive, superseded]
+updated: 2026-05-12
+---
+
 # 下一阶段计划：Atlas 工作台到 3D 回灌
 
 更新时间：2026-05-01

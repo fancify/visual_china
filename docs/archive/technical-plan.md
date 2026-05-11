@@ -1,3 +1,10 @@
+---
+type: archive
+status: superseded
+tags: [archive, superseded]
+updated: 2026-05-12
+---
+
 # 山河中国 · 首版技术方案
 
 ## 目标

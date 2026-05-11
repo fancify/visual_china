@@ -1,3 +1,10 @@
+---
+type: archive
+status: superseded
+tags: [archive, superseded]
+updated: 2026-05-12
+---
+
 # 山河中国 · 需求对齐与下一阶段共识草案
 
 ## 1. 这份文档的目的
