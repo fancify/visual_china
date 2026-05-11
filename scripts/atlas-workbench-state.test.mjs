@@ -27,7 +27,7 @@ test("atlas workbench starts with default-visible layers enabled", () => {
 
   // 跟 3D 主游戏对齐后，atlas 只剩 水系 / 城市 / 关隘 / 民生 4 层。
   // 前 3 个 defaultVisible: true，让用户打开 atlas 一眼看到秦岭网络
-  // （西安、剑门关、汉水）。民生（都江堰水利）是专题图层，按需打开。
+  // （长安、剑门关、汉水）。民生（导江/都江堰水利）是专题图层，按需打开。
   assert.equal(state.visibleLayerIds.has("water"), true);
   assert.equal(state.visibleLayerIds.has("city"), true);
   assert.equal(state.visibleLayerIds.has("pass"), true);

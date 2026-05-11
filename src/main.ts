@@ -2,7 +2,6 @@ import "./style.css";
 
 import {
   AmbientLight,
-  BackSide,
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
@@ -26,8 +25,6 @@ import {
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
-  Points,
-  PointsMaterial,
   Raycaster,
   Scene,
   SphereGeometry,
@@ -60,8 +57,7 @@ import {
 } from "./data/qinlingSlice";
 import {
   createAmbientMixer,
-  type AmbientContext,
-  type AmbientMixer
+  type AmbientContext
 } from "./game/audio/ambientMixer";
 import {
   createAudioRuntime,
@@ -86,7 +82,6 @@ import {
   EnvironmentController,
   seasonLabel,
   weatherLabel,
-  formatTimeOfDay,
   formatAncientTimeOfDay,
   skyBodyHorizonFade,
   sharedAtmosphericFarColor,
@@ -158,10 +153,6 @@ import {
   type QinlingAtlasFeature,
   type QinlingAtlasLayerId
 } from "./game/qinlingAtlas.js";
-import {
-  importedHydrographyAssetToAtlasFeatures,
-  type ImportedHydrographyAsset
-} from "./game/osmHydrographyAtlas.js";
 import { hydrographyFeatureToAtlasFeature } from "./game/hydrographyAtlas.js";
 import type { HydrographyFeature } from "./game/hydrographyModel.js";
 import { qinlingModernHydrography } from "./game/qinlingHydrography.js";
@@ -545,7 +536,7 @@ function hudDebugWarn(message: string, details?: unknown): void {
   console.warn("[HUD-DEBUG]", message, details);
 }
 
-// proximity 半径：原 3-5u 太宽——玩家出生位置就压在西安半径内，HUD 一直挂着
+// proximity 半径：原 3-5u 太宽——玩家出生位置就压在长安半径内，HUD 一直挂着
 // 不会消失，用户报告"不会触发"。半径砍半，强制"必须走进城/景"才显示。
 const PROXIMITY_RADIUS_DEFAULT = 1.6;
 const PROXIMITY_RADIUS_CITY_COUNTY = 1.4;
@@ -1503,7 +1494,7 @@ function updateCityLodFade(): void {
     sprite.material.opacity = prefectureAlpha;
     sprite.visible = prefectureAlpha > 0.01;
   }
-  // capital 名签（西安/成都）：本来 opacity 恒 1，但用户要求"标签离得太远
+  // capital 名签（长安/成都）：本来 opacity 恒 1，但用户要求"标签离得太远
   // 就不要显示了"——给一档软 fade 250..330，覆盖飞镜头到 region 边缘的
   // 极端情况。默认相机 26..170 全程 1.0 不变。
   const capitalLabelAlpha = 1 - MathUtils.smoothstep(distance, 250, 330);
@@ -3729,7 +3720,7 @@ interface RegionPlacemark {
 
 // 宏观地带标签：跟 feature 系统并行，atlas 打开时作为"地理骨架"。
 // 用 lat/lon 而不是 world.x/z，bounds 改了自动跟着重投影（refactor #63）。
-// 真实经纬度按对应地理中心估算：关中平原≈西安附近(34.5°N, 108.5°E)，
+// 真实经纬度按对应地理中心估算：关中平原≈长安附近(34.5°N, 108.5°E)，
 // 秦岭主脊≈太白山(33.95°N, 107.78°E)，等等。
 const qinlingRegionPlacemarks: RegionPlacemark[] = [
   { name: "关中平原",     lat: 34.50, lon: 108.30, fontSize: 26 },
@@ -3903,9 +3894,9 @@ function nearestLandmarkText(): string {
 
   const currentPosition = new Vector2(player.position.x, player.position.z);
   // 跟 rebuildLandmarkVisuals 保持一致：legacy 重叠的"意象"城市地标不
-  // 进 HUD nearest（否则站在 西安 旁还是被告知"附近：长安意象"）。
+  // 进 HUD nearest（否则站在 长安 旁还是被告知"附近：长安意象"）。
   // 同时把 P4 真实城市 instanced markers 也变成 nearest 候选，否则 HUD
-  // 会指向更远的 渭河平原 / 褒斜谷意象 之类，而玩家其实就站在西安/汉中
+  // 会指向更远的 渭河平原 / 褒斜谷意象 之类，而玩家其实就站在长安/汉中
   // 旁边——codex d99d587 review 抓到。
   const renderableLandmarks = landmarks.filter(
     (landmark) => !isLegacyOverlappingCityLandmark(landmark)

@@ -90,7 +90,7 @@ export const landmarks: Landmark[] = [
   })
 ];
 
-// 默认 routeStart 投到关中（西安）；regionBundle.content.routeStart 可在加载
+// 默认 routeStart 投到关中（长安）；regionBundle.content.routeStart 可在加载
 // poiManifest 时覆盖。
 const _routeStart = geoToWorld(
   { lat: 34.34, lon: 108.94 },

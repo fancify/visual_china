@@ -69,10 +69,10 @@ test("baoxie road keeps the Liuba-centered historical middle section", () => {
   assert.ok(Math.abs(liuba.lon - 106.92) <= 0.02);
 });
 
-test("ziwu-road starts at Xi'an city, not at the canyon mouth", () => {
+test("ziwu-road starts at Chang'an city, not at the canyon mouth", () => {
   const anchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["ziwu-road"];
   assert.equal(anchors.length, 7);
-  assert.equal(anchors[0].name, "西安");
+  assert.equal(anchors[0].name, "长安");
   assert.ok(Math.abs(anchors[0].lat - 34.27) < 0.05);
   assert.ok(Math.abs(anchors[0].lon - 108.95) < 0.05);
   assert.deepEqual(qinlingRouteAnchors["ziwu-road"].labelPoint, qinlingRouteAnchors["ziwu-road"].points[3]);
@@ -137,14 +137,14 @@ test("guanzhong corridor links the northern Shu-road mouths across the Wei south
 
   assert.deepEqual(
     guanzhongAnchors.map((anchor) => anchor.name),
-    ["宝鸡", "眉县", "周至", "西安"]
+    ["宝鸡", "眉县", "周至", "长安"]
   );
 });
 
 test("lizhi road starts from Chang'an and now lands inside the expanded southern slice", () => {
   const lizhiAnchors = QINLING_ROUTE_ANCHOR_GEOGRAPHY["lizhi-road"];
   assert.equal(lizhiAnchors.length, 5);
-  assert.equal(lizhiAnchors[0]?.name.includes("西安"), true);
+  assert.equal(lizhiAnchors[0]?.name.includes("长安"), true);
   assert.equal(lizhiAnchors.at(-1)?.name.includes("涪陵"), true);
   assert.ok(lizhiAnchors.at(-1).lat >= qinlingRegionBounds.south);
   assert.ok(lizhiAnchors.at(-1).lat <= 29.8, "lizhi-road should still reach the far south edge corridor");

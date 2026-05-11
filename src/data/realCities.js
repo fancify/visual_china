@@ -5,7 +5,15 @@
  * - lat/lon 取自当代行政中心（Wikipedia / 中国国家基础地理信息数据），
  *   不同朝代历史治所（如汉中之"褒城"）以现代行政中心代替。
  * - tier = 京城 / 州府 / 县城，按城市的历史/当代规模分档：
- *   - 京城：长安（西安）、成都（蜀汉都城）—— 三档建筑簇里的最高档
+ *   - 京城：长安、洛阳（两京）、成都（蜀汉都城）—— 三档建筑簇里的最高档
+ *
+ * 2026-05-11 Epoch v1 = 唐玄宗天宝十四年 (755 AD)：
+ *   - 当前数据混用了现代名（西安/北京/南京 等）和真实历史名。
+ *   - 本轮 cleanup 已把 "西安" → "长安"（Tang 都城真名）。
+ *   - 其余 ~20 个现代地名（北京→幽州、重庆→渝州、宁波→明州 等）以及
+ *     不属于 Tang 755 城市集的近代地名（上海/深圳/香港 等），
+ *     收录在 docs/tang-epoch-migration-list.md，S4 epoch schema 落地时
+ *     系统迁移：保留 modern epoch + 新建 tang-tianbao-14 epoch。
  *   - 州府：宝鸡、汉中、广元、天水、绵阳、巴中、德阳、都江堰
  *   - 县城：参考"古蜀道示意全图"里挂在古道线上的县级节点
  *
@@ -17,13 +25,15 @@
 export const realQinlingCities = [
   // 京城（capital）
   {
+    // S4 TODO: rename id "xian" → "changan"，但当前 8+ test 引用此 id，
+    // 等 S4 epoch schema 一起迁。
     id: "xian",
-    name: "西安",
+    name: "长安",
     lat: 34.27,
     lon: 108.95,
     tier: "capital",
-    hint: "古长安，关中盆地的核心，汉/唐都城",
-    description: `西安即古长安，地处关中平原中部，渭河南岸。公元前 202 年汉高祖刘邦定都于此，称长安，此后历经西汉（前 206—9 年）、隋（581—618 年）、唐（618—907 年）等十余个王朝建都或陪都，是中国历史上建都朝代最多、时间最长的城市之一。
+    hint: "唐都，关中盆地的核心",
+    description: `长安地处关中平原中部，渭河南岸。公元前 202 年汉高祖刘邦定都于此，称长安，此后历经西汉（前 206—9 年）、隋（581—618 年）、唐（618—907 年）等十余个王朝建都或陪都，是中国历史上建都朝代最多、时间最长的城市之一。天宝十四年（755 AD）安史之乱前夕，长安城内人口超百万，为当时世界最大都市。
 
 地理上，长安坐拥"八百里秦川"，北依渭北台塬，南望秦岭主脊，东有潼关天险，西连陇右。渭河及其支流泾河、灞河构成城市水系骨架，农业条件优越，历代称"金城千里，天府之国"（此语早于成都获同称）。
 
@@ -46,7 +56,7 @@ export const realQinlingCities = [
   // 州府（prefecture）
   {
     id: "baoji",
-    name: "宝鸡",
+    name: "岐州",
     lat: 34.36,
     lon: 107.24,
     tier: "prefecture",
@@ -59,7 +69,7 @@ export const realQinlingCities = [
   },
   {
     id: "hanzhong",
-    name: "汉中",
+    name: "梁州",
     lat: 33.07,
     lon: 107.03,
     tier: "prefecture",
@@ -68,11 +78,11 @@ export const realQinlingCities = [
 
 汉中盆地南北宽约 30—50 公里，东西绵延约 200 公里，夹于秦岭与巴山两大山系之间，是南北方之间难得的宜农谷地，自古为屯粮练兵之所。汉水将盆地串联，水运亦可东达荆楚。
 
-汉中是蜀道体系中最关键的中继节点，多条主干道在此交汇：褒斜道从北（眉县）入；子午道从东北（西安子午谷）入；傥骆道从东北（周至骆谷）入；陈仓道从西北（宝鸡陈仓）入；金牛道从南（广元）出。诸葛亮五次北伐，均以汉中作为前进基地，在此积粮造械、整训大军。228 年至 234 年间，汉中承担了蜀汉北伐全部的后勤补给链条。`
+汉中是蜀道体系中最关键的中继节点，多条主干道在此交汇：褒斜道从北（眉县）入；子午道从东北（长安子午谷）入；傥骆道从东北（周至骆谷）入；陈仓道从西北（宝鸡陈仓）入；金牛道从南（广元）出。诸葛亮五次北伐，均以汉中作为前进基地，在此积粮造械、整训大军。228 年至 234 年间，汉中承担了蜀汉北伐全部的后勤补给链条。`
   },
   {
     id: "guangyuan",
-    name: "广元",
+    name: "利州",
     lat: 32.43,
     lon: 105.84,
     tier: "prefecture",
@@ -96,7 +106,7 @@ export const realQinlingCities = [
   // 用山岳 symbol 渲染，不再走城市 marker 路径。它是西岳，不是城。
   {
     id: "tianshui",
-    name: "天水",
+    name: "秦州",
     lat: 34.58,
     lon: 105.72,
     tier: "prefecture",
@@ -109,7 +119,7 @@ export const realQinlingCities = [
   },
   {
     id: "mianyang",
-    name: "绵阳",
+    name: "绵州",
     lat: 31.47,
     lon: 104.74,
     tier: "prefecture",
@@ -122,7 +132,7 @@ export const realQinlingCities = [
   },
   {
     id: "bazhong",
-    name: "巴中",
+    name: "巴州",
     lat: 31.85,
     lon: 106.77,
     tier: "prefecture",
@@ -135,7 +145,7 @@ export const realQinlingCities = [
   },
   {
     id: "deyang",
-    name: "德阳",
+    name: "汉州",
     lat: 31.13,
     lon: 104.40,
     tier: "prefecture",
@@ -148,7 +158,7 @@ export const realQinlingCities = [
   },
   {
     id: "dujiangyan",
-    name: "都江堰",
+    name: "导江",
     lat: 31.00,
     lon: 103.62,
     tier: "prefecture",
@@ -163,7 +173,7 @@ export const realQinlingCities = [
   // 县城（county）
   { id: "meixian", name: "眉县", lat: 34.27, lon: 107.75, tier: "county", hint: "褒斜道关中端的入口" },
   { id: "zhouzhi", name: "周至", lat: 34.16, lon: 108.22, tier: "county", hint: "傥骆道关中端入口" },
-  { id: "fengxian", name: "凤县", lat: 33.91, lon: 106.52, tier: "county", hint: "陈仓道腹心" },
+  { id: "fengxian", name: "凤州", lat: 33.91, lon: 106.52, tier: "county", hint: "陈仓道腹心" },
   { id: "taibai", name: "太白", lat: 34.06, lon: 107.32, tier: "county", hint: "秦岭主脊腹地，褒斜道折线" },
   {
     id: "liuba",
@@ -225,7 +235,7 @@ export const realQinlingCities = [
   },
   {
     id: "chengxian",
-    name: "成县",
+    name: "成州",
     lat: 33.74,
     lon: 105.73,
     tier: "county",
@@ -311,7 +321,7 @@ export const realQinlingCities = [
   },
   {
     id: "chongqing",
-    name: "重庆",
+    name: "渝州",
     lat: 29.56,
     lon: 106.55,
     tier: "capital",
@@ -320,7 +330,7 @@ export const realQinlingCities = [
   },
   {
     id: "fuling",
-    name: "涪陵",
+    name: "涪州",
     lat: 29.70,
     lon: 107.39,
     tier: "prefecture",
@@ -338,7 +348,7 @@ export const realQinlingCities = [
   },
   {
     id: "wuhan",
-    name: "武汉",
+    name: "江夏",
     lat: 30.59,
     lon: 114.31,
     tier: "capital",
@@ -347,7 +357,7 @@ export const realQinlingCities = [
   },
   {
     id: "changsha",
-    name: "长沙",
+    name: "潭州",
     lat: 28.23,
     lon: 112.94,
     tier: "prefecture",
@@ -356,7 +366,7 @@ export const realQinlingCities = [
   },
   {
     id: "yueyang",
-    name: "岳阳",
+    name: "岳州",
     lat: 29.37,
     lon: 113.13,
     tier: "county",
@@ -365,7 +375,7 @@ export const realQinlingCities = [
   },
   {
     id: "nanchang",
-    name: "南昌",
+    name: "洪州",
     lat: 28.69,
     lon: 115.86,
     tier: "prefecture",
@@ -374,7 +384,7 @@ export const realQinlingCities = [
   },
   {
     id: "jiujiang",
-    name: "九江",
+    name: "江州",
     lat: 29.71,
     lon: 116.00,
     tier: "county",
@@ -392,7 +402,7 @@ export const realQinlingCities = [
   },
   {
     id: "yibin",
-    name: "宜宾",
+    name: "戎州",
     lat: 28.77,
     lon: 104.62,
     tier: "prefecture",
@@ -402,7 +412,7 @@ export const realQinlingCities = [
   // 北扩 Phase F：黄土高原 / 太行山 / 华北平原 / 燕山南麓
   {
     id: "beijing",
-    name: "北京",
+    name: "幽州",
     lat: 39.90,
     lon: 116.40,
     tier: "capital",
@@ -420,7 +430,7 @@ export const realQinlingCities = [
   },
   {
     id: "datong",
-    name: "大同",
+    name: "云州",
     lat: 40.08,
     lon: 113.30,
     tier: "county",
@@ -447,7 +457,7 @@ export const realQinlingCities = [
   },
   {
     id: "anyang",
-    name: "安阳",
+    name: "相州",
     lat: 36.10,
     lon: 114.39,
     tier: "county",
@@ -465,7 +475,7 @@ export const realQinlingCities = [
   },
   {
     id: "yanan",
-    name: "延安",
+    name: "延州",
     lat: 36.59,
     lon: 109.49,
     tier: "county",
@@ -474,7 +484,7 @@ export const realQinlingCities = [
   },
   {
     id: "yulin-sx",
-    name: "榆林",
+    name: "银州",
     lat: 38.29,
     lon: 109.74,
     tier: "county",
@@ -483,7 +493,7 @@ export const realQinlingCities = [
   },
   {
     id: "kaifeng",
-    name: "开封",
+    name: "汴州",
     lat: 34.80,
     lon: 114.31,
     tier: "prefecture",
@@ -493,7 +503,7 @@ export const realQinlingCities = [
   { id: "xixiang", name: "西乡", lat: 32.99, lon: 107.77, tier: "county", hint: "汉中盆地东段，子午道汉中端" },
   {
     id: "guiyang",
-    name: "贵阳",
+    name: "矩州",
     lat: 26.65,
     lon: 106.63,
     tier: "prefecture",
@@ -502,7 +512,7 @@ export const realQinlingCities = [
   },
   {
     id: "guilin",
-    name: "桂林",
+    name: "桂州",
     lat: 25.27,
     lon: 110.29,
     tier: "prefecture",
@@ -574,7 +584,7 @@ export const realQinlingCities = [
   },
   {
     id: "yichang",
-    name: "宜昌",
+    name: "峡州",
     lat: 30.71,
     lon: 111.27,
     tier: "prefecture",
@@ -583,7 +593,7 @@ export const realQinlingCities = [
   },
   {
     id: "xiangyang",
-    name: "襄阳",
+    name: "襄州",
     lat: 32.04,
     lon: 112.12,
     tier: "prefecture",
@@ -610,7 +620,7 @@ export const realQinlingCities = [
   },
   {
     id: "huanggang",
-    name: "黄冈",
+    name: "黄州",
     lat: 30.45,
     lon: 114.88,
     tier: "county",
@@ -619,7 +629,7 @@ export const realQinlingCities = [
   },
   {
     id: "yichun-jx",
-    name: "宜春",
+    name: "袁州",
     lat: 27.81,
     lon: 114.42,
     tier: "county",
@@ -628,7 +638,7 @@ export const realQinlingCities = [
   },
   {
     id: "jian",
-    name: "吉安",
+    name: "吉州",
     lat: 27.11,
     lon: 114.99,
     tier: "prefecture",
@@ -637,7 +647,7 @@ export const realQinlingCities = [
   },
   {
     id: "ganzhou",
-    name: "赣州",
+    name: "虔州",
     lat: 25.83,
     lon: 114.94,
     tier: "prefecture",
@@ -655,7 +665,7 @@ export const realQinlingCities = [
   },
   {
     id: "shaoyang",
-    name: "邵阳",
+    name: "邵州",
     lat: 27.24,
     lon: 111.47,
     tier: "county",
@@ -668,15 +678,15 @@ export const realQinlingCities = [
   // 主要港口/古都 prefecture，剩下 county。
   // 华东沿海 + 江南
   { id: "shanghai", name: "上海", lat: 31.23, lon: 121.47, tier: "capital", hint: "近代金融与航运中心" },
-  { id: "nanjing", name: "南京", lat: 32.06, lon: 118.80, tier: "capital", hint: "六朝古都，明初都城" },
+  { id: "nanjing", name: "江宁", lat: 32.06, lon: 118.80, tier: "capital", hint: "六朝古都，明初都城" },
   { id: "hangzhou", name: "杭州", lat: 30.27, lon: 120.16, tier: "capital", hint: "南宋都城，西湖" },
   { id: "suzhou", name: "苏州", lat: 31.30, lon: 120.62, tier: "prefecture", hint: "江南园林，吴文化中心" },
-  { id: "ningbo", name: "宁波", lat: 29.87, lon: 121.55, tier: "prefecture", hint: "明州港，海上丝路起点之一" },
+  { id: "ningbo", name: "明州", lat: 29.87, lon: 121.55, tier: "prefecture", hint: "明州港，海上丝路起点之一" },
   { id: "wuxi", name: "无锡", lat: 31.49, lon: 120.31, tier: "prefecture", hint: "太湖北岸，运河重镇" },
   { id: "yangzhou", name: "扬州", lat: 32.39, lon: 119.42, tier: "prefecture", hint: "运河枢纽，唐时富甲东南" },
-  { id: "zhenjiang", name: "镇江", lat: 32.20, lon: 119.45, tier: "county", hint: "京口，长江与运河交汇" },
+  { id: "zhenjiang", name: "润州", lat: 32.20, lon: 119.45, tier: "county", hint: "京口，长江与运河交汇" },
   // 山东 / 中原
-  { id: "jinan", name: "济南", lat: 36.65, lon: 117.12, tier: "capital", hint: "山东省会，泉城" },
+  { id: "jinan", name: "齐州", lat: 36.65, lon: 117.12, tier: "capital", hint: "山东省会，泉城" },
   { id: "qingdao", name: "青岛", lat: 36.07, lon: 120.38, tier: "prefecture", hint: "胶州湾港城" },
   { id: "yantai", name: "烟台", lat: 37.46, lon: 121.45, tier: "county", hint: "胶东半岛海港" },
   { id: "qufu", name: "曲阜", lat: 35.59, lon: 116.99, tier: "county", hint: "孔子故里" },
@@ -703,15 +713,15 @@ export const realQinlingCities = [
   { id: "harbin", name: "哈尔滨", lat: 45.80, lon: 126.54, tier: "capital", hint: "黑龙江省会，松花江畔" },
   // 西北
   { id: "lanzhou", name: "兰州", lat: 36.06, lon: 103.83, tier: "capital", hint: "甘肃省会，黄河穿城" },
-  { id: "yinchuan", name: "银川", lat: 38.49, lon: 106.23, tier: "capital", hint: "宁夏省会，西夏故都" },
-  { id: "xining", name: "西宁", lat: 36.62, lon: 101.78, tier: "capital", hint: "青海省会，湟水之滨" },
+  { id: "yinchuan", name: "灵州", lat: 38.49, lon: 106.23, tier: "capital", hint: "宁夏省会，西夏故都" },
+  { id: "xining", name: "鄯州", lat: 36.62, lon: 101.78, tier: "capital", hint: "青海省会，湟水之滨" },
   { id: "urumqi", name: "乌鲁木齐", lat: 43.83, lon: 87.62, tier: "capital", hint: "新疆首府，天山北麓" },
-  { id: "kashgar", name: "喀什", lat: 39.47, lon: 75.99, tier: "prefecture", hint: "南疆古城，丝路重镇" },
-  { id: "dunhuang", name: "敦煌", lat: 40.14, lon: 94.66, tier: "prefecture", hint: "莫高窟，河西走廊西端" },
+  { id: "kashgar", name: "疏勒", lat: 39.47, lon: 75.99, tier: "prefecture", hint: "南疆古城，丝路重镇" },
+  { id: "dunhuang", name: "沙州", lat: 40.14, lon: 94.66, tier: "prefecture", hint: "莫高窟，河西走廊西端" },
   // 西南
   { id: "kunming", name: "昆明", lat: 25.04, lon: 102.72, tier: "capital", hint: "云南省会，滇池北岸" },
-  { id: "dali", name: "大理", lat: 25.61, lon: 100.27, tier: "prefecture", hint: "南诏大理国故都" },
+  { id: "dali", name: "太和城", lat: 25.61, lon: 100.27, tier: "prefecture", hint: "南诏大理国故都" },
   { id: "lijiang", name: "丽江", lat: 26.87, lon: 100.23, tier: "county", hint: "纳西古城" },
-  { id: "lhasa", name: "拉萨", lat: 29.65, lon: 91.13, tier: "capital", hint: "西藏首府，布达拉宫" },
+  { id: "lhasa", name: "逻些", lat: 29.65, lon: 91.13, tier: "capital", hint: "西藏首府，布达拉宫" },
   { id: "shigatse", name: "日喀则", lat: 29.27, lon: 88.88, tier: "prefecture", hint: "后藏中心，扎什伦布寺" }
 ];

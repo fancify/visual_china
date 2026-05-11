@@ -455,7 +455,7 @@ test("E3 天体地平线 fade 范围正确 (sky body horizon fade)", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test("Z1 世界比例尺：1u ≈ 3.27km (验证 codex 假设)", () => {
-  // 用 projectGeoToWorld 投影西安和洛阳，算两点世界距离 vs 真实距离
+  // 用 projectGeoToWorld 投影长安和洛阳，算两点世界距离 vs 真实距离
   const xian = { lat: 34.27, lon: 108.95 };
   const luoyang = { lat: 34.62, lon: 112.45 };
 

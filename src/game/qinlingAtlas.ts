@@ -191,7 +191,7 @@ export const qinlingAtlasLayers: QinlingAtlasLayer[] = [
     id: "city",
     name: "城市",
     defaultVisible: true,
-    description: "西安、汉中、成都等真实坐标节点，跟 3D 同源。"
+    description: "长安、梁州（汉中）、成都等真实坐标节点，跟 3D 同源。"
   },
   {
     id: "pass",
@@ -226,12 +226,12 @@ export const qinlingAtlasRequiredNames: string[] = [
   "渭河",
   "汉水",
   "嘉陵江",
-  "西安",
-  "宝鸡",
-  "汉中",
-  "广元",
+  "长安",
+  "岐州",     // 唐 (今宝鸡)
+  "梁州",     // 唐 (今汉中)
+  "利州",     // 唐 (今广元)
   "成都",
-  "都江堰",
+  "导江",     // 唐 蜀州 (今都江堰)
   "大散关",
   "阳平关",
   "剑门关"
@@ -546,7 +546,7 @@ export const qinlingAncientSites: QinlingAncientSite[] = [
     name: "半坡遗址",
     lat: 34.27,
     lon: 109.07,
-    summary: "西安东郊，仰韶半坡类型典型聚落（约前 4800 年），半地穴房 + 公共墓地。",
+    summary: "长安东郊，仰韶半坡类型典型聚落（约前 4800 年），半地穴房 + 公共墓地。",
     role: "yangshao-dwelling",
     symbol: ancientSymbol
   },
@@ -609,7 +609,7 @@ export const qinlingAncientSites: QinlingAncientSite[] = [
     name: "杜陵",
     lat: 34.196,
     lon: 108.995,
-    summary: "西汉宣帝陵，西安东南郊杜陵塬，离市区最近的西汉帝陵，封土完整。",
+    summary: "西汉宣帝陵，长安东南郊杜陵塬，离市区最近的西汉帝陵，封土完整。",
     role: "imperial-tomb",
     symbol: ancientImperialTombSymbol
   },
@@ -636,7 +636,7 @@ export const qinlingAncientSites: QinlingAncientSite[] = [
     name: "霸陵",
     lat: 34.275,
     lon: 109.119,
-    summary: "西汉文帝陵，西安东郊白鹿原，西汉唯一依山为陵，无封土。",
+    summary: "西汉文帝陵，长安东郊白鹿原，西汉唯一依山为陵，无封土。",
     role: "imperial-tomb",
     symbol: ancientImperialTombSymbol
   },

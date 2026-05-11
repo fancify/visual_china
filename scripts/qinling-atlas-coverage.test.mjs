@@ -33,7 +33,8 @@ test("Qinling 2D atlas contains named geography needed for the slice narrative",
     assert.ok(featuresByName.has(name), `${name} must exist in the 2D atlas`);
   }
 
-  for (const name of ["潼关", "华山", "重庆", "涪陵", "泸州", "宜宾", "武汉", "长沙", "南昌", "洞庭湖", "鄱阳湖", "岳阳楼", "滕王阁", "荆州古城"]) {
+  // Tang 755 epoch 名（旧现代名注释在右）。S4 epoch schema 落地后会做更系统的迁移。
+  for (const name of ["潼关", "华山", "渝州", "涪州", "泸州", "戎州", "江夏", "潭州", "洪州", "洞庭湖", "鄱阳湖", "岳阳楼", "滕王阁", "荆州古城"]) {
     assert.ok(featuresByName.has(name), `${name} should be visible after the east/south expansion`);
   }
 });

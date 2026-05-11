@@ -538,7 +538,7 @@ test("city hover card includes city facts and matching story beat", () => {
     beat
   });
 
-  assert.match(html, /西安/);
+  assert.match(html, /长安/);
   assert.match(html, /capital/);
   assert.match(html, /海拔：460 m/);
   assert.match(html, /34\.2700°N/);
