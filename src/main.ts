@@ -5770,6 +5770,32 @@ function update(deltaSeconds: number): void {
       camera.position.z,
       camera.position.y
     );
+    // Audit-fix (2026-05-11): 沿 camera→player 线段 sample terrain，如果中点 terrain
+    // 高于视线 → 抬 camera y。解决用户反复反馈的"通病" — 前景 terrain 山丘遮挡 player
+    // (R10a-fix delta 已经 +0.03 player 真踩地，但视线被 foreground hill 遮)。
+    // 用 5 个均匀采样点足够，per-frame ~5 次 sampleSurfaceHeight 开销可忽略。
+    if (terrainSampler) {
+      const pX = player.position.x;
+      const pZ = player.position.z;
+      const pY = player.position.y;
+      let neededY = camera.position.y;
+      for (let s = 1; s <= 4; s += 1) {
+        const t = s / 5; // 0.2, 0.4, 0.6, 0.8 — 不算端点
+        const sx = camera.position.x + (pX - camera.position.x) * t;
+        const sz = camera.position.z + (pZ - camera.position.z) * t;
+        const losY = camera.position.y + (pY - camera.position.y) * t;
+        const terrainY = terrainSampler.sampleSurfaceHeight(sx, sz);
+        // terrain 比视线高 0.5u 以上 → camera 抬一档 (clearance 1.5u 留给视线穿过)
+        const occlusion = terrainY + 1.5 - losY;
+        if (occlusion > 0) {
+          // 把 camera 抬高足够让视线绕过 occluder。t=0.2 远 → 抬 occlusion / 0.8；
+          // t=0.8 近 → 抬 occlusion / 0.2。统一公式: occlusion / (1 - t)
+          const lift = occlusion / Math.max(0.1, 1 - t);
+          neededY = Math.max(neededY, camera.position.y + lift);
+        }
+      }
+      camera.position.y = neededY;
+    }
   }
   // 始终用 +Y 作为 up：overview 模式现在改成"从南方斜俯视北"而不是纯顶视，
   // 不需要再用 -Z 翻转 up。
