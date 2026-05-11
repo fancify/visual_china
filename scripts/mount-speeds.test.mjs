@@ -226,6 +226,7 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
     21,
     "space should not affect altitude when the player is not on the cloud mount"
   );
+  // Audit-fix (2026-05-11): walk/foot baseline 改 +0.35 → +0.25 (foot 踩 ground)
   assert.ok(
     Math.abs(
       resolvePlayerTargetY({
@@ -233,7 +234,7 @@ test("cloud flight helpers only react on the cloud mount and clamp altitude cont
         ground: 12,
         groundSurface: 13.2,
         cloudFlightAltitude: 30
-      }) - 13.55
+      }) - 13.45
     ) < 1e-9
   );
 

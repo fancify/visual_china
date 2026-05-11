@@ -858,7 +858,12 @@ export function resolvePlayerTargetY({
     return cloudFlightAltitude;
   }
 
-  return (groundSurface ?? ground) + 0.35;
+  // Audit-fix (2026-05-11): 之前 +0.35 让 player.position.y 在 ground 上 0.35u。
+  // avatar STANDING_POSE_FOOT_Y = -0.25 (脚底在 mesh local y=-0.25)，所以脚底实际在
+  // ground + 0.10u (浮空 0.1u)，slope 下行+前景 scenery 遮挡时用户视觉感觉"陷"。
+  // 改 +0.35 → +0.25 让脚底正好踩在 ground 上 (player.y - 0.25 = ground)。
+  // mount 骑乘时 mount 系统额外提升 saddle，本函数 +0.25 是walk/foot baseline。
+  return (groundSurface ?? ground) + 0.25;
 }
 
 export function nextCloudFlightAltitude({
