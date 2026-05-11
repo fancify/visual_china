@@ -9,13 +9,17 @@
 - **Branch**: `feature/full-china-1800m-hydrosheds`
 - **地理范围**: 全中国 73-135°E × 18-53°N（1711 × 1186 world units, ~3.27 km/u）
 - **第一个 Epoch**: 唐玄宗 **天宝十四年 (755 AD) 安史前夜**——现代 DEM + 唐代水系/城市/POI overlay
-- **进行中**: 6-step refactor plan（Claude × Codex × BotW 三轮对齐版）
+- **进行中**: 7-step refactor plan（Claude × Codex × BotW 三轮对齐版 + PM audit S7）
   - ✅ S1 Baseline regression gate（19 cases, `npm run regression:baseline`）
   - ✅ S2 TS/Test hygiene（28 .d.ts → .ts，npm test 拆 4 组）
+  - ✅ CL Cleanup + Tang anachronism rename
+  - ✅ SSOT audit (5 fixed, 5 deferred to S3-S5)
+  - ✅ PM audit (ARCHITECTURE / CLAUDE.md / CONTRIBUTING / CI)
   - ⏳ S3 SurfaceProvider + DistanceBand（下一步，打穿模根因）
-  - ⏳ S4 Epoch Schema v3（迁数据到 Tang 755）
+  - ⏳ S4 Epoch Schema v3（迁数据到 Tang 755 + qinling* → region* rename）
   - ⏳ S5 Runtime split（main.ts 拆 6 runtime）
   - ⏳ S6 Hero visual slice（唐风山水路线 + BotW 技巧）
+  - ⏳ S7 Polish（Biome + strictness sprint + tests/ 迁移 + nightly CI）
 
 详情：[docs/context-summary.md](./docs/context-summary.md) / [docs/README.md](./docs/README.md)
 

@@ -6,7 +6,7 @@
 
 - **目标**：浏览器 3D 中国地理叙事原型，第一个 epoch = 唐玄宗 天宝十四年 (755 AD)
 - **Stack**：Three.js + TypeScript + Vite + Node 25
-- **状态**：6-step refactor 中（见 todo.md）
+- **状态**：7-step refactor 中（S1-S6 + S7 polish；见 todo.md）
 
 ## 工作流
 
@@ -46,7 +46,7 @@
 
 ### 测试组织
 
-- `npm run test:fast` (~200ms) — 契约/math/snapshot；S3-S6 每个改动都该跑
+- `npm run test:fast` (~200ms) — 契约/math/snapshot；S3-S7 每个改动都该跑
 - `npm run test:visual` (~36s) — 渲染/几何/runtime
 - `npm run test:data` (~1s) — DEM/POI/atlas validation
 - `npm run test:audio` (~100ms) — audio 子系统
@@ -73,13 +73,13 @@
 
 `.context/codex-session-id` 保存当前 codex consult session ID，可 resume 继续对话。已 gitignored。
 
-## 当前 6-step refactor 进度
+## 当前 7-step refactor 进度
 
 见 [todo.md](./todo.md) 和 [memory/project_refactor_plan_v1](.claude/projects/-Users-chen-Documents-GitHub-visual-china/memory/project_refactor_plan_v1.md)。
 
 ```
-✅ S1 Baseline    ✅ S2 TS hygiene   ✅ CL cleanup    ✅ SSOT
-⏳ S3 SurfaceProvider (next)   ⏳ S4 Epoch    ⏳ S5 Runtime split    ⏳ S6 Hero slice
+✅ S1 Baseline    ✅ S2 TS hygiene   ✅ CL cleanup    ✅ SSOT    ✅ PM audit
+⏳ S3 SurfaceProvider (next)   ⏳ S4 Epoch    ⏳ S5 Runtime split    ⏳ S6 Hero slice    ⏳ S7 Polish
 ```
 
 ## 紧急 reminder

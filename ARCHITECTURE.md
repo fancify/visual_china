@@ -1,6 +1,6 @@
 # 山河中国 · 架构
 
-> **一页读懂**：项目目标、当前结构、目标结构（S3-S6 后）、与传统游戏项目的差异
+> **一页读懂**：项目目标、当前结构、目标结构（S3-S7 后）、与传统游戏项目的差异
 > 更新：2026-05-11
 
 ## 一句话
@@ -16,7 +16,7 @@ visual_china/
 ├── CLAUDE.md                 ← AI 协作约定 (项目本地)
 ├── tsconfig.json             ← strict + ES2023 + Bundler resolution
 ├── package.json              ← 4-stage test split + build + dev
-├── todo.md                   ← 当前 6-step refactor 进度
+├── todo.md                   ← 当前 7-step refactor 进度
 ├── index.html                ← 主游戏入口
 ├── china-lowres.html         ← 全国低分辨率 demo 入口
 │

@@ -16,7 +16,7 @@
 - **Tang overlay 必须重写**: 黄河北流走天津方向 / 济水独流入海 / 隋唐大运河（永济渠+通济渠+邗沟+江南河，以洛阳为中心）/ 淮河独流入海 / 永定河叫桑干河 / 唐代 15 道行政区划 / 长安+洛阳两京
 - **冻结理由**: 盛唐最后的余晖；杜甫《自京赴奉先县咏怀》、李白江南漫游、王维辋川别业都在这一年；行政区划仍是开元 15 道制未崩
 
-## 6-Step Refactor 进展（2026-05-11）
+## 7-Step Refactor 进展（2026-05-11）
 
 | Step | 状态 | 内容 |
 |---|---|---|
@@ -26,8 +26,9 @@
 | S4 Epoch Schema v3 | ⏳ | 第一份 epoch = tang-tianbao-14；含 LandmarkHierarchy (Triangle Rule) |
 | S5 Runtime Split | ⏳ | main.ts 6263 → 6 runtime (Terrain/Surface/Water/Content/Environment/Player) |
 | S6 Hero Visual Slice | ⏳ | 一条唐风山水路线 + BotW 技巧融合（fog inscatter / VisualProfile / 草法线 / 树叶 edited normals / context-triggered swell / 前景 silhouette） |
+| S7 Post-Refactor Polish | ⏳ | Biome format/lint + `noUncheckedIndexedAccess` + `tests/` 实体迁移 + nightly CI |
 
-参考：[6-step plan 详情（memory）](../../.claude/projects/-Users-chen-Documents-GitHub-visual-china/memory/project_refactor_plan_v1.md)
+参考：[7-step plan 详情（memory）](../../.claude/projects/-Users-chen-Documents-GitHub-visual-china/memory/project_refactor_plan_v1.md)
 
 ## 当前架构状态
 
@@ -50,7 +51,7 @@
 - 2D Atlas Workbench：图层筛选、缩放、拖拽、feature 详情
 - LOD morph（R6/R10a）、atmospheric haze（R5）、WindManager（R7）、风+草
 
-## 主要未解决问题（待 S3-S6 修）
+## 主要未解决问题（待 S3-S7 修）
 
 - **穿模/错漏**：模块各自采样地形，无统一 ground contract → S3 SurfaceProvider 解决
 - **高视角河 ribbon 看不见**（polygonOffset 排序问题）→ S3 几何 + S6 distance band
@@ -78,4 +79,4 @@ npm run build               # tsc + vite build
 
 ## 下一步
 
-**S3 SurfaceProvider**——为所有 player/camera/city/POI/water/vegetation/label 提供统一地表契约，根治"audit P0 / R10a 又抓 3 个" 回归循环。详见 6-step plan memory。
+**S3 SurfaceProvider**——为所有 player/camera/city/POI/water/vegetation/label 提供统一地表契约，根治"audit P0 / R10a 又抓 3 个" 回归循环。详见 7-step plan memory。

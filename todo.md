@@ -2,7 +2,7 @@
 
 更新时间：2026-05-11
 
-## 当前阶段：6-Step Refactor（Tang 755 Epoch）
+## 当前阶段：7-Step Refactor（Tang 755 Epoch）
 
 详细 plan 见 [memory/project_refactor_plan_v1](../.claude/projects/-Users-chen-Documents-GitHub-visual-china/memory/project_refactor_plan_v1.md)。
 
