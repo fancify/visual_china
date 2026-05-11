@@ -38,3 +38,4 @@ public/data/qinling-slice-dem.*.bin
 # 大体量 DEM JSON：reproducible via `npm run build:dem`，不进 git（GitHub 100MB 限制）
 public/data/qinling-slice-dem.json
 public/data/regions/qinling/slice-l1.json
+.context/
