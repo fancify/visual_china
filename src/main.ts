@@ -476,6 +476,19 @@ renderer.shadowMap.type = PCFSoftShadowMap;
 // TODO: Phase 4 enable shadow casting via applyCastShadowPolicy().
 appRoot.appendChild(renderer.domElement);
 
+// 玩家头顶坐标 HUD — dev mode 用，方便定位 bug 时报告位置。
+// DOM overlay 每帧 project player.position 到屏幕，跟随玩家。
+const playerCoordHud = document.createElement("div");
+playerCoordHud.id = "player-coord-hud";
+playerCoordHud.style.cssText =
+  "position:fixed;pointer-events:none;z-index:1000;color:#fff;" +
+  "font:600 11px 'JetBrains Mono','Menlo',monospace;" +
+  "text-shadow:0 1px 2px rgba(0,0,0,0.95),0 0 4px rgba(0,0,0,0.7);" +
+  "padding:1px 6px;border-radius:3px;background:rgba(0,0,0,0.45);" +
+  "transform:translate(-50%,-100%);transition:opacity 0.2s;white-space:nowrap;";
+playerCoordHud.textContent = "x=0 y=0 z=0";
+appRoot.appendChild(playerCoordHud);
+
 const perfStats = createPerfStats({ enabled: isDevModeEnabled() });
 const perfMonitor = createPerfMonitor({
   getActiveChunkCount: () => visibleChunkIds.size
@@ -5226,6 +5239,7 @@ refreshAtlasWorkbench();
 
 const targetCameraPosition = new Vector3();
 const lookTarget = new Vector3();
+const playerHeadProjector = new Vector3();
 const clock = new Clock();
 let cloudDrift = 0;
 let cloudFlightAltitude = 12;
@@ -5864,6 +5878,33 @@ function frame(): void {
     }
   }
   updateLabelVisibility();
+
+  // 更新玩家头顶坐标 HUD - 每帧 project player.position 到屏幕
+  // 头顶 1.6u 偏移让 HUD 不挡脸。
+  {
+    const headWorld = playerHeadProjector.set(
+      player.position.x,
+      player.position.y + 1.6,
+      player.position.z
+    );
+    headWorld.project(camera);
+    if (headWorld.z < 1) {
+      // 在视野内
+      const sx = (headWorld.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-headWorld.y * 0.5 + 0.5) * window.innerHeight;
+      playerCoordHud.style.left = `${sx}px`;
+      playerCoordHud.style.top = `${sy}px`;
+      playerCoordHud.style.opacity = "1";
+      playerCoordHud.textContent =
+        `x=${player.position.x.toFixed(1)} ` +
+        `z=${player.position.z.toFixed(1)} ` +
+        `y=${player.position.y.toFixed(2)}`;
+    } else {
+      // 玩家在镜头后方，藏起来
+      playerCoordHud.style.opacity = "0";
+    }
+  }
+
   // 走 EffectComposer：RenderPass + UnrealBloomPass + OutputPass 链。
   // 高亮像素（雪冠、太阳盘、水面）会有柔和辉光；midtone 被 threshold
   // 0.92 排除掉，色彩不动。
