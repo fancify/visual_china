@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "visual-china.epoch-manifest.v1",
+  "worldId": "china",
+  "regionId": "qinling",
+  "epochId": "modern",
+  "label": "现代",
+  "year": 2026,
+  "description": "现代中国地理：1800m 全国 DEM + OSM 现代水系 + 当代行政区划。基础参考层，所有其他 epoch 在此之上做时代覆盖。",
+  "projection": {
+    "bounds": { "west": 73, "east": 135, "south": 18, "north": 53 },
+    "world": { "width": 1711, "depth": 1186 },
+    "policy": "strict-geographic"
+  },
+  "terrain": {
+    "manifest": "/data/regions/qinling/manifest.json"
+  },
+  "hydrography": {
+    "primary": "/data/regions/qinling/hydrography/primary-modern.json",
+    "osmEvidence": "/data/regions/qinling/hydrography/osm-modern.json"
+  },
+  "settlements": {
+    "cities": "src/data/realCities.js"
+  },
+  "routes": {
+    "routes": "src/game/data/qinlingRouteAnchors.js"
+  },
+  "poi": {
+    "manifest": "/data/regions/qinling/poi/manifest.json",
+    "content": "/data/regions/qinling/poi/content.json"
+  },
+  "visualProfile": {
+    "id": "modern-default",
+    "label": "现代默认",
+    "warmth": 0,
+    "atmosphericFar": { "r": 0.69, "g": 0.77, "b": 0.86 },
+    "sunTint": { "r": 1.0, "g": 0.97, "b": 0.9 },
+    "ambientGround": { "r": 0.42, "g": 0.45, "b": 0.41 },
+    "waterTint": { "r": 0.31, "g": 0.49, "b": 0.55 },
+    "fogDensity": 0.18
+  },
+  "landmarkHierarchy": {
+    "gravityWell": {
+      "id": "xian",
+      "label": "西安（古长安）"
+    },
+    "large": [
+      {
+        "id": "qinling-spine",
+        "label": "秦岭主脊",
+        "geo": { "lat": 33.85, "lon": 108.0 },
+        "visualForm": "ridge",
+        "hierarchy": "large",
+        "visibilityBand": "far",
+        "preferredSilhouette": "ridge",
+        "revealRole": "anchor"
+      },
+      {
+        "id": "huashan",
+        "label": "华山",
+        "geo": { "lat": 34.49, "lon": 110.08 },
+        "visualForm": "peak",
+        "hierarchy": "large",
+        "visibilityBand": "far",
+        "preferredSilhouette": "triangle",
+        "revealRole": "reward"
+      },
+      {
+        "id": "taishan",
+        "label": "泰山",
+        "geo": { "lat": 36.25, "lon": 117.10 },
+        "visualForm": "peak",
+        "hierarchy": "large",
+        "visibilityBand": "far",
+        "preferredSilhouette": "triangle"
+      }
+    ],
+    "medium": [
+      {
+        "id": "tongguan",
+        "label": "潼关",
+        "geo": { "lat": 34.55, "lon": 110.30 },
+        "visualForm": "pass",
+        "hierarchy": "medium",
+        "visibilityBand": "mid",
+        "revealRole": "turning-point"
+      },
+      {
+        "id": "pass-jianmen",
+        "label": "剑门关",
+        "geo": { "lat": 32.20, "lon": 105.55 },
+        "visualForm": "pass",
+        "hierarchy": "medium",
+        "visibilityBand": "mid",
+        "revealRole": "turning-point",
+        "preferredSilhouette": "ridge"
+      },
+      {
+        "id": "hanzhong",
+        "label": "汉中（古梁州）",
+        "geo": { "lat": 33.07, "lon": 107.03 },
+        "visualForm": "city-wall",
+        "hierarchy": "medium",
+        "visibilityBand": "mid"
+      }
+    ],
+    "small": []
+  },
+  "sourceQuality": {
+    "terrain": "high",
+    "hydrography": "high",
+    "settlements": "high",
+    "routes": "medium",
+    "poi": "medium",
+    "primarySources": [
+      "FABDEM V1-2 (Hawker et al., 2022)",
+      "HydroSHEDS 15s (Lehner & Grill, 2013)",
+      "OpenStreetMap Overpass (2026 snapshot)",
+      "Natural Earth 10m (2023)",
+      "Wikipedia 中文 (modern cities)"
+    ],
+    "knownGaps": [
+      "POI 准确性审计未完整跑过（用户 todo S4 标记）",
+      "城市 ID 仍是 'xian' / 'beijing' 现代名拼写（S4c rename 待做）",
+      "海岸线未做时代区分（modern epoch 用现代海岸；Tang epoch 需要 -30km 后退）"
+    ]
+  }
+}

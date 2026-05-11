@@ -1,0 +1,212 @@
+{
+  "schemaVersion": "visual-china.epoch-manifest.v1",
+  "worldId": "china",
+  "regionId": "qinling",
+  "epochId": "tang-tianbao-14",
+  "label": "唐玄宗 天宝十四年 (755 AD) 安史前夜",
+  "year": 755,
+  "description": "盛唐最后的余晖。安禄山 755 年 11 月在范阳（幽州）起兵；冬天破洛阳，玄宗 756 年 6 月入蜀，杨贵妃于马嵬驿死。本 epoch 冻结在 755 年初——长安人口逾百万、丝路繁荣、行政区划仍是开元 15 道制；杜甫 24 岁、李白 35 岁刚离长安、王维 35 岁辋川半隐居；玄宗 70 岁、贵妃 36 岁。",
+  "projection": {
+    "bounds": { "west": 73, "east": 135, "south": 18, "north": 53 },
+    "world": { "width": 1711, "depth": 1186 },
+    "policy": "strict-geographic"
+  },
+  "terrain": {
+    "manifest": "/data/regions/qinling/manifest.json",
+    "_note": "复用现代 DEM——1300 年尺度上山系基本不变。冰川/河道变化在 hydrography 层做。"
+  },
+  "hydrography": {
+    "primary": "TODO_S4B:/data/epochs/tang-tianbao-14/hydrography/primary.json",
+    "tangOverrides": "TODO_S4B:/data/epochs/tang-tianbao-14/hydrography/tang-overrides.json",
+    "_todo_s4b": [
+      "黄河走唐代 \"汉志河道\"：濮阳-滑县-茌平-博平-高唐-平原-德州-沧州一线北流入渤海（天津附近），不是现代山东东营入海",
+      "济水独流入海：河南济源源头 → 河南北 → 山东西 → 入渤海（被黄河夺道前的状态）",
+      "淮河独流入海：清水亭/盱眙 → 涟水 → 入黄海（南宋 1194 年黄河夺淮前）",
+      "隋唐大运河：永济渠（洛阳-涿郡/幽州）+ 通济渠（洛阳-淮安）+ 邗沟（淮安-扬州）+ 江南河（扬州-杭州）——以洛阳为中心扇形",
+      "永定河叫桑干河，清水状态（中游北京段）",
+      "鄱阳湖、洞庭湖范围比现代大；云梦泽残迹仍在",
+      "海岸线：渤海湾/黄海/长江口比现代后退约 30-100km（暂不做，标 TODO）"
+    ]
+  },
+  "settlements": {
+    "cities": "TODO_S4B:/data/epochs/tang-tianbao-14/cities.json",
+    "_todo_s4b": [
+      "从 src/data/realCities.js 派生 Tang 子集 (~50-60 个唐代州/府/县)",
+      "排除 modern epoch 中不存在的近代港口 (上海/天津/深圳/香港 等)",
+      "排除 Tang 时为吐蕃/南诏/渤海境的 (拉萨/日喀则/大理/昆明/丽江)",
+      "为每个城市添加 Tang 行政等级 (京兆府/河南府/太原府 / 雍/凉/扬等大都督府 / 一般州 / 县)",
+      "描述文本 Tang 视角重写：避免 \"宋/明/清/近代\"，强调 755 前的历史",
+      "数据源 reference: docs/tang-epoch-755-poi-database.md"
+    ]
+  },
+  "routes": {
+    "routes": "TODO_S4B:/data/epochs/tang-tianbao-14/routes.json",
+    "_todo_s4b": [
+      "蜀道八条 (陈仓 / 褒斜 / 傥骆 / 子午 / 金牛 / 米仓 / 祁山 / 荔枝) — Tang 时全部活跃",
+      "Tang 驿道系统 (~1639 驿站) 抽干线：长安-洛阳驰道 / 长安-河西走廊 / 洛阳-江都 / 长安-成都 / 长安-范阳",
+      "丝绸之路东段：长安 → 凉州 → 甘州 → 肃州 → 沙州 (敦煌) → 玉门关/阳关 → 安西都护府",
+      "茶马古道雏形：成都 → 雅州 → 黎州 → 太和城 (大理) — Tang 与南诏关系紧张但商道仍通",
+      "revealIntent: 每条 route 加 BotW Triangle Rule 弯曲度，避免直线连接两端"
+    ]
+  },
+  "poi": {
+    "manifest": "TODO_S4B:/data/epochs/tang-tianbao-14/poi/manifest.json",
+    "content": "TODO_S4B:/data/epochs/tang-tianbao-14/poi/content.json",
+    "_todo_s4b": [
+      "长安 POI: 大明宫 / 兴庆宫 / 大慈恩寺 (大雁塔) / 大荐福寺 (小雁塔) / 青龙寺 / 西市 / 东市 / 朱雀大街 / 含光门 / 朱雀门 / 玄武门 / 安福门 / 兴庆池 / 曲江池",
+      "洛阳 POI: 应天门 / 端门 / 明堂 / 天堂 / 上阳宫 / 含嘉仓 / 龙门石窟 (Tang 兴盛期) / 白马寺",
+      "唐代寺院: 法门寺 (扶风) / 灞桥 / 兴教寺 / 草堂寺",
+      "考古遗址: 半坡 (前 Tang 但属长安东郊文化层) / 西汉帝陵群 / 唐代帝陵 (献陵/昭陵/乾陵/桥陵/泰陵 等)",
+      "驿站: 临皋驿 (长安出南门第一) / 蓝田驿 / 商州 / 武关 / 黄龙驿 等",
+      "Tang 名人居所/相关地: 杜甫长安寓所 / 王维辋川别业 / 李白 \"少年时\" 处 / 白居易童年地 (但他 772 才生)",
+      "茶马交易点: 雅州 / 黎州 / 太和城",
+      "丝路重镇: 凉州姑臧 / 甘州删丹 / 肃州酒泉 / 沙州敦煌 (莫高窟兴盛期) / 西州交河 / 安西都护府龟兹"
+    ]
+  },
+  "visualProfile": {
+    "id": "tang-warm-baseline",
+    "label": "唐代基础（暖底色，金色阳光，盛唐余晖）",
+    "warmth": 0.3,
+    "atmosphericFar": { "r": 0.78, "g": 0.72, "b": 0.65 },
+    "sunTint": { "r": 1.0, "g": 0.92, "b": 0.78 },
+    "ambientGround": { "r": 0.48, "g": 0.42, "b": 0.36 },
+    "waterTint": { "r": 0.40, "g": 0.52, "b": 0.50 },
+    "fogDensity": 0.22,
+    "weatherOverrides": {
+      "rain": {
+        "atmosphericFar": { "r": 0.55, "g": 0.60, "b": 0.62 },
+        "fogDensity": 0.45,
+        "warmth": 0.1
+      },
+      "snow": {
+        "atmosphericFar": { "r": 0.85, "g": 0.84, "b": 0.86 },
+        "warmth": -0.1
+      }
+    },
+    "seasonOverrides": {
+      "autumn": {
+        "ambientGround": { "r": 0.62, "g": 0.48, "b": 0.30 },
+        "warmth": 0.45
+      },
+      "winter": {
+        "warmth": 0.05,
+        "fogDensity": 0.28
+      }
+    }
+  },
+  "landmarkHierarchy": {
+    "gravityWell": {
+      "id": "changan",
+      "label": "长安（唐都）"
+    },
+    "large": [
+      {
+        "id": "qinling-spine",
+        "label": "秦岭主脊",
+        "geo": { "lat": 33.85, "lon": 108.0 },
+        "visualForm": "ridge",
+        "hierarchy": "large",
+        "visibilityBand": "far",
+        "preferredSilhouette": "ridge",
+        "revealRole": "anchor"
+      },
+      {
+        "id": "huashan",
+        "label": "西岳华山",
+        "geo": { "lat": 34.49, "lon": 110.08 },
+        "visualForm": "peak",
+        "hierarchy": "large",
+        "visibilityBand": "far",
+        "preferredSilhouette": "triangle",
+        "revealRole": "reward"
+      },
+      {
+        "id": "luoyang",
+        "label": "洛阳（东都）",
+        "geo": { "lat": 34.62, "lon": 112.45 },
+        "visualForm": "city-wall",
+        "hierarchy": "large",
+        "visibilityBand": "far",
+        "revealRole": "reward"
+      },
+      {
+        "id": "youzhou",
+        "label": "幽州（范阳，安禄山起兵地）",
+        "geo": { "lat": 39.90, "lon": 116.40 },
+        "visualForm": "city-wall",
+        "hierarchy": "large",
+        "visibilityBand": "far",
+        "revealRole": "turning-point"
+      }
+    ],
+    "medium": [
+      {
+        "id": "tongguan",
+        "label": "潼关",
+        "geo": { "lat": 34.55, "lon": 110.30 },
+        "visualForm": "pass",
+        "hierarchy": "medium",
+        "visibilityBand": "mid",
+        "revealRole": "turning-point"
+      },
+      {
+        "id": "pass-jianmen",
+        "label": "剑门关",
+        "geo": { "lat": 32.20, "lon": 105.55 },
+        "visualForm": "pass",
+        "hierarchy": "medium",
+        "visibilityBand": "mid",
+        "revealRole": "turning-point",
+        "preferredSilhouette": "ridge"
+      },
+      {
+        "id": "liangzhou",
+        "label": "梁州（汉中）",
+        "geo": { "lat": 33.07, "lon": 107.03 },
+        "visualForm": "city-wall",
+        "hierarchy": "medium",
+        "visibilityBand": "mid"
+      },
+      {
+        "id": "liangzhou-hexi",
+        "label": "凉州（武威，河西节度使治）",
+        "geo": { "lat": 37.93, "lon": 102.64 },
+        "visualForm": "city-wall",
+        "hierarchy": "medium",
+        "visibilityBand": "mid"
+      },
+      {
+        "id": "shazhou",
+        "label": "沙州（敦煌，丝路西端莫高窟）",
+        "geo": { "lat": 40.14, "lon": 94.66 },
+        "visualForm": "temple",
+        "hierarchy": "medium",
+        "visibilityBand": "mid",
+        "revealRole": "reward"
+      }
+    ],
+    "small": []
+  },
+  "sourceQuality": {
+    "terrain": "high",
+    "hydrography": "speculative",
+    "settlements": "speculative",
+    "routes": "speculative",
+    "poi": "speculative",
+    "primarySources": [
+      "TODO_S4B: 旧唐书·地理志 (天宝十一载 752)",
+      "TODO_S4B: 新唐书·地理志 (开元 28 年 740 + 天宝期)",
+      "TODO_S4B: 资治通鉴 唐玄宗末年纪事",
+      "TODO_S4B: 谭其骧《中国历史地图集》第五册 隋唐时期",
+      "TODO_S4B: Harvard CHGIS Tang 行政区划 shapefile",
+      "docs/tang-epoch-755-poi-database.md (本 epoch 启动 reference)"
+    ],
+    "knownGaps": [
+      "S4a 是 schema skeleton 不含实际 Tang 水系/POI/驿道数据",
+      "海岸线 Tang vs 现代差异未做（标 -30km 后退）",
+      "POI 经纬度需逐一核对（现代行政中心 vs Tang 治所 可能数百米~数十公里偏差）",
+      "敦煌/喀什/拉萨/逻些 (吐蕃都) 等边境地名需 cross-reference 多本史志",
+      "南诏/吐蕃/渤海非 Tang 直辖区数据策略未定 (染色 vs 隐藏)"
+    ]
+  }
+}

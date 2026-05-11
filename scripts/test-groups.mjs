@@ -35,7 +35,8 @@ const GROUPS = {
     "ground-anchor-registry",
     "regression-baseline",   // S1 19-case snapshot
     "ssot-drift",            // SSOT round 5 守卫
-    "surface-provider"       // S3 SurfaceProvider contract + 默认实现
+    "surface-provider",      // S3 SurfaceProvider contract + 默认实现
+    "epoch-manifest"         // S4 EpochManifest schema + modern/tang manifests
   ],
 
   // 渲染 / 几何 / runtime — 用 mock scene + threejs，慢
