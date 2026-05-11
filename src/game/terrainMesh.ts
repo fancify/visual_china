@@ -105,9 +105,9 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   // 流式加载时 mesh.visible 切换是硬跳）。main.ts 维护 fade timer。
   const material = new MeshPhongMaterial({
     vertexColors: true,
-    // 用户实验：切回 flatShading 看 low-poly 块状画风。性能差 < 1%，
-    // 视觉决定。Smooth false → true 让每三角形清晰可辨，更"low-poly stylized"。
-    flatShading: true,
+    // 2026-05-11: flatShading true → false (smoothShading)。用户反复 "陷入大三角"
+    // 反馈 + 千里江山图 风格目标。每三角面共享法线让山形平滑，符合 山水画 silhouette。
+    flatShading: false,
     shininess: 8,
     transparent: true,
     opacity: 0

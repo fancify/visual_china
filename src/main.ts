@@ -769,7 +769,11 @@ terrainGeometry.setAttribute("color", colorAttribute);
 const cloudCookieTexture = createCloudCookieTexture(256);
 const terrainMaterial = new MeshPhongMaterial({
   vertexColors: true,
-  flatShading: true,
+  // 2026-05-11 切回 smoothShading=false → flatShading=false: 用户反复反馈"三角化
+  // 感强 / 陷入大三角"。flat shading 每三角面独立法线 → 视觉低多边形块状。
+  // smooth 让相邻面共享法线 → 平滑过渡，接近 千里江山图 山水画 silhouette。
+  // 性能不变 (Codex commit aeee91862 已确认 perf delta <1%)。
+  flatShading: false,
   shininess: 8,
   // 方案 A z-fight 解：base mesh（L1 14.4 km/cell）和 chunks (0.9 km/cell)
   // 同位置时让 chunks 必赢 depth-test。polygonOffset 把 base 的 depth 值
