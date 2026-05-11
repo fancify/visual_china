@@ -5539,15 +5539,20 @@ function update(deltaSeconds: number): void {
     player.rotation.z = MathUtils.lerp(player.rotation.z, avatarTilt.roll, 0.18);
   }
 
-  const ground = terrainSampler.sampleHeight(player.position.x, player.position.z);
+  // S3b: 走 SurfaceProvider 而非 terrainSampler 直采——所有 surface query 的 SSOT。
   // R10a-revert: 不再做 LOD morph 高度混合。R10a 试图让 player y 跟 morphed terrain
   // 同步，但 scenery (草/树) anchor 仍用 L0 sampler，结果 player 正确 / scenery 浮埋。
   // R10a-fix: 改为把 morph zone 推到 scenery spawn 半径 50u 之外（TERRAIN_LOD_MORPH_START 30→60），
   // 让 scenery 范围内 terrain 永远 L0，所有 anchor 都对齐 L0 sampler。
-  const groundSurface = terrainSampler.sampleSurfaceHeight(
-    player.position.x,
-    player.position.z
-  );
+  const surface = surfaceProvider
+    ? surfaceProvider.sampleGround({ x: player.position.x, z: player.position.z })
+    : null;
+  const ground = surface
+    ? surface.groundY
+    : terrainSampler.sampleHeight(player.position.x, player.position.z);
+  const groundSurface = surface
+    ? surface.renderY
+    : terrainSampler.sampleSurfaceHeight(player.position.x, player.position.z);
   cloudFlightAltitude = nextCloudFlightAltitude({
     currentMountId,
     keys,
@@ -5589,8 +5594,16 @@ function update(deltaSeconds: number): void {
     footstepPulseTimerMs += deltaSeconds * 1000;
     if (footstepPulseTimerMs >= FOOTSTEP_INTERVAL_MS) {
       footstepPulseTimerMs = 0;
+      // S3b: footstep 从 surfaceProvider.sampleGround().state.footstep 取，跟
+      // audio / visual / scenery 走同一 SurfaceState（SSOT）。fallback 到原始
+      // sampleRiver 判断，保证 surfaceProvider 未就绪时行为不变。
+      const footstepMaterial = surface
+        ? surface.state.footstep
+        : (terrainSampler.sampleRiver(player.position.x, player.position.z) > WATER_FOOTSTEP_THRESHOLD
+            ? "water"
+            : "grass");
       triggerSystem.footstepPulse({
-        inWater: terrainSampler.sampleRiver(player.position.x, player.position.z) > WATER_FOOTSTEP_THRESHOLD,
+        footstep: footstepMaterial,
         mounted:
           currentMountId === "horse"
             ? "horse"

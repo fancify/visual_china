@@ -17,9 +17,16 @@ export interface TriggerSystem {
   getRecentFires(limit?: number): FireRecord[];
   /** 注册周期性 thunder 间隔 trigger（weather=storm 时） */
   setThunderActive(active: boolean): void;
-  /** 玩家步伐 phase tick → 触发 footstep */
+  /**
+   * 玩家步伐 phase tick → 触发 footstep。
+   *
+   * S3b: 用 `footstep: FootstepMaterial` 替代 `inWater: boolean`，让 audio
+   * 跟 SurfaceProvider.sampleGround().state.footstep 同源（SSOT）。
+   * 当前 audio buffer 只覆盖 grass + water + horse + ox；其他 footstep type
+   * 暂 fallback 到 grass，但 API 已对齐 future S6 stone/snow/mud/wood 扩展。
+   */
   footstepPulse(opts: {
-    inWater: boolean;
+    footstep: "grass" | "stone" | "water" | "snow" | "mud" | "wood";
     mounted: "ox" | "horse" | null;
   }): void;
 }
@@ -205,7 +212,7 @@ export function createTriggerSystem(runtime: AudioRuntime): TriggerSystem {
         id = "mount_horse_hoof";
         pitchSemitones = Math.random() * 0.6 - 0.3;
         reason = "footstep:horse-hoof";
-      } else if (opts.inWater && runtime.buffers.has("footstep_water_wading")) {
+      } else if (opts.footstep === "water" && runtime.buffers.has("footstep_water_wading")) {
         id = "footstep_water_wading";
         reason = "footstep:water";
       }

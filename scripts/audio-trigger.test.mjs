@@ -42,7 +42,7 @@ test("footstep pulse on ox falls back to grass when no ox hoof buffer exists", (
   const triggers = createTriggerSystem(runtime);
 
   triggers.footstepPulse({
-    inWater: false,
+    footstep: "grass",
     mounted: "ox"
   });
 
@@ -60,7 +60,7 @@ test("trigger system records recent fires with timestamps and reasons", () => {
   triggers.fire("ui_hover", { reason: "hover POI: 黄龙" });
   runtime.context.currentTime = 13.25;
   triggers.footstepPulse({
-    inWater: false,
+    footstep: "grass",
     mounted: null
   });
 
