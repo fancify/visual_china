@@ -280,6 +280,17 @@ async function bakeL0Chunk({ chunkX, chunkZ, tiles }) {
   }
 
   if (!hasData) return null;
+
+  // Sparse chunk filter: 边境 chunks 仅含极少数有效 cell (常 < 1%) 烤出后
+  // NaN inpaint 把几个有效值扩散到整 chunk → "浮在海面的方块"。
+  // 阈值 20% 有效 cell 才保留 chunk; 否则 ocean plane 接管。
+  let validCount = 0;
+  for (let i = 0; i < heights.length; i += 1) {
+    if (Number.isFinite(heights[i])) validCount += 1;
+  }
+  const validRatio = validCount / heights.length;
+  if (validRatio < 0.2) return null;
+
   return heights;
 }
 

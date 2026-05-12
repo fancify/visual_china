@@ -52,14 +52,15 @@ const camera = new PerspectiveCamera(
   0.1,
   3000
 );
-// 起始位置：洛阳东南上空中等高，望向东方——能看到中原 + 远处东海
-const luoyang = projectGeoToWorld(
-  { lat: 34.62, lon: 112.45 },
+// 起始位置：岷山高原 (31.69°N 102.65°E) 验证 chunk seam 修复
+// 用户之前在这看到陡崖条带
+const minshan = projectGeoToWorld(
+  { lat: 31.69, lon: 102.65 },
   qinlingRegionBounds,
   qinlingRegionWorld
 );
-camera.position.set(luoyang.x, 60, luoyang.z + 10);
-camera.lookAt(luoyang.x + 200, 0, luoyang.z - 50);
+camera.position.set(minshan.x, 40, minshan.z + 8);
+camera.lookAt(minshan.x + 30, 0, minshan.z - 30);
 
 // 灯：盛唐金光（《长安三万里》参考）
 const ambient = new AmbientLight(0xfff0d4, 0.45);

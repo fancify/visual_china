@@ -78,44 +78,53 @@ export function createPyramidChunkMesh(
   const centerX = (nw.x + se.x) / 2;
   const centerZ = (nw.z + se.z) / 2;
 
-  // PlaneGeometry: 物理大小放大 2.5% 让相邻 chunks 边缘重叠
-  // 盖住 chunk mesh 之间的 seam (vertex 不共享导致)
-  const OVERLAP = 1.025;
+  // PlaneGeometry: 物理大小严格 = chunk geographic bounds 投影 (无 overlap)
+  // 之前 OVERLAP 1.025 + chunk 内部 box blur 让相邻 chunks 边缘 Y 各算各的 mean,
+  // 在 chunk 接缝处出现"陡崖条带" seam. 撤掉 overlap, 让 chunks 边缘 vertex 严格按
+  // raw FABDEM cell 值 — 边缘 cell 两边 chunk 都用同一个底层 raster，自然对齐.
   const geometry = new PlaneGeometry(
-    worldWidth * OVERLAP,
-    worldDepth * OVERLAP,
+    worldWidth,
+    worldDepth,
     cellsPerChunk - 1,
     cellsPerChunk - 1
   );
   geometry.rotateX(-Math.PI / 2);
 
-  // Smooth heights one pass + NaN inpaint。FABDEM 30m raw 在 chunk 边缘
-  // 常有 NaN 边带（tile boundary），fallback 直接用 sea-level 会在平原上戳方块。
-  // 改用 5×5 邻居 mean 填 NaN，让 hole 跟陆地平滑融合；纯海洋区整 chunk 没有
-  // 仍归 oceanRenderer 处理。
+  // Smooth 策略 — 区分 chunk 边缘 vs 内部, 防 seam:
+  //   - chunk 边界 2 行 / 2 列 cells: 直接用 raw FABDEM 值 (不动), 保证相邻 chunks
+  //     边缘对齐 (它们共享同一 raster overlap, raw 值天然一致)
+  //   - chunk 内部 cells: 3×3 box blur, anti-alias 高频
+  //   - NaN cell (任何位置): 5×5 邻居 mean inpaint
   const smoothed = new Float32Array(cellsPerChunk * cellsPerChunk);
+  const BORDER = 2; // chunk 边 2 行/列保 raw 不 smooth
   for (let r = 0; r < cellsPerChunk; r += 1) {
     for (let c = 0; c < cellsPerChunk; c += 1) {
       const center = heights[r * cellsPerChunk + c];
+      const isBorder =
+        r < BORDER || r >= cellsPerChunk - BORDER ||
+        c < BORDER || c >= cellsPerChunk - BORDER;
+
       if (Number.isFinite(center)) {
-        // 有效 cell — 3×3 box blur (anti-alias)
-        let sum = 0;
-        let count = 0;
-        for (let dr = -1; dr <= 1; dr += 1) {
-          for (let dc = -1; dc <= 1; dc += 1) {
-            const rr = r + dr;
-            const cc = c + dc;
-            if (rr < 0 || rr >= cellsPerChunk || cc < 0 || cc >= cellsPerChunk) continue;
-            const v = heights[rr * cellsPerChunk + cc];
-            if (Number.isFinite(v)) {
-              sum += v;
-              count += 1;
+        if (isBorder) {
+          // 边缘 — raw 不动, 保 seam alignment
+          smoothed[r * cellsPerChunk + c] = center;
+        } else {
+          // 内部 — 3×3 box blur
+          let sum = 0;
+          let count = 0;
+          for (let dr = -1; dr <= 1; dr += 1) {
+            for (let dc = -1; dc <= 1; dc += 1) {
+              const v = heights[(r + dr) * cellsPerChunk + (c + dc)];
+              if (Number.isFinite(v)) {
+                sum += v;
+                count += 1;
+              }
             }
           }
+          smoothed[r * cellsPerChunk + c] = count > 0 ? sum / count : center;
         }
-        smoothed[r * cellsPerChunk + c] = sum / count;
       } else {
-        // NaN cell — 5×5 邻居 mean inpaint, fallback NaN 若没邻居
+        // NaN — 5×5 邻居 mean inpaint
         let sum = 0;
         let count = 0;
         for (let dr = -2; dr <= 2; dr += 1) {
