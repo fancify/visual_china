@@ -145,15 +145,15 @@ export function createPyramidChunkMesh(
   }
 
   // Lift each vertex Y by smoothed heights.
-  // chunk heights row 0 = north; PlaneGeometry rotateX(-π/2) 后 vertex row 0 = south,
-  // 所以需要 flip row 让 vertex 跟 chunk north-south 对齐。
+  // PlaneGeometry rotateX(-π/2) 后 vertex row 0 = NORTH (local Y=+H/2 → world Z=-H/2),
+  // chunk heights row 0 也 = NORTH (bake 用 lat = bounds.north - row/N * span).
+  // 两侧约定一致, 不需 flip. (之前 flip 导致 chunk 内部 N-S 颠倒 → 跨 chunk N-S seam
+  // 显陡崖条带, root cause; E-W seam 因 flip 对称不受影响. 2026-05-12 修.)
   const positionAttr = geometry.attributes.position as BufferAttribute;
   for (let r = 0; r < cellsPerChunk; r += 1) {
     for (let c = 0; c < cellsPerChunk; c += 1) {
       const vertIdx = r * cellsPerChunk + c;
-      const chunkRow = cellsPerChunk - 1 - r; // flip
-      const chunkCol = c;
-      const elev = smoothed[chunkRow * cellsPerChunk + chunkCol];
+      const elev = smoothed[r * cellsPerChunk + c];
       const worldY = Number.isFinite(elev)
         ? (elev / VERTICAL_SCALE) * VERTICAL_EXAGGERATION
         : SEA_LEVEL_FALLBACK;
