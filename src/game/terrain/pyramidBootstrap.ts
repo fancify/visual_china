@@ -82,11 +82,12 @@ export async function bootstrapPyramidTerrain(
     const [xMin, xMax] = L0Meta.chunkRangeX;
     const [zMin, zMax] = L0Meta.chunkRangeZ;
 
-    // 距离阈值（世界单位）— 决定 tier 切换
-    // L0 视野半径 = viewRadius；超出转 L1, 再外 L2, 再外 L3, 再外丢弃
-    const tier1Dist = viewRadius * 1.0; // L0 → L1 边界
-    const tier2Dist = viewRadius * 2.5; // L1 → L2 边界
-    const tier3Dist = viewRadius * 6.0; // L2 → L3 边界
+    // 简化策略 2026-05-12 (B): 只画 L0, 远景化在 fog 里
+    // L1/L2/L3 chunks 因为 NaN inpaint 在海岸边产生悬空台地 artifacts;
+    // fog 800u 远景几乎全化, L1+ 视觉价值低. 大幅简化.
+    const tier1Dist = viewRadius * 3.0; // L0 边界 — 之外不画
+    const tier2Dist = Infinity;
+    const tier3Dist = Infinity;
 
     for (let x = xMin; x <= xMax; x += 1) {
       for (let z = zMin; z <= zMax; z += 1) {
@@ -102,24 +103,11 @@ export async function bootstrapPyramidTerrain(
         const dz = cWorld.z - camZ;
         const dist = Math.sqrt(dx * dx + dz * dz);
 
-        // pick base tier by distance, with fallback if missing
-        // L0 hole? → 试 L1; L1 hole? → 试 L2; ...
-        const tryTiers: [TierName, number][] = [];
+        // 只画 L0 — 跟随 fog 远景化为天色, 避免 L1+ tier 悬空台地 artifact
         if (dist < tier1Dist) {
-          tryTiers.push(["L0", 1], ["L1", 2], ["L2", 4], ["L3", 8]);
-        } else if (dist < tier2Dist) {
-          tryTiers.push(["L1", 2], ["L2", 4], ["L3", 8]);
-        } else if (dist < tier3Dist) {
-          tryTiers.push(["L2", 4], ["L3", 8]);
-        } else {
-          tryTiers.push(["L3", 8]);
-        }
-        for (const [tn, div] of tryTiers) {
-          const cx = Math.floor(x / div);
-          const cz = Math.floor(z / div);
-          if (loader.isKnownMissing(tn, cx, cz)) continue;
-          desiredKeys.add(key(tn, cx, cz));
-          break;
+          if (!loader.isKnownMissing("L0", x, z)) {
+            desiredKeys.add(key("L0", x, z));
+          }
         }
       }
     }
