@@ -130,7 +130,10 @@ export async function createLakeRenderer(
       shape.holes.push(holeShape);
     }
     const geom = new ShapeGeometry(shape);
-    geom.rotateX(-Math.PI / 2);
+    // 注意: rotateX(+π/2) 不是 -π/2. ShapeGeometry vertex 存 (X, Y=worldZ, 0),
+    // -π/2 会让 new Z = -worldZ → 全湖南北翻 (Tai Hu 31°N 翻到 41°N 北京附近 bug).
+    // +π/2 旋转矩阵: new Z = +worldZ, 保留 lat 方向.
+    geom.rotateX(Math.PI / 2);
     const mesh = new Mesh(geom, material);
     mesh.renderOrder = 5;
 

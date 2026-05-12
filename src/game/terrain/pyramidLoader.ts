@@ -39,7 +39,9 @@ export class PyramidLoader {
 
   constructor(opts: PyramidLoaderOptions = {}) {
     this.baseUrl = opts.baseUrl ?? "/data/dem";
-    this.maxChunksPerTier = opts.maxChunksPerTier ?? 64;
+    // cache 64 太小 — L1 实测 ~235 active chunks, 64 命中率低反复 re-decode 慢. 512
+    // 容纳 4-tier 同时 max 500 chunks (~250MB Float32 buffer) — 内存可接受
+    this.maxChunksPerTier = opts.maxChunksPerTier ?? 512;
   }
 
   /** Fetch manifest (cached); call before first use. */
