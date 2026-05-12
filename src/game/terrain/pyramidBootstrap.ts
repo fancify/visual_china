@@ -17,7 +17,12 @@ import { MeshPhongMaterial } from "three";
 import { PyramidLoader } from "./pyramidLoader.js";
 import { PyramidSampler } from "./pyramidSampler.js";
 import { PyramidSurfaceProvider } from "./pyramidSurfaceProvider.js";
-import { createPyramidChunkMesh, disposePyramidChunkMesh } from "./pyramidMesh.js";
+import {
+  createPyramidChunkMesh,
+  disposePyramidChunkMesh,
+  harmonizeBoundaryNormals,
+  harmonizeCorner
+} from "./pyramidMesh.js";
 import type { TierName } from "./pyramidTypes.js";
 import { projectGeoToWorld } from "../mapOrientation.js";
 import { qinlingRegionBounds, qinlingRegionWorld } from "../../data/qinlingRegion.js";
@@ -82,33 +87,55 @@ export async function bootstrapPyramidTerrain(
     const [xMin, xMax] = L0Meta.chunkRangeX;
     const [zMin, zMax] = L0Meta.chunkRangeZ;
 
-    // 简化策略 2026-05-12 (B): 只画 L0, 远景化在 fog 里
-    // L1/L2/L3 chunks 因为 NaN inpaint 在海岸边产生悬空台地 artifacts;
-    // fog 800u 远景几乎全化, L1+ 视觉价值低. 大幅简化.
-    const tier1Dist = viewRadius * 3.0; // L0 边界 — 之外不画
-    const tier2Dist = Infinity;
-    const tier3Dist = Infinity;
+    // Distance-band LOD (2026-05-13 BotW 风格 4 tier):
+    //   L0 (~434m cell)   0-240u   (~0-786km)
+    //   L1 (~867m cell)   240-640u (~786-2096km)
+    //   L2 (~1734m cell)  640-1440u (~2096-4716km)
+    //   L3 (~3469m cell)  1440u+ (远景)
+    // 每 L0 grid 位置选一 tier (按距离), Set dedup 自然合并多 L0 → 同 L1/L2/L3 chunk.
+    // 跨 tier 接缝若显眼, 后续上 atmospheric perspective shader 化掉.
+    const dBand = [
+      viewRadius * 3.0,
+      viewRadius * 8.0,
+      viewRadius * 18.0,
+      Infinity
+    ];
+
+    function tierOfL0Position(x: number, z: number): { tier: TierName; cx: number; cz: number } | null {
+      const cLon = manifest.bounds.west + (x + 0.5) * L0SizeDeg;
+      const cLat = manifest.bounds.north - (z + 0.5) * L0SizeDeg;
+      const cWorld = projectGeoToWorld(
+        { lat: cLat, lon: cLon },
+        qinlingRegionBounds,
+        qinlingRegionWorld
+      );
+      const dx = cWorld.x - camX;
+      const dz = cWorld.z - camZ;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      let tierIdx: number;
+      if (dist < dBand[0]) tierIdx = 0;
+      else if (dist < dBand[1]) tierIdx = 1;
+      else if (dist < dBand[2]) tierIdx = 2;
+      else if (dist < dBand[3]) tierIdx = 3;
+      else return null;
+      const tier = `L${tierIdx}` as TierName;
+      const cx = x >> tierIdx;
+      const cz = z >> tierIdx;
+      return { tier, cx, cz };
+    }
 
     for (let x = xMin; x <= xMax; x += 1) {
       for (let z = zMin; z <= zMax; z += 1) {
-        // chunk center geo
-        const cLon = manifest.bounds.west + (x + 0.5) * L0SizeDeg;
-        const cLat = manifest.bounds.north - (z + 0.5) * L0SizeDeg;
-        const cWorld = projectGeoToWorld(
-          { lat: cLat, lon: cLon },
-          qinlingRegionBounds,
-          qinlingRegionWorld
-        );
-        const dx = cWorld.x - camX;
-        const dz = cWorld.z - camZ;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-
-        // 只画 L0 — 跟随 fog 远景化为天色, 避免 L1+ tier 悬空台地 artifact
-        if (dist < tier1Dist) {
-          if (!loader.isKnownMissing("L0", x, z)) {
-            desiredKeys.add(key("L0", x, z));
-          }
-        }
+        const sel = tierOfL0Position(x, z);
+        if (!sel) continue;
+        const meta = manifest.tiers[sel.tier];
+        if (!meta) continue;
+        if (
+          sel.cx < meta.chunkRangeX[0] || sel.cx > meta.chunkRangeX[1] ||
+          sel.cz < meta.chunkRangeZ[0] || sel.cz > meta.chunkRangeZ[1]
+        ) continue;
+        if (loader.isKnownMissing(sel.tier, sel.cx, sel.cz)) continue;
+        desiredKeys.add(key(sel.tier, sel.cx, sel.cz));
       }
     }
 
@@ -116,12 +143,66 @@ export async function bootstrapPyramidTerrain(
     for (const k of desiredKeys) {
       if (meshHandles.has(k)) continue;
       const [tier, xs, zs] = k.split(":");
-      void loader.requestChunk(tier as TierName, Number(xs), Number(zs)).then((chunk) => {
+      const x = Number(xs);
+      const z = Number(zs);
+      void loader.requestChunk(tier as TierName, x, z).then((chunk) => {
         if (!chunk) return;
         if (meshHandles.has(k)) return; // race
         const handle = createPyramidChunkMesh(chunk, { material });
         scene_.add(handle.mesh);
         meshHandles.set(k, handle);
+
+        // 跨 chunk 法线统一 — 两步:
+        //   1. 边界 pairwise: 跟 4 axis 邻居 (E/S/W/N) 边线 vertex normal 平均
+        //   2. 角点 4-way: 跟 4 diagonal 邻居一起 4-way 角点 vertex normal 平均
+        //      (pairwise 在角点不收敛, 平坦盆地区域格子点残留 ~30° 偏差)
+        // 边界/角点 vertex colors 跟着 normal 同步 refresh (slope 基于 normal.y).
+        const tierName = tier as TierName;
+
+        // Step 1: 4 axis 邻居 edge harmonization
+        const east = meshHandles.get(key(tierName, x + 1, z));
+        if (east) harmonizeBoundaryNormals(handle, east, "east");
+        const south = meshHandles.get(key(tierName, x, z + 1));
+        if (south) harmonizeBoundaryNormals(handle, south, "south");
+        const west = meshHandles.get(key(tierName, x - 1, z));
+        if (west) harmonizeBoundaryNormals(west, handle, "east");
+        const north = meshHandles.get(key(tierName, x, z - 1));
+        if (north) harmonizeBoundaryNormals(north, handle, "south");
+
+        // Step 2: 4 corner 4-way harmonization
+        // 每角点收集所有已加载的共享 chunk + 对应 corner label
+        const nw = meshHandles.get(key(tierName, x - 1, z - 1));
+        const ne = meshHandles.get(key(tierName, x + 1, z - 1));
+        const sw = meshHandles.get(key(tierName, x - 1, z + 1));
+        const se = meshHandles.get(key(tierName, x + 1, z + 1));
+
+        // 本 chunk NW corner = 西邻 NE = 北邻 SW = NW-diag SE
+        const nwEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "NW" }];
+        if (west) nwEntries.push({ handle: west, corner: "NE" });
+        if (north) nwEntries.push({ handle: north, corner: "SW" });
+        if (nw) nwEntries.push({ handle: nw, corner: "SE" });
+        harmonizeCorner(nwEntries);
+
+        // 本 chunk NE corner = 东邻 NW = 北邻 SE = NE-diag SW
+        const neEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "NE" }];
+        if (east) neEntries.push({ handle: east, corner: "NW" });
+        if (north) neEntries.push({ handle: north, corner: "SE" });
+        if (ne) neEntries.push({ handle: ne, corner: "SW" });
+        harmonizeCorner(neEntries);
+
+        // 本 chunk SW corner = 西邻 SE = 南邻 NW = SW-diag NE
+        const swEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "SW" }];
+        if (west) swEntries.push({ handle: west, corner: "SE" });
+        if (south) swEntries.push({ handle: south, corner: "NW" });
+        if (sw) swEntries.push({ handle: sw, corner: "NE" });
+        harmonizeCorner(swEntries);
+
+        // 本 chunk SE corner = 东邻 SW = 南邻 NE = SE-diag NW
+        const seEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "SE" }];
+        if (east) seEntries.push({ handle: east, corner: "SW" });
+        if (south) seEntries.push({ handle: south, corner: "NE" });
+        if (se) seEntries.push({ handle: se, corner: "NW" });
+        harmonizeCorner(seEntries);
       });
     }
 

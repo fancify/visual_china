@@ -45,9 +45,19 @@ export interface LoadedChunk {
   chunkZ: number;
   /** geographic bounds covered by this chunk */
   bounds: { west: number; east: number; north: number; south: number };
-  /** N×N Float32 heights, NaN for missing cells */
+  /**
+   * Heights array. Size depends on ghostWidth:
+   *   - ghostWidth=0 (old format): cellsPerChunk² Float32, row-major, row 0 = north
+   *   - ghostWidth=1 (v2, L0 only): (cellsPerChunk+2)² Float32, with 1-cell ring of
+   *     ghost samples beyond chunk bounds. Index (r=0, c=0) = NW ghost corner;
+   *     real mesh cells are at indices [1..cellsPerChunk] (offset by ghostWidth).
+   * NaN for missing samples.
+   */
   heights: Float32Array;
+  /** Mesh vertices per side (unchanged regardless of ghostWidth) */
   cellsPerChunk: number;
+  /** 0 = old format (no ghost ring), 1 = ghost ring 1 cell thick for cross-chunk smoothing */
+  ghostWidth: number;
   /** for LRU cache eviction */
   lastUsed: number;
 }

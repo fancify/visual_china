@@ -19,7 +19,7 @@ import type {
   TierName
 } from "./pyramidTypes.js";
 
-const VERTICAL_EXAGGERATION = 1.07; // 跟 demSampler.ts TERRAIN_VERTICAL_EXAGGERATION 同
+const VERTICAL_EXAGGERATION = 1.07; // 跟 pyramidMesh.ts 同步
 const SEA_LEVEL = 0;
 
 export interface PyramidSamplerOptions {
@@ -30,7 +30,8 @@ export interface PyramidSamplerOptions {
   verticalScale?: number;
 }
 
-const DEFAULT_VERTICAL_SCALE = 110;
+// 跟 pyramidMesh.ts VERTICAL_SCALE 同步, 保 sampler 物理 Y 跟视觉 Y 一致
+const DEFAULT_VERTICAL_SCALE = 500;
 
 export class PyramidSampler {
   readonly loader: PyramidLoader;
@@ -97,7 +98,10 @@ function sampleChunkBilinear(
   lon: number,
   lat: number
 ): number {
-  const { bounds, cellsPerChunk, heights } = chunk;
+  const { bounds, cellsPerChunk, heights, ghostWidth: gw0 } = chunk;
+  const ghostWidth = gw0 ?? 0;
+  // 数组真实边长 (含 ghost ring), 用于 stride 索引
+  const arraySide = cellsPerChunk + 2 * ghostWidth;
   // u = column fraction (0=west, 1=east), v = row fraction (0=north, 1=south)
   const u = (lon - bounds.west) / (bounds.east - bounds.west);
   const v = (bounds.north - lat) / (bounds.north - bounds.south);
@@ -112,7 +116,8 @@ function sampleChunkBilinear(
   const fc = colF - c0;
   const fr = rowF - r0;
 
-  const idx = (r: number, c: number) => r * cellsPerChunk + c;
+  // Mesh vertex (r, c) ∈ [0, cellsPerChunk) maps to array index (r+gw, c+gw) ∈ [gw, gw+N)
+  const idx = (r: number, c: number) => (r + ghostWidth) * arraySide + (c + ghostWidth);
   const v00 = heights[idx(r0, c0)];
   const v01 = heights[idx(r0, c1)];
   const v10 = heights[idx(r1, c0)];

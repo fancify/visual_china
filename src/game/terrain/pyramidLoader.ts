@@ -156,8 +156,9 @@ export class PyramidLoader {
       return null;
     }
     const buf = await resp.arrayBuffer();
-    // 大小防御: 真 chunk = 8 header + 256*256*2 = 131080 字节 exactly
-    if (buf.byteLength !== 131080) {
+    // 大小防御: 真 chunk 是 8 header + N²*2 (v1) 或 8 + (N+2)²*2 (v2 ghost). N=256 →
+    // v1=131080, v2=133136. 其他大小一律拒, 防 Vite SPA fallback HTML 误读.
+    if (buf.byteLength !== 131080 && buf.byteLength !== 133136) {
       return null;
     }
     const decoded = decodePyramidChunk(buf);
@@ -178,6 +179,7 @@ export class PyramidLoader {
       bounds,
       heights: decoded.heights,
       cellsPerChunk: decoded.cellsPerChunk,
+      ghostWidth: decoded.ghostWidth,
       lastUsed: ++this.now
     };
   }

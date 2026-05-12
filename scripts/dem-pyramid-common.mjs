@@ -178,28 +178,32 @@ export function float32ToFloat16(value) {
 
 const HEADER_SIZE = 8;
 const MAGIC = 0xdead;
-const VERSION = 1;
 
-export function encodeChunkBinary({ tier, chunkX, chunkZ, heights }) {
+/**
+ * Encode chunk to binary. ghostWidth:
+ *   - 0 → version 1, heights size = N² (legacy)
+ *   - 1 → version 2, heights size = (N+2)² with 1-cell ghost ring (跨 chunk seam fix)
+ */
+export function encodeChunkBinary({ tier, chunkX, chunkZ, heights, ghostWidth = 0 }) {
   const cellsPerChunk = TIER_PARAMS[`L${tier}`].cellsPerChunk;
-  const expectedSize = cellsPerChunk * cellsPerChunk;
+  const arraySide = cellsPerChunk + 2 * ghostWidth;
+  const expectedSize = arraySide * arraySide;
   if (heights.length !== expectedSize) {
     throw new Error(
-      `encodeChunkBinary: heights.length=${heights.length} != ${expectedSize} for L${tier}`
+      `encodeChunkBinary: heights.length=${heights.length} != ${expectedSize} for L${tier} ghostWidth=${ghostWidth}`
     );
   }
+  const version = ghostWidth === 0 ? 1 : 2;
 
   const buffer = new ArrayBuffer(HEADER_SIZE + expectedSize * 2);
   const view = new DataView(buffer);
 
-  // Header
   view.setUint16(0, MAGIC, true);
-  view.setUint8(2, VERSION);
+  view.setUint8(2, version);
   view.setUint8(3, tier);
   view.setUint16(4, chunkX, true);
   view.setUint16(6, chunkZ, true);
 
-  // Data (Float16 little-endian)
   for (let i = 0; i < expectedSize; i += 1) {
     const f16 = float32ToFloat16(heights[i]);
     view.setUint16(HEADER_SIZE + i * 2, f16, true);

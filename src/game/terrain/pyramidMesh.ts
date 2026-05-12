@@ -30,16 +30,63 @@ import {
 } from "../../data/qinlingRegion.js";
 import type { LoadedChunk } from "./pyramidTypes.js";
 
-// vertical scale 调优 (2026-05-12)
-// 测试发现 elevation_m/110 在 256×256 grid + 1° chunk 下显得过于尖刺。
-// FABDEM 30m raw bilinear 下采样到 444m/cell 后高频信号被放大；
-// 改为 elevation_m/180 让山势更平缓，接近千里江山图横看远山的比例。
+// vertical scale 调优历史:
+// - 110 (太尖刺) → 180 → 260 (BotW/原神风, ~13.5× 夸张, 千里江山图)
+// - 260 → 500 (2026-05-13 改 7× 夸张, 接近 Skyrim/Horizon Zero Dawn 地面 RPG 尺度)
+// 夸张倍数 = (水平 m/unit) / (垂直 m/unit) = 3275 / (SCALE/EXAGGERATION)
+//   3275 = world.width 1711u × cos(35.5°) × 111km / 62°
+//   SCALE 500 / 1.07 ≈ 467 m/unit → 夸张 ≈ 7.0×
 const VERTICAL_EXAGGERATION = 1.07;
-// scale 180 → 260: 平原区高频起伏被压回真实比例。秦岭 3000m → ~12u 而非 18u
-const VERTICAL_SCALE = 260;
+const VERTICAL_SCALE = 500;
 // NaN cell (chunk 边缘 / FABDEM hole) fallback 到 -3, 跟 ocean plane Y=-3 齐平
 // 让 ocean plane 自然吃掉 hole, 而非伪造 Y=0 陆地
 const SEA_LEVEL_FALLBACK = -3;
+
+// 千里江山图 vertex color palette
+const COLOR_LOW_GREEN = new Color(0.35, 0.55, 0.36);  // 平原青绿 (草、田)
+const COLOR_MID_WARM = new Color(0.62, 0.55, 0.40);   // 丘陵赭石 (土、林)
+const COLOR_HIGH_STONE = new Color(0.58, 0.55, 0.52); // 高山岩灰 (石)
+const COLOR_SNOW = new Color(0.92, 0.92, 0.88);       // 雪线
+const COLOR_STEEP = new Color(0.48, 0.42, 0.36);      // 陡坡岩
+
+function colorForVertex(out: Color, y: number, ny: number): void {
+  const slopeT = Math.max(0, Math.min(1, (1 - ny) * 2.2));
+  const elevT = Math.max(0, Math.min(1, y / 25));
+  if (y > 28) {
+    out.copy(COLOR_SNOW);
+  } else if (elevT < 0.35) {
+    out.copy(COLOR_LOW_GREEN).lerp(COLOR_MID_WARM, elevT / 0.35);
+  } else if (elevT < 0.75) {
+    out.copy(COLOR_MID_WARM).lerp(COLOR_HIGH_STONE, (elevT - 0.35) / 0.4);
+  } else {
+    out.copy(COLOR_HIGH_STONE).lerp(COLOR_SNOW, (elevT - 0.75) / 0.25);
+  }
+  out.lerp(COLOR_STEEP, slopeT * 0.55);
+}
+
+/**
+ * 重新计算 vertex colors. 不传 indices → 全 chunk; 传 → 只更新指定 vertex.
+ * Normal harmonization 改了边界 normal 后必须调用此函数刷新边界 vertex 颜色,
+ * 否则边界仍显旧 slope 颜色 (盆地平坦区会暴露成可见格子).
+ */
+export function refreshVertexColors(
+  handle: Pick<PyramidMeshHandle, "geometry">,
+  indices?: number[]
+): void {
+  const positionAttr = handle.geometry.attributes.position as BufferAttribute;
+  const normalAttr = handle.geometry.attributes.normal as BufferAttribute | undefined;
+  const colorAttr = handle.geometry.attributes.color as BufferAttribute | undefined;
+  if (!colorAttr || !normalAttr) return;
+  const tmp = new Color();
+  const range = indices ?? null;
+  const count = range ? range.length : positionAttr.count;
+  for (let k = 0; k < count; k += 1) {
+    const i = range ? range[k] : k;
+    colorForVertex(tmp, positionAttr.getY(i), normalAttr.getY(i));
+    colorAttr.setXYZ(i, tmp.r, tmp.g, tmp.b);
+  }
+  colorAttr.needsUpdate = true;
+}
 
 export interface PyramidMeshOptions {
   /** 默认 MeshPhongMaterial；外部可传共享 material */
@@ -60,7 +107,9 @@ export function createPyramidChunkMesh(
   chunk: LoadedChunk,
   opts: PyramidMeshOptions = {}
 ): PyramidMeshHandle {
-  const { cellsPerChunk, heights, bounds } = chunk;
+  const { cellsPerChunk, heights, bounds, ghostWidth: gw0 } = chunk;
+  const ghostWidth = gw0 ?? 0;
+  const arraySide = cellsPerChunk + 2 * ghostWidth;
 
   // World bounds for this chunk
   const nw = projectGeoToWorld(
@@ -90,49 +139,59 @@ export function createPyramidChunkMesh(
   );
   geometry.rotateX(-Math.PI / 2);
 
-  // Smooth 策略 — 区分 chunk 边缘 vs 内部, 防 seam:
-  //   - chunk 边界 2 行 / 2 列 cells: 直接用 raw FABDEM 值 (不动), 保证相邻 chunks
-  //     边缘对齐 (它们共享同一 raster overlap, raw 值天然一致)
-  //   - chunk 内部 cells: 3×3 box blur, anti-alias 高频
-  //   - NaN cell (任何位置): 5×5 邻居 mean inpaint
+  // Smooth 策略 (2026-05-13 v4 — ghost cells):
+  //   - ghostWidth=1 (v2 bake): chunk 数据多带 1-cell ghost ring, 跨 chunk smoothing
+  //     完全 symmetric. boundary cell 用 (-1, 0, +1) 三向邻居, 包含邻 chunk 的 cell.
+  //     两 chunks 在 boundary 处计算同一个 smoothed 值, 几何 + 法线自然一致.
+  //   - ghostWidth=0 (v1 bake): legacy, 沿用 BLEND_WIDTH 渐变作 fallback.
+  //   - NaN cell: 5×5 邻居 mean inpaint.
   const smoothed = new Float32Array(cellsPerChunk * cellsPerChunk);
-  const BORDER = 2; // chunk 边 2 行/列保 raw 不 smooth
+  const BLEND_WIDTH_V1 = 4; // 仅 v1 fallback 用
+
   for (let r = 0; r < cellsPerChunk; r += 1) {
     for (let c = 0; c < cellsPerChunk; c += 1) {
-      const center = heights[r * cellsPerChunk + c];
-      const isBorder =
-        r < BORDER || r >= cellsPerChunk - BORDER ||
-        c < BORDER || c >= cellsPerChunk - BORDER;
+      // 数组 index (考虑 ghost offset)
+      const ar = r + ghostWidth;
+      const ac = c + ghostWidth;
+      const center = heights[ar * arraySide + ac];
 
       if (Number.isFinite(center)) {
-        if (isBorder) {
-          // 边缘 — raw 不动, 保 seam alignment
-          smoothed[r * cellsPerChunk + c] = center;
-        } else {
-          // 内部 — 3×3 box blur
-          let sum = 0;
-          let count = 0;
-          for (let dr = -1; dr <= 1; dr += 1) {
-            for (let dc = -1; dc <= 1; dc += 1) {
-              const v = heights[(r + dr) * cellsPerChunk + (c + dc)];
-              if (Number.isFinite(v)) {
-                sum += v;
-                count += 1;
-              }
+        // 3×3 box blur, 用 ghost cells 时所有方向都能取到 (boundary 也包括 ghost ring)
+        let sum = 0;
+        let count = 0;
+        for (let dr = -1; dr <= 1; dr += 1) {
+          for (let dc = -1; dc <= 1; dc += 1) {
+            const rr = ar + dr;
+            const cc = ac + dc;
+            if (rr < 0 || rr >= arraySide || cc < 0 || cc >= arraySide) continue;
+            const v = heights[rr * arraySide + cc];
+            if (Number.isFinite(v)) {
+              sum += v;
+              count += 1;
             }
           }
-          smoothed[r * cellsPerChunk + c] = count > 0 ? sum / count : center;
+        }
+        const blur = count > 0 ? sum / count : center;
+
+        if (ghostWidth > 0) {
+          // 有 ghost: 全 cell uniform smooth, boundary cell 已 symmetric.
+          smoothed[r * cellsPerChunk + c] = blur;
+        } else {
+          // 无 ghost: blend gradient, 外圈保 raw 对齐邻 chunk.
+          const distEdge = Math.min(r, c, cellsPerChunk - 1 - r, cellsPerChunk - 1 - c);
+          const w = Math.max(0, Math.min(1, distEdge / BLEND_WIDTH_V1));
+          smoothed[r * cellsPerChunk + c] = center * (1 - w) + blur * w;
         }
       } else {
-        // NaN — 5×5 邻居 mean inpaint
+        // NaN — 5×5 邻居 mean inpaint (用 array 空间, 自动包括 ghost)
         let sum = 0;
         let count = 0;
         for (let dr = -2; dr <= 2; dr += 1) {
           for (let dc = -2; dc <= 2; dc += 1) {
-            const rr = r + dr;
-            const cc = c + dc;
-            if (rr < 0 || rr >= cellsPerChunk || cc < 0 || cc >= cellsPerChunk) continue;
-            const v = heights[rr * cellsPerChunk + cc];
+            const rr = ar + dr;
+            const cc = ac + dc;
+            if (rr < 0 || rr >= arraySide || cc < 0 || cc >= arraySide) continue;
+            const v = heights[rr * arraySide + cc];
             if (Number.isFinite(v)) {
               sum += v;
               count += 1;
@@ -163,42 +222,10 @@ export function createPyramidChunkMesh(
   positionAttr.needsUpdate = true;
   geometry.computeVertexNormals();
 
-  // Vertex colors based on elevation + slope (千里江山图 调色板):
-  //   低海拔平地: 青绿 (草、田)
-  //   中海拔丘陵: 赭石黄褐 (土、林)
-  //   高海拔山脊: 灰白 (石)
-  //   雪线以上: 雪白
-  //   陡坡 (slope > 0.4 rad ~ 23°): 偏石灰岩
+  // Vertex colors: 千里江山图 调色板（详 colorForVertex / refreshVertexColors）
   const colorAttr = new BufferAttribute(new Float32Array(positionAttr.count * 3), 3);
-  const baseLowGreen = new Color(0.35, 0.55, 0.36);  // 平原青绿
-  const baseMidWarm = new Color(0.62, 0.55, 0.40);   // 丘陵赭石
-  const baseHighStone = new Color(0.58, 0.55, 0.52); // 高山岩灰
-  const baseSnow = new Color(0.92, 0.92, 0.88);      // 雪线
-  const baseSteep = new Color(0.48, 0.42, 0.36);     // 陡坡岩
-  const tmp = new Color();
-  const normalAttr = geometry.attributes.normal as BufferAttribute;
-  for (let i = 0; i < positionAttr.count; i += 1) {
-    const y = positionAttr.getY(i);
-    // slope = acos(normal.y) — flat ground normal.y ≈ 1
-    const ny = normalAttr.getY(i);
-    const slopeT = Math.max(0, Math.min(1, (1 - ny) * 2.2));
-
-    // base color by elevation tier
-    const elevT = Math.max(0, Math.min(1, y / 25));
-    if (y > 28) {
-      tmp.copy(baseSnow);
-    } else if (elevT < 0.35) {
-      tmp.copy(baseLowGreen).lerp(baseMidWarm, elevT / 0.35);
-    } else if (elevT < 0.75) {
-      tmp.copy(baseMidWarm).lerp(baseHighStone, (elevT - 0.35) / 0.4);
-    } else {
-      tmp.copy(baseHighStone).lerp(baseSnow, (elevT - 0.75) / 0.25);
-    }
-    // mix in 陡坡岩 by slope
-    tmp.lerp(baseSteep, slopeT * 0.55);
-    colorAttr.setXYZ(i, tmp.r, tmp.g, tmp.b);
-  }
   geometry.setAttribute("color", colorAttr);
+  refreshVertexColors({ geometry });
 
   const material = opts.material ?? new MeshPhongMaterial({
     vertexColors: true,
@@ -209,8 +236,7 @@ export function createPyramidChunkMesh(
   const mesh = new Mesh(geometry, material);
   mesh.position.set(centerX, 0, centerZ);
   mesh.name = `pyramid-chunk-${chunk.tier}-${chunk.chunkX}-${chunk.chunkZ}`;
-  // Renderer ordering: lower tiers (closer/finer) render on top
-  const tierNum = Number(chunk.tier.slice(1)); // "L0" → 0
+  const tierNum = Number(chunk.tier.slice(1));
   mesh.renderOrder = 10 - tierNum;
 
   return { mesh, geometry, material, chunk };
@@ -220,4 +246,160 @@ export function createPyramidChunkMesh(
 export function disposePyramidChunkMesh(handle: PyramidMeshHandle): void {
   handle.geometry.dispose();
   // Don't dispose material if shared
+}
+
+/**
+ * 跨 chunk 边界法线统一 (root cause of "陡崖条带" image 2 / 新报告):
+ * 每个 chunk 各自 computeVertexNormals() 只看本 chunk 三角形, 边界顶点法线
+ * 缺少邻居那半边贡献 → 邻 chunk 法线方向不同 → Phong shading 在 chunk 边界
+ * 显示亮度断阶 (即使 elevation 完全对齐).
+ *
+ * 此函数: 把 a 的指定边 vertex normal 跟 b 的对应边平均, 回写两边都用平均值.
+ * edgeOfA 是 a 这一侧的边方向:
+ *   'east'  → a.col=N-1 (东) 对 b.col=0 (b 在 a 东侧)
+ *   'south' → a.row=N-1 (南) 对 b.row=0 (b 在 a 南侧)
+ * 反向 (west/north) 直接调换 a/b 即可, 不在此处单独处理.
+ */
+export function harmonizeBoundaryNormals(
+  a: PyramidMeshHandle,
+  b: PyramidMeshHandle,
+  edgeOfA: "east" | "south"
+): void {
+  const N = a.chunk.cellsPerChunk;
+  if (b.chunk.cellsPerChunk !== N) return;
+  const pA = a.geometry.attributes.position as BufferAttribute;
+  const pB = b.geometry.attributes.position as BufferAttribute;
+  const nA = a.geometry.attributes.normal as BufferAttribute;
+  const nB = b.geometry.attributes.normal as BufferAttribute;
+
+  const edgeIndicesA: number[] = [];
+  const edgeIndicesB: number[] = [];
+
+  for (let i = 0; i < N; i += 1) {
+    let idxA: number;
+    let idxB: number;
+    if (edgeOfA === "east") {
+      // a 东边 col=N-1; b 西边 col=0; 同 row
+      idxA = i * N + (N - 1);
+      idxB = i * N + 0;
+    } else {
+      // a 南边 row=N-1; b 北边 row=0; 同 col
+      idxA = (N - 1) * N + i;
+      idxB = 0 * N + i;
+    }
+    edgeIndicesA.push(idxA);
+    edgeIndicesB.push(idxB);
+
+    // 1. 位置 Y 平均 — 修边界 micro-gap (root cause 山脊跨 chunk 显蓝青色细缝:
+    //    v3 blend 后两 chunk 同 XZ 但 Y 差 0.05-0.14u, 低俯角穿透到天空背景)
+    const yA = pA.getY(idxA);
+    const yB = pB.getY(idxB);
+    const yAvg = (yA + yB) / 2;
+    pA.setY(idxA, yAvg);
+    pB.setY(idxB, yAvg);
+
+    // 2. 法线方向平均 — 修 Phong shading 接缝
+    const ax = nA.getX(idxA);
+    const ay = nA.getY(idxA);
+    const az = nA.getZ(idxA);
+    const bx = nB.getX(idxB);
+    const by = nB.getY(idxB);
+    const bz = nB.getZ(idxB);
+    let sx = ax + bx;
+    let sy = ay + by;
+    let sz = az + bz;
+    const len = Math.sqrt(sx * sx + sy * sy + sz * sz);
+    if (len > 1e-6) {
+      sx /= len;
+      sy /= len;
+      sz /= len;
+    } else {
+      sx = 0;
+      sy = 1;
+      sz = 0;
+    }
+    nA.setXYZ(idxA, sx, sy, sz);
+    nB.setXYZ(idxB, sx, sy, sz);
+  }
+  pA.needsUpdate = true;
+  pB.needsUpdate = true;
+  nA.needsUpdate = true;
+  nB.needsUpdate = true;
+
+  // Bbox 需要重算 (Y 改了, frustum culling 可能受影响)
+  a.geometry.computeBoundingBox();
+  a.geometry.computeBoundingSphere();
+  b.geometry.computeBoundingBox();
+  b.geometry.computeBoundingSphere();
+
+  // 边界 vertex 法线变了, 同步刷新两侧 vertex colors
+  refreshVertexColors(a, edgeIndicesA);
+  refreshVertexColors(b, edgeIndicesB);
+}
+
+/**
+ * 4-way 角点法线汇总. 每个 chunk 角点最多被 4 个 chunk 共享 (本 + 两个 axis 邻 + 1
+ * diagonal 邻). pairwise harmonizeBoundaryNormals 只能两两平均, 角点处迭代不收敛
+ * (max angle 30° 残留, 平坦盆地里成可见格子点).
+ *
+ * 此函数: 收集传入的所有 handle 在指定角点位置的 normal, 4-way 平均, 回写所有.
+ * 同步 refresh 该顶点 vertex color (slope-based, 跟着 normal 更新).
+ */
+export function harmonizeCorner(
+  entries: { handle: PyramidMeshHandle; corner: "NW" | "NE" | "SW" | "SE" }[]
+): void {
+  if (entries.length < 2) return;
+  const N0 = entries[0].handle.chunk.cellsPerChunk;
+  const cornerIdx = (corner: "NW" | "NE" | "SW" | "SE", N: number): number => {
+    if (corner === "NW") return 0;
+    if (corner === "NE") return N - 1;
+    if (corner === "SW") return (N - 1) * N;
+    return (N - 1) * N + (N - 1);
+  };
+
+  // Pass 1: 4-way average for both Y position AND normal direction
+  let sumY = 0;
+  let yCount = 0;
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (const { handle, corner } of entries) {
+    const N = handle.chunk.cellsPerChunk;
+    if (N !== N0) continue;
+    const idx = cornerIdx(corner, N);
+    const p = handle.geometry.attributes.position as BufferAttribute;
+    const n = handle.geometry.attributes.normal as BufferAttribute;
+    sumY += p.getY(idx);
+    yCount += 1;
+    nx += n.getX(idx);
+    ny += n.getY(idx);
+    nz += n.getZ(idx);
+  }
+  const avgY = yCount > 0 ? sumY / yCount : 0;
+  const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  if (len > 1e-6) {
+    nx /= len;
+    ny /= len;
+    nz /= len;
+  } else {
+    nx = 0;
+    ny = 1;
+    nz = 0;
+  }
+
+  // Pass 2: write back to all chunks at corner
+  for (const { handle, corner } of entries) {
+    const N = handle.chunk.cellsPerChunk;
+    if (N !== N0) continue;
+    const idx = cornerIdx(corner, N);
+    const p = handle.geometry.attributes.position as BufferAttribute;
+    const n = handle.geometry.attributes.normal as BufferAttribute;
+    p.setY(idx, avgY);
+    n.setXYZ(idx, nx, ny, nz);
+    p.needsUpdate = true;
+    n.needsUpdate = true;
+    handle.geometry.computeBoundingBox();
+    handle.geometry.computeBoundingSphere();
+    refreshVertexColors(handle, [idx]);
+  }
 }

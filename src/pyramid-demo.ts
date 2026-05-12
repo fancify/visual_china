@@ -39,7 +39,8 @@ const scene = new Scene();
 // 长安三万里 暖金色天 调色
 scene.background = new Color(0xc7d5e3);
 // fog: 近景清晰 (50u) → 远景化在 350u（约 1100km 视距）淡化进背景色
-scene.fog = new Fog(0xc7d5e3, 80, 800);
+// fog 远拉到 2400u (~7800km) 让 LOD 远景 (L2/L3) 可见. 之前 800 把多 tier 化掉了
+scene.fog = new Fog(0xc7d5e3, 150, 2400);
 
 // 起始相机位置: 长安 (西安) 上空
 const chanan = projectGeoToWorld(
@@ -111,6 +112,10 @@ const handle = await bootstrapPyramidTerrain(scene, {
   viewRadiusUnits: 80
 });
 
+// 临时 debug (Y harmonization 验证 — 验完即删)
+(window as unknown as { scene: Scene; camera: PerspectiveCamera }).scene = scene;
+(window as unknown as { scene: Scene; camera: PerspectiveCamera }).camera = camera;
+
 // ocean plane —— 修 B7 海洋漫灌
 // Y 压到 -3 — 陆地 fallback Y=0 牢牢遮住, 海洋区 chunks 不存在才露出
 const oceanPlane = createOceanPlane({ seaLevelY: -3 });
@@ -119,17 +124,17 @@ scene.add(oceanPlane);
 // 小地图
 const minimap = createMinimap({ corner: "top-right", width: 240, height: 165 });
 
-// debug overlay: chunk grid + lat/lon 网格 + POI 测试桩
-// 按 G 键切换显示
+// debug overlay: 默认 hidden, 按 G 键切开（调试用 — chunk grid + 经纬度网格 + POI 桩）
 const manifest = await handle.loader.loadManifest();
 const debugOverlay = createDebugOverlay({
   manifest,
   geoGridStep: 5,
-  chunkLabelStride: 2, // 每隔 1 chunk 标一次（避免文字挤）
+  chunkLabelStride: 2,
   showChunkGrid: true,
   showPois: true,
   showGeoGrid: true
 });
+debugOverlay.setVisible(false);
 scene.add(debugOverlay.group);
 window.addEventListener("keydown", (e) => {
   if (e.key === "g" || e.key === "G") {

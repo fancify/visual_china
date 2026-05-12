@@ -262,57 +262,64 @@ function sampleAt(lon, lat, tilesIndex) {
   return NaN;
 }
 
-async function bakeL0Chunk({ chunkX, chunkZ, tiles }) {
+async function bakeL0Chunk({ chunkX, chunkZ, tiles, ghostWidth = 1 }) {
   const bounds = chunkBoundsAt("L0", chunkX, chunkZ);
-  const overlapping = tilesCoveringChunk(tiles, bounds);
-  if (overlapping.length === 0) {
-    return null;
-  }
 
-  // Preload all overlapping tile pixel data
+  // Ghost-aware bounds: 比 chunk 边界向外延 ghostWidth 个 cell 找 tile.
+  const N = TIER_PARAMS.L0.cellsPerChunk;
+  const lonSpan = bounds.east - bounds.west;
+  const latSpan = bounds.north - bounds.south;
+  const denom = N - 1;
+  const cellLonDeg = lonSpan / denom;
+  const cellLatDeg = latSpan / denom;
+  const expandedBounds = ghostWidth > 0
+    ? {
+        west: bounds.west - cellLonDeg * ghostWidth,
+        east: bounds.east + cellLonDeg * ghostWidth,
+        north: bounds.north + cellLatDeg * ghostWidth,
+        south: bounds.south - cellLatDeg * ghostWidth
+      }
+    : bounds;
+
+  const overlapping = tilesCoveringChunk(tiles, expandedBounds);
+  if (overlapping.length === 0) return null;
+
   for (const t of overlapping) {
     await loadTilePixels(t);
   }
 
-  const N = TIER_PARAMS.L0.cellsPerChunk;
-  const heights = new Float32Array(N * N).fill(Number.NaN);
+  // 数组边 = N + 2*ghostWidth. 内部 [ghostWidth..ghostWidth+N) 是 mesh vertex 对应,
+  // 外圈是 ghost cells (跨 chunk smooth/normal 用).
+  // 几何: array index r → lat = north - (r - ghostWidth) * cellLatDeg
+  //   r=ghostWidth → lat=north (mesh row 0)
+  //   r=ghostWidth+N-1 → lat=south (mesh row N-1)
+  //   r=0 (北 ghost) → lat = north + cellLatDeg (邻居北 chunk 的最南 vertex)
+  const arraySide = N + 2 * ghostWidth;
+  const heights = new Float32Array(arraySide * arraySide).fill(Number.NaN);
   let hasData = false;
+  let validInnerCount = 0;
 
-  // **Sample at VERTEX positions, not cell centers**
-  // PlaneGeometry has N vertices per edge. vertex (col=0) at chunk west edge,
-  // vertex (col=N-1) at chunk east edge.
-  // chunk(x).vertex(col=N-1) and chunk(x+1).vertex(col=0) are at SAME world position
-  // → must sample SAME lon/lat → same raster pixel → no seam.
-  //
-  // 因此 vertex(col, row) sample at:
-  //   lon = west + col / (N-1) * lonSpan   (col=0 → lon=west, col=N-1 → lon=east)
-  //   lat = north - row / (N-1) * latSpan  (row=0 → lat=north, row=N-1 → lat=south)
-  const lonSpan = bounds.east - bounds.west;
-  const latSpan = bounds.north - bounds.south;
-  const denom = N - 1;
-  for (let row = 0; row < N; row += 1) {
-    const lat = bounds.north - (row / denom) * latSpan;
-    for (let col = 0; col < N; col += 1) {
-      const lon = bounds.west + (col / denom) * lonSpan;
+  for (let r = 0; r < arraySide; r += 1) {
+    const lat = bounds.north - (r - ghostWidth) * cellLatDeg;
+    for (let c = 0; c < arraySide; c += 1) {
+      const lon = bounds.west + (c - ghostWidth) * cellLonDeg;
       const v = sampleAt(lon, lat, overlapping);
       if (Number.isFinite(v)) {
-        heights[row * N + col] = v;
+        heights[r * arraySide + c] = v;
         hasData = true;
+        const isInner =
+          r >= ghostWidth && r < ghostWidth + N &&
+          c >= ghostWidth && c < ghostWidth + N;
+        if (isInner) validInnerCount += 1;
       }
     }
   }
 
   if (!hasData) return null;
 
-  // Sparse chunk filter: 边境 chunks 仅含极少数有效 cell (常 < 1%) 烤出后
-  // NaN inpaint 把几个有效值扩散到整 chunk → "浮在海面的方块"。
-  // 阈值 20% 有效 cell 才保留 chunk; 否则 ocean plane 接管。
-  let validCount = 0;
-  for (let i = 0; i < heights.length; i += 1) {
-    if (Number.isFinite(heights[i])) validCount += 1;
-  }
-  const validRatio = validCount / heights.length;
-  if (validRatio < 0.2) return null;
+  // Sparse filter 仅基于内部 N×N (ghost 不算)
+  const validRatio = validInnerCount / (N * N);
+  if (validRatio < 0.05) return null;
 
   return heights;
 }
@@ -375,18 +382,25 @@ async function downsampleTier(srcTierName, dstTierName) {
     if (srcGrid.length === 0) return;
 
     // 解码 + 拼成 2N × 2N then 2× pool down to N × N
+    // src 可能是 v1 (N²) 或 v2 (N+2)² with ghost ring. 后者取内部 N×N.
     const big = new Float32Array(2 * N * 2 * N).fill(Number.NaN);
     for (const { dx, dz, buf } of srcGrid) {
-      // skip 8-byte header
+      const version = buf.readUInt8(2);
+      const dataBytes = buf.length - 8;
+      const arraySide = Math.round(Math.sqrt(dataBytes / 2));
+      const ghostWidth = version === 2 ? 1 : 0;
       const view = new DataView(buf.buffer, buf.byteOffset + 8);
-      for (let i = 0; i < N * N; i += 1) {
-        const f16 = view.getUint16(i * 2, true);
-        const f32 = float16ToFloat32(f16);
-        const localRow = Math.floor(i / N);
-        const localCol = i % N;
-        const bigRow = dz * N + localRow;
-        const bigCol = dx * N + localCol;
-        big[bigRow * (2 * N) + bigCol] = f32;
+      // 读 inner N×N (跳过 ghost ring)
+      for (let row = 0; row < N; row += 1) {
+        for (let col = 0; col < N; col += 1) {
+          const srcRow = row + ghostWidth;
+          const srcCol = col + ghostWidth;
+          const f16 = view.getUint16((srcRow * arraySide + srcCol) * 2, true);
+          const f32 = float16ToFloat32(f16);
+          const bigRow = dz * N + row;
+          const bigCol = dx * N + col;
+          big[bigRow * (2 * N) + bigCol] = f32;
+        }
       }
     }
 
@@ -508,7 +522,8 @@ if (tiers.includes("L0")) {
       tier: 0,
       chunkX: item.x,
       chunkZ: item.z,
-      heights
+      heights,
+      ghostWidth: 1
     });
     await fs.writeFile(outPath, binary);
     baked += 1;
