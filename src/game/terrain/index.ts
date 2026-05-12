@@ -32,6 +32,7 @@ export { bootstrapPyramidTerrain } from "./pyramidBootstrap.js";
 export { decodePyramidChunk, float16ToFloat32 } from "./pyramidDecode.js";
 export { RiverLoader } from "./riverRenderer.js";
 export { createOceanPlane } from "./oceanRenderer.js";
+export { createLakeRenderer } from "./lakeRenderer.js";
 export { createMinimap } from "./minimap.js";
 export { createDebugOverlay } from "./debugOverlay.js";
 

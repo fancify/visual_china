@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "visual-china.tang-admin.v1",
+  "epoch": "Tang 755 (天宝十四载)",
+  "source": "CHGIS V6 (Harvard CGA + Fudan Univ)",
+  "url": "https://chgis.fas.harvard.edu/",
+  "citation": "Berman, Lex (2017). v6_time_*_utf_wgs84. Harvard Dataverse.",
+  "filter": "BEG_YR <= 755 AND END_YR >= 755",
+  "datasets": {
+    "counties": {
+      "kind": "POINT",
+      "count": 1470,
+      "file": "counties.json",
+      "sizeKB": 283.1
+    },
+    "prefectures": {
+      "kind": "POINT",
+      "count": 339,
+      "file": "prefectures.json",
+      "sizeKB": 63.5
+    },
+    "prefecture-polygons": {
+      "kind": "POLYGON",
+      "count": 121,
+      "file": "prefecture-polygons.json",
+      "sizeKB": 2487.6
+    }
+  }
+}
