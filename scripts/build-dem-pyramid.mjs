@@ -171,109 +171,126 @@ class TileCache {
 const tileCache = new TileCache(32);
 
 // ─── L0 chunk 烤逻辑 ─────────────────────────────────────────────
+//
+// 算法: cell-center direct sampling (修陡崖条带 root cause)
+// 之前用 readRasters resample(window→N×N) 在 chunk window 边界处 bilinear
+// 没 ghost cells, 邻 chunks 各自 resample 不同结果 → seam.
+//
+// 现在: 每个 cell 算它的 geographic 中心 (lon_c, lat_c), 找包含的 tile, 计算
+// tile pixel coord, bilinear in pixel space. 两个相邻 chunks 跨边界共享同一
+// lon/lat 的 cells 必然从同一 raster pixels 取值 → 自动对齐.
+
+// Tile pixel cache: full tile pixel data, indexed once per tile.
+const tilePixelCache = new Map(); // tile.path → { pixels: Float32Array, width, height, ...tile }
+
+async function loadTilePixels(tile) {
+  if (tilePixelCache.has(tile.path)) return tilePixelCache.get(tile.path);
+  const entry = await tileCache.get(tile);
+  const { image, width, height } = entry;
+  // Read whole tile in one go
+  const raster = await image.readRasters({
+    interleave: true,
+    fillValue: -9999
+  });
+  const pixels = raster instanceof Float32Array ? raster : Float32Array.from(raster);
+  const cached = {
+    pixels,
+    width,
+    height,
+    west: entry.west,
+    east: entry.east,
+    north: entry.north,
+    south: entry.south
+  };
+  tilePixelCache.set(tile.path, cached);
+  // LRU eviction if too many
+  if (tilePixelCache.size > 32) {
+    const firstKey = tilePixelCache.keys().next().value;
+    tilePixelCache.delete(firstKey);
+  }
+  return cached;
+}
+
+// Sample raw FABDEM elevation at (lon, lat) using bilinear in tile pixel space.
+// Returns NaN if no tile covers this point.
+function sampleAt(lon, lat, tilesIndex) {
+  // Find tile containing (lon, lat)
+  for (const t of tilesIndex) {
+    if (lon >= t.west && lon < t.east && lat >= t.south && lat < t.north) {
+      const cached = tilePixelCache.get(t.path);
+      if (!cached) {
+        // Tile not loaded yet — caller must preload all overlapping tiles first
+        return NaN;
+      }
+      const { pixels, width, height } = cached;
+      // (lon, lat) → pixel coord (in tile)
+      // Tile is north-to-south top-down. row 0 is northernmost.
+      const u = (lon - t.west) / (t.east - t.west);
+      const v = (t.north - lat) / (t.north - t.south);
+      // pixel (u*width, v*height) in float
+      const px = u * (width - 1);
+      const py = v * (height - 1);
+      const col0 = Math.floor(px);
+      const row0 = Math.floor(py);
+      const col1 = Math.min(width - 1, col0 + 1);
+      const row1 = Math.min(height - 1, row0 + 1);
+      const fc = px - col0;
+      const fr = py - row0;
+      const v00 = pixels[row0 * width + col0];
+      const v01 = pixels[row0 * width + col1];
+      const v10 = pixels[row1 * width + col0];
+      const v11 = pixels[row1 * width + col1];
+      // Bilinear with NaN handling
+      let sum = 0;
+      let wSum = 0;
+      const samples = [
+        { val: v00, w: (1 - fc) * (1 - fr) },
+        { val: v01, w: fc * (1 - fr) },
+        { val: v10, w: (1 - fc) * fr },
+        { val: v11, w: fc * fr }
+      ];
+      for (const s of samples) {
+        if (Number.isFinite(s.val) && s.val > -9999 && s.w > 0) {
+          sum += s.val * s.w;
+          wSum += s.w;
+        }
+      }
+      return wSum > 0 ? sum / wSum : NaN;
+    }
+  }
+  return NaN;
+}
 
 async function bakeL0Chunk({ chunkX, chunkZ, tiles }) {
   const bounds = chunkBoundsAt("L0", chunkX, chunkZ);
   const overlapping = tilesCoveringChunk(tiles, bounds);
   if (overlapping.length === 0) {
-    return null; // 海洋 / 全无覆盖
+    return null;
+  }
+
+  // Preload all overlapping tile pixel data
+  for (const t of overlapping) {
+    await loadTilePixels(t);
   }
 
   const N = TIER_PARAMS.L0.cellsPerChunk;
   const heights = new Float32Array(N * N).fill(Number.NaN);
   let hasData = false;
 
-  for (const tile of overlapping) {
-    const entry = await tileCache.get(tile);
-    const { image, width, height } = entry;
-
-    // chunk's bounds 映射到 tile's pixel space
-    // tile bounds: tile.west .. tile.east (1°), tile.north .. tile.south (1°)
-    // image: 3600×3600 pixels typically
-    const tileWest = entry.west;
-    const tileEast = entry.east;
-    const tileNorth = entry.north;
-    const tileSouth = entry.south;
-    const tileWidthDeg = tileEast - tileWest;
-    const tileHeightDeg = tileNorth - tileSouth;
-
-    // 计算 tile 与 chunk 的重叠区域 (geo)
-    const overlapWest = Math.max(bounds.west, tileWest);
-    const overlapEast = Math.min(bounds.east, tileEast);
-    const overlapNorth = Math.min(bounds.north, tileNorth);
-    const overlapSouth = Math.max(bounds.south, tileSouth);
-
-    // tile pixel window
-    const px0 = clamp(
-      Math.floor(((overlapWest - tileWest) / tileWidthDeg) * width),
-      0,
-      width - 1
-    );
-    const px1 = clamp(
-      Math.ceil(((overlapEast - tileWest) / tileWidthDeg) * width),
-      1,
-      width
-    );
-    const py0 = clamp(
-      Math.floor(((tileNorth - overlapNorth) / tileHeightDeg) * height),
-      0,
-      height - 1
-    );
-    const py1 = clamp(
-      Math.ceil(((tileNorth - overlapSouth) / tileHeightDeg) * height),
-      1,
-      height
-    );
-
-    const tileWinW = Math.max(1, px1 - px0);
-    const tileWinH = Math.max(1, py1 - py0);
-
-    // chunk pixel range for this overlap
-    const cx0 = clamp(
-      Math.floor(((overlapWest - bounds.west) / (bounds.east - bounds.west)) * N),
-      0,
-      N - 1
-    );
-    const cx1 = clamp(
-      Math.ceil(((overlapEast - bounds.west) / (bounds.east - bounds.west)) * N),
-      1,
-      N
-    );
-    const cz0 = clamp(
-      Math.floor(((bounds.north - overlapNorth) / (bounds.north - bounds.south)) * N),
-      0,
-      N - 1
-    );
-    const cz1 = clamp(
-      Math.ceil(((bounds.north - overlapSouth) / (bounds.north - bounds.south)) * N),
-      1,
-      N
-    );
-
-    const chunkWinW = Math.max(1, cx1 - cx0);
-    const chunkWinH = Math.max(1, cz1 - cz0);
-
-    // 用 geotiff 的 readRasters 重采样到目标 chunk 维度
-    const raster = await image.readRasters({
-      interleave: true,
-      window: [px0, py0, px1, py1],
-      width: chunkWinW,
-      height: chunkWinH,
-      resampleMethod: "bilinear",
-      fillValue: -9999
-    });
-
-    for (let row = 0; row < chunkWinH; row += 1) {
-      for (let col = 0; col < chunkWinW; col += 1) {
-        const v = raster[row * chunkWinW + col];
-        if (!Number.isFinite(v) || v <= -9999) continue;
-        const idx = (cz0 + row) * N + (cx0 + col);
-        if (Number.isFinite(heights[idx])) {
-          // 多 tile 重叠 — 取平均（边界处常见）
-          heights[idx] = (heights[idx] + v) * 0.5;
-        } else {
-          heights[idx] = v;
-        }
+  // Sample each cell at its geographic center
+  // chunk row 0 = north, row N-1 = south
+  // chunk col 0 = west, col N-1 = east
+  // cell center at lon = bounds.west + (col + 0.5) / N * (east - west)
+  //                 lat = bounds.north - (row + 0.5) / N * (north - south)
+  const lonSpan = bounds.east - bounds.west;
+  const latSpan = bounds.north - bounds.south;
+  for (let row = 0; row < N; row += 1) {
+    const lat = bounds.north - ((row + 0.5) / N) * latSpan;
+    for (let col = 0; col < N; col += 1) {
+      const lon = bounds.west + ((col + 0.5) / N) * lonSpan;
+      const v = sampleAt(lon, lat, overlapping);
+      if (Number.isFinite(v)) {
+        heights[row * N + col] = v;
         hasData = true;
       }
     }
