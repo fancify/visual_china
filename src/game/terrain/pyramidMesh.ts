@@ -30,8 +30,12 @@ import {
 } from "../../data/qinlingRegion.js";
 import type { LoadedChunk } from "./pyramidTypes.js";
 
+// vertical scale 调优 (2026-05-12)
+// 测试发现 elevation_m/110 在 256×256 grid + 1° chunk 下显得过于尖刺。
+// FABDEM 30m raw bilinear 下采样到 444m/cell 后高频信号被放大；
+// 改为 elevation_m/180 让山势更平缓，接近千里江山图横看远山的比例。
 const VERTICAL_EXAGGERATION = 1.07;
-const VERTICAL_SCALE = 110; // elevation_m / 110 = world Y units (跟 demSampler.ts 同)
+const VERTICAL_SCALE = 180; // elevation_m / 180 = world Y units
 const SEA_LEVEL_FALLBACK = 0;
 
 export interface PyramidMeshOptions {
@@ -81,27 +85,40 @@ export function createPyramidChunkMesh(
   );
   geometry.rotateX(-Math.PI / 2);
 
-  // Lift each vertex Y by sampled heights
+  // Smooth heights one pass (3×3 box blur) to reduce FABDEM raw 高频 alias.
+  // FABDEM 30m bare-earth 在城市 / 林边仍有 ±3-5m 噪声; resample 到 444m/cell
+  // 后这些噪声转成 mesh 尖刺。一次 box blur 让 silhouette 接近千里江山图远山调。
+  const smoothed = new Float32Array(cellsPerChunk * cellsPerChunk);
+  for (let r = 0; r < cellsPerChunk; r += 1) {
+    for (let c = 0; c < cellsPerChunk; c += 1) {
+      let sum = 0;
+      let count = 0;
+      for (let dr = -1; dr <= 1; dr += 1) {
+        for (let dc = -1; dc <= 1; dc += 1) {
+          const rr = r + dr;
+          const cc = c + dc;
+          if (rr < 0 || rr >= cellsPerChunk || cc < 0 || cc >= cellsPerChunk) continue;
+          const v = heights[rr * cellsPerChunk + cc];
+          if (Number.isFinite(v)) {
+            sum += v;
+            count += 1;
+          }
+        }
+      }
+      smoothed[r * cellsPerChunk + c] = count > 0 ? sum / count : Number.NaN;
+    }
+  }
+
+  // Lift each vertex Y by smoothed heights.
+  // chunk heights row 0 = north; PlaneGeometry rotateX(-π/2) 后 vertex row 0 = south,
+  // 所以需要 flip row 让 vertex 跟 chunk north-south 对齐。
   const positionAttr = geometry.attributes.position as BufferAttribute;
-  // PlaneGeometry vertex order after rotateX:
-  //   row 0 at -depth/2 (north in world? need to check)
-  //   vertex(c, r) at index r * cellsPerChunk + c
-  //
-  // PlaneGeometry default: y axis points up; widthSegments along x, heightSegments along original y
-  // After rotateX(-PI/2): original y axis becomes z; row 0 is at -depth/2 (south after rotate),
-  // row last at +depth/2.
-  // But chunk heights[r=0] is the NORTH cell. So we flip row index:
   for (let r = 0; r < cellsPerChunk; r += 1) {
     for (let c = 0; c < cellsPerChunk; c += 1) {
       const vertIdx = r * cellsPerChunk + c;
-      // chunk heights row 0 = north; mesh vertex row 0 after rotateX(-PI/2) = ?
-      // PlaneGeometry segments y goes from -depth/2 to +depth/2 (before rotate).
-      // After rotateX(-π/2): y → -z (rotation -π/2 around X turns +Y into +Z? actually into -Z).
-      // Reset: rotateX(-π/2) maps (x, y, 0) to (x, 0, -y). So original y=+depth/2 → world z=-depth/2 (north).
-      // So vertex row 0 (smallest original y = -depth/2) → world z=+depth/2 = south. We need to flip.
       const chunkRow = cellsPerChunk - 1 - r; // flip
       const chunkCol = c;
-      const elev = heights[chunkRow * cellsPerChunk + chunkCol];
+      const elev = smoothed[chunkRow * cellsPerChunk + chunkCol];
       const worldY = Number.isFinite(elev)
         ? (elev / VERTICAL_SCALE) * VERTICAL_EXAGGERATION
         : SEA_LEVEL_FALLBACK;
@@ -111,20 +128,39 @@ export function createPyramidChunkMesh(
   positionAttr.needsUpdate = true;
   geometry.computeVertexNormals();
 
-  // Default vertex colors based on elevation (placeholder; material shader will replace)
+  // Vertex colors based on elevation + slope (千里江山图 调色板):
+  //   低海拔平地: 青绿 (草、田)
+  //   中海拔丘陵: 赭石黄褐 (土、林)
+  //   高海拔山脊: 灰白 (石)
+  //   雪线以上: 雪白
+  //   陡坡 (slope > 0.4 rad ~ 23°): 偏石灰岩
   const colorAttr = new BufferAttribute(new Float32Array(positionAttr.count * 3), 3);
-  const baseLow = new Color(0.55, 0.62, 0.45); // 平原绿
-  const baseMid = new Color(0.66, 0.58, 0.42); // 丘陵土黄
-  const baseHigh = new Color(0.88, 0.86, 0.82); // 雪山白
+  const baseLowGreen = new Color(0.35, 0.55, 0.36);  // 平原青绿
+  const baseMidWarm = new Color(0.62, 0.55, 0.40);   // 丘陵赭石
+  const baseHighStone = new Color(0.58, 0.55, 0.52); // 高山岩灰
+  const baseSnow = new Color(0.92, 0.92, 0.88);      // 雪线
+  const baseSteep = new Color(0.48, 0.42, 0.36);     // 陡坡岩
   const tmp = new Color();
+  const normalAttr = geometry.attributes.normal as BufferAttribute;
   for (let i = 0; i < positionAttr.count; i += 1) {
     const y = positionAttr.getY(i);
-    const t = Math.max(0, Math.min(1, y / 30)); // 0 at sea, 1 at ~3300m
-    if (t < 0.5) {
-      tmp.copy(baseLow).lerp(baseMid, t * 2);
+    // slope = acos(normal.y) — flat ground normal.y ≈ 1
+    const ny = normalAttr.getY(i);
+    const slopeT = Math.max(0, Math.min(1, (1 - ny) * 2.2));
+
+    // base color by elevation tier
+    const elevT = Math.max(0, Math.min(1, y / 25));
+    if (y > 28) {
+      tmp.copy(baseSnow);
+    } else if (elevT < 0.35) {
+      tmp.copy(baseLowGreen).lerp(baseMidWarm, elevT / 0.35);
+    } else if (elevT < 0.75) {
+      tmp.copy(baseMidWarm).lerp(baseHighStone, (elevT - 0.35) / 0.4);
     } else {
-      tmp.copy(baseMid).lerp(baseHigh, (t - 0.5) * 2);
+      tmp.copy(baseHighStone).lerp(baseSnow, (elevT - 0.75) / 0.25);
     }
+    // mix in 陡坡岩 by slope
+    tmp.lerp(baseSteep, slopeT * 0.55);
     colorAttr.setXYZ(i, tmp.r, tmp.g, tmp.b);
   }
   geometry.setAttribute("color", colorAttr);
