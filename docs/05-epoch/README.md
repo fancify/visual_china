@@ -16,7 +16,7 @@ updated: 2026-05-12
 | **modern** | shipped | manifest at `public/data/epochs/modern/manifest.json` |
 | **tang-tianbao-14** | S4a ✅ schema / S4b ⏸ 数据 sourcing 暂搁（等 terrain rewrite 完） | [POI database](./tang-epoch-755-poi-database.md) |
 
-## Tang 755 (天宝十四年) 关键约束
+## 唐 755 (天宝十四年) 关键约束
 
 详见 [memory/project_epoch_decision](../../.claude/projects/-Users-chen-Documents-GitHub-visual-china/memory/project_epoch_decision.md)：
 - 黄河走唐代 "汉志河道" 北流入渤海（不是现代山东东营）
@@ -25,7 +25,7 @@ updated: 2026-05-12
 - 隋唐大运河：永济渠 + 通济渠 + 邗沟 + 江南河
 - 永定河叫桑干河，清水状态
 
-## Tang 755 周边文明（必含）
+## 唐 755 周边文明（必含）
 
 详见 [memory/project_tang_epoch_neighbors](../../.claude/projects/-Users-chen-Documents-GitHub-visual-china/memory/project_tang_epoch_neighbors.md)：
 吐蕃（逻些）/ 西域（高昌 / 龟兹 / 于阗 / 疏勒 / 碎叶）/ 南诏（太和城 / 大理）/ 渤海国（上京龙泉府）/ 新罗（庆州）/ 日本（平城京）/ 回纥（鄂尔浑河）/ 大食（撒马尔罕）。
@@ -34,7 +34,7 @@ updated: 2026-05-12
 
 # POI 体系 (S4b)
 
-**S4b 阶段任务**：建立 Tang 755 完整 POI 知识库——城市、山水、古迹、交通——含图文介绍 + Tang 视角 + 历史长河。
+**S4b 阶段任务**：建立 唐 755 完整 POI 知识库——城市、山水、古迹、交通——含图文介绍 + 唐人视角 + 历史长河。
 
 ## 4 大类（不是 12 类，已合并）
 
@@ -48,7 +48,7 @@ updated: 2026-05-12
 
 ### 已拍板的边界 case
 - **莫高窟 / 龙门石窟 / 云冈 独立**（不归城市），文化分量 >> 城市附庸
-- **汉陵各帝独立**（长 / 茂 / 阳 / 杜 / 霸 等各 1 doc），各陵各帝 Tang 视角不同
+- **汉陵各帝独立**（长 / 茂 / 阳 / 杜 / 霸 等各 1 doc），各陵各帝 唐人视角不同
 
 ## 独立性原则（核心 spec）
 
@@ -107,7 +107,7 @@ updated: 2026-05-12
 （朝代分段视具体 POI 而定）
 
 ## 引文（如适用）
-[Tang 诗词 / 史志原文]
+[唐人诗词 / 史志原文]
 
 ## 图
 [1-3 张图，附 caption + 出处]
@@ -160,7 +160,7 @@ updated: 2026-05-12
 | "盛唐的雅集、诗社、文人私园——这场乱之后，大半都成了过去式" (盛衰隐性对照) | "唉，盛唐就这样消逝了" (直接抒情) |
 | "考古至今也没碰到过" (轻轻一压) | "至今未被发现（令人遗憾）" (直白抒情) |
 | "当时世上最大的城" / "中古最大的人造体" (比较级**必加限定**) | "世上最大的城" (unbounded 不明何时何范围) |
-| 全中文 heading: `## 大唐天宝十四载（755年）` / `## 形貌` | 中英混排: `## Tang 755 视角` |
+| 全中文 heading: `## 大唐天宝十四载（755年）` / `## 形貌` | 中英混排: `## Tang 755 视角`（禁用，"Tang" 应改"唐 / 大唐"）|
 | 城内地标各 1 个独立 `###`（25+ 个 named entities） | 用 `### 三大宫` + 粗体段落堆叠 |
 
 ### 怀古技巧（per-段至少 1 处）
