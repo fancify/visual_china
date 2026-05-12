@@ -28,23 +28,48 @@ import {
   qinlingRegionWorld
 } from "../../data/qinlingRegion.js";
 import type { PyramidManifest } from "./pyramidTypes.js";
+import { POI_REGISTRY, type PoiEntry } from "../../data/poiRegistry.generated.js";
 
-interface KnownPoi {
-  lat: number;
-  lon: number;
-  label: string;
-  color: number;
+// Tang 中文 label 字典 — 跟 minimap.ts POI_LABELS 保持同步.
+// (考虑未来抽到 src/data/poiLabels.ts 单源, 现在双处先 OK)
+const POI_LABEL_DICT: Record<string, string> = {
+  changan: "长安",
+  luoyang: "洛阳",
+  yangzhou: "扬州",
+  taiyuan: "太原",
+  youzhou: "幽州",
+  yizhou: "益州",
+  liangzhou: "凉州",
+  lingwu: "灵武",
+  shanzhou: "鄯州",
+  huashan: "华山",
+  songshan: "嵩山",
+  taishan: "泰山",
+  taibaishan: "太白山",
+  lushan: "庐山",
+  "zhongnan-shan": "终南山",
+  "baima-si": "白马寺",
+  "famen-si": "法门寺",
+  "longmen-shiku": "龙门石窟",
+  "mogao-caves": "莫高窟",
+  "wangchuan-bieye": "辋川别业",
+  "xingjiao-si": "兴教寺"
+};
+
+const POI_COLOR_BY_CATEGORY: Record<string, number> = {
+  city: 0xff5050,      // 红
+  relic: 0xffaa50,     // 橙
+  scenic: 0x50ff50,    // 绿
+  transport: 0x50ffff  // 青
+};
+
+function poiColor(poi: PoiEntry): number {
+  return POI_COLOR_BY_CATEGORY[poi.category] ?? 0xffffff;
 }
 
-const KNOWN_POIS: KnownPoi[] = [
-  { lat: 34.27, lon: 108.95, label: "长安", color: 0xff5050 },
-  { lat: 34.62, lon: 112.45, label: "洛阳", color: 0xffaa50 },
-  { lat: 31.69, lon: 102.65, label: "岷山测试点", color: 0xff00ff },
-  { lat: 40.14, lon: 94.66, label: "沙州", color: 0xffff50 },
-  { lat: 39.9, lon: 116.4, label: "幽州", color: 0x50ffff },
-  { lat: 30.67, lon: 104.06, label: "益州", color: 0x50ff50 },
-  { lat: 32.39, lon: 119.43, label: "扬州", color: 0xff80c0 }
-];
+function poiLabel(poi: PoiEntry): string {
+  return POI_LABEL_DICT[poi.id] ?? poi.id;
+}
 
 const STAKE_HEIGHT = 60;
 
@@ -261,7 +286,10 @@ export function createDebugOverlay(opts: DebugOverlayOptions): DebugOverlayHandl
   }
 
   if (showPois) {
-    for (const poi of KNOWN_POIS) {
+    // 跟 minimap + 3D 主画面共用 POI_REGISTRY (SSOT). 只显示 gravity + large
+    // 防 stake 立柱太密 — debug 用 visualization 不需要全 27 个全立.
+    for (const poi of POI_REGISTRY) {
+      if (poi.hierarchy !== "gravity" && poi.hierarchy !== "large") continue;
       const w = projectGeoToWorld(
         { lat: poi.lat, lon: poi.lon },
         qinlingRegionBounds,
@@ -270,8 +298,8 @@ export function createDebugOverlay(opts: DebugOverlayOptions): DebugOverlayHandl
       const stake = buildStake(
         w.x,
         w.z,
-        `${poi.label} (${poi.lat}°N ${poi.lon}°E)`,
-        poi.color
+        `${poiLabel(poi)} (${poi.lat.toFixed(2)}°N ${poi.lon.toFixed(2)}°E)`,
+        poiColor(poi)
       );
       group.add(stake);
     }
