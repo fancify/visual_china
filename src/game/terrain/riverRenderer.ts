@@ -16,14 +16,14 @@
 //   各 chunk JSON — lazy fetch (跟 DEM chunk 同步加载)
 
 import {
-  BufferAttribute,
-  BufferGeometry,
+  CatmullRomCurve3,
   Color,
   Group,
-  Mesh,
-  MeshBasicMaterial,
   Vector3
 } from "three";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { projectGeoToWorld } from "../mapOrientation.js";
 import {
   qinlingRegionBounds,
@@ -36,22 +36,35 @@ import type {
 } from "./pyramidTypes.js";
 import type { PyramidSampler } from "./pyramidSampler.js";
 
-const Y_OFFSET = 0.12; // 河流浮于 DEM 表面，避免 z-fight；调大可见
-const WATER_COLOR = new Color(0.22, 0.42, 0.55); // 偏深蓝绿，跟陆地色对比
+// 用 Three.js Line2 (fat lines) — 屏幕空间 anti-aliased polylines, 恒定像素宽度
+// 不管相机距离, 永远不出 ribbon-quad facet 缺陷 (image 10-14 那些 bubble/fragment).
+// 真正干净的 cartographic 河, 跟 BotW 不一样 — BotW 用 3D 水面 shader, 不是线.
+//
+// 资源: three/examples/jsm/lines/{Line2, LineGeometry, LineMaterial}
 
-// 调大 width — 当前 verticalScale=180 下原来 0.05u 太细看不见
+const Y_OFFSET = 0.08; // 河流浮于 DEM 表面 z-fight 缓冲
+const WATER_COLOR = new Color(0.62, 0.78, 0.88); // 淡青蓝, 千里江山图水彩
+const SPLINE_SUBDIV = 5; // 每 source segment 插 5 点 — 平滑曲线 (Line2 没 quad 问题)
+
+// Linewidth in world units (worldUnits: true) — 真实物理宽度, 远看自然变细近看变粗:
+//   ord 8+ 干流 (长江/黄河):  0.9u  (~ 3km, 跟真实长江中下游 1-3km 对齐)
+//   ord 7 (大支流):           0.5u
+//   ord 6:                    0.3u
+//   ord 5:                    0.18u
+//   ord 4:                    0.10u
 function widthForOrd(ord: number): number {
-  if (ord >= 8) return 2.0;
-  if (ord >= 7) return 1.5;
-  if (ord >= 6) return 1.0;
-  if (ord >= 5) return 0.6;
-  if (ord >= 4) return 0.35;
-  return 0.2; // ord 3
+  if (ord >= 8) return 0.9;
+  if (ord >= 7) return 0.5;
+  if (ord >= 6) return 0.3;
+  if (ord >= 5) return 0.18;
+  return 0.10; // ord 4
 }
 
 export interface RiverLoaderOptions {
   baseUrl?: string;
   sampler: PyramidSampler;
+  /** 过滤 stream order 阈值 (默认 4 — 毛细支流 ord 3 全跳过, 减半 polyline 数 + 性能) */
+  minOrder?: number;
 }
 
 export interface RiverChunkHandle {
@@ -64,6 +77,7 @@ export interface RiverChunkHandle {
 export class RiverLoader {
   readonly baseUrl: string;
   readonly sampler: PyramidSampler;
+  readonly minOrder: number;
 
   private manifest: RiverManifest | null = null;
   private manifestPromise: Promise<RiverManifest> | null = null;
@@ -73,6 +87,7 @@ export class RiverLoader {
   constructor(opts: RiverLoaderOptions) {
     this.baseUrl = opts.baseUrl ?? "/data/rivers";
     this.sampler = opts.sampler;
+    this.minOrder = opts.minOrder ?? 4;
   }
 
   async loadManifest(): Promise<RiverManifest> {
@@ -149,108 +164,113 @@ export class RiverLoader {
     const group = new Group();
     group.name = `rivers-${data.chunkX}-${data.chunkZ}`;
 
-    // Bucket polylines by ord (so each ord gets one merged mesh with appropriate width)
+    // Group polylines by ord (each ord 一 shared LineMaterial)
     const byOrd = new Map<number, RiverPolyline[]>();
     for (const p of data.polylines) {
+      if (p.ord < this.minOrder) continue;
       const list = byOrd.get(p.ord) ?? [];
       list.push(p);
       byOrd.set(p.ord, list);
     }
 
+    // 同 ord 所有 polylines 合并到一个 LineSegments2 — 一个 draw call 渲全 chunk 同色河
     for (const [ord, polylines] of byOrd) {
-      const width = widthForOrd(ord);
-      const geometry = buildRibbonGeometry(polylines, width, this.sampler);
-      if (geometry === null) continue;
-      const material = new MeshBasicMaterial({
-        color: WATER_COLOR,
+      const linewidth = widthForOrd(ord);
+      const material = new LineMaterial({
+        color: WATER_COLOR.getHex(),
+        linewidth,
         transparent: true,
-        opacity: 0.85,
-        depthWrite: false
+        opacity: 0.9,
+        depthWrite: false,
+        worldUnits: true
       });
-      const mesh = new Mesh(geometry, material);
-      mesh.renderOrder = 20; // above terrain
-      mesh.name = `rivers-ord-${ord}`;
-      group.add(mesh);
+      material.resolution.set(
+        typeof window !== "undefined" ? window.innerWidth : 1920,
+        typeof window !== "undefined" ? window.innerHeight : 1080
+      );
+
+      // 抽所有 polylines 的 segments (LineSegmentsGeometry 要 [a,b, c,d, ...] 段对)
+      const allSegments: number[] = [];
+      for (const poly of polylines) {
+        appendPolylineSegments(poly, this.sampler, allSegments);
+      }
+      if (allSegments.length === 0) continue;
+
+      const geometry = new LineSegmentsGeometry();
+      geometry.setPositions(allSegments);
+      const lines = new LineSegments2(geometry, material);
+      lines.computeLineDistances();
+      lines.renderOrder = 20;
+      lines.name = `rivers-ord-${ord}`;
+      group.add(lines);
     }
 
     return group;
   }
 }
 
-// ─── Ribbon geometry builder ────────────────────────────────────
+// ─── Segment-pair appender for LineSegmentsGeometry batching ──────
 
-function buildRibbonGeometry(
-  polylines: RiverPolyline[],
-  width: number,
-  sampler: PyramidSampler
-): BufferGeometry | null {
-  // For each polyline, build a strip: two parallel rows of vertices
-  // perpendicular to local direction. Triangles connect them.
-  const positions: number[] = [];
-  const indices: number[] = [];
-  let baseIdx = 0;
+function appendPolylineSegments(
+  poly: RiverPolyline,
+  sampler: PyramidSampler,
+  out: number[]
+): void {
+  if (poly.coords.length < 2) return;
 
-  for (const poly of polylines) {
-    if (poly.coords.length < 2) continue;
+  // 1. lon/lat → world XZ
+  const sourceXZ: Vector3[] = poly.coords.map(([lon, lat]) => {
+    const w = projectGeoToWorld({ lat, lon }, qinlingRegionBounds, qinlingRegionWorld);
+    return new Vector3(w.x, 0, w.z);
+  });
 
-    // 1. Project each lon/lat to world (x, z); sample Y from DEM
-    const worldPoints: Vector3[] = [];
-    for (const [lon, lat] of poly.coords) {
-      const w = projectGeoToWorld(
-        { lat, lon },
-        qinlingRegionBounds,
-        qinlingRegionWorld
-      );
-      const y = sampler.sampleHeightWorld(w.x, w.z);
-      const finalY = Number.isFinite(y) ? y + Y_OFFSET : Y_OFFSET;
-      worldPoints.push(new Vector3(w.x, finalY, w.z));
+  // 2. Catmull-Rom 平滑
+  let smoothed: Vector3[];
+  if (sourceXZ.length >= 2) {
+    const curve = new CatmullRomCurve3(sourceXZ, false, "centripetal", 0.5);
+    const totalPts = Math.max(4, sourceXZ.length * SPLINE_SUBDIV);
+    smoothed = curve.getPoints(totalPts);
+  } else {
+    smoothed = sourceXZ;
+  }
+  if (smoothed.length < 2) return;
+
+  // 3. Y sample + moving-avg smooth
+  const rawY: number[] = smoothed.map((p) => {
+    const y = sampler.sampleHeightWorld(p.x, p.z);
+    return Number.isFinite(y) ? y : NaN;
+  });
+  for (let i = 0; i < rawY.length; i += 1) {
+    if (!Number.isFinite(rawY[i])) {
+      let prev = i - 1;
+      while (prev >= 0 && !Number.isFinite(rawY[prev])) prev -= 1;
+      let next = i + 1;
+      while (next < rawY.length && !Number.isFinite(rawY[next])) next += 1;
+      if (prev >= 0 && next < rawY.length) rawY[i] = (rawY[prev] + rawY[next]) / 2;
+      else if (prev >= 0) rawY[i] = rawY[prev];
+      else if (next < rawY.length) rawY[i] = rawY[next];
+      else rawY[i] = 0;
     }
-    if (worldPoints.length < 2) continue;
-
-    // 2. For each segment, compute perpendicular direction; emit 2 quad vertices
-    for (let i = 0; i < worldPoints.length; i += 1) {
-      const p = worldPoints[i];
-      // Local tangent direction = avg of (i-1 → i) and (i → i+1)
-      let tx = 0;
-      let tz = 0;
-      if (i > 0) {
-        tx += p.x - worldPoints[i - 1].x;
-        tz += p.z - worldPoints[i - 1].z;
-      }
-      if (i < worldPoints.length - 1) {
-        tx += worldPoints[i + 1].x - p.x;
-        tz += worldPoints[i + 1].z - p.z;
-      }
-      const tlen = Math.sqrt(tx * tx + tz * tz) || 1;
-      tx /= tlen;
-      tz /= tlen;
-      // Perpendicular (in xz plane): rotate 90° → (-tz, tx)
-      const px = -tz;
-      const pz = tx;
-
-      // Two parallel vertices, ± width/2 perpendicular
-      const halfW = width * 0.5;
-      positions.push(p.x + px * halfW, p.y, p.z + pz * halfW);
-      positions.push(p.x - px * halfW, p.y, p.z - pz * halfW);
+  }
+  const SMOOTH_K = 7;
+  const half = Math.floor(SMOOTH_K / 2);
+  const smoothY: number[] = new Array(rawY.length);
+  for (let i = 0; i < rawY.length; i += 1) {
+    let s = 0;
+    let n = 0;
+    for (let k = -half; k <= half; k += 1) {
+      const j = Math.max(0, Math.min(rawY.length - 1, i + k));
+      s += rawY[j];
+      n += 1;
     }
-
-    // 3. Triangles connecting adjacent vertex pairs
-    const segCount = worldPoints.length;
-    for (let i = 0; i < segCount - 1; i += 1) {
-      const v0 = baseIdx + i * 2;
-      const v1 = v0 + 1;
-      const v2 = v0 + 2;
-      const v3 = v0 + 3;
-      indices.push(v0, v2, v1);
-      indices.push(v1, v2, v3);
-    }
-    baseIdx += segCount * 2;
+    smoothY[i] = s / n;
   }
 
-  if (positions.length === 0) return null;
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
+  // 4. 写 segment pairs [a.x,a.y,a.z, b.x,b.y,b.z, b.x,b.y,b.z, c.x,c.y,c.z, ...]
+  for (let i = 0; i < smoothed.length - 1; i += 1) {
+    const a = smoothed[i];
+    const b = smoothed[i + 1];
+    out.push(a.x, smoothY[i] + Y_OFFSET, a.z);
+    out.push(b.x, smoothY[i + 1] + Y_OFFSET, b.z);
+  }
 }
