@@ -33,6 +33,8 @@ export class PyramidLoader {
   private chunkCache = new Map<string, LoadedChunk>();
   /** chunks currently being fetched (dedup concurrent requests) */
   private inflightFetches = new Map<string, Promise<LoadedChunk | null>>();
+  /** keys known to NOT exist on server (404 / fallback) — avoid re-fetch */
+  private missingChunks = new Set<string>();
   private now = 0;
 
   constructor(opts: PyramidLoaderOptions = {}) {
@@ -72,6 +74,7 @@ export class PyramidLoader {
     chunkZ: number
   ): Promise<LoadedChunk | null> {
     const key = this.cacheKey(tier, chunkX, chunkZ);
+    if (this.missingChunks.has(key)) return null;
     const cached = this.chunkCache.get(key);
     if (cached) {
       cached.lastUsed = ++this.now;
@@ -87,11 +90,18 @@ export class PyramidLoader {
       if (chunk) {
         this.chunkCache.set(key, chunk);
         this.evictIfFull(tier);
+      } else {
+        this.missingChunks.add(key);
       }
       return chunk;
     } finally {
       this.inflightFetches.delete(key);
     }
+  }
+
+  /** Synchronously check if chunk known missing (404/cached) */
+  isKnownMissing(tier: TierName, chunkX: number, chunkZ: number): boolean {
+    return this.missingChunks.has(this.cacheKey(tier, chunkX, chunkZ));
   }
 
   /**
@@ -136,7 +146,17 @@ export class PyramidLoader {
     if (!resp.ok) {
       throw new Error(`chunk fetch failed ${tier} ${chunkX},${chunkZ}: HTTP ${resp.status}`);
     }
+    // Vite dev server SPA fallback: 不存在的 .bin 文件返回 200 + index.html
+    // Content-Type 检查兜底 — 真 chunk 是 application/octet-stream 或 absent
+    const contentType = resp.headers.get("content-type") || "";
+    if (contentType.includes("text/html")) {
+      return null;
+    }
     const buf = await resp.arrayBuffer();
+    // 大小防御: 真 chunk = 8 header + 256*256*2 = 131080 字节 exactly
+    if (buf.byteLength !== 131080) {
+      return null;
+    }
     const decoded = decodePyramidChunk(buf);
 
     // Compute geographic bounds

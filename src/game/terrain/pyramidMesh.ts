@@ -35,8 +35,11 @@ import type { LoadedChunk } from "./pyramidTypes.js";
 // FABDEM 30m raw bilinear 下采样到 444m/cell 后高频信号被放大；
 // 改为 elevation_m/180 让山势更平缓，接近千里江山图横看远山的比例。
 const VERTICAL_EXAGGERATION = 1.07;
-const VERTICAL_SCALE = 180; // elevation_m / 180 = world Y units
-const SEA_LEVEL_FALLBACK = 0;
+// scale 180 → 260: 平原区高频起伏被压回真实比例。秦岭 3000m → ~12u 而非 18u
+const VERTICAL_SCALE = 260;
+// NaN cell (chunk 边缘 / FABDEM hole) fallback 到 -3, 跟 ocean plane Y=-3 齐平
+// 让 ocean plane 自然吃掉 hole, 而非伪造 Y=0 陆地
+const SEA_LEVEL_FALLBACK = -3;
 
 export interface PyramidMeshOptions {
   /** 默认 MeshPhongMaterial；外部可传共享 material */
@@ -75,11 +78,12 @@ export function createPyramidChunkMesh(
   const centerX = (nw.x + se.x) / 2;
   const centerZ = (nw.z + se.z) / 2;
 
-  // PlaneGeometry: (width, depth, widthSegments, depthSegments)
-  // 256×256 cells → 255×255 segments
+  // PlaneGeometry: 物理大小放大 2.5% 让相邻 chunks 边缘重叠
+  // 盖住 chunk mesh 之间的 seam (vertex 不共享导致)
+  const OVERLAP = 1.025;
   const geometry = new PlaneGeometry(
-    worldWidth,
-    worldDepth,
+    worldWidth * OVERLAP,
+    worldDepth * OVERLAP,
     cellsPerChunk - 1,
     cellsPerChunk - 1
   );

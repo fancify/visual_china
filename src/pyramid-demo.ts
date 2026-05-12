@@ -18,7 +18,8 @@ import {
 import {
   bootstrapPyramidTerrain,
   RiverLoader,
-  createOceanPlane
+  createOceanPlane,
+  createMinimap
 } from "./game/terrain/index.js";
 import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
@@ -109,8 +110,12 @@ const handle = await bootstrapPyramidTerrain(scene, {
 });
 
 // ocean plane —— 修 B7 海洋漫灌
-const oceanPlane = createOceanPlane({ seaLevelY: 0 });
+// Y 压到 -3 — 陆地 fallback Y=0 牢牢遮住, 海洋区 chunks 不存在才露出
+const oceanPlane = createOceanPlane({ seaLevelY: -3 });
 scene.add(oceanPlane);
+
+// 小地图
+const minimap = createMinimap({ corner: "top-right", width: 240, height: 165 });
 
 // rivers
 const riverLoader = new RiverLoader({
@@ -178,6 +183,11 @@ function animate(): void {
         loadedRiverGroups.set(key, rh);
       });
     }
+  }
+
+  // minimap (每 6 帧更新一次足够)
+  if (frameCounter % 6 === 0) {
+    minimap.update(camera.position.x, camera.position.z, yaw);
   }
 
   // status

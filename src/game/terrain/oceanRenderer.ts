@@ -37,7 +37,9 @@ export interface OceanPlaneOptions {
 }
 
 export function createOceanPlane(opts: OceanPlaneOptions = {}): Mesh {
-  const seaLevelY = opts.seaLevelY ?? 0;
+  // 把 ocean 压到 -0.3 — 陆地 NaN cell fallback 是 0，刚好遮住 ocean
+  // 真海洋区域陆地完全没 chunk，所以 ocean 露出
+  const seaLevelY = opts.seaLevelY ?? -0.3;
   const padding = opts.padding ?? 200;
 
   const nw = projectGeoToWorld(

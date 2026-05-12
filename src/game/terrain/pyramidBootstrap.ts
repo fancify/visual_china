@@ -64,52 +64,62 @@ export async function bootstrapPyramidTerrain(
   }
 
   function updateVisible(camera: PerspectiveCamera, scene_: Scene): void {
-    // Convert camera world XZ to lon/lat to decide which chunks are near
+    // Mutually exclusive tier 选择：每个 L0 chunk grid location 只画一个 tier.
+    // L0 在 chunk grid 上是最细粒度；其他 tier 都是 L0 的 2^n 聚合.
+    //
+    // 算法:
+    //   1. 遍历 L0 grid 所有 chunk 位置
+    //   2. 计算 chunk 到 camera 距离 → 选 tier (near=L0, mid=L1, far=L2, horizon=L3)
+    //   3. 把对应 tier 的 chunk 加入 desiredKeys
+    //   4. 同一个 L0 grid 位置永远只有一个 tier 在场 — **不重叠**
     const camX = camera.position.x;
     const camZ = camera.position.z;
 
-    // For each tier, request chunks within view radius
-    // L0 small radius, higher tiers progressively bigger
-    const tierViewRadii: Record<TierName, number> = {
-      L0: viewRadius * 0.3,
-      L1: viewRadius * 0.6,
-      L2: viewRadius,
-      L3: viewRadius * 2,
-      L4: viewRadius * 4
-    };
-
     const desiredKeys = new Set<string>();
-    for (const tierName of ["L0", "L1", "L2", "L3"] as TierName[]) {
-      const tierMeta = manifest.tiers[tierName];
-      if (!tierMeta) continue;
-      const sizeDeg = tierMeta.chunkSizeDeg;
-      // Approximate world unit per chunk: assume 1 deg ≈ 27.6 world units (project convention)
-      const chunkWorldSize = sizeDeg * 27.6;
-      const radius = tierViewRadii[tierName];
-      const chunkRadius = Math.ceil(radius / chunkWorldSize);
+    const L0Meta = manifest.tiers.L0;
+    if (!L0Meta) return;
+    const L0SizeDeg = L0Meta.chunkSizeDeg;
+    const [xMin, xMax] = L0Meta.chunkRangeX;
+    const [zMin, zMax] = L0Meta.chunkRangeZ;
 
-      // Compute current camera chunk (rough)
-      // Use unproject to get geo, then convert to chunk index
-      // Simpler: iterate near chunks via meta range
-      const [xMin, xMax] = tierMeta.chunkRangeX;
-      const [zMin, zMax] = tierMeta.chunkRangeZ;
-      // For each candidate chunk in tier, compute world distance from camera
-      for (let x = xMin; x <= xMax; x += 1) {
-        for (let z = zMin; z <= zMax; z += 1) {
-          // chunk center geo
-          const cLon = manifest.bounds.west + (x + 0.5) * sizeDeg;
-          const cLat = manifest.bounds.north - (z + 0.5) * sizeDeg;
-          const cWorld = projectGeoToWorld(
-            { lat: cLat, lon: cLon },
-            qinlingRegionBounds,
-            qinlingRegionWorld
-          );
-          const dx = cWorld.x - camX;
-          const dz = cWorld.z - camZ;
-          const distSq = dx * dx + dz * dz;
-          if (distSq <= radius * radius) {
-            desiredKeys.add(key(tierName, x, z));
-          }
+    // 距离阈值（世界单位）— 决定 tier 切换
+    // L0 视野半径 = viewRadius；超出转 L1, 再外 L2, 再外 L3, 再外丢弃
+    const tier1Dist = viewRadius * 1.0; // L0 → L1 边界
+    const tier2Dist = viewRadius * 2.5; // L1 → L2 边界
+    const tier3Dist = viewRadius * 6.0; // L2 → L3 边界
+
+    for (let x = xMin; x <= xMax; x += 1) {
+      for (let z = zMin; z <= zMax; z += 1) {
+        // chunk center geo
+        const cLon = manifest.bounds.west + (x + 0.5) * L0SizeDeg;
+        const cLat = manifest.bounds.north - (z + 0.5) * L0SizeDeg;
+        const cWorld = projectGeoToWorld(
+          { lat: cLat, lon: cLon },
+          qinlingRegionBounds,
+          qinlingRegionWorld
+        );
+        const dx = cWorld.x - camX;
+        const dz = cWorld.z - camZ;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+
+        // pick base tier by distance, with fallback if missing
+        // L0 hole? → 试 L1; L1 hole? → 试 L2; ...
+        const tryTiers: [TierName, number][] = [];
+        if (dist < tier1Dist) {
+          tryTiers.push(["L0", 1], ["L1", 2], ["L2", 4], ["L3", 8]);
+        } else if (dist < tier2Dist) {
+          tryTiers.push(["L1", 2], ["L2", 4], ["L3", 8]);
+        } else if (dist < tier3Dist) {
+          tryTiers.push(["L2", 4], ["L3", 8]);
+        } else {
+          tryTiers.push(["L3", 8]);
+        }
+        for (const [tn, div] of tryTiers) {
+          const cx = Math.floor(x / div);
+          const cz = Math.floor(z / div);
+          if (loader.isKnownMissing(tn, cx, cz)) continue;
+          desiredKeys.add(key(tn, cx, cz));
+          break;
         }
       }
     }
