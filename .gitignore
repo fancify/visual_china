@@ -44,3 +44,7 @@ public/data/regions/qinling/slice-l1.json
 .codex-temp-tests/
 logs/
 .obsidian/
+
+# Terrain rewrite v2 — pyramid + rivers data (build artifacts, regenerable from FABDEM + HydroSHEDS)
+public/data/dem/
+public/data/rivers/
