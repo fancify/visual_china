@@ -28,10 +28,34 @@
   - `5b17bbcb2` bakeL0 cell-center sampling
   - `92764af42` vertex-position sampling
   - `f7580cfc0` **pyramidMesh row flip true root cause** — 证据见 `docs/04-rendering/2026-05-12-chunk-row-flip-fix/`
+- ✅ **(2026-05-13 加塞 P2)** Ghost cells + 4-tier LOD + 全中国覆盖 + POI Registry + Minimap 重写
+  - `35a7f258d` ghost cells (v2 bin) + normal/Y/corner harmonization → 盆地 cyan slash seam 收口
+  - `35a7f258d` 4-tier LOD distance-band (L0/L1/L2/L3), fog 800→2400u 远景拉回
+  - `35a7f258d` vertical scale 13.5× → **7×** (Skyrim 风, 地面 RPG 尺度)
+  - `1f061a1cd` POI Registry generator: docs frontmatter → typed `poiRegistry.generated.ts` (27 POI, SSOT)
+  - `1f061a1cd` Minimap 双模式 (compact 角落 / fullscreen M 切) + 滚轮 zoom + 拖拽 pan + BotW category 图标
+  - `1f061a1cd` debugOverlay 默认 hidden (G 切), POI registry 同源
+  - `aee26a855` FABDEM-HF downloader lon padding bug fix → 928 西部 tile 下载 (19.7 GB)
+  - 西部 bake 进行中 (~10 min ETA), 完成后全中国陆地覆盖
 
 ### 进行中 / 下一步
 
-- ⏳ **S3 SurfaceProvider + DistanceBand** (2-4d) — 下一步，直接打穿模根因
+候选下一项（按用户原本"4 项做完讨论水系"路径，前 4 项已完成）：
+
+- 🌊 **Tang 水系** (2-3d, 用户 stated next) — Tang 755 vs 现代水系核心差异落地
+  - 黄河北流 (天津以北独流入海，非现代山东东营)
+  - 济水独流（与黄河平行的"四渎"之一，宋代后被黄河夺道）
+  - 隋唐大运河（永济渠 → 长安-洛阳-涿郡，非元代起的京杭线）
+  - 淮河独流入海（南宋黄河夺淮之前的独立水系）
+  - 桑干河 / 永定河上游
+  - 数据源：[memory/project_epoch_decision](.claude/projects/-Users-chen-Documents-GitHub-visual-china/memory/project_epoch_decision.md) + Line B 史料考证
+- 🎨 **BotW 远景 Phase 2 (atmospheric perspective shader)** (半天)
+  - fog 换成 sky-tinted gradient shader（早晨 pink / 黄昏 amber / 暴雨灰白）
+  - GLSL: `mix(terrainColor, skyColor, pow(distance/MAX, 1.5))`
+- 🎨 **BotW 远景 Phase 3 (horizon silhouette billboard)** (1d)
+  - L3 hillshade 烤 PNG → sky dome 远端 → "水墨远山"假远景
+- 🗺️ **Minimap hillshade 底图** (半天) — 当前 minimap 底色空, 烤一张 2048×1024 L3 hillshade PNG
+- ⏳ **S3 SurfaceProvider + DistanceBand** (2-4d) — 直接打穿模根因
   - SurfaceProvider 接口：`sampleGround / sampleWater / classifyDistance`
   - SurfaceState：`material / wetness / snowCover / dust / waterDepth / reflectivity / traction / footstep`
   - DistanceBand policy：terrain 最后退，actors/植被/POI 先退；view-cone cull

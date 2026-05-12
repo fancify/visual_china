@@ -48,3 +48,6 @@ logs/
 # Terrain rewrite v2 — pyramid + rivers data (build artifacts, regenerable from FABDEM + HydroSHEDS)
 public/data/dem/
 public/data/rivers/
+
+# Tang 历史地理参考材料 (谭其骧地图集 + CHGIS) - 数 GB, 第三方版权
+data/references/

@@ -19,10 +19,11 @@ import {
   bootstrapPyramidTerrain,
   RiverLoader,
   createOceanPlane,
+  createLakeRenderer,
   createMinimap,
   createDebugOverlay
 } from "./game/terrain/index.js";
-import { projectGeoToWorld } from "./game/mapOrientation.js";
+import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
   qinlingRegionBounds,
   qinlingRegionWorld
@@ -121,6 +122,17 @@ const handle = await bootstrapPyramidTerrain(scene, {
 const oceanPlane = createOceanPlane({ seaLevelY: -3 });
 scene.add(oceanPlane);
 
+// lakes (Natural Earth 10m, 186 China lakes) — flat polygon meshes, Y 跟随 sampler
+// 查 terrain 海拔 (青海湖 ~6.8u, 鄱阳湖 ~0.03u). Sampler 未加载的 chunk fallback 海平面.
+const lakeHandle = await createLakeRenderer({
+  baseUrl: "/data/lakes",
+  sampler: handle.sampler,
+  fallbackY: 0,
+  surfaceLift: 0.05
+});
+scene.add(lakeHandle.group);
+setStatus(`湖泊: ${lakeHandle.lakeCount} 个 polygon 加载`);
+
 // 小地图
 const minimap = createMinimap({ corner: "top-right", width: 240, height: 165 });
 
@@ -193,11 +205,17 @@ function animate(): void {
   if (frameCounter % 10 === 0) {
     handle.updateVisible(camera, scene);
 
-    // sync rivers — use camera-near chunks (rough L0 grid index)
-    // camera 当前 chunk 用 lon/lat 反求
-    const camGeoLon = chanan.x; // placeholder; use camera world XZ → lon/lat
-    // simpler: iterate manifest entries within world distance
-    const candidates = riverLoader.findCandidateChunks(40, 18, 3); // 长安附近 L0 chunk ~40,18
+    // Rivers: 跟 camera 联动 — 把相机 world 位置反求到 L0 chunk grid.
+    // radius 跟相机高度联动: 平视 radius=16, 高空俯视 radius=28 (~3000km, 覆盖 LOD L2 范围)
+    const camGeo = unprojectWorldToGeo(
+      { x: camera.position.x, z: camera.position.z },
+      qinlingRegionBounds,
+      qinlingRegionWorld
+    );
+    const camChunkX = Math.floor((camGeo.lon - qinlingRegionBounds.west) / 1.0);
+    const camChunkZ = Math.floor((qinlingRegionBounds.north - camGeo.lat) / 1.0);
+    const riverRadius = camera.position.y > 100 ? 28 : camera.position.y > 40 ? 20 : 14;
+    const candidates = riverLoader.findCandidateChunks(camChunkX, camChunkZ, riverRadius);
     for (const { x, z } of candidates) {
       const key = `${x}:${z}`;
       if (loadedRiverGroups.has(key)) continue;
