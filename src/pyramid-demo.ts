@@ -15,7 +15,7 @@ import {
   Vector3,
   WebGLRenderer
 } from "three";
-import { bootstrapPyramidTerrain } from "./game/terrain/index.js";
+import { bootstrapPyramidTerrain, RiverLoader } from "./game/terrain/index.js";
 import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
   qinlingRegionBounds,
@@ -47,7 +47,8 @@ const camera = new PerspectiveCamera(
   0.1,
   3000
 );
-camera.position.set(chanan.x, 40, chanan.z + 30);
+// 改成 鸟瞰图：相机高空俯视长安区，便于看到河流网络
+camera.position.set(chanan.x, 80, chanan.z + 5);
 camera.lookAt(chanan.x, 0, chanan.z);
 
 // 灯：盛唐金光（《长安三万里》参考）
@@ -97,6 +98,15 @@ const handle = await bootstrapPyramidTerrain(scene, {
   baseUrl: "/data/dem",
   viewRadiusUnits: 80
 });
+
+// rivers
+const riverLoader = new RiverLoader({
+  baseUrl: "/data/rivers",
+  sampler: handle.sampler
+});
+await riverLoader.loadManifest();
+const loadedRiverGroups = new Map<string, ReturnType<RiverLoader["getCachedChunk"]>>();
+
 setStatus("已加载 manifest，开始流式 chunks...");
 
 // frame loop
@@ -139,6 +149,22 @@ function animate(): void {
   // update pyramid (visible chunks)
   if (frameCounter % 10 === 0) {
     handle.updateVisible(camera, scene);
+
+    // sync rivers — use camera-near chunks (rough L0 grid index)
+    // camera 当前 chunk 用 lon/lat 反求
+    const camGeoLon = chanan.x; // placeholder; use camera world XZ → lon/lat
+    // simpler: iterate manifest entries within world distance
+    const candidates = riverLoader.findCandidateChunks(40, 18, 3); // 长安附近 L0 chunk ~40,18
+    for (const { x, z } of candidates) {
+      const key = `${x}:${z}`;
+      if (loadedRiverGroups.has(key)) continue;
+      void riverLoader.requestChunk(x, z).then((rh) => {
+        if (!rh) return;
+        if (loadedRiverGroups.has(key)) return;
+        scene.add(rh.group);
+        loadedRiverGroups.set(key, rh);
+      });
+    }
   }
 
   // status
