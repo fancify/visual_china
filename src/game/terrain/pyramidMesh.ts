@@ -89,27 +89,49 @@ export function createPyramidChunkMesh(
   );
   geometry.rotateX(-Math.PI / 2);
 
-  // Smooth heights one pass (3×3 box blur) to reduce FABDEM raw 高频 alias.
-  // FABDEM 30m bare-earth 在城市 / 林边仍有 ±3-5m 噪声; resample 到 444m/cell
-  // 后这些噪声转成 mesh 尖刺。一次 box blur 让 silhouette 接近千里江山图远山调。
+  // Smooth heights one pass + NaN inpaint。FABDEM 30m raw 在 chunk 边缘
+  // 常有 NaN 边带（tile boundary），fallback 直接用 sea-level 会在平原上戳方块。
+  // 改用 5×5 邻居 mean 填 NaN，让 hole 跟陆地平滑融合；纯海洋区整 chunk 没有
+  // 仍归 oceanRenderer 处理。
   const smoothed = new Float32Array(cellsPerChunk * cellsPerChunk);
   for (let r = 0; r < cellsPerChunk; r += 1) {
     for (let c = 0; c < cellsPerChunk; c += 1) {
-      let sum = 0;
-      let count = 0;
-      for (let dr = -1; dr <= 1; dr += 1) {
-        for (let dc = -1; dc <= 1; dc += 1) {
-          const rr = r + dr;
-          const cc = c + dc;
-          if (rr < 0 || rr >= cellsPerChunk || cc < 0 || cc >= cellsPerChunk) continue;
-          const v = heights[rr * cellsPerChunk + cc];
-          if (Number.isFinite(v)) {
-            sum += v;
-            count += 1;
+      const center = heights[r * cellsPerChunk + c];
+      if (Number.isFinite(center)) {
+        // 有效 cell — 3×3 box blur (anti-alias)
+        let sum = 0;
+        let count = 0;
+        for (let dr = -1; dr <= 1; dr += 1) {
+          for (let dc = -1; dc <= 1; dc += 1) {
+            const rr = r + dr;
+            const cc = c + dc;
+            if (rr < 0 || rr >= cellsPerChunk || cc < 0 || cc >= cellsPerChunk) continue;
+            const v = heights[rr * cellsPerChunk + cc];
+            if (Number.isFinite(v)) {
+              sum += v;
+              count += 1;
+            }
           }
         }
+        smoothed[r * cellsPerChunk + c] = sum / count;
+      } else {
+        // NaN cell — 5×5 邻居 mean inpaint, fallback NaN 若没邻居
+        let sum = 0;
+        let count = 0;
+        for (let dr = -2; dr <= 2; dr += 1) {
+          for (let dc = -2; dc <= 2; dc += 1) {
+            const rr = r + dr;
+            const cc = c + dc;
+            if (rr < 0 || rr >= cellsPerChunk || cc < 0 || cc >= cellsPerChunk) continue;
+            const v = heights[rr * cellsPerChunk + cc];
+            if (Number.isFinite(v)) {
+              sum += v;
+              count += 1;
+            }
+          }
+        }
+        smoothed[r * cellsPerChunk + c] = count > 0 ? sum / count : Number.NaN;
       }
-      smoothed[r * cellsPerChunk + c] = count > 0 ? sum / count : Number.NaN;
     }
   }
 
