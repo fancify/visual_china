@@ -23,21 +23,27 @@ const OUTPUT_DIR = "data/fabdem/china/tiles";
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const concurrencyArg = args.find((a) => a.startsWith("--concurrency="));
-const CONCURRENCY = concurrencyArg ? Number(concurrencyArg.split("=")[1]) : 8;
+// concurrency 默认 4 (之前 8 有时撞 hf-mirror 限流; 经验 4 稳健不慢)
+const CONCURRENCY = concurrencyArg ? Number(concurrencyArg.split("=")[1]) : 4;
 
-function pad(n) {
+// FABDEM 命名:  lat 2 位 (N32), lon 3 位 (E102 / E080). 之前 padLat = padLon = 2
+// 导致 lon < 100 (西部 73-99) 生成 "E80" 而非 "E080" → URL 404. 历史东部 lon ≥ 100
+// 偶然 work, 西部全废.
+function padLat(n) {
   return String(Math.abs(n)).padStart(2, "0");
 }
+function padLon(n) {
+  return String(Math.abs(n)).padStart(3, "0");
+}
 
-// 一个 tile 所在的 10° 块文件夹名（HF 上 FABDEM 是按 10° 分组的）
 function blockFolder(lat, lon) {
   const lat10 = Math.floor(lat / 10) * 10;
   const lon10 = Math.floor(lon / 10) * 10;
-  return `N${pad(lat10)}E${pad(lon10)}-N${pad(lat10 + 10)}E${pad(lon10 + 10)}_FABDEM_V1-2`;
+  return `N${padLat(lat10)}E${padLon(lon10)}-N${padLat(lat10 + 10)}E${padLon(lon10 + 10)}_FABDEM_V1-2`;
 }
 
 function tileName(lat, lon) {
-  return `N${pad(lat)}E${pad(lon)}_FABDEM_V1-2.tif`;
+  return `N${padLat(lat)}E${padLon(lon)}_FABDEM_V1-2.tif`;
 }
 
 function tileUrl(lat, lon) {
