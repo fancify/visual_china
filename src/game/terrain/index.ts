@@ -31,6 +31,7 @@ export {
 export { bootstrapPyramidTerrain } from "./pyramidBootstrap.js";
 export { decodePyramidChunk, float16ToFloat32 } from "./pyramidDecode.js";
 export { RiverLoader } from "./riverRenderer.js";
+export { createOceanPlane } from "./oceanRenderer.js";
 
 export type { PyramidMeshHandle, PyramidMeshOptions } from "./pyramidMesh.js";
 export type { PyramidTerrainHandle, PyramidBootstrapOptions } from "./pyramidBootstrap.js";

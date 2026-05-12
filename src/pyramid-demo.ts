@@ -15,7 +15,11 @@ import {
   Vector3,
   WebGLRenderer
 } from "three";
-import { bootstrapPyramidTerrain, RiverLoader } from "./game/terrain/index.js";
+import {
+  bootstrapPyramidTerrain,
+  RiverLoader,
+  createOceanPlane
+} from "./game/terrain/index.js";
 import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
   qinlingRegionBounds,
@@ -33,7 +37,7 @@ const scene = new Scene();
 // 长安三万里 暖金色天 调色
 scene.background = new Color(0xc7d5e3);
 // fog: 近景清晰 (50u) → 远景化在 350u（约 1100km 视距）淡化进背景色
-scene.fog = new Fog(0xc7d5e3, 60, 350);
+scene.fog = new Fog(0xc7d5e3, 80, 800);
 
 // 起始相机位置: 长安 (西安) 上空
 const chanan = projectGeoToWorld(
@@ -47,9 +51,14 @@ const camera = new PerspectiveCamera(
   0.1,
   3000
 );
-// 改成 鸟瞰图：相机高空俯视长安区，便于看到河流网络
-camera.position.set(chanan.x, 80, chanan.z + 5);
-camera.lookAt(chanan.x, 0, chanan.z);
+// 起始位置：洛阳东南上空中等高，望向东方——能看到中原 + 远处东海
+const luoyang = projectGeoToWorld(
+  { lat: 34.62, lon: 112.45 },
+  qinlingRegionBounds,
+  qinlingRegionWorld
+);
+camera.position.set(luoyang.x, 60, luoyang.z + 10);
+camera.lookAt(luoyang.x + 200, 0, luoyang.z - 50);
 
 // 灯：盛唐金光（《长安三万里》参考）
 const ambient = new AmbientLight(0xfff0d4, 0.45);
@@ -98,6 +107,10 @@ const handle = await bootstrapPyramidTerrain(scene, {
   baseUrl: "/data/dem",
   viewRadiusUnits: 80
 });
+
+// ocean plane —— 修 B7 海洋漫灌
+const oceanPlane = createOceanPlane({ seaLevelY: 0 });
+scene.add(oceanPlane);
 
 // rivers
 const riverLoader = new RiverLoader({
