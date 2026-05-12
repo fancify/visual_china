@@ -23,12 +23,15 @@ import { chinaBounds, parseFabdemTileName, workspacePath } from "./china-dem-com
 // 这跟 FABDEM tile 1° 边界对齐——简化重采样
 // 实际更直观：直接选 chunk size = 1.024° at L0 (close to 1°, 256 cells × 0.004°)
 
+// chunkSizeDeg 必须是整数, 跟 FABDEM tile 1°×1° 边界对齐!
+// 之前 1.024 (=256×0.004) 故意整数 cell deg, 但 chunk grid 跟 FABDEM tile 错位
+// 累积 → 用户看到 "陡崖条带". 改 1.0 后 cell_meters = 433m (vs 之前 444m, 差 4%)
 export const TIER_PARAMS = {
-  L0: { tier: 0, cellsPerChunk: 256, chunkSizeDeg: 1.024 },
-  L1: { tier: 1, cellsPerChunk: 256, chunkSizeDeg: 2.048 },
-  L2: { tier: 2, cellsPerChunk: 256, chunkSizeDeg: 4.096 },
-  L3: { tier: 3, cellsPerChunk: 256, chunkSizeDeg: 8.192 },
-  L4: { tier: 4, cellsPerChunk: 256, chunkSizeDeg: 16.384 }
+  L0: { tier: 0, cellsPerChunk: 256, chunkSizeDeg: 1.0 },
+  L1: { tier: 1, cellsPerChunk: 256, chunkSizeDeg: 2.0 },
+  L2: { tier: 2, cellsPerChunk: 256, chunkSizeDeg: 4.0 },
+  L3: { tier: 3, cellsPerChunk: 256, chunkSizeDeg: 8.0 },
+  L4: { tier: 4, cellsPerChunk: 256, chunkSizeDeg: 16.0 }
 };
 
 export const TIER_NAMES = ["L0", "L1", "L2", "L3", "L4"];

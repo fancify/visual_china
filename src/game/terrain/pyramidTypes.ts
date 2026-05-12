@@ -10,9 +10,9 @@ export interface PyramidTierMeta {
   tier: number;
   /** 256 (每 chunk 一边的 cell 数) */
   cellsPerChunk: number;
-  /** 1.024, 2.048, 4.096, 8.192, 16.384 度 */
+  /** 1.0, 2.0, 4.0, 8.0, 16.0 度 — 必整数, 跟 FABDEM tile 边界对齐 */
   chunkSizeDeg: number;
-  /** ~444, 888, 1776, 3552, 7104 米 */
+  /** ~433, 866, 1735, 3469, 6937 米 (1° / 256) */
   cellMeters: number;
   /** 实际 chunk 数 */
   chunkCount: number;

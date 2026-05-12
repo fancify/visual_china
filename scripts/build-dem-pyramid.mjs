@@ -548,8 +548,14 @@ for (const t of TIER_NAMES) {
     chunkSizeDeg: TIER_PARAMS[t].chunkSizeDeg,
     cellMeters: Number(cellM.toFixed(1)),
     chunkCount: chunks.length,
-    chunkRangeX: [Math.min(...chunks.map((c) => c.x)), Math.max(...chunks.map((c) => c.x))],
-    chunkRangeZ: [Math.min(...chunks.map((c) => c.z)), Math.max(...chunks.map((c) => c.z))]
+    chunkRangeX: chunks.reduce(
+      (acc, c) => [Math.min(acc[0], c.x), Math.max(acc[1], c.x)],
+      [Infinity, -Infinity]
+    ),
+    chunkRangeZ: chunks.reduce(
+      (acc, c) => [Math.min(acc[0], c.z), Math.max(acc[1], c.z)],
+      [Infinity, -Infinity]
+    )
   };
 }
 

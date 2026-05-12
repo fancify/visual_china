@@ -131,11 +131,14 @@ export class PyramidLoader {
     const tierMeta = this.manifest!.tiers[tier];
     if (!tierMeta) return null;
 
-    // bounds check via manifest range
+    // bounds check via manifest range (跳过 null - build script edge case)
     const [xMin, xMax] = tierMeta.chunkRangeX;
     const [zMin, zMax] = tierMeta.chunkRangeZ;
-    if (chunkX < xMin || chunkX > xMax || chunkZ < zMin || chunkZ > zMax) {
-      return null;
+    if (Number.isFinite(xMin) && Number.isFinite(xMax)) {
+      if (chunkX < xMin || chunkX > xMax) return null;
+    }
+    if (Number.isFinite(zMin) && Number.isFinite(zMax)) {
+      if (chunkZ < zMin || chunkZ > zMax) return null;
     }
 
     const url = `${this.baseUrl}/${tier}/${chunkX}_${chunkZ}.bin`;
