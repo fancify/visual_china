@@ -19,7 +19,8 @@ import {
   bootstrapPyramidTerrain,
   RiverLoader,
   createOceanPlane,
-  createMinimap
+  createMinimap,
+  createDebugOverlay
 } from "./game/terrain/index.js";
 import { projectGeoToWorld } from "./game/mapOrientation.js";
 import {
@@ -117,6 +118,24 @@ scene.add(oceanPlane);
 
 // 小地图
 const minimap = createMinimap({ corner: "top-right", width: 240, height: 165 });
+
+// debug overlay: chunk grid + lat/lon 网格 + POI 测试桩
+// 按 G 键切换显示
+const manifest = await handle.loader.loadManifest();
+const debugOverlay = createDebugOverlay({
+  manifest,
+  geoGridStep: 5,
+  chunkLabelStride: 5,
+  showChunkGrid: true,
+  showPois: true,
+  showGeoGrid: true
+});
+scene.add(debugOverlay.group);
+window.addEventListener("keydown", (e) => {
+  if (e.key === "g" || e.key === "G") {
+    debugOverlay.setVisible(!debugOverlay.group.visible);
+  }
+});
 
 // rivers
 const riverLoader = new RiverLoader({
