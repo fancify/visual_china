@@ -214,9 +214,10 @@ async function loadTilePixels(tile) {
 // Sample raw FABDEM elevation at (lon, lat) using bilinear in tile pixel space.
 // Returns NaN if no tile covers this point.
 function sampleAt(lon, lat, tilesIndex) {
-  // Find tile containing (lon, lat)
+  // Find tile containing (lon, lat); use <= to include north/east edges
+  // (vertex sampling means we exactly hit chunk边界 lon/lat values)
   for (const t of tilesIndex) {
-    if (lon >= t.west && lon < t.east && lat >= t.south && lat < t.north) {
+    if (lon >= t.west && lon <= t.east && lat >= t.south && lat <= t.north) {
       const cached = tilePixelCache.get(t.path);
       if (!cached) {
         // Tile not loaded yet — caller must preload all overlapping tiles first
@@ -277,17 +278,22 @@ async function bakeL0Chunk({ chunkX, chunkZ, tiles }) {
   const heights = new Float32Array(N * N).fill(Number.NaN);
   let hasData = false;
 
-  // Sample each cell at its geographic center
-  // chunk row 0 = north, row N-1 = south
-  // chunk col 0 = west, col N-1 = east
-  // cell center at lon = bounds.west + (col + 0.5) / N * (east - west)
-  //                 lat = bounds.north - (row + 0.5) / N * (north - south)
+  // **Sample at VERTEX positions, not cell centers**
+  // PlaneGeometry has N vertices per edge. vertex (col=0) at chunk west edge,
+  // vertex (col=N-1) at chunk east edge.
+  // chunk(x).vertex(col=N-1) and chunk(x+1).vertex(col=0) are at SAME world position
+  // → must sample SAME lon/lat → same raster pixel → no seam.
+  //
+  // 因此 vertex(col, row) sample at:
+  //   lon = west + col / (N-1) * lonSpan   (col=0 → lon=west, col=N-1 → lon=east)
+  //   lat = north - row / (N-1) * latSpan  (row=0 → lat=north, row=N-1 → lat=south)
   const lonSpan = bounds.east - bounds.west;
   const latSpan = bounds.north - bounds.south;
+  const denom = N - 1;
   for (let row = 0; row < N; row += 1) {
-    const lat = bounds.north - ((row + 0.5) / N) * latSpan;
+    const lat = bounds.north - (row / denom) * latSpan;
     for (let col = 0; col < N; col += 1) {
-      const lon = bounds.west + ((col + 0.5) / N) * lonSpan;
+      const lon = bounds.west + (col / denom) * lonSpan;
       const v = sampleAt(lon, lat, overlapping);
       if (Number.isFinite(v)) {
         heights[row * N + col] = v;
