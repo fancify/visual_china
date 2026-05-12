@@ -125,7 +125,7 @@ const manifest = await handle.loader.loadManifest();
 const debugOverlay = createDebugOverlay({
   manifest,
   geoGridStep: 5,
-  chunkLabelStride: 5,
+  chunkLabelStride: 2, // 每隔 1 chunk 标一次（避免文字挤）
   showChunkGrid: true,
   showPois: true,
   showGeoGrid: true

@@ -49,17 +49,21 @@ const KNOWN_POIS: KnownPoi[] = [
 const STAKE_HEIGHT = 60;
 
 function buildLabelSprite(text: string, color = "#ffffff"): Sprite {
+  const lines = text.split("\n");
   const canvas = document.createElement("canvas");
   canvas.width = 256;
-  canvas.height = 96;
+  canvas.height = lines.length > 1 ? 128 : 96;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = color;
-  ctx.font = "bold 32px -apple-system, sans-serif";
+  ctx.font = lines.length > 1 ? "bold 26px -apple-system, sans-serif" : "bold 32px -apple-system, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  const lineH = canvas.height / (lines.length + 1);
+  for (let i = 0; i < lines.length; i += 1) {
+    ctx.fillText(lines[i], canvas.width / 2, lineH * (i + 1));
+  }
   const tex = new CanvasTexture(canvas);
   const mat = new SpriteMaterial({ map: tex, depthTest: false });
   const sprite = new Sprite(mat);
@@ -179,17 +183,17 @@ export function createDebugOverlay(opts: DebugOverlayOptions): DebugOverlayHandl
   }
 
   if (showChunkGrid) {
-    const wireMat = new LineBasicMaterial({
-      color: 0x4096ff,
-      transparent: true,
-      opacity: 0.5,
-      depthTest: false
-    });
     const L0Meta = opts.manifest.tiers.L0;
     const sizeDeg = L0Meta.chunkSizeDeg;
     const [xMin, xMax] = L0Meta.chunkRangeX;
     const [zMin, zMax] = L0Meta.chunkRangeZ;
-    const wireY = 6;
+    const wireY = 25; // 高一点超过山脊好看
+    // 每个 chunk 用不同色 — chunk seam 一眼可辨
+    function chunkColor(x: number, z: number): number {
+      // 棋盘色 + 强对比, 让 seam 必然可见
+      const checker = (x + z) % 2 === 0;
+      return checker ? 0xff5060 : 0x40c8ff; // 红/蓝交替
+    }
     for (let x = xMin; x <= xMax; x += 1) {
       for (let z = zMin; z <= zMax; z += 1) {
         const west = opts.manifest.bounds.west + x * sizeDeg;
@@ -225,6 +229,14 @@ export function createDebugOverlay(opts: DebugOverlayOptions): DebugOverlayHandl
         ]);
         const geom = new BufferGeometry();
         geom.setAttribute("position", new BufferAttribute(pts, 3));
+        // 每个 chunk 不同色，强 line opacity
+        const wireMat = new LineBasicMaterial({
+          color: chunkColor(x, z),
+          transparent: true,
+          opacity: 0.85,
+          depthTest: false,
+          linewidth: 2
+        });
         const line = new Line(geom, wireMat);
         line.renderOrder = 91;
         group.add(line);
@@ -232,9 +244,16 @@ export function createDebugOverlay(opts: DebugOverlayOptions): DebugOverlayHandl
         if (x % chunkLabelStride === 0 && z % chunkLabelStride === 0) {
           const cx = (nw.x + se.x) / 2;
           const cz = (nw.z + se.z) / 2;
-          const label = buildLabelSprite(`L0(${x},${z})`, "#7fc8ff");
-          label.position.set(cx, wireY + 5, cz);
-          label.scale.set(10, 3.7, 1);
+          const lonW = opts.manifest.bounds.west + x * sizeDeg;
+          const latN = opts.manifest.bounds.north - z * sizeDeg;
+          const checker = (x + z) % 2 === 0;
+          const labelColor = checker ? "#ff8080" : "#80d8ff";
+          const label = buildLabelSprite(
+            `(${x},${z})\n${lonW}°E ${latN}°N`,
+            labelColor
+          );
+          label.position.set(cx, wireY + 8, cz);
+          label.scale.set(7, 4, 1);
           group.add(label);
         }
       }
