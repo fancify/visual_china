@@ -155,6 +155,8 @@ export async function createLakeRenderer(
       const entry = buildLake(poly);
       if (!entry) continue;
       entry.mesh.name = f.properties.name ?? "lake";
+      // store scalerank for camera-altitude LOD filter (鸟瞰只显示 rank ≤ 2 等)
+      entry.mesh.userData.scalerank = f.properties.scalerank ?? 99;
       group.add(entry.mesh);
       entries.push(entry);
     }

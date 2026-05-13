@@ -87,17 +87,18 @@ export async function bootstrapPyramidTerrain(
     const [xMin, xMax] = L0Meta.chunkRangeX;
     const [zMin, zMax] = L0Meta.chunkRangeZ;
 
-    // Distance-band LOD (2026-05-13 BotW 风格 4 tier):
-    //   L0 (~434m cell)   0-240u   (~0-786km)
-    //   L1 (~867m cell)   240-640u (~786-2096km)
-    //   L2 (~1734m cell)  640-1440u (~2096-4716km)
-    //   L3 (~3469m cell)  1440u+ (远景)
-    // 每 L0 grid 位置选一 tier (按距离), Set dedup 自然合并多 L0 → 同 L1/L2/L3 chunk.
-    // 跨 tier 接缝若显眼, 后续上 atmospheric perspective shader 化掉.
+    // Distance-band LOD (2026-05-13 v2 — 平衡 4 tier 都参与):
+    //   L0 (~434m cell)   0-160u    (~0-524km)
+    //   L1 (~867m cell)   160-400u  (~524-1310km)
+    //   L2 (~1734m cell)  400-960u  (~1310-3144km)
+    //   L3 (~3469m cell)  960u+      (~3144km+)
+    // 之前 3/8/18 multipliers L1 独大 (50%) + L3 从不激活 (中国 5600km E-W, max dist
+    // 2800km 都不到 L2 边界 4716km, L3 永远不触发). 现在 2/5/12 让 L3 真正接管远景.
+    // 每 L0 grid 位置选一 tier, Set dedup 自然合并多 L0 → 同 L1/L2/L3 chunk.
     const dBand = [
-      viewRadius * 3.0,
-      viewRadius * 8.0,
-      viewRadius * 18.0,
+      viewRadius * 2.0,
+      viewRadius * 5.0,
+      viewRadius * 12.0,
       Infinity
     ];
 

@@ -228,6 +228,32 @@ function animate(): void {
     }
   }
 
+  // 内容 LOD: 按相机高度 4 级筛选 — 鸟瞰只看 gravity 地标, 低空才显细节
+  // 河 (stream order): high=只 ord 7+, mid=6+, low=5+, ground=4+ (default)
+  // 湖 (scalerank): high=≤2, mid=≤4, low=≤6, ground=全
+  // 跟 BotW 三角法则一致 — 远只见标志性地理, 近见全细节.
+  if (frameCounter % 12 === 0) {
+    const alt = camera.position.y;
+    let minRiverOrd: number;
+    let maxLakeScalerank: number;
+    if (alt > 300) { minRiverOrd = 7; maxLakeScalerank = 2; }
+    else if (alt > 120) { minRiverOrd = 6; maxLakeScalerank = 4; }
+    else if (alt > 50) { minRiverOrd = 5; maxLakeScalerank = 6; }
+    else { minRiverOrd = 4; maxLakeScalerank = 99; }
+
+    for (const rh of loadedRiverGroups.values()) {
+      if (!rh) continue;
+      for (const child of rh.group.children) {
+        const m = child.name.match(/rivers-ord-(\d+)/);
+        if (m) child.visible = Number(m[1]) >= minRiverOrd;
+      }
+    }
+    for (const child of lakeHandle.group.children) {
+      const sr = (child.userData?.scalerank as number | undefined) ?? 0;
+      child.visible = sr <= maxLakeScalerank;
+    }
+  }
+
   // minimap (每 6 帧更新一次足够)
   if (frameCounter % 6 === 0) {
     minimap.update(camera.position.x, camera.position.z, yaw);
