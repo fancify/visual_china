@@ -102,7 +102,10 @@ export async function bootstrapPyramidTerrain(
       Infinity
     ];
 
-    function tierOfL0Position(x: number, z: number): { tier: TierName; cx: number; cz: number } | null {
+    // tier 解析: 按距离选 target tier, 不存在则 cascade 到 finer tier (codex P1 #1+2 修).
+    // 直到找到一个 exists chunk 或所有 tier 都 missing. Manifest v2 用 chunks list 精确查;
+    // v1 退到 range check.
+    function resolveTier(x: number, z: number): { tier: TierName; cx: number; cz: number } | null {
       const cLon = manifest.bounds.west + (x + 0.5) * L0SizeDeg;
       const cLat = manifest.bounds.north - (z + 0.5) * L0SizeDeg;
       const cWorld = projectGeoToWorld(
@@ -113,29 +116,40 @@ export async function bootstrapPyramidTerrain(
       const dx = cWorld.x - camX;
       const dz = cWorld.z - camZ;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      let tierIdx: number;
-      if (dist < dBand[0]) tierIdx = 0;
-      else if (dist < dBand[1]) tierIdx = 1;
-      else if (dist < dBand[2]) tierIdx = 2;
-      else if (dist < dBand[3]) tierIdx = 3;
+      let targetIdx: number;
+      if (dist < dBand[0]) targetIdx = 0;
+      else if (dist < dBand[1]) targetIdx = 1;
+      else if (dist < dBand[2]) targetIdx = 2;
+      else if (dist < dBand[3]) targetIdx = 3;
       else return null;
-      const tier = `L${tierIdx}` as TierName;
-      const cx = x >> tierIdx;
-      const cz = z >> tierIdx;
-      return { tier, cx, cz };
+
+      // Cascade target → 0: 第一个 exists 的 tier 即用
+      for (let t = targetIdx; t >= 0; t -= 1) {
+        const tier = `L${t}` as TierName;
+        const cx = x >> t;
+        const cz = z >> t;
+        const exists = loader.chunkExists(tier, cx, cz);
+        if (exists === true) {
+          return { tier, cx, cz };
+        }
+        if (exists === false) {
+          continue; // manifest 明确没此 chunk, try finer
+        }
+        // exists === null: v1 manifest 无 chunks list, range check 兜底
+        const meta = manifest.tiers[tier];
+        if (!meta) continue;
+        if (cx < meta.chunkRangeX[0] || cx > meta.chunkRangeX[1]) continue;
+        if (cz < meta.chunkRangeZ[0] || cz > meta.chunkRangeZ[1]) continue;
+        if (loader.isKnownMissing(tier, cx, cz)) continue;
+        return { tier, cx, cz };
+      }
+      return null;
     }
 
     for (let x = xMin; x <= xMax; x += 1) {
       for (let z = zMin; z <= zMax; z += 1) {
-        const sel = tierOfL0Position(x, z);
+        const sel = resolveTier(x, z);
         if (!sel) continue;
-        const meta = manifest.tiers[sel.tier];
-        if (!meta) continue;
-        if (
-          sel.cx < meta.chunkRangeX[0] || sel.cx > meta.chunkRangeX[1] ||
-          sel.cz < meta.chunkRangeZ[0] || sel.cz > meta.chunkRangeZ[1]
-        ) continue;
-        if (loader.isKnownMissing(sel.tier, sel.cx, sel.cz)) continue;
         desiredKeys.add(key(sel.tier, sel.cx, sel.cz));
       }
     }

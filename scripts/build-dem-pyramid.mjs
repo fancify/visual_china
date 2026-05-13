@@ -355,6 +355,7 @@ async function downsampleTier(srcTierName, dstTierName) {
   const N = TIER_PARAMS[srcTierName].cellsPerChunk;
   const dstTierNum = TIER_PARAMS[dstTierName].tier;
   let written = 0;
+  const writtenChunks = [];
 
   const items = Array.from(dstChunkSet).map((k) => {
     const [x, z] = k.split("_").map(Number);
@@ -404,9 +405,9 @@ async function downsampleTier(srcTierName, dstTierName) {
       }
     }
 
-    // 2×2 mean pool
+    // 2×2 mean pool + validRatio
     const out = new Float32Array(N * N).fill(Number.NaN);
-    let anyData = false;
+    let validCount = 0;
     for (let row = 0; row < N; row += 1) {
       for (let col = 0; col < N; col += 1) {
         let sum = 0;
@@ -422,12 +423,22 @@ async function downsampleTier(srcTierName, dstTierName) {
         }
         if (count > 0) {
           out[row * N + col] = sum / count;
-          anyData = true;
+          validCount += 1;
         }
       }
     }
+    const validRatio = validCount / (N * N);
 
-    if (!anyData) return;
+    // Sparse parent filter (codex P1 #5 修): L1 ≥ 30%, L2 ≥ 40%, L3 ≥ 50%.
+    // 低阈值 chunk 全是 NaN → mesh fallback Y=-3 ocean plane, 视觉上是"大海洋矩形"
+    // 假装是 chunk. 不写就交给 runtime fallback 到 finer tier 或 ocean plane 兜底.
+    const sparseThresholds = { L1: 0.30, L2: 0.40, L3: 0.50, L4: 0.50 };
+    const threshold = sparseThresholds[dstTierName] ?? 0;
+    if (validRatio < threshold) {
+      // 删除已存在的旧 sparse parent 文件 (上次 bake 写过的)
+      try { await fs.unlink(chunkOutputPath(dstTierName, dst.x, dst.z)); } catch {}
+      return;
+    }
 
     const binary = encodeChunkBinary({
       tier: dstTierNum,
@@ -436,10 +447,11 @@ async function downsampleTier(srcTierName, dstTierName) {
       heights: out
     });
     await fs.writeFile(chunkOutputPath(dstTierName, dst.x, dst.z), binary);
+    writtenChunks.push({ x: dst.x, z: dst.z, validRatio: +validRatio.toFixed(3) });
     written += 1;
   });
 
-  return written;
+  return { written, chunks: writtenChunks };
 }
 
 // Float16 → Float32 decoder
@@ -541,11 +553,15 @@ const downsamplePairs = [
   ["L3", "L4"]
 ];
 
+// Per-tier chunks list (with validRatio) — manifest emit 用
+const tierChunksList = {};
+
 for (const [src, dst] of downsamplePairs) {
   if (!tiers.includes(dst)) continue;
   console.log(`─── ${dst} (${src} 2×2 mean pool down) ───`);
-  const w = await downsampleTier(src, dst);
-  console.log(`${dst} done: ${w} written`);
+  const r = await downsampleTier(src, dst);
+  tierChunksList[dst] = r.chunks;
+  console.log(`${dst} done: ${r.written} written (validRatio threshold filtered)`);
   console.log("");
 }
 
@@ -567,7 +583,8 @@ async function listTierChunks(tierName) {
 }
 
 const manifest = {
-  schemaVersion: "visual-china.dem-pyramid.v1",
+  // v2 schema: 每 tier 多 chunks[] (exact existence index + 可选 validRatio)
+  schemaVersion: "visual-china.dem-pyramid.v2",
   generatedAt: new Date().toISOString(),
   generator: "scripts/build-dem-pyramid.mjs",
   source: "FABDEM V1-2 (Hawker et al., 2022)",
@@ -580,6 +597,11 @@ for (const t of TIER_NAMES) {
   const chunks = await listTierChunks(t);
   if (chunks.length === 0) continue;
   const cellM = cellMetersAtTier(t);
+  // L1-L4: 用 downsampleTier 返回的 validRatio. L0: 单 {x,z} 无 ratio (bake 时已
+  // 阈值 0.05 过, 后续若需精确可读 bin 计算).
+  const chunkList = tierChunksList[t]
+    ? tierChunksList[t].map((c) => ({ x: c.x, z: c.z, validRatio: c.validRatio }))
+    : chunks.map((c) => ({ x: c.x, z: c.z }));
   manifest.tiers[t] = {
     tier: TIER_PARAMS[t].tier,
     cellsPerChunk: TIER_PARAMS[t].cellsPerChunk,
@@ -593,7 +615,8 @@ for (const t of TIER_NAMES) {
     chunkRangeZ: chunks.reduce(
       (acc, c) => [Math.min(acc[0], c.z), Math.max(acc[1], c.z)],
       [Infinity, -Infinity]
-    )
+    ),
+    chunks: chunkList
   };
 }
 

@@ -5,6 +5,13 @@
 
 export type TierName = "L0" | "L1" | "L2" | "L3" | "L4";
 
+export interface PyramidChunkEntry {
+  x: number;
+  z: number;
+  /** L1+ 下采样有: 有效 cell 比例 (0-1). L0 (v1 schema) 无此字段 */
+  validRatio?: number;
+}
+
 export interface PyramidTierMeta {
   /** numeric tier index 0..4 */
   tier: number;
@@ -19,10 +26,12 @@ export interface PyramidTierMeta {
   /** [min, max] 范围 */
   chunkRangeX: [number, number];
   chunkRangeZ: [number, number];
+  /** v2 schema: exact chunk existence list. 旧 v1 manifest 没此字段, runtime fallback 到 range check */
+  chunks?: PyramidChunkEntry[];
 }
 
 export interface PyramidManifest {
-  schemaVersion: "visual-china.dem-pyramid.v1";
+  schemaVersion: "visual-china.dem-pyramid.v1" | "visual-china.dem-pyramid.v2";
   generatedAt: string;
   generator: string;
   source: string;

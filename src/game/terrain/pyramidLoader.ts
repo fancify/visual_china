@@ -107,6 +107,31 @@ export class PyramidLoader {
   }
 
   /**
+   * Check if chunk exists per manifest v2 chunks list. Returns:
+   *  - true: chunk exists, safe to request
+   *  - false: chunk known missing per manifest (no fetch attempt)
+   *  - null: manifest v1 (无 chunks list) 或 manifest 未加载, 退到旧路径
+   */
+  private existsByManifest: Map<string, Set<string>> | null = null;
+  private buildExistsIndex(): void {
+    if (this.existsByManifest || !this.manifest) return;
+    this.existsByManifest = new Map();
+    for (const tier of Object.keys(this.manifest.tiers) as TierName[]) {
+      const meta = this.manifest.tiers[tier];
+      if (!meta?.chunks) continue;
+      const set = new Set<string>();
+      for (const c of meta.chunks) set.add(`${c.x}:${c.z}`);
+      this.existsByManifest.set(tier, set);
+    }
+  }
+  chunkExists(tier: TierName, chunkX: number, chunkZ: number): boolean | null {
+    this.buildExistsIndex();
+    const set = this.existsByManifest?.get(tier);
+    if (!set) return null; // v1 manifest 退到旧 range check
+    return set.has(`${chunkX}:${chunkZ}`);
+  }
+
+  /**
    * Pick the best tier for a given camera-to-chunk distance.
    * Heuristic: switch tier roughly every 50 km.
    */
