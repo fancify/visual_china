@@ -35,6 +35,8 @@ export interface PyramidTerrainHandle {
   updateVisible(camera: PerspectiveCamera, scene: Scene): void;
   /** Debug: 切 L0-L3 tier 染色 (L0 绿/L1 蓝/L2 黄/L3 红) — 鸟瞰一眼看 tier 分布 */
   setDebugLodTint(active: boolean): void;
+  /** Debug: 切 flatShading — 三角面分明 vs smooth blend */
+  setFlatShading(active: boolean): void;
   dispose(): void;
 }
 
@@ -257,5 +259,15 @@ export async function bootstrapPyramidTerrain(
     }
   }
 
-  return { loader, sampler, surfaceProvider, updateVisible, setDebugLodTint, dispose };
+  /** 切 flatShading — 三角面边分明 vs smooth blend. 全 material 同步 toggle. */
+  function setFlatShading(active: boolean): void {
+    material.flatShading = active;
+    material.needsUpdate = true;
+    for (const m of Object.values(tierTintMaterials)) {
+      m.flatShading = active;
+      m.needsUpdate = true;
+    }
+  }
+
+  return { loader, sampler, surfaceProvider, updateVisible, setDebugLodTint, setFlatShading, dispose };
 }

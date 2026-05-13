@@ -149,6 +149,7 @@ const debugOverlay = createDebugOverlay({
 debugOverlay.setVisible(false);
 scene.add(debugOverlay.group);
 let lodTintActive = false;
+let flatShadingActive = false;
 window.addEventListener("keydown", (e) => {
   if (e.key === "g" || e.key === "G") {
     debugOverlay.setVisible(!debugOverlay.group.visible);
@@ -160,6 +161,14 @@ window.addEventListener("keydown", (e) => {
     setStatus(lodTintActive
       ? "LOD 染色: L0 绿 / L1 蓝 / L2 黄 / L3 红 (再按 D 关)"
       : "LOD 染色关闭");
+  }
+  // F 键: 切 flatShading debug — 三角面分明 vs smooth blend
+  if (e.key === "f" || e.key === "F") {
+    flatShadingActive = !flatShadingActive;
+    handle.setFlatShading(flatShadingActive);
+    setStatus(flatShadingActive
+      ? "Flat shading: 三角面分明 (再按 F 关 — 回 smooth)"
+      : "Smooth shading 恢复");
   }
 });
 
