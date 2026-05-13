@@ -114,8 +114,9 @@ const handle = await bootstrapPyramidTerrain(scene, {
 });
 
 // 临时 debug (Y harmonization 验证 — 验完即删)
-(window as unknown as { scene: Scene; camera: PerspectiveCamera }).scene = scene;
-(window as unknown as { scene: Scene; camera: PerspectiveCamera }).camera = camera;
+(window as unknown as { scene: Scene; camera: PerspectiveCamera; pyramidHandle: typeof handle }).scene = scene;
+(window as unknown as { scene: Scene; camera: PerspectiveCamera; pyramidHandle: typeof handle }).camera = camera;
+(window as unknown as { scene: Scene; camera: PerspectiveCamera; pyramidHandle: typeof handle }).pyramidHandle = handle;
 
 // ocean plane —— 修 B7 海洋漫灌
 // Y 压到 -3 — 陆地 fallback Y=0 牢牢遮住, 海洋区 chunks 不存在才露出
@@ -150,6 +151,7 @@ debugOverlay.setVisible(false);
 scene.add(debugOverlay.group);
 let lodTintActive = false;
 let flatShadingActive = false;
+
 window.addEventListener("keydown", (e) => {
   if (e.key === "g" || e.key === "G") {
     debugOverlay.setVisible(!debugOverlay.group.visible);

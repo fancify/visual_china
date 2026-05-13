@@ -37,6 +37,10 @@ export interface PyramidTerrainHandle {
   setDebugLodTint(active: boolean): void;
   /** Debug: 切 flatShading — 三角面分明 vs smooth blend */
   setFlatShading(active: boolean): void;
+  /** 设置 LOD 距离 band (world units). 3 个数字: L0/L1, L1/L2, L2/L3 边界. 下一帧生效 */
+  setLodBands(bands: [number, number, number]): void;
+  /** 读当前 LOD 距离 band (world units) — 3 元组 */
+  getLodBands(): [number, number, number];
   dispose(): void;
 }
 
@@ -76,6 +80,15 @@ export async function bootstrapPyramidTerrain(
   let debugTintActive = false;
   const viewRadius = opts.viewRadiusUnits ?? 100;
 
+  // Distance-band LOD (mutable — setLodBands() 改这个 array, 下帧 updateVisible 用):
+  //   L0 (~434m cell)   0-150u    (~0-490km)  近景高细节
+  //   L1 (~867m cell)   150-300u  (~490-980km) 中景
+  //   L2 (~1734m cell)  300-600u  (~980-1968km) 远景
+  //   L3 (~3469m cell)  600u+     (~1968km+) horizon
+  // chunks 总数 ~308 (vs 旧 160/400/960 的 ~435, -29%), 三角形 ~-30%. 近场 0-490km 几
+  // 乎一样, 中远场山形棱角变粗换性能.
+  const lodBands: [number, number, number] = [150, 300, 600];
+
   function key(tier: TierName, x: number, z: number): string {
     return `${tier}:${x}:${z}`;
   }
@@ -99,20 +112,9 @@ export async function bootstrapPyramidTerrain(
     const [xMin, xMax] = L0Meta.chunkRangeX;
     const [zMin, zMax] = L0Meta.chunkRangeZ;
 
-    // Distance-band LOD (2026-05-13 v2 — 平衡 4 tier 都参与):
-    //   L0 (~434m cell)   0-160u    (~0-524km)
-    //   L1 (~867m cell)   160-400u  (~524-1310km)
-    //   L2 (~1734m cell)  400-960u  (~1310-3144km)
-    //   L3 (~3469m cell)  960u+      (~3144km+)
-    // 之前 3/8/18 multipliers L1 独大 (50%) + L3 从不激活 (中国 5600km E-W, max dist
-    // 2800km 都不到 L2 边界 4716km, L3 永远不触发). 现在 2/5/12 让 L3 真正接管远景.
     // 每 L0 grid 位置选一 tier, Set dedup 自然合并多 L0 → 同 L1/L2/L3 chunk.
-    const dBand = [
-      viewRadius * 2.0,
-      viewRadius * 5.0,
-      viewRadius * 12.0,
-      Infinity
-    ];
+    // lodBands 是 mutable 外层闭包变量 — setLodBands() 改它, 下帧生效.
+    const dBand = lodBands;
 
     // tier 解析: 按距离选 target tier, 不存在则 cascade 到 finer tier (codex P1 #1+2 修).
     // 直到找到一个 exists chunk 或所有 tier 都 missing. Manifest v2 用 chunks list 精确查;
@@ -132,8 +134,7 @@ export async function bootstrapPyramidTerrain(
       if (dist < dBand[0]) targetIdx = 0;
       else if (dist < dBand[1]) targetIdx = 1;
       else if (dist < dBand[2]) targetIdx = 2;
-      else if (dist < dBand[3]) targetIdx = 3;
-      else return null;
+      else targetIdx = 3;  // 远景永远 fallback 到 L3 (cascade 会找到 exists tier)
 
       // Cascade target → 0: 第一个 exists 的 tier 即用
       for (let t = targetIdx; t >= 0; t -= 1) {
@@ -269,5 +270,26 @@ export async function bootstrapPyramidTerrain(
     }
   }
 
-  return { loader, sampler, surfaceProvider, updateVisible, setDebugLodTint, setFlatShading, dispose };
+  /** 设 LOD 距离 band (world units) — mutate in-place 让 updateVisible 闭包看到新值 */
+  function setLodBands(bands: [number, number, number]): void {
+    lodBands[0] = bands[0];
+    lodBands[1] = bands[1];
+    lodBands[2] = bands[2];
+  }
+
+  function getLodBands(): [number, number, number] {
+    return [lodBands[0], lodBands[1], lodBands[2]];
+  }
+
+  return {
+    loader,
+    sampler,
+    surfaceProvider,
+    updateVisible,
+    setDebugLodTint,
+    setFlatShading,
+    setLodBands,
+    getLodBands,
+    dispose
+  };
 }
