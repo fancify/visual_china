@@ -148,9 +148,18 @@ const debugOverlay = createDebugOverlay({
 });
 debugOverlay.setVisible(false);
 scene.add(debugOverlay.group);
+let lodTintActive = false;
 window.addEventListener("keydown", (e) => {
   if (e.key === "g" || e.key === "G") {
     debugOverlay.setVisible(!debugOverlay.group.visible);
+  }
+  // D 键: 切 LOD tier 染色 debug — 鸟瞰看哪块是哪 tier (L0 绿/L1 蓝/L2 黄/L3 红)
+  if (e.key === "d" || e.key === "D") {
+    lodTintActive = !lodTintActive;
+    handle.setDebugLodTint(lodTintActive);
+    setStatus(lodTintActive
+      ? "LOD 染色: L0 绿 / L1 蓝 / L2 黄 / L3 红 (再按 D 关)"
+      : "LOD 染色关闭");
   }
 });
 

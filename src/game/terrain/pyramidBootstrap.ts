@@ -33,6 +33,8 @@ export interface PyramidTerrainHandle {
   surfaceProvider: PyramidSurfaceProvider;
   /** 每帧 / camera 变动时调；async chunks 自加载 */
   updateVisible(camera: PerspectiveCamera, scene: Scene): void;
+  /** Debug: 切 L0-L3 tier 染色 (L0 绿/L1 蓝/L2 黄/L3 红) — 鸟瞰一眼看 tier 分布 */
+  setDebugLodTint(active: boolean): void;
   dispose(): void;
 }
 
@@ -62,6 +64,14 @@ export async function bootstrapPyramidTerrain(
     flatShading: false,
     shininess: 6
   });
+  // Tier-tint debug materials — 鸟瞰看哪个 chunk 是哪 tier (D 键切换)
+  const tierTintMaterials: Record<string, MeshPhongMaterial> = {
+    L0: new MeshPhongMaterial({ color: 0x60c060, flatShading: false, shininess: 6 }),  // 绿 = 近景高细节
+    L1: new MeshPhongMaterial({ color: 0x60a0d0, flatShading: false, shininess: 6 }),  // 蓝 = 中景
+    L2: new MeshPhongMaterial({ color: 0xe0c050, flatShading: false, shininess: 6 }),  // 黄 = 远景
+    L3: new MeshPhongMaterial({ color: 0xd06040, flatShading: false, shininess: 6 })   // 红 = 极远 horizon
+  };
+  let debugTintActive = false;
   const viewRadius = opts.viewRadiusUnits ?? 100;
 
   function key(tier: TierName, x: number, z: number): string {
@@ -163,16 +173,13 @@ export async function bootstrapPyramidTerrain(
       void loader.requestChunk(tier as TierName, x, z).then((chunk) => {
         if (!chunk) return;
         if (meshHandles.has(k)) return; // race
-        const handle = createPyramidChunkMesh(chunk, { material });
+        const tierName = tier as TierName;
+        const meshMaterial = debugTintActive ? tierTintMaterials[tierName] : material;
+        const handle = createPyramidChunkMesh(chunk, { material: meshMaterial });
         scene_.add(handle.mesh);
         meshHandles.set(k, handle);
 
-        // 跨 chunk 法线统一 — 两步:
-        //   1. 边界 pairwise: 跟 4 axis 邻居 (E/S/W/N) 边线 vertex normal 平均
-        //   2. 角点 4-way: 跟 4 diagonal 邻居一起 4-way 角点 vertex normal 平均
-        //      (pairwise 在角点不收敛, 平坦盆地区域格子点残留 ~30° 偏差)
-        // 边界/角点 vertex colors 跟着 normal 同步 refresh (slope 基于 normal.y).
-        const tierName = tier as TierName;
+        // 跨 chunk 法线统一 (tierName 已上面定义).
 
         // Step 1: 4 axis 邻居 edge harmonization
         const east = meshHandles.get(key(tierName, x + 1, z));
@@ -238,7 +245,17 @@ export async function bootstrapPyramidTerrain(
     }
     meshHandles.clear();
     material.dispose();
+    for (const m of Object.values(tierTintMaterials)) m.dispose();
   }
 
-  return { loader, sampler, surfaceProvider, updateVisible, dispose };
+  /** 切换 LOD 染色 debug — L0 绿 L1 蓝 L2 黄 L3 红, 鸟瞰一眼看清 tier 分布 */
+  function setDebugLodTint(active: boolean): void {
+    debugTintActive = active;
+    for (const [k, handle] of meshHandles) {
+      const tier = k.split(":")[0] as TierName;
+      handle.mesh.material = active ? tierTintMaterials[tier] : material;
+    }
+  }
+
+  return { loader, sampler, surfaceProvider, updateVisible, setDebugLodTint, dispose };
 }
