@@ -29,6 +29,7 @@
     "china:dem:build": "node scripts/build-china-national-dem.mjs",
     "china:lowres:download": "node scripts/download-china-lowres-etopo.mjs",
     "china:lowres:build": "node scripts/build-china-lowres-dem.mjs",
+    "build:land-mask": "node scripts/build-china-land-mask-gshhg.mjs",
     "regression:baseline": "node --test scripts/regression-baseline.test.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run test:fast",
@@ -43,6 +44,7 @@
   "devDependencies": {
     "@types/three": "^0.178.1",
     "shapefile": "^0.6.6",
+    "shpjs": "^6.2.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.0"
   }

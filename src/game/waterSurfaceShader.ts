@@ -1,4 +1,5 @@
-import { Color, ShaderMaterial, Vector3 } from "three";
+import { Color, ShaderMaterial, UniformsLib, UniformsUtils, Vector3 } from "three";
+import { WATER_SURFACE_COLOR, WATER_SURFACE_OPACITY } from "./terrain/waterStyle.js";
 
 /**
  * 整区水面 shader：菲涅尔 + 时间相位涟漪 + 太阳高光。
@@ -15,21 +16,35 @@ import { Color, ShaderMaterial, Vector3 } from "three";
  * 但视觉气质提升非常明显。
  */
 const VERTEX = /* glsl */ `
+  #include <fog_pars_vertex>
   varying vec3 vWorldPosition;
   varying vec3 vViewDirection;
   void main() {
     vec4 wp = modelMatrix * vec4(position, 1.0);
     vWorldPosition = wp.xyz;
     vViewDirection = normalize(cameraPosition - wp.xyz);
-    gl_Position = projectionMatrix * viewMatrix * wp;
+    vec4 mvPosition = viewMatrix * wp;
+    gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
   }
 `;
 const FRAGMENT = /* glsl */ `
+  #include <fog_pars_fragment>
   uniform vec3 uBaseColor;
+  uniform vec3 uDeepWaterColor;
   uniform vec3 uHighlightColor;
   uniform vec3 uSunDirection;
   uniform float uTime;
   uniform float uOpacity;
+  uniform float uShimmerStrength;
+  uniform float uCoastColorStrength;
+  uniform float uCoastBandScale;
+  uniform sampler2D uCoastDistanceMap;
+  uniform float uUseCoastDistanceMap;
+  uniform vec2 uCoastMapOrigin;
+  uniform vec2 uCoastMapSize;
+  // 太阳高光乘子。湖默认 1.0 (保留 Phong 光斑); ocean 显式 0 (BotW 不做 specular).
+  uniform float uSunGlintStrength;
   varying vec3 vWorldPosition;
   varying vec3 vViewDirection;
 
@@ -51,12 +66,12 @@ const FRAGMENT = /* glsl */ `
   void main() {
     // 多频 sin 叠出沿河方向的涟漪
     vec2 worldXZ = vWorldPosition.xz;
-    float ripple1 = sin(worldXZ.x * 0.18 + worldXZ.y * 0.05 + uTime * 0.4);
-    float ripple2 = sin(worldXZ.x * -0.07 + worldXZ.y * 0.21 + uTime * 0.55);
+    float ripple1 = sin(worldXZ.x * 0.18 + worldXZ.y * 0.05 + uTime * 0.28);
+    float ripple2 = sin(worldXZ.x * -0.07 + worldXZ.y * 0.21 + uTime * 0.36);
     float ripple = (ripple1 * 0.5 + ripple2 * 0.5) * 0.5 + 0.5;
 
     // value noise 给"水纹细节"
-    float fineNoise = wn_noise(worldXZ * 0.62 + uTime * vec2(0.18, 0.12));
+    float fineNoise = wn_noise(worldXZ * 0.62 + uTime * vec2(0.10, 0.07));
 
     // Fresnel：vViewDirection 与"上方"夹角越大（视线越平）水面越亮
     vec3 normalUp = vec3(0.0, 1.0, 0.0);
@@ -64,18 +79,43 @@ const FRAGMENT = /* glsl */ `
     float fresnel = pow(1.0 - ndotv, 3.0);
 
     // 太阳高光：sun 方向越接近 view-up 反射方向越亮（粗糙近似）
+    // BotW 不做这个 — ocean 设 uSunGlintStrength=0 完全关掉；湖默认 1.0 保留
     vec3 sunDir = normalize(uSunDirection);
     vec3 reflectDir = reflect(-vViewDirection, normalUp);
     float sunGlint = pow(max(0.0, dot(reflectDir, sunDir)), 28.0);
 
-    vec3 color = uBaseColor;
-    color += uHighlightColor * (ripple * 0.18 + fineNoise * 0.08);
-    color = mix(color, uHighlightColor, fresnel * 0.45);
-    color += uHighlightColor * sunGlint * 0.7;
+    float coastDistance = uUseCoastDistanceMap > 0.5
+      ? texture2D(uCoastDistanceMap, vec2(
+          clamp((vWorldPosition.x - uCoastMapOrigin.x) / uCoastMapSize.x, 0.0, 1.0),
+          clamp((vWorldPosition.z - uCoastMapOrigin.y) / uCoastMapSize.y, 0.0, 1.0)
+        )).r
+      : 1.0;
+    float deepT = smoothstep(0.08, max(0.09, uCoastBandScale), coastDistance);
+
+    vec3 color = mix(uBaseColor, uDeepWaterColor, deepT * uCoastColorStrength);
+    color += uHighlightColor * (ripple * 0.055 + fineNoise * 0.025) * uShimmerStrength;
+    color = mix(color, uHighlightColor, fresnel * 0.16 * uShimmerStrength);
+    color += uHighlightColor * sunGlint * 0.22 * uShimmerStrength * uSunGlintStrength;
 
     gl_FragColor = vec4(color, uOpacity);
+    #include <fog_fragment>
   }
 `;
+
+export interface WaterSurfaceShaderOptions {
+  baseColor?: Color | number | string;
+  deepWaterColor?: Color | number | string;
+  highlightColor?: Color | number | string;
+  opacity?: number;
+  shimmerStrength?: number;
+  coastColorStrength?: number;
+  coastBandScale?: number;
+  coastDistanceMap?: { value: unknown };
+  coastMapOrigin?: { x: number; y: number };
+  coastMapSize?: { x: number; y: number };
+  /** 太阳高光强度乘子。默认 1.0（保留原 Phong glint）；BotW 风格 ocean 设 0。 */
+  sunGlintStrength?: number;
+}
 
 export interface WaterSurfaceShaderHandle {
   material: ShaderMaterial;
@@ -83,21 +123,46 @@ export interface WaterSurfaceShaderHandle {
   setSunDirection(direction: Vector3): void;
   setBaseColor(color: Color): void;
   setOpacity(opacity: number): void;
+  setShimmerStrength(strength: number): void;
 }
 
-export function createWaterSurfaceMaterial(): WaterSurfaceShaderHandle {
+function resolveColor(value: Color | number | string | undefined, fallback: Color): Color {
+  if (value instanceof Color) return value.clone();
+  if (value !== undefined) return new Color(value);
+  return fallback.clone();
+}
+
+export function createWaterSurfaceMaterial(
+  opts: WaterSurfaceShaderOptions = {}
+): WaterSurfaceShaderHandle {
+  const baseColor = resolveColor(opts.baseColor, WATER_SURFACE_COLOR);
+  const deepWaterColor = resolveColor(opts.deepWaterColor, new Color(0x1e5f78));
+  const highlightColor = resolveColor(opts.highlightColor, new Color(0xcfe6ea));
   const material = new ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
-    uniforms: {
-      uBaseColor: { value: new Color(0x6aa7b0) },
-      uHighlightColor: { value: new Color(0xd9efef) },
-      uSunDirection: { value: new Vector3(110, 160, 24).normalize() },
-      uTime: { value: 0 },
-      uOpacity: { value: 0.32 }
-    },
+    uniforms: UniformsUtils.merge([
+      UniformsLib.fog,
+      {
+        uBaseColor: { value: baseColor },
+        uDeepWaterColor: { value: deepWaterColor },
+        uHighlightColor: { value: highlightColor },
+        uSunDirection: { value: new Vector3(110, 160, 24).normalize() },
+        uTime: { value: 0 },
+        uOpacity: { value: opts.opacity ?? WATER_SURFACE_OPACITY },
+        uShimmerStrength: { value: opts.shimmerStrength ?? 0.22 },
+        uCoastColorStrength: { value: opts.coastColorStrength ?? 0 },
+        uCoastBandScale: { value: opts.coastBandScale ?? 0.35 },
+        uCoastDistanceMap: opts.coastDistanceMap ?? { value: null },
+        uUseCoastDistanceMap: { value: opts.coastDistanceMap ? 1 : 0 },
+        uCoastMapOrigin: { value: opts.coastMapOrigin ?? { x: -855.5, y: -593 } },
+        uCoastMapSize: { value: opts.coastMapSize ?? { x: 1711, y: 1186 } },
+        uSunGlintStrength: { value: opts.sunGlintStrength ?? 1.0 }
+      }
+    ]),
     transparent: true,
-    depthWrite: false
+    depthWrite: false,
+    fog: true
   });
 
   return {
@@ -113,7 +178,9 @@ export function createWaterSurfaceMaterial(): WaterSurfaceShaderHandle {
     },
     setOpacity(opacity) {
       material.uniforms.uOpacity.value = opacity;
+    },
+    setShimmerStrength(strength) {
+      material.uniforms.uShimmerStrength.value = strength;
     }
   };
 }
-

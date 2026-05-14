@@ -30,8 +30,14 @@ export {
 } from "./pyramidMesh.js";
 export { bootstrapPyramidTerrain } from "./pyramidBootstrap.js";
 export { decodePyramidChunk, float16ToFloat32 } from "./pyramidDecode.js";
-export { RiverLoader } from "./riverRenderer.js";
+export { RiverLoader, updateRiverGroupShimmer } from "./riverRenderer.js";
 export { createOceanPlane } from "./oceanRenderer.js";
+export {
+  createLandMaskGroupFromData,
+  createLandMaskRenderer,
+  createLandMaskSamplerFromData,
+  loadLandMaskData
+} from "./landMaskRenderer.js";
 export { createLakeRenderer } from "./lakeRenderer.js";
 export { createMinimap } from "./minimap.js";
 export { createDebugOverlay } from "./debugOverlay.js";
@@ -39,6 +45,8 @@ export { createDebugOverlay } from "./debugOverlay.js";
 export type { PyramidMeshHandle, PyramidMeshOptions } from "./pyramidMesh.js";
 export type { PyramidTerrainHandle, PyramidBootstrapOptions } from "./pyramidBootstrap.js";
 export type { RiverChunkHandle, RiverLoaderOptions } from "./riverRenderer.js";
+export type { LandMaskData, LandMaskOptions, LandMaskSampler } from "./landMaskRenderer.js";
+export type { LakeMaskSampler, LakeRendererHandle, LakeRendererOptions } from "./lakeRenderer.js";
 export type {
   PyramidManifest,
   PyramidTierMeta,

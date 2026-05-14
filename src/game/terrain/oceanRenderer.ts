@@ -13,21 +13,21 @@
 //   - 浅蓝绿色 + transparent + fog-aware
 //   - depthWrite false 防止 z-fight 河流
 //   - renderOrder -10 让它在 chunks 之下
+//   - sunGlintStrength=0 — BotW 风, 海面不画 Phong specular 高光斑
+//   - 浅水/深水 visual 现在做在 terrain 顶点 (pyramidMesh.ts coast tint), 不做在 ocean shader
 
-import {
-  Color,
-  Mesh,
-  MeshBasicMaterial,
-  PlaneGeometry
-} from "three";
+import { Mesh, PlaneGeometry } from "three";
 import { projectGeoToWorld } from "../mapOrientation.js";
+import { createWaterSurfaceMaterial } from "../waterSurfaceShader.js";
 import {
   qinlingRegionBounds,
   qinlingRegionWorld
 } from "../../data/qinlingRegion.js";
-
-const OCEAN_COLOR = new Color(0.26, 0.40, 0.52);
-const OCEAN_OPACITY = 0.92;
+import {
+  OCEAN_WATER_COLOR,
+  OCEAN_WATER_OPACITY,
+  OCEAN_WATER_SHIMMER
+} from "./waterStyle.js";
 
 export interface OceanPlaneOptions {
   /** 海面 world Y。默认 0 (sea level) */
@@ -36,12 +36,12 @@ export interface OceanPlaneOptions {
   padding?: number;
 }
 
-export function createOceanPlane(opts: OceanPlaneOptions = {}): Mesh {
-  // 把 ocean 压到 -0.3 — 陆地 NaN cell fallback 是 0，刚好遮住 ocean
-  // 真海洋区域陆地完全没 chunk，所以 ocean 露出
-  const seaLevelY = opts.seaLevelY ?? -0.3;
-  const padding = opts.padding ?? 200;
-
+function regionPlane(padding = 0): {
+  centerX: number;
+  centerZ: number;
+  width: number;
+  depth: number;
+} {
   const nw = projectGeoToWorld(
     { lat: qinlingRegionBounds.north, lon: qinlingRegionBounds.west },
     qinlingRegionBounds,
@@ -52,26 +52,39 @@ export function createOceanPlane(opts: OceanPlaneOptions = {}): Mesh {
     qinlingRegionBounds,
     qinlingRegionWorld
   );
-  const width = Math.abs(se.x - nw.x) + padding * 2;
-  const depth = Math.abs(se.z - nw.z) + padding * 2;
-  const centerX = (nw.x + se.x) / 2;
-  const centerZ = (nw.z + se.z) / 2;
+  return {
+    width: Math.abs(se.x - nw.x) + padding * 2,
+    depth: Math.abs(se.z - nw.z) + padding * 2,
+    centerX: (nw.x + se.x) / 2,
+    centerZ: (nw.z + se.z) / 2
+  };
+}
 
-  const geometry = new PlaneGeometry(width, depth, 2, 2);
+export function createOceanPlane(opts: OceanPlaneOptions = {}): Mesh {
+  // 把 ocean 压到 -0.3 — 陆地 NaN cell fallback 是 0，刚好遮住 ocean
+  // 真海洋区域陆地完全没 chunk，所以 ocean 露出
+  const seaLevelY = opts.seaLevelY ?? -0.3;
+  const padding = opts.padding ?? 8000;
+  const plane = regionPlane(padding);
+
+  const geometry = new PlaneGeometry(plane.width, plane.depth, 2, 2);
   geometry.rotateX(-Math.PI / 2);
 
-  const material = new MeshBasicMaterial({
-    color: OCEAN_COLOR,
-    transparent: true,
-    opacity: OCEAN_OPACITY,
-    depthWrite: false,
-    fog: true
+  const waterSurface = createWaterSurfaceMaterial({
+    baseColor: OCEAN_WATER_COLOR,
+    opacity: OCEAN_WATER_OPACITY,
+    shimmerStrength: OCEAN_WATER_SHIMMER,
+    highlightColor: 0x9bcbd2,
+    coastColorStrength: 0,
+    // BotW 风：ocean 完全关掉 sun glint specular（lakes 默认 1.0 保留）
+    sunGlintStrength: 0
   });
 
-  const mesh = new Mesh(geometry, material);
-  mesh.position.set(centerX, seaLevelY, centerZ);
+  const mesh = new Mesh(geometry, waterSurface.material);
+  mesh.position.set(plane.centerX, seaLevelY, plane.centerZ);
   mesh.name = "ocean-plane";
   mesh.renderOrder = -10;
+  mesh.userData.waterSurface = waterSurface;
 
   return mesh;
 }

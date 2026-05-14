@@ -21,9 +21,12 @@ import {
   createPyramidChunkMesh,
   disposePyramidChunkMesh,
   harmonizeBoundaryNormals,
-  harmonizeCorner
+  harmonizeCorner,
+  refreshVertexColors
 } from "./pyramidMesh.js";
 import type { TierName } from "./pyramidTypes.js";
+import type { LandMaskSampler } from "./landMaskRenderer.js";
+import { clampCoastalTargetTier } from "./coastalLod.js";
 import { projectGeoToWorld } from "../mapOrientation.js";
 import { qinlingRegionBounds, qinlingRegionWorld } from "../../data/qinlingRegion.js";
 
@@ -37,6 +40,8 @@ export interface PyramidTerrainHandle {
   setDebugLodTint(active: boolean): void;
   /** Debug: 切 flatShading — 三角面分明 vs smooth blend */
   setFlatShading(active: boolean): void;
+  /** Visual compare: toggle subtle flat-shore beach tint. */
+  setBeachTint(active: boolean): void;
   /** 设置 LOD 距离 band (world units). 3 个数字: L0/L1, L1/L2, L2/L3 边界. 下一帧生效 */
   setLodBands(bands: [number, number, number]): void;
   /** 读当前 LOD 距离 band (world units) — 3 元组 */
@@ -50,6 +55,8 @@ export interface PyramidBootstrapOptions {
   viewRadiusUnits?: number;
   /** 共享 material；不传则默认 */
   material?: MeshPhongMaterial;
+  /** Optional vector coastline mask. DEM vertices outside land are hole-punched. */
+  landMaskSampler?: LandMaskSampler | null;
 }
 
 export async function bootstrapPyramidTerrain(
@@ -78,6 +85,7 @@ export async function bootstrapPyramidTerrain(
     L3: new MeshPhongMaterial({ color: 0xd06040, flatShading: false, shininess: 6 })   // 红 = 极远 horizon
   };
   let debugTintActive = false;
+  let beachTintActive = true;
   const viewRadius = opts.viewRadiusUnits ?? 100;
 
   // Distance-band LOD (mutable — setLodBands() 改这个 array, 下帧 updateVisible 用):
@@ -135,6 +143,14 @@ export async function bootstrapPyramidTerrain(
       else if (dist < dBand[1]) targetIdx = 1;
       else if (dist < dBand[2]) targetIdx = 2;
       else targetIdx = 3;  // 远景永远 fallback 到 L3 (cascade 会找到 exists tier)
+      targetIdx = clampCoastalTargetTier(
+        targetIdx,
+        x,
+        z,
+        L0SizeDeg,
+        manifest.bounds,
+        opts.landMaskSampler
+      );
 
       // Cascade target → 0: 第一个 exists 的 tier 即用
       for (let t = targetIdx; t >= 0; t -= 1) {
@@ -178,7 +194,11 @@ export async function bootstrapPyramidTerrain(
         if (meshHandles.has(k)) return; // race
         const tierName = tier as TierName;
         const meshMaterial = debugTintActive ? tierTintMaterials[tierName] : material;
-        const handle = createPyramidChunkMesh(chunk, { material: meshMaterial });
+        const handle = createPyramidChunkMesh(chunk, {
+          material: meshMaterial,
+          landMaskSampler: opts.landMaskSampler,
+          beachTintEnabled: beachTintActive
+        });
         scene_.add(handle.mesh);
         meshHandles.set(k, handle);
 
@@ -270,6 +290,18 @@ export async function bootstrapPyramidTerrain(
     }
   }
 
+  function setBeachTint(active: boolean): void {
+    beachTintActive = active;
+    for (const [, handle] of meshHandles) {
+      const base = handle.geometry.userData.coastProximityBase as Float32Array | undefined;
+      const positionCount = handle.geometry.attributes.position.count;
+      handle.geometry.userData.coastProximity = active && base
+        ? base
+        : new Float32Array(positionCount);
+      refreshVertexColors(handle);
+    }
+  }
+
   /** 设 LOD 距离 band (world units) — mutate in-place 让 updateVisible 闭包看到新值 */
   function setLodBands(bands: [number, number, number]): void {
     lodBands[0] = bands[0];
@@ -288,6 +320,7 @@ export async function bootstrapPyramidTerrain(
     updateVisible,
     setDebugLodTint,
     setFlatShading,
+    setBeachTint,
     setLodBands,
     getLodBands,
     dispose

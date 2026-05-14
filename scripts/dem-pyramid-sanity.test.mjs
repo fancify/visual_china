@@ -39,16 +39,23 @@ async function readChunk(tierName, x, z) {
   const cz = dv.getUint16(6, true);
   // data
   const N = TIER_PARAMS[tierName].cellsPerChunk;
+  const dataBytes = buf.length - 8;
+  const arraySide = Math.round(Math.sqrt(dataBytes / 2));
+  const ghostWidth = ver === 2 ? 1 : 0;
   const heights = new Float32Array(N * N);
-  for (let i = 0; i < N * N; i += 1) {
-    const f16 = dv.getUint16(8 + i * 2, true);
-    heights[i] = float16ToFloat32(f16);
+  for (let row = 0; row < N; row += 1) {
+    for (let col = 0; col < N; col += 1) {
+      const srcRow = row + ghostWidth;
+      const srcCol = col + ghostWidth;
+      const f16 = dv.getUint16(8 + (srcRow * arraySide + srcCol) * 2, true);
+      heights[row * N + col] = float16ToFloat32(f16);
+    }
   }
   return { header: { magic, ver, tier, cx, cz }, heights };
 }
 
 test("manifest.json schema is valid", () => {
-  assert.equal(manifest.schemaVersion, "visual-china.dem-pyramid.v1");
+  assert.equal(manifest.schemaVersion, "visual-china.dem-pyramid.v2");
   assert.equal(manifest.projection, "strict-geographic");
   assert.ok(manifest.tiers.L0);
   assert.ok(manifest.tiers.L1);
@@ -69,10 +76,10 @@ test("each tier has exactly 256×256 cells per chunk", () => {
 });
 
 test("tier chunkSizeDeg doubles each level (256 cells per chunk × 2× cell increase)", () => {
-  assert.equal(manifest.tiers.L0.chunkSizeDeg, 1.024);
-  assert.equal(manifest.tiers.L1.chunkSizeDeg, 2.048);
-  assert.equal(manifest.tiers.L2.chunkSizeDeg, 4.096);
-  assert.equal(manifest.tiers.L3.chunkSizeDeg, 8.192);
+  assert.equal(manifest.tiers.L0.chunkSizeDeg, 1);
+  assert.equal(manifest.tiers.L1.chunkSizeDeg, 2);
+  assert.equal(manifest.tiers.L2.chunkSizeDeg, 4);
+  assert.equal(manifest.tiers.L3.chunkSizeDeg, 8);
 });
 
 test("L0 binary chunk header round-trips", async () => {
@@ -83,7 +90,7 @@ test("L0 binary chunk header round-trips", async () => {
   const chunk = await readChunk("L0", x, z).catch(() => null);
   if (chunk) {
     assert.equal(chunk.header.magic, 0xdead);
-    assert.equal(chunk.header.ver, 1);
+    assert.ok([1, 2].includes(chunk.header.ver));
     assert.equal(chunk.header.tier, 0);
     assert.equal(chunk.header.cx, x);
     assert.equal(chunk.header.cz, z);
@@ -138,11 +145,11 @@ test("chunk bounds at (0,0) cover NW corner of china", () => {
   assert.equal(b.west, chinaBounds.west);
   assert.equal(b.north, chinaBounds.north);
   // 浮点比较用 epsilon
-  assert.ok(Math.abs(b.east - b.west - 1.024) < 1e-9);
-  assert.ok(Math.abs(b.north - b.south - 1.024) < 1e-9);
+  assert.ok(Math.abs(b.east - b.west - 1) < 1e-9);
+  assert.ok(Math.abs(b.north - b.south - 1) < 1e-9);
 });
 
-test("disk size within budget (<300 MB total)", async () => {
+test("disk size within budget (<360 MB total)", async () => {
   let total = 0;
   for (const t of TIER_NAMES) {
     const dir = path.join(pyramidOutputDir(), t);
@@ -159,5 +166,5 @@ test("disk size within budget (<300 MB total)", async () => {
   }
   const MB = total / 1024 / 1024;
   console.log(`    Pyramid total: ${MB.toFixed(1)} MB`);
-  assert.ok(MB < 300, `pyramid size ${MB.toFixed(1)} MB > 300 MB`);
+  assert.ok(MB < 360, `pyramid size ${MB.toFixed(1)} MB > 360 MB`);
 });

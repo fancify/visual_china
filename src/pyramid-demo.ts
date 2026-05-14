@@ -18,8 +18,11 @@ import {
 import {
   bootstrapPyramidTerrain,
   RiverLoader,
+  updateRiverGroupShimmer,
   createOceanPlane,
+  createLandMaskSamplerFromData,
   createLakeRenderer,
+  loadLandMaskData,
   createMinimap,
   createDebugOverlay
 } from "./game/terrain/index.js";
@@ -39,13 +42,15 @@ function setStatus(text: string): void {
 const scene = new Scene();
 // 长安三万里 暖金色天 调色
 scene.background = new Color(0xc7d5e3);
-// fog: 近景清晰 (50u) → 远景化在 350u（约 1100km 视距）淡化进背景色
-// fog 远拉到 2400u (~7800km) 让 LOD 远景 (L2/L3) 可见. 之前 800 把多 tier 化掉了
-scene.fog = new Fog(0xc7d5e3, 150, 2400);
+// 远景雾：隐藏 DEM 数据边缘和海天交界，让世界读起来像继续延伸。
+scene.fog = new Fog(0xc7d5e3, 360, 1250);
 
-// 起始相机位置: 长安 (西安) 上空
-const chanan = projectGeoToWorld(
-  { lat: 34.27, lon: 108.95 },
+// 起始相机位置: 北京上空约 10km。
+// 项目垂直比例: worldY = meters / 500 * 1.07，因此 10000m ≈ 21.4u。
+const BEIJING_START_GEO = { lat: 39.9042, lon: 116.4074 };
+const START_ALTITUDE_WORLD_Y = 21.4;
+const startWorld = projectGeoToWorld(
+  BEIJING_START_GEO,
   qinlingRegionBounds,
   qinlingRegionWorld
 );
@@ -53,17 +58,11 @@ const camera = new PerspectiveCamera(
   60,
   window.innerWidth / window.innerHeight,
   0.1,
-  3000
+  12000
 );
-// 起始位置：岷山高原 (31.69°N 102.65°E) 验证 chunk seam 修复
-// 用户之前在这看到陡崖条带
-const minshan = projectGeoToWorld(
-  { lat: 31.69, lon: 102.65 },
-  qinlingRegionBounds,
-  qinlingRegionWorld
-);
-camera.position.set(minshan.x, 40, minshan.z + 8);
-camera.lookAt(minshan.x + 30, 0, minshan.z - 30);
+// camera demo 强制 yaw=0/pitch=-0.3 (朝北 + 略下俯)
+camera.position.set(startWorld.x, START_ALTITUDE_WORLD_Y, startWorld.z);
+camera.lookAt(startWorld.x, 0, startWorld.z - 260);
 
 // 灯：盛唐金光（《长安三万里》参考）
 const ambient = new AmbientLight(0xfff0d4, 0.45);
@@ -106,11 +105,18 @@ canvas.addEventListener("pointermove", (e) => {
   lastMouse = { x: e.clientX, y: e.clientY };
 });
 
+// Natural Earth vector land mask feeds terrain hole-punching only. Rendering it
+// as a flat underlay creates visible pale coastal slabs where DEM is missing.
+setStatus("加载 coastline mask...");
+const landMaskData = await loadLandMaskData("/data/china");
+const landMaskSampler = createLandMaskSamplerFromData(landMaskData);
+
 // bootstrap pyramid
 setStatus("加载 pyramid manifest...");
 const handle = await bootstrapPyramidTerrain(scene, {
   baseUrl: "/data/dem",
-  viewRadiusUnits: 80
+  viewRadiusUnits: 80,
+  landMaskSampler
 });
 
 // 临时 debug (Y harmonization 验证 — 验完即删)
@@ -120,8 +126,14 @@ const handle = await bootstrapPyramidTerrain(scene, {
 
 // ocean plane —— 修 B7 海洋漫灌
 // Y 压到 -3 — 陆地 fallback Y=0 牢牢遮住, 海洋区 chunks 不存在才露出
+// 海岸的浅水/沙带视觉做在 terrain 顶点 (pyramidMesh.ts coast tint), 海面 shader
+// 只负责 base + ripple + fresnel + (no sun glint, BotW 风).
 const oceanPlane = createOceanPlane({ seaLevelY: -3 });
 scene.add(oceanPlane);
+const oceanWaterSurface = oceanPlane.userData.waterSurface as
+  | { setTime(time: number): void; setSunDirection(direction: Vector3): void }
+  | undefined;
+oceanWaterSurface?.setSunDirection(sun.position.clone());
 
 // lakes (Natural Earth 10m, 186 China lakes) — flat polygon meshes, Y 跟随 sampler
 // 查 terrain 海拔 (青海湖 ~6.8u, 鄱阳湖 ~0.03u). Sampler 未加载的 chunk fallback 海平面.
@@ -151,6 +163,7 @@ debugOverlay.setVisible(false);
 scene.add(debugOverlay.group);
 let lodTintActive = false;
 let flatShadingActive = false;
+let beachTintActive = true;
 
 window.addEventListener("keydown", (e) => {
   if (e.key === "g" || e.key === "G") {
@@ -172,12 +185,22 @@ window.addEventListener("keydown", (e) => {
       ? "Flat shading: 三角面分明 (再按 F 关 — 回 smooth)"
       : "Smooth shading 恢复");
   }
+  // B 键: 切沙滩色带 — 对比海岸线原始颜色 vs 低平岸线轻微沙色过渡
+  if (e.key === "b" || e.key === "B") {
+    beachTintActive = !beachTintActive;
+    handle.setBeachTint(beachTintActive);
+    setStatus(beachTintActive
+      ? "沙滩色带开启 (按 B 关闭对比)"
+      : "沙滩色带关闭 (按 B 开启对比)");
+  }
 });
 
 // rivers
 const riverLoader = new RiverLoader({
   baseUrl: "/data/rivers",
-  sampler: handle.sampler
+  sampler: handle.sampler,
+  landMaskSampler,
+  excludeWaterSampler: lakeHandle.waterMaskSampler
 });
 await riverLoader.loadManifest();
 const loadedRiverGroups = new Map<string, ReturnType<RiverLoader["getCachedChunk"]>>();
@@ -193,6 +216,12 @@ function animate(): void {
   const dt = (now - lastFrame) / 1000;
   lastFrame = now;
   frameCounter += 1;
+  const waterTime = now * 0.001;
+  oceanWaterSurface?.setTime(waterTime);
+  lakeHandle.setTime(waterTime);
+  for (const rh of loadedRiverGroups.values()) {
+    if (rh) updateRiverGroupShimmer(rh.group, waterTime);
+  }
 
   // movement
   const fwd = new Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
@@ -286,7 +315,7 @@ function animate(): void {
       `相机 world(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})<br />` +
         `cache: ${cacheN} chunks<br />` +
         `FPS: ${(1 / dt).toFixed(0)}<br />` +
-        `长安在 world(${chanan.x.toFixed(1)}, ${chanan.z.toFixed(1)})`
+        `北京在 world(${startWorld.x.toFixed(1)}, ${startWorld.z.toFixed(1)})`
     );
   }
 

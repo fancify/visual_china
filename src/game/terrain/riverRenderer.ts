@@ -24,7 +24,7 @@ import {
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
-import { projectGeoToWorld } from "../mapOrientation.js";
+import { projectGeoToWorld, unprojectWorldToGeo } from "../mapOrientation.js";
 import {
   qinlingRegionBounds,
   qinlingRegionWorld
@@ -35,6 +35,13 @@ import type {
   RiverPolyline
 } from "./pyramidTypes.js";
 import type { PyramidSampler } from "./pyramidSampler.js";
+import type { LandMaskSampler } from "./landMaskRenderer.js";
+import type { LakeMaskSampler } from "./lakeRenderer.js";
+import {
+  RIVER_WATER_COLOR,
+  RIVER_WATER_OPACITY,
+  RIVER_WATER_SHIMMER
+} from "./waterStyle.js";
 
 // 用 Three.js Line2 (fat lines) — 屏幕空间 anti-aliased polylines, 恒定像素宽度
 // 不管相机距离, 永远不出 ribbon-quad facet 缺陷 (image 10-14 那些 bubble/fragment).
@@ -43,8 +50,9 @@ import type { PyramidSampler } from "./pyramidSampler.js";
 // 资源: three/examples/jsm/lines/{Line2, LineGeometry, LineMaterial}
 
 const Y_OFFSET = 0.08; // 河流浮于 DEM 表面 z-fight 缓冲
-const WATER_COLOR = new Color(0.62, 0.78, 0.88); // 淡青蓝, 千里江山图水彩
 const SPLINE_SUBDIV = 5; // 每 source segment 插 5 点 — 平滑曲线 (Line2 没 quad 问题)
+const RIVER_HIGHLIGHT_COLOR = new Color(0x7fa1a6);
+const SHORE_CLIP_ITERATIONS = 8;
 
 // Linewidth in world units (worldUnits: true) — 真实物理宽度, 远看自然变细近看变粗:
 //   ord 8+ 干流 (长江/黄河):  0.9u  (~ 3km, 跟真实长江中下游 1-3km 对齐)
@@ -65,6 +73,10 @@ export interface RiverLoaderOptions {
   sampler: PyramidSampler;
   /** 过滤 stream order 阈值 (默认 4 — 毛细支流 ord 3 全跳过, 减半 polyline 数 + 性能) */
   minOrder?: number;
+  /** Optional coastline mask: skip river segments whose midpoint is outside land. */
+  landMaskSampler?: LandMaskSampler | null;
+  /** Optional lake mask: skip river segments whose midpoint is inside lake polygons. */
+  excludeWaterSampler?: LakeMaskSampler | null;
 }
 
 export interface RiverChunkHandle {
@@ -78,6 +90,8 @@ export class RiverLoader {
   readonly baseUrl: string;
   readonly sampler: PyramidSampler;
   readonly minOrder: number;
+  readonly landMaskSampler: LandMaskSampler | null;
+  readonly excludeWaterSampler: LakeMaskSampler | null;
 
   private manifest: RiverManifest | null = null;
   private manifestPromise: Promise<RiverManifest> | null = null;
@@ -88,6 +102,8 @@ export class RiverLoader {
     this.baseUrl = opts.baseUrl ?? "/data/rivers";
     this.sampler = opts.sampler;
     this.minOrder = opts.minOrder ?? 4;
+    this.landMaskSampler = opts.landMaskSampler ?? null;
+    this.excludeWaterSampler = opts.excludeWaterSampler ?? null;
   }
 
   async loadManifest(): Promise<RiverManifest> {
@@ -177,10 +193,10 @@ export class RiverLoader {
     for (const [ord, polylines] of byOrd) {
       const linewidth = widthForOrd(ord);
       const material = new LineMaterial({
-        color: WATER_COLOR.getHex(),
+        color: RIVER_WATER_COLOR.getHex(),
         linewidth,
         transparent: true,
-        opacity: 0.9,
+        opacity: RIVER_WATER_OPACITY,
         depthWrite: false,
         worldUnits: true
       });
@@ -188,11 +204,18 @@ export class RiverLoader {
         typeof window !== "undefined" ? window.innerWidth : 1920,
         typeof window !== "undefined" ? window.innerHeight : 1080
       );
+      material.userData.waterBaseColor = RIVER_WATER_COLOR.clone();
+      material.userData.waterBaseOpacity = RIVER_WATER_OPACITY;
+      material.userData.waterShimmerStrength = RIVER_WATER_SHIMMER;
+      material.userData.waterPhase = ord * 0.73;
 
       // 抽所有 polylines 的 segments (LineSegmentsGeometry 要 [a,b, c,d, ...] 段对)
       const allSegments: number[] = [];
       for (const poly of polylines) {
-        appendPolylineSegments(poly, this.sampler, allSegments);
+        appendPolylineSegments(poly, this.sampler, allSegments, {
+          landMaskSampler: this.landMaskSampler,
+          excludeWaterSampler: this.excludeWaterSampler
+        });
       }
       if (allSegments.length === 0) continue;
 
@@ -209,12 +232,33 @@ export class RiverLoader {
   }
 }
 
+export function updateRiverGroupShimmer(group: Group, time: number): void {
+  group.traverse((obj) => {
+    const material = (obj as LineSegments2).material as LineMaterial | undefined;
+    const baseColor = material?.userData.waterBaseColor as Color | undefined;
+    const baseOpacity = material?.userData.waterBaseOpacity as number | undefined;
+    const shimmerStrength =
+      (material?.userData.waterShimmerStrength as number | undefined) ?? RIVER_WATER_SHIMMER;
+    if (!material || !baseColor || baseOpacity === undefined) return;
+
+    const phase = (material.userData.waterPhase as number | undefined) ?? 0;
+    const shimmer = 0.5 + 0.5 * Math.sin(time * 0.85 + phase);
+    material.color.copy(baseColor).lerp(RIVER_HIGHLIGHT_COLOR, shimmer * shimmerStrength);
+    material.opacity = Math.min(1, baseOpacity * (0.98 + shimmer * 0.02));
+    material.needsUpdate = true;
+  });
+}
+
 // ─── Segment-pair appender for LineSegmentsGeometry batching ──────
 
 function appendPolylineSegments(
   poly: RiverPolyline,
   sampler: PyramidSampler,
-  out: number[]
+  out: number[],
+  masks: {
+    landMaskSampler?: LandMaskSampler | null;
+    excludeWaterSampler?: LakeMaskSampler | null;
+  } = {}
 ): void {
   if (poly.coords.length < 2) return;
 
@@ -270,7 +314,78 @@ function appendPolylineSegments(
   for (let i = 0; i < smoothed.length - 1; i += 1) {
     const a = smoothed[i];
     const b = smoothed[i + 1];
-    out.push(a.x, smoothY[i] + Y_OFFSET, a.z);
-    out.push(b.x, smoothY[i + 1] + Y_OFFSET, b.z);
+    let ax = a.x;
+    let az = a.z;
+    let ay = smoothY[i];
+    let bx = b.x;
+    let bz = b.z;
+    let by = smoothY[i + 1];
+
+    if (masks.landMaskSampler) {
+      const geoA = unprojectWorldToGeo({ x: ax, z: az }, qinlingRegionBounds, qinlingRegionWorld);
+      const geoB = unprojectWorldToGeo({ x: bx, z: bz }, qinlingRegionBounds, qinlingRegionWorld);
+      const landA = masks.landMaskSampler.isLand(geoA.lon, geoA.lat);
+      const landB = masks.landMaskSampler.isLand(geoB.lon, geoB.lat);
+      if (!landA && !landB) continue;
+      if (landA !== landB) {
+        const t = findShoreClipT(
+          masks.landMaskSampler,
+          ax,
+          az,
+          landA,
+          bx,
+          bz,
+          landB
+        );
+        const sx = ax + (bx - ax) * t;
+        const sz = az + (bz - az) * t;
+        const sy = ay + (by - ay) * t;
+        if (landA) {
+          bx = sx;
+          bz = sz;
+          by = sy;
+        } else {
+          ax = sx;
+          az = sz;
+          ay = sy;
+        }
+      }
+    }
+
+    const mid = {
+      x: (ax + bx) / 2,
+      z: (az + bz) / 2
+    };
+    const geo = unprojectWorldToGeo(mid, qinlingRegionBounds, qinlingRegionWorld);
+    if (masks.landMaskSampler && !masks.landMaskSampler.isLand(geo.lon, geo.lat)) {
+      continue;
+    }
+    if (masks.excludeWaterSampler?.isWater(geo.lon, geo.lat)) {
+      continue;
+    }
+    out.push(ax, ay + Y_OFFSET, az);
+    out.push(bx, by + Y_OFFSET, bz);
   }
+}
+
+function findShoreClipT(
+  sampler: LandMaskSampler,
+  ax: number,
+  az: number,
+  landA: boolean,
+  bx: number,
+  bz: number,
+  _landB: boolean
+): number {
+  let tLow = landA ? 0 : 1;
+  let tHigh = landA ? 1 : 0;
+  for (let i = 0; i < SHORE_CLIP_ITERATIONS; i += 1) {
+    const tMid = (tLow + tHigh) / 2;
+    const x = ax + (bx - ax) * tMid;
+    const z = az + (bz - az) * tMid;
+    const geo = unprojectWorldToGeo({ x, z }, qinlingRegionBounds, qinlingRegionWorld);
+    if (sampler.isLand(geo.lon, geo.lat)) tLow = tMid;
+    else tHigh = tMid;
+  }
+  return (tLow + tHigh) / 2;
 }

@@ -34,6 +34,8 @@ const GROUPS = {
     "perf-monitor",
     "ground-anchor-registry",
     "regression-baseline",   // S1 19-case snapshot
+    "dem-pyramid-ocean-cleanup",
+    "pyramid-coastal-lod",
     "ssot-drift",            // SSOT round 5 守卫
     "surface-provider",      // S3 SurfaceProvider contract + 默认实现
     "epoch-manifest"         // S4 EpochManifest schema + modern/tang manifests
@@ -52,6 +54,9 @@ const GROUPS = {
     "terrain-atmospheric-haze",
     "cloud-cookie",
     "cloud-planes",
+    "land-mask-renderer",
+    "pyramid-mesh-land-mask",
+    "terrain-water-integration",
     "scenery-shader-enhancer",
     "grass-biome",
     "city-floor-occlusion",

@@ -29,6 +29,7 @@ import {
   qinlingRegionWorld
 } from "../../data/qinlingRegion.js";
 import type { LoadedChunk } from "./pyramidTypes.js";
+import type { LandMaskSampler } from "./landMaskRenderer.js";
 
 // vertical scale 调优历史:
 // - 110 (太尖刺) → 180 → 260 (BotW/原神风, ~13.5× 夸张, 千里江山图)
@@ -42,32 +43,160 @@ const VERTICAL_SCALE = 500;
 // 让 ocean plane 自然吃掉 hole, 而非伪造 Y=0 陆地
 const SEA_LEVEL_FALLBACK = -3;
 
-// 千里江山图 vertex color palette
-const COLOR_LOW_GREEN = new Color(0.35, 0.55, 0.36);  // 平原青绿 (草、田)
-const COLOR_MID_WARM = new Color(0.62, 0.55, 0.40);   // 丘陵赭石 (土、林)
-const COLOR_HIGH_STONE = new Color(0.58, 0.55, 0.52); // 高山岩灰 (石)
-const COLOR_SNOW = new Color(0.92, 0.92, 0.88);       // 雪线
-const COLOR_STEEP = new Color(0.48, 0.42, 0.36);      // 陡坡岩
+// Mesh-clip 边界 vertex 精确定位 — sub-cell binary search.
+// 每条混合 edge 跑 6 轮二分 (2^6 = 64 sub-divisions) 通过 landMaskSampler 找
+// 精确陆海临界 t ∈ [0,1]. 比起 t=0.5 中点定位 (产出 45° 阶梯), 二分让
+// boundary 顶点贴合 polygon 实际位置 → 任意角度曲线.
+// 6 轮就够了 — 4096×2304 sampler raster 1 px ≈ 0.015°，cell 跨度 0.004°,
+// 一个 cell 内 sampler pixel 只覆盖 1/4 个，6 轮已超 sub-pixel 精度.
+const SHORE_BISECT_ITERATIONS = 6;
 
-function colorForVertex(out: Color, y: number, ny: number): void {
+function findShoreT(
+  sampler: LandMaskSampler,
+  lonA: number, latA: number, inA: number,
+  lonB: number, latB: number, _inB: number
+): number {
+  // tLow 始终对应 land 侧, tHigh 对应 ocean. inA 决定起始方向.
+  let tLow = inA ? 0 : 1;
+  let tHigh = inA ? 1 : 0;
+  for (let i = 0; i < SHORE_BISECT_ITERATIONS; i += 1) {
+    const tMid = (tLow + tHigh) / 2;
+    const lon = lonA + (lonB - lonA) * tMid;
+    const lat = latA + (latB - latA) * tMid;
+    if (sampler.isLand(lon, lat)) tLow = tMid;
+    else tHigh = tMid;
+  }
+  return (tLow + tHigh) / 2;
+}
+
+// 海岸 proximity 算法常量
+// 2 cells ≈ 860m，只做贴岸窄色带，不改变海岸线视觉轮廓。
+const COAST_K_CELLS = 2;
+// 早 cut: elev > 200m 跳过 sampler 查询. COAST_BAND_WORLD_Y_MAX=0.18 worldY ≈ 85m elev,
+// 覆盖中国大部分沿海平原 (Bohai 5-30m, 长江口 0-10m, Shandong 海岸丘陵 50-100m).
+// 200m 留 ~2x margin 给搜索范围内可能更高的 vertex.
+const COAST_ELEV_GATE_M = 200;
+
+const COAST_DIRS: ReadonlyArray<readonly [number, number]> = [
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+  [1, 1], [1, -1], [-1, 1], [-1, -1]
+];
+
+function computeCoastProximityArray(
+  smoothed: Float32Array,
+  isNaNVertex: Uint8Array,
+  N: number,
+  bounds: { west: number; east: number; south: number; north: number },
+  sampler: LandMaskSampler | null
+): Float32Array {
+  const proximity = new Float32Array(N * N);
+  if (!sampler) return proximity; // 全 0 — colorForVertex 行为同改前
+  const cellLonStep = (bounds.east - bounds.west) / (N - 1);
+  const cellLatStep = (bounds.north - bounds.south) / (N - 1);
+  for (let r = 0; r < N; r += 1) {
+    for (let c = 0; c < N; c += 1) {
+      const idx = r * N + c;
+      // NaN vertex 本身 (海洋区) 跳过, hole-punch 不渲染
+      if (isNaNVertex[idx]) continue;
+      const elev = smoothed[idx];
+      if (!Number.isFinite(elev) || elev > COAST_ELEV_GATE_M) continue;
+      const lon = bounds.west + c * cellLonStep;
+      const lat = bounds.north - r * cellLatStep;
+      let minDist = COAST_K_CELLS + 1;
+      for (let d = 0; d < COAST_DIRS.length; d += 1) {
+        const [dlat, dlon] = COAST_DIRS[d];
+        for (let k = 1; k <= COAST_K_CELLS && k < minDist; k += 1) {
+          const sLon = lon + dlon * k * cellLonStep;
+          const sLat = lat + dlat * k * cellLatStep;
+          if (!sampler.isLand(sLon, sLat)) {
+            if (k < minDist) minDist = k;
+            break;
+          }
+        }
+      }
+      if (minDist <= COAST_K_CELLS) {
+        // 距离=1 → 最近邻就是海 → proximity=1
+        // 距离=K → 最远才碰到海 → proximity=1/K
+        proximity[idx] = 1 - (minDist - 1) / COAST_K_CELLS;
+      }
+    }
+  }
+  return proximity;
+}
+
+// BotW × 千里江山图 × 长安三万里:
+// blue-green land base, warm golden pigment in hills, gray rock, bright snow.
+// Keep land greener than soil while preserving red/yellow pigment to separate
+// it from the teal-blue water palette.
+const COLOR_LOW_GREEN = new Color(0.43, 0.62, 0.34);  // 平原青绿草地
+const COLOR_MID_WARM = new Color(0.58, 0.62, 0.38);   // 丘陵青绿 + 暖金
+const COLOR_HIGH_STONE = new Color(0.46, 0.50, 0.43); // 高山冷灰岩
+const COLOR_SNOW = new Color(0.94, 0.93, 0.88);       // 雪线
+const COLOR_STEEP = new Color(0.38, 0.40, 0.30);      // 陡坡暗岩草
+
+// BotW 风海岸调色 — 见 feedback_botw_coast_palette
+const COLOR_BEACH = new Color(0.83, 0.76, 0.60);          // 沙带 muted khaki，不要亮黄
+const COLOR_COASTAL_CLIFF = new Color(0.50, 0.46, 0.42);  // 滨海岩崖 灰褐，比内陆 STEEP 更湿冷
+const COLOR_COASTAL_GRASS = new Color(0.42, 0.62, 0.40);  // 海边草甸，比内陆 LOW_GREEN 略饱和
+
+// 海岸 tint 适用的 worldY 上限。VERTICAL_SCALE=500 / EXAG=1.07 → 1 worldY ≈ 467m elev。
+// 0.18 worldY ≈ 85m 海拔；覆盖中国沿海平原 (渤海/长江/珠江口都在此带内)。
+// 超过此高度完全无 coast tint, 山地海岸由 slope cliff 颜色处理。
+const COAST_BAND_WORLD_Y_MAX = 0.18;
+
+function colorForVertex(
+  out: Color,
+  y: number,
+  ny: number,
+  coastProximity: number = 0
+): void {
   const slopeT = Math.max(0, Math.min(1, (1 - ny) * 2.2));
-  const elevT = Math.max(0, Math.min(1, y / 25));
-  if (y > 28) {
+  const elevT = Math.max(0, Math.min(1, y / 18));
+  const snowT = Math.max(0, Math.min(1, (y - 7.4) / 2.8));
+  if (snowT >= 1) {
     out.copy(COLOR_SNOW);
   } else if (elevT < 0.35) {
     out.copy(COLOR_LOW_GREEN).lerp(COLOR_MID_WARM, elevT / 0.35);
   } else if (elevT < 0.75) {
     out.copy(COLOR_MID_WARM).lerp(COLOR_HIGH_STONE, (elevT - 0.35) / 0.4);
   } else {
-    out.copy(COLOR_HIGH_STONE).lerp(COLOR_SNOW, (elevT - 0.75) / 0.25);
+    out.copy(COLOR_HIGH_STONE);
   }
+  out.lerp(COLOR_SNOW, snowT * 0.9);
   out.lerp(COLOR_STEEP, slopeT * 0.55);
+
+  // 海岸 tint —— 只在低海拔 + 接近 land mask 边缘的 vertex 上施加。
+  // BotW slope-aware：平地→沙、陡坡→灰岩、中间→海边草。
+  if (coastProximity > 0 && y < COAST_BAND_WORLD_Y_MAX) {
+    const elevFactor = 1 - y / COAST_BAND_WORLD_Y_MAX;  // 0 海拔=1，COAST_BAND 顶=0
+    const tintStrength = elevFactor * coastProximity;
+    // slope buckets: ny>0.92 平地 → beach；ny<0.65 陡 → cliff；中间 → grass
+    let coastCol: Color;
+    if (ny > 0.92) {
+      coastCol = COLOR_BEACH;
+    } else if (ny < 0.65) {
+      coastCol = COLOR_COASTAL_CLIFF;
+    } else {
+      // 平滑过渡：BEACH (ny=0.92) → GRASS (ny=0.78) → CLIFF (ny=0.65)
+      if (ny > 0.78) {
+        const t = (0.92 - ny) / (0.92 - 0.78);
+        coastCol = new Color().copy(COLOR_BEACH).lerp(COLOR_COASTAL_GRASS, t);
+      } else {
+        const t = (0.78 - ny) / (0.78 - 0.65);
+        coastCol = new Color().copy(COLOR_COASTAL_GRASS).lerp(COLOR_COASTAL_CLIFF, t);
+      }
+    }
+    out.lerp(coastCol, tintStrength * 0.35);
+  }
 }
 
 /**
  * 重新计算 vertex colors. 不传 indices → 全 chunk; 传 → 只更新指定 vertex.
  * Normal harmonization 改了边界 normal 后必须调用此函数刷新边界 vertex 颜色,
  * 否则边界仍显旧 slope 颜色 (盆地平坦区会暴露成可见格子).
+ *
+ * 读 geometry.userData.coastProximity (Float32Array, per-vertex 0..1) 来上海岸 tint.
+ * 没有该 userData 等价于 coastProximity=0 — 行为跟改造前完全一致.
  */
 export function refreshVertexColors(
   handle: Pick<PyramidMeshHandle, "geometry">,
@@ -77,12 +206,14 @@ export function refreshVertexColors(
   const normalAttr = handle.geometry.attributes.normal as BufferAttribute | undefined;
   const colorAttr = handle.geometry.attributes.color as BufferAttribute | undefined;
   if (!colorAttr || !normalAttr) return;
+  const coastProx = handle.geometry.userData?.coastProximity as Float32Array | undefined;
   const tmp = new Color();
   const range = indices ?? null;
   const count = range ? range.length : positionAttr.count;
   for (let k = 0; k < count; k += 1) {
     const i = range ? range[k] : k;
-    colorForVertex(tmp, positionAttr.getY(i), normalAttr.getY(i));
+    const cp = coastProx ? coastProx[i] : 0;
+    colorForVertex(tmp, positionAttr.getY(i), normalAttr.getY(i), cp);
     colorAttr.setXYZ(i, tmp.r, tmp.g, tmp.b);
   }
   colorAttr.needsUpdate = true;
@@ -93,6 +224,10 @@ export interface PyramidMeshOptions {
   material?: MeshPhongMaterial;
   /** flatShading 默认 false (smooth, 类山水画风); chunk 远景可 true */
   flatShading?: boolean;
+  /** Optional vector land mask used to discard DEM cells that fall in ocean. */
+  landMaskSampler?: LandMaskSampler | null;
+  /** Whether coastal land vertices receive a subtle beach color tint. */
+  beachTintEnabled?: boolean;
 }
 
 export interface PyramidMeshHandle {
@@ -200,6 +335,9 @@ export function createPyramidChunkMesh(
         }
         smoothed[r * cellsPerChunk + c] = count > 0 ? sum / count : Number.NaN;
       }
+
+      // smoothed 只处理 DEM 高度；真正陆海裁剪在下面的 mesh-clip 阶段用
+      // GSHHG vector landMaskSampler 覆盖 DEM/ETOPO 的粗陆海分类。
     }
   }
 
@@ -220,10 +358,162 @@ export function createPyramidChunkMesh(
     }
   }
   positionAttr.needsUpdate = true;
+
+  // NaN cell mesh-clip (2026-05-14, 替换 2026-05-13 hole-punch):
+  //   旧版: 含 NaN vertex 的 cell 整个跳, 海岸是 1° DEM cell 直角阶梯
+  //         (你能看到 "minecraft 海岸" 的方块感, 用户 V1 反馈核心痛点)
+  //   新版: 先用高精度 landMaskSampler 标记海侧 vertex，再对跨 land/ocean
+  //         边界的 cell 跑 marching-squares 风:
+  //         按周长走 (a→b→cc→d), 在 land/ocean 切换的 edge 上插入 midpoint,
+  //         fan-triangulate 得到的多边形. boundary 顶点 worldY=0 (sea level),
+  //         位置 = 两端 vertex 的 local XZ 中点 (与 PlaneGeometry 初始坐标系对齐).
+  //   全 land cell 沿用旧 winding (a,b,d)+(b,cc,d) — 中间面积无差别, 不动.
+  //   全 ocean cell 跳 — 跟旧版一样.
+  //   PlaneGeometry index: 每 cell 4 vertex a=(r,c) b=(r+1,c) cc=(r+1,c+1) d=(r,c+1)
+  const sampler = opts.landMaskSampler ?? null;
+  const isNaNVertex = new Uint8Array(cellsPerChunk * cellsPerChunk);
+  const cellLonStepBoundary = (bounds.east - bounds.west) / (cellsPerChunk - 1);
+  const cellLatStepBoundary = (bounds.north - bounds.south) / (cellsPerChunk - 1);
+  for (let i = 0; i < smoothed.length; i += 1) {
+    if (!Number.isFinite(smoothed[i])) isNaNVertex[i] = 1;
+  }
+  if (sampler) {
+    for (let r = 0; r < cellsPerChunk; r += 1) {
+      const lat = bounds.north - r * cellLatStepBoundary;
+      for (let c = 0; c < cellsPerChunk; c += 1) {
+        const lon = bounds.west + c * cellLonStepBoundary;
+        const idx = r * cellsPerChunk + c;
+        if (!sampler.isLand(lon, lat)) isNaNVertex[idx] = 1;
+      }
+    }
+  }
+  const segs = cellsPerChunk - 1;
+  const baseVertexCount = positionAttr.count; // = N*N
+  const newIndices: number[] = [];
+  const boundaryPositions: number[] = []; // flat [x, y, z, x, y, z, ...] for new boundary verts
+  let boundaryVertCount = 0;
+
+  // 给一条混合 edge 加 boundary vertex，返回它在合并 buffer 里的 vertex index.
+  // 用 binary search 找精确陆海临界 t ∈ [0..1] (sampler 存在时), 没 sampler 退化到 t=0.5.
+  // local XZ 在 chunk PlaneGeometry 坐标系内按 t lerp (lat/lon → XZ 是线性映射, lerp t 等价).
+  // Y=0 = ocean plane 平面, land 顶点的高度自然下落到海平面.
+  const addEdgeBoundary = (
+    idxA: number, idxB: number,
+    lonA: number, latA: number, inA: number,
+    lonB: number, latB: number, inB: number
+  ): number => {
+    const t = sampler
+      ? findShoreT(sampler, lonA, latA, inA, lonB, latB, inB)
+      : 0.5;
+    const xA = positionAttr.getX(idxA);
+    const zA = positionAttr.getZ(idxA);
+    const xB = positionAttr.getX(idxB);
+    const zB = positionAttr.getZ(idxB);
+    boundaryPositions.push(
+      xA + (xB - xA) * t,
+      0,
+      zA + (zB - zA) * t
+    );
+    const idx = baseVertexCount + boundaryVertCount;
+    boundaryVertCount += 1;
+    return idx;
+  };
+
+  for (let r = 0; r < segs; r += 1) {
+    for (let c = 0; c < segs; c += 1) {
+      const a = r * cellsPerChunk + c;
+      const b = (r + 1) * cellsPerChunk + c;
+      const cc = (r + 1) * cellsPerChunk + (c + 1);
+      const d = r * cellsPerChunk + (c + 1);
+      const inA = isNaNVertex[a] ? 0 : 1;
+      const inB = isNaNVertex[b] ? 0 : 1;
+      const inCC = isNaNVertex[cc] ? 0 : 1;
+      const inD = isNaNVertex[d] ? 0 : 1;
+      const cfg = inA | (inB << 1) | (inCC << 2) | (inD << 3);
+      if (cfg === 0) continue;
+      if (cfg === 0b1111) {
+        // 全 land — 沿用旧 winding
+        newIndices.push(a, b, d, b, cc, d);
+        continue;
+      }
+      // 混合 cell — corner lat/lon + 周长 walk + fan triangulate
+      const lonA = bounds.west + c * cellLonStepBoundary;
+      const latA = bounds.north - r * cellLatStepBoundary;
+      const lonB = lonA;
+      const latB = bounds.north - (r + 1) * cellLatStepBoundary;
+      const lonCC = bounds.west + (c + 1) * cellLonStepBoundary;
+      const latCC = latB;
+      const lonD = lonCC;
+      const latD = latA;
+      const walk: number[] = [];
+      if (inA) walk.push(a);
+      if (inA !== inB) walk.push(addEdgeBoundary(a, b, lonA, latA, inA, lonB, latB, inB));
+      if (inB) walk.push(b);
+      if (inB !== inCC) walk.push(addEdgeBoundary(b, cc, lonB, latB, inB, lonCC, latCC, inCC));
+      if (inCC) walk.push(cc);
+      if (inCC !== inD) walk.push(addEdgeBoundary(cc, d, lonCC, latCC, inCC, lonD, latD, inD));
+      if (inD) walk.push(d);
+      if (inD !== inA) walk.push(addEdgeBoundary(d, a, lonD, latD, inD, lonA, latA, inA));
+      if (walk.length < 3) continue;
+      for (let i = 1; i < walk.length - 1; i += 1) {
+        newIndices.push(walk[0], walk[i], walk[i + 1]);
+      }
+    }
+  }
+
+  // 把 boundary midpoint 顶点 append 到 position buffer
+  // ⚠ 同时必须 extend UV attribute！否则 Three.js shader 拿 vUv 变量时
+  // index 越界会刷 "Vertex buffer is not big enough" GL warning 飞起.
+  // (computeVertexNormals 会自动 resize normal; color 我们另起 totalCount 大小, 不用 extend)
+  if (boundaryVertCount > 0) {
+    const newCount = baseVertexCount + boundaryVertCount;
+    const newPositions = new Float32Array(newCount * 3);
+    newPositions.set(positionAttr.array as Float32Array);
+    for (let i = 0; i < boundaryPositions.length; i += 1) {
+      newPositions[baseVertexCount * 3 + i] = boundaryPositions[i];
+    }
+    geometry.setAttribute("position", new BufferAttribute(newPositions, 3));
+    // UV: boundary 顶点 UV = (0, 0); material 不用 texture 但 Three.js shader 仍 declare vUv
+    const oldUv = geometry.attributes.uv as BufferAttribute | undefined;
+    if (oldUv) {
+      const newUv = new Float32Array(newCount * 2);
+      newUv.set(oldUv.array as Float32Array);
+      // boundary verts default Float32Array fill = 0, 不需手动 set
+      geometry.setAttribute("uv", new BufferAttribute(newUv, 2));
+    }
+  }
+
+  geometry.setIndex(newIndices);
+  // ⚠ computeVertexNormals 在本 three.js 版本不 auto-resize normal — 只 reset existing.
+  // 如果之前 normal.count != position.count (因为我们 extend 了 position) 必须先删掉,
+  // 让 computeVertexNormals 自己建一个正确大小的. 否则 GL 会刷 vertex buffer too small.
+  if (boundaryVertCount > 0) {
+    geometry.deleteAttribute("normal");
+  }
   geometry.computeVertexNormals();
 
+  // 海岸 proximity per-vertex (0..1) — 用 landMaskSampler 在 vertex lat/lon 周围 K 格
+  // 8 方向扫描最近"非陆地"距离, 跨 chunk 一致 (sampler 是全局的).
+  // 只对低海拔 vertex 算 (early-out 内陆山地) → 总开销 O(coastal-low-elev * 24 lookups).
+  // 跟着 mesh 一起存在 geometry.userData; refreshVertexColors 读它再 blend coast 调色.
+  //
+  const baseCoastProx =
+    sampler && boundaryVertCount > 0
+      ? computeCoastProximityArray(smoothed, isNaNVertex, cellsPerChunk, bounds, sampler)
+      : new Float32Array(cellsPerChunk * cellsPerChunk);
+  // boundary midpoint 顶点只定义裁剪几何，不参与沙滩 tint；
+  // 否则海岸线本身会被染粗，看起来像形状被色带改了。
+  const totalCount = baseVertexCount + boundaryVertCount;
+  const coastProximity = new Float32Array(totalCount);
+  coastProximity.set(baseCoastProx);
+  geometry.userData.coastProximityBase = coastProximity;
+  geometry.userData.coastProximity = coastProximity;
+  if (opts.beachTintEnabled === false) {
+    geometry.userData.coastProximity = new Float32Array(totalCount);
+  }
+
   // Vertex colors: 千里江山图 调色板（详 colorForVertex / refreshVertexColors）
-  const colorAttr = new BufferAttribute(new Float32Array(positionAttr.count * 3), 3);
+  const colorAttr = new BufferAttribute(new Float32Array(totalCount * 3), 3);
   geometry.setAttribute("color", colorAttr);
   refreshVertexColors({ geometry });
 

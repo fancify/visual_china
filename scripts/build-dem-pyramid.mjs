@@ -23,6 +23,12 @@ import { fromFile } from "geotiff";
 
 import { chinaBounds } from "./china-dem-common.mjs";
 import {
+  removeStaleChunkOutput,
+  removeStaleTierChunks
+} from "./dem-pyramid-cleanup.mjs";
+import { getEtopoOceanSampler } from "./etopo-ocean-mask.mjs";
+import { createLandMaskSamplerFromData } from "../src/game/terrain/landMaskRenderer.js";
+import {
   TIER_PARAMS,
   TIER_NAMES,
   cellDegAtTier,
@@ -64,6 +70,7 @@ const userBbox = bboxOpt
   : chinaBounds;
 
 const forceOverwrite = getFlag("force");
+const landMaskPath = path.resolve("public/data/china/land-mask.json");
 
 for (const t of tiers) {
   if (!TIER_PARAMS[t]) {
@@ -169,6 +176,17 @@ class TileCache {
 }
 
 const tileCache = new TileCache(32);
+
+async function loadLandMaskSampler() {
+  try {
+    const raw = await fs.readFile(landMaskPath, "utf8");
+    const data = JSON.parse(raw);
+    return createLandMaskSamplerFromData(data);
+  } catch (error) {
+    console.warn(`Land mask unavailable at ${landMaskPath}; falling back to ETOPO ocean mask (${error.message})`);
+    return null;
+  }
+}
 
 // ─── L0 chunk 烤逻辑 ─────────────────────────────────────────────
 //
@@ -303,7 +321,17 @@ async function bakeL0Chunk({ chunkX, chunkZ, tiles, ghostWidth = 1 }) {
     const lat = bounds.north - (r - ghostWidth) * cellLatDeg;
     for (let c = 0; c < arraySide; c += 1) {
       const lon = bounds.west + (c - ghostWidth) * cellLonDeg;
-      const v = sampleAt(lon, lat, overlapping);
+      let v = sampleAt(lon, lat, overlapping);
+      // 高精度 GSHHG land mask 决定陆海分类；ETOPO 只作为缺洞回填的海拔来源。
+      // 之前用 ETOPO 60s (~1.85km) 判海，L0 430m 网格会被 4-cell 一组锁成
+      // 方块海岸。GSHHG vector sampler 保留 DEM 网格能表达的真实岸线。
+      if (landMaskSampler ? !landMaskSampler.isLand(lon, lat) : etopoSampler.isOcean(lon, lat)) {
+        v = Number.NaN;
+      } else if (!Number.isFinite(v)) {
+        // FABDEM 数据洞且不在海里 — 用 ETOPO 海拔填.
+        const etopoM = etopoSampler.sampleLandElevation(lon, lat);
+        if (Number.isFinite(etopoM)) v = etopoM;
+      }
       if (Number.isFinite(v)) {
         heights[r * arraySide + c] = v;
         hasData = true;
@@ -363,6 +391,12 @@ async function downsampleTier(srcTierName, dstTierName) {
   });
 
   console.log(`  ${dstTierName}: ${items.length} chunks (from ${srcChunks.size} ${srcTierName} chunks)`);
+  const removedStaleParents = await removeStaleTierChunks(dstDir, dstChunkSet);
+  if (removedStaleParents.length > 0) {
+    console.log(
+      `  ${dstTierName}: removed ${removedStaleParents.length} stale parent chunks with no ${srcTierName} children`
+    );
+  }
 
   await withConcurrency(items, concurrency, async (dst) => {
     // Load 4 src chunks (may be missing 1-3)
@@ -429,10 +463,12 @@ async function downsampleTier(srcTierName, dstTierName) {
     }
     const validRatio = validCount / (N * N);
 
-    // Sparse parent filter (codex P1 #5 修): L1 ≥ 30%, L2 ≥ 40%, L3 ≥ 50%.
-    // 低阈值 chunk 全是 NaN → mesh fallback Y=-3 ocean plane, 视觉上是"大海洋矩形"
-    // 假装是 chunk. 不写就交给 runtime fallback 到 finer tier 或 ocean plane 兜底.
-    const sparseThresholds = { L1: 0.30, L2: 0.40, L3: 0.50, L4: 0.50 };
+    // Sparse parent filter — 阈值统一 5%. 原 30/40/50% 在 Tibet/海岸边缘 + 数据洞
+    // 区杀掉了太多 L2/L3 chunk, 导致 runtime cascade 退到 L0/L1 → 远景出现孤立绿/蓝
+    // 斑 (用户 2026-05 观察). pool 函数 (line 414+) 已 NaN-tolerant: 4 个 L0 cell 里
+    // 任 1 个有效, 该 L2 cell 就有值. 5% 阈值只杀真正几乎全 NaN 的 chunk (e.g. 远海),
+    // 留下"部分有效"的 chunk 让 LOD 同心圆环 radial 完整.
+    const sparseThresholds = { L1: 0.05, L2: 0.05, L3: 0.05, L4: 0.05 };
     const threshold = sparseThresholds[dstTierName] ?? 0;
     if (validRatio < threshold) {
       // 删除已存在的旧 sparse parent 文件 (上次 bake 写过的)
@@ -475,6 +511,15 @@ await fs.mkdir(pyramidOutputDir(), { recursive: true });
 
 const tilesIndex = await loadFabdemTileIndex();
 console.log(`Loaded ${tilesIndex.length} FABDEM tiles`);
+
+// ETOPO 60s 全球 bathymetry — 用于 FABDEM 数据洞 gap-fill: NaN cell 在陆地区
+// 时用 ETOPO 海拔填上, 海洋区保持 NaN 让 ocean plane 接管.
+const etopoSampler = await getEtopoOceanSampler();
+console.log("Loaded ETOPO 60s sampler (gap-fill for FABDEM NaN cells)");
+const landMaskSampler = await loadLandMaskSampler();
+console.log(landMaskSampler
+  ? "Loaded GSHHG land mask sampler (primary coastline classifier)"
+  : "Using ETOPO 60s as fallback coastline classifier");
 console.log("");
 
 // L0 烤 from FABDEM raw
@@ -526,6 +571,9 @@ if (tiers.includes("L0")) {
     });
 
     if (heights === null) {
+      if (forceOverwrite && await removeStaleChunkOutput(outPath)) {
+        console.log(`  removed stale ocean/empty L0 chunk ${item.x}_${item.z}.bin`);
+      }
       skipped += 1;
       return;
     }

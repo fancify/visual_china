@@ -7,6 +7,7 @@ dist/
 # Raw DEM downloads and extracted source tiles are too large for Git.
 data/fabdem/
 data/etopo/
+data/gshhg/
 
 # Raw third-party hydrography downloads are reproducible source data.
 data/hydrography/raw/

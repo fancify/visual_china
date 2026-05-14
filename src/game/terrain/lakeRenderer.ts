@@ -8,20 +8,24 @@
 //          (built by scripts/build-china-lakes.mjs from data/natural-earth/ne_10m_lakes.geojson)
 
 import {
-  Color,
   DoubleSide,
   Group,
   Mesh,
-  MeshBasicMaterial,
   Shape,
   ShapeGeometry
 } from "three";
 import { projectGeoToWorld } from "../mapOrientation.js";
+import { createWaterSurfaceMaterial } from "../waterSurfaceShader.js";
 import {
   qinlingRegionBounds,
   qinlingRegionWorld
 } from "../../data/qinlingRegion.js";
 import type { PyramidSampler } from "./pyramidSampler.js";
+import {
+  LAKE_WATER_COLOR,
+  LAKE_WATER_OPACITY,
+  LAKE_WATER_SHIMMER
+} from "./waterStyle.js";
 
 interface LakeFeature {
   type: "Feature";
@@ -34,6 +38,10 @@ interface LakeFeature {
 
 interface LakeBundle {
   features: LakeFeature[];
+}
+
+export interface LakeMaskSampler {
+  isWater(lon: number, lat: number): boolean;
 }
 
 export interface LakeRendererOptions {
@@ -53,18 +61,85 @@ export interface LakeRendererOptions {
 export interface LakeRendererHandle {
   group: Group;
   lakeCount: number;
+  waterMaskSampler: LakeMaskSampler;
+  /** 推进湖面细微波光时间。 */
+  setTime(time: number): void;
   /** 异步刷新所有 lake Y — 调用此函数当 terrain chunks 加载完, sampler 能返回有效值 */
   refreshSurfaceY(): void;
   dispose(): void;
 }
-
-const LAKE_COLOR_DEFAULT = 0x9bcfd8; // 淡青蓝, 千里江山图水色
 
 interface LakeMeshEntry {
   mesh: Mesh;
   /** 用 first ring 的 centroid 算 — 用于 sampler 查 Y */
   centroidLon: number;
   centroidLat: number;
+}
+
+interface IndexedLakePolygon {
+  bbox: { west: number; east: number; south: number; north: number };
+  rings: number[][][];
+}
+
+function ringBbox(ring: number[][]): IndexedLakePolygon["bbox"] {
+  let west = Infinity;
+  let east = -Infinity;
+  let south = Infinity;
+  let north = -Infinity;
+  for (const [lon, lat] of ring) {
+    west = Math.min(west, lon);
+    east = Math.max(east, lon);
+    south = Math.min(south, lat);
+    north = Math.max(north, lat);
+  }
+  return { west, east, south, north };
+}
+
+function pointInRing(lon: number, lat: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const xi = ring[i][0];
+    const yi = ring[i][1];
+    const xj = ring[j][0];
+    const yj = ring[j][1];
+    const intersects =
+      yi > lat !== yj > lat &&
+      lon < ((xj - xi) * (lat - yi)) / (yj - yi || Number.EPSILON) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInPolygon(lon: number, lat: number, rings: number[][][]): boolean {
+  if (!rings.length || !pointInRing(lon, lat, rings[0])) return false;
+  for (let i = 1; i < rings.length; i += 1) {
+    if (pointInRing(lon, lat, rings[i])) return false;
+  }
+  return true;
+}
+
+export function createLakeMaskSamplerFromBundle(bundle: LakeBundle): LakeMaskSampler {
+  const polygons: IndexedLakePolygon[] = [];
+  for (const feature of bundle.features) {
+    const polys = feature.geometry.type === "Polygon"
+      ? [feature.geometry.coordinates as number[][][]]
+      : (feature.geometry.coordinates as number[][][][]);
+    for (const rings of polys) {
+      if (!rings.length || rings[0].length < 3) continue;
+      polygons.push({ bbox: ringBbox(rings[0]), rings });
+    }
+  }
+
+  return {
+    isWater(lon: number, lat: number): boolean {
+      for (const polygon of polygons) {
+        const b = polygon.bbox;
+        if (lon < b.west || lon > b.east || lat < b.south || lat > b.north) continue;
+        if (pointInPolygon(lon, lat, polygon.rings)) return true;
+      }
+      return false;
+    }
+  };
 }
 
 export async function createLakeRenderer(
@@ -74,8 +149,8 @@ export async function createLakeRenderer(
   const sampler = opts.sampler;
   const fallbackY = opts.fallbackY ?? 0;
   const surfaceLift = opts.surfaceLift ?? 0.05;
-  const color = opts.color ?? LAKE_COLOR_DEFAULT;
-  const opacity = opts.opacity ?? 0.85;
+  const color = opts.color ?? LAKE_WATER_COLOR.getHex();
+  const opacity = opts.opacity ?? LAKE_WATER_OPACITY;
 
   const resp = await fetch(`${baseUrl}/china-lakes.json`);
   if (!resp.ok) throw new Error(`lake bundle fetch failed: HTTP ${resp.status}`);
@@ -84,13 +159,14 @@ export async function createLakeRenderer(
   const group = new Group();
   group.name = "lakes";
 
-  const material = new MeshBasicMaterial({
-    color: new Color(color),
-    transparent: true,
+  const waterSurface = createWaterSurfaceMaterial({
+    baseColor: color,
     opacity,
-    depthWrite: false,
-    side: DoubleSide
+    shimmerStrength: LAKE_WATER_SHIMMER
   });
+  const material = waterSurface.material;
+  material.side = DoubleSide;
+  group.userData.waterSurface = waterSurface;
 
   function toWorldXZ(lon: number, lat: number): { x: number; z: number } {
     return projectGeoToWorld({ lat, lon }, qinlingRegionBounds, qinlingRegionWorld);
@@ -181,5 +257,14 @@ export async function createLakeRenderer(
     material.dispose();
   }
 
-  return { group, lakeCount: entries.length, refreshSurfaceY, dispose };
+  return {
+    group,
+    lakeCount: entries.length,
+    waterMaskSampler: createLakeMaskSamplerFromBundle(bundle),
+    setTime(time) {
+      waterSurface.setTime(time);
+    },
+    refreshSurfaceY,
+    dispose
+  };
 }
