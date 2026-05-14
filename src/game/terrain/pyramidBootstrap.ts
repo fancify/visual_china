@@ -203,6 +203,17 @@ export async function bootstrapPyramidTerrain(
       }
     }
 
+    // L3 is the nationwide horizon/backdrop layer. Keep every existing L3 chunk
+    // in the desired set so high-altitude views do not end at the local scan
+    // window. Finer selected chunks below will still split overlapping parents.
+    for (const chunk of manifest.tiers.L3.chunks ?? []) {
+      const horizonKey = key("L3", chunk.x, chunk.z);
+      desiredKeys.add(horizonKey);
+      if (!desiredDistances.has(horizonKey)) {
+        desiredDistances.set(horizonKey, Infinity);
+      }
+    }
+
     function tierIndex(tier: TierName): number {
       return Number(tier.slice(1));
     }
@@ -284,9 +295,11 @@ export async function bootstrapPyramidTerrain(
       const meshMaterial = debugTintActive ? tierTintMaterials[tierName] : material;
       const handle = createPyramidChunkMesh(chunk, {
         material: meshMaterial,
-        // Vector land mask owns coastline clipping. DEM NaNs are inpainted instead
-        // of cut, otherwise artificial rectangles/reservoir-like holes show inland.
-        landMaskSampler: tierNumber <= 1 ? opts.landMaskSampler : null,
+        // Vector land mask owns coastline clipping at every tier. DEM NaNs are
+        // inpainted instead of cut, otherwise artificial rectangles/reservoir-like
+        // holes show inland. Applying this to L2/L3 prevents far coarse chunks
+        // from drawing giant rectangular land slabs across ocean.
+        landMaskSampler: opts.landMaskSampler,
         clipInvalidHeights: false,
         beachTintEnabled: beachTintActive
       });

@@ -39,18 +39,12 @@ export {
 export { createLakeRenderer } from "./lakeRenderer.js";
 export { createMinimap } from "./minimap.js";
 export { createDebugOverlay } from "./debugOverlay.js";
-export { createPyramidEnvironmentRuntime } from "./pyramidEnvironmentRuntime.js";
 
 export type { PyramidMeshHandle, PyramidMeshOptions } from "./pyramidMesh.js";
 export type { PyramidTerrainHandle, PyramidBootstrapOptions } from "./pyramidBootstrap.js";
 export type { RiverChunkHandle, RiverLoaderOptions } from "./riverRenderer.js";
 export type { LandMaskData, LandMaskSampler } from "./landMaskRenderer.js";
 export type { LakeMaskSampler, LakeRendererHandle, LakeRendererOptions } from "./lakeRenderer.js";
-export type {
-  PyramidEnvironmentRuntime,
-  PyramidEnvironmentRuntimeOptions,
-  PyramidEnvironmentWaterSurface
-} from "./pyramidEnvironmentRuntime.js";
 export type {
   PyramidManifest,
   PyramidTierMeta,

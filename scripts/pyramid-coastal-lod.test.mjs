@@ -27,15 +27,15 @@ test("coastal L0 chunk detection samples both land and ocean inside the chunk", 
   assert.equal(isCoastalL0Chunk(48, 23, 1, bounds, sampler), false);
 });
 
-test("coastal chunks are clamped to L1 or finer instead of distant L2/L3", () => {
+test("coastal chunks keep their distance tier because all tiers use vector land clipping", () => {
   const sampler = {
     isLand(lon) {
       return lon < 120.5;
     }
   };
 
-  assert.equal(clampCoastalTargetTier(3, 47, 23, 1, bounds, sampler), 1);
-  assert.equal(clampCoastalTargetTier(2, 47, 23, 1, bounds, sampler), 1);
+  assert.equal(clampCoastalTargetTier(3, 47, 23, 1, bounds, sampler), 3);
+  assert.equal(clampCoastalTargetTier(2, 47, 23, 1, bounds, sampler), 2);
   assert.equal(clampCoastalTargetTier(0, 47, 23, 1, bounds, sampler), 0);
   assert.equal(clampCoastalTargetTier(3, 46, 23, 1, bounds, sampler), 3);
 });
@@ -79,7 +79,10 @@ test("terrain visibility requests the complete desired set without flooding high
   assert.match(source, /function addExistingChildChunks/);
   assert.match(source, /split the parent into child chunks/);
   assert.match(source, /desiredKeys\.delete\(coarseKey\)/);
-  assert.match(source, /landMaskSampler: tierNumber <= 1 \? opts\.landMaskSampler : null/);
+  assert.match(source, /nationwide horizon\/backdrop layer/);
+  assert.match(source, /manifest\.tiers\.L3\.chunks/);
+  assert.match(source, /landMaskSampler: opts\.landMaskSampler/);
+  assert.match(source, /prevents far coarse chunks\s*\n\s*\/\/ from drawing giant rectangular land slabs across ocean/);
   assert.match(source, /clipInvalidHeights: false/);
   assert.match(source, /requestKeys = Array\.from\(desiredKeys\)\.sort/);
   assert.doesNotMatch(source, /requestBudget/);

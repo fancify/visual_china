@@ -56,7 +56,6 @@ const GROUPS = {
     "cloud-planes",
     "land-mask-renderer",
     "pyramid-mesh-land-mask",
-    "pyramid-environment-runtime",
     "terrain-water-integration",
     "scenery-shader-enhancer",
     "grass-biome",

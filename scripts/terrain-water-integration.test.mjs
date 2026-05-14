@@ -368,6 +368,7 @@ test("pyramid demo preload screen stages terrain and water before entering", () 
   assert.match(source, /setPreloadProgress\(0\.22, "加载出生点附近 L0\.\.\."/);
   assert.match(source, /await preloadTerrainChunks\(coreL0\)/);
   assert.match(source, /setPreloadProgress\(0\.48, "加载远景 L3\.\.\."/);
+  assert.match(source, /for \(const chunk of terrainManifest\.tiers\.L3\.chunks \?\? \[\]\)/);
   assert.match(source, /await preloadTerrainChunks\(fallbackL3\)/);
   assert.match(source, /setPreloadProgress\(0\.58, "构建预览地形\.\.\."/);
   assert.match(source, /await handle\.updateVisibleAsync\(camera, scene\);\nrenderer\.render\(scene, camera\);\n\n\/\/ ocean plane/);
@@ -375,9 +376,8 @@ test("pyramid demo preload screen stages terrain and water before entering", () 
   assert.match(source, /setPreloadProgress\(0\.94, "构建当前视野地形\.\.\."/);
   assert.match(source, /await handle\.updateVisibleAsync\(camera, scene\)/);
   assert.match(source, /renderer\.render\(scene, camera\);\n\n\/\/ keys/);
-  assert.match(source, /createPyramidEnvironmentRuntime/);
-  assert.match(source, /enableSkyDome: true/);
-  assert.match(source, /pyramidEnvironment\.update\(dt\)/);
+  assert.doesNotMatch(source, /createPyramidEnvironmentRuntime/);
+  assert.doesNotMatch(source, /pyramidEnvironment\.update\(dt\)/);
   assert.match(source, /setTimeout\(hidePreload, 180\)/);
 });
 

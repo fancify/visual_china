@@ -93,8 +93,10 @@ export function clampCoastalTargetTier(
   bounds: GeographicBounds,
   landMaskSampler: LandMaskSampler | null | undefined
 ): number {
-  if (targetTier <= 1) return targetTier;
-  return isCoastalL0Chunk(chunkX, chunkZ, chunkSizeDeg, bounds, landMaskSampler)
-    ? 1
-    : targetTier;
+  void chunkX;
+  void chunkZ;
+  void chunkSizeDeg;
+  void bounds;
+  void landMaskSampler;
+  return targetTier;
 }

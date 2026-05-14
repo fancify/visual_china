@@ -24,8 +24,7 @@ import {
   createLakeRenderer,
   loadLandMaskData,
   createMinimap,
-  createDebugOverlay,
-  createPyramidEnvironmentRuntime
+  createDebugOverlay
 } from "./game/terrain/index.js";
 import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
@@ -252,8 +251,11 @@ for (let x = center.x - 1; x <= center.x + 1; x += 1) {
 await preloadTerrainChunks(coreL0);
 
 setPreloadProgress(0.48, "加载远景 L3...");
-const startWindow = l0WindowForStart(DEMO_VIEW_RADIUS_UNITS);
 const l3Keys = new Set<string>();
+for (const chunk of terrainManifest.tiers.L3.chunks ?? []) {
+  l3Keys.add(`${chunk.x}:${chunk.z}`);
+}
+const startWindow = l0WindowForStart(DEMO_VIEW_RADIUS_UNITS);
 for (let x = startWindow.xMin; x <= startWindow.xMax; x += 1) {
   for (let z = startWindow.zMin; z <= startWindow.zMax; z += 1) {
     l3Keys.add(`${x >> 3}:${z >> 3}`);
@@ -280,16 +282,7 @@ scene.add(oceanPlane);
 const oceanWaterSurface = oceanPlane.userData.waterSurface as
   | { setTime(time: number): void; setSunDirection(direction: Vector3): void }
   | undefined;
-const pyramidEnvironment = createPyramidEnvironmentRuntime({
-  scene,
-  renderer,
-  camera,
-  ambientLight: ambient,
-  sunLight: sun,
-  fog: scene.fog,
-  waterSurfaces: oceanWaterSurface ? [oceanWaterSurface] : [],
-  enableSkyDome: true
-});
+oceanWaterSurface?.setSunDirection(sun.position.clone());
 
 // lakes (Natural Earth 10m, 186 China lakes) — flat polygon meshes, Y 跟随 sampler
 // 查 terrain 海拔 (青海湖 ~6.8u, 鄱阳湖 ~0.03u). Sampler 未加载的 chunk fallback 海平面.
@@ -396,7 +389,6 @@ function animate(): void {
   lastFrame = now;
   frameCounter += 1;
   const waterTime = now * 0.001;
-  pyramidEnvironment.update(dt);
   oceanWaterSurface?.setTime(waterTime);
   lakeHandle.setTime(waterTime);
   for (const rh of loadedRiverGroups.values()) {
@@ -504,7 +496,6 @@ function animate(): void {
       `相机 world(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})<br />` +
         `cache: ${cacheN} chunks<br />` +
         `FPS: ${(1 / dt).toFixed(0)}<br />` +
-        `${pyramidEnvironment.statusText()}<br />` +
         `北京在 world(${startWorld.x.toFixed(1)}, ${startWorld.z.toFixed(1)})`
     );
   }
