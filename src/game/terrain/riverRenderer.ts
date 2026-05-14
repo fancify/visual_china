@@ -9,7 +9,8 @@
 //   ord 5 (大支流):   0.18
 //   ord 6+ (干流):    0.30 - 0.50
 //
-// Y 由 PyramidSampler 查询 — 河流贴 mesh 表面 + 微小 offset 避免 z-fight
+// Y 由 PyramidSampler 已加载缓存查询 — 河流贴 mesh 表面 + 微小 offset 避免 z-fight。
+// 不在河流构建时触发 DEM 预取，否则一批河流 chunk 会把全国 terrain cache 撑满。
 //
 // 数据流:
 //   manifest.json (./data/rivers/manifest.json) — 一次加载
@@ -95,6 +96,7 @@ export class RiverLoader {
 
   private manifest: RiverManifest | null = null;
   private manifestPromise: Promise<RiverManifest> | null = null;
+  private candidateIndex: Map<number, RiverManifest["chunks"]> | null = null;
   private chunkCache = new Map<string, RiverChunkHandle>();
   private inflightFetches = new Map<string, Promise<RiverChunkHandle | null>>();
 
@@ -116,6 +118,7 @@ export class RiverLoader {
         })
         .then((m) => {
           this.manifest = m;
+          this.candidateIndex = null;
           return m;
         });
     }
@@ -146,16 +149,35 @@ export class RiverLoader {
   /** Find chunks that exist in manifest near a center chunk (x, z). */
   findCandidateChunks(centerX: number, centerZ: number, radius: number): { x: number; z: number }[] {
     if (!this.manifest) return [];
+    const index = this.getCandidateIndex();
     const out: { x: number; z: number }[] = [];
-    for (const entry of this.manifest.chunks) {
-      if (
-        Math.abs(entry.x - centerX) <= radius &&
-        Math.abs(entry.z - centerZ) <= radius
-      ) {
-        out.push({ x: entry.x, z: entry.z });
+    for (let z = centerZ - radius; z <= centerZ + radius; z += 1) {
+      const row = index.get(z);
+      if (!row) continue;
+      for (const entry of row) {
+        if (Math.abs(entry.x - centerX) <= radius) {
+          out.push({ x: entry.x, z: entry.z });
+        }
       }
     }
     return out;
+  }
+
+  getCandidateIndexSizeForTest(): number {
+    return this.getCandidateIndex().size;
+  }
+
+  private getCandidateIndex(): Map<number, RiverManifest["chunks"]> {
+    if (this.candidateIndex) return this.candidateIndex;
+    const index = new Map<number, RiverManifest["chunks"]>();
+    for (const entry of this.manifest?.chunks ?? []) {
+      const row = index.get(entry.z);
+      if (row) row.push(entry);
+      else index.set(entry.z, [entry]);
+    }
+    for (const row of index.values()) row.sort((a, b) => a.x - b.x);
+    this.candidateIndex = index;
+    return index;
   }
 
   // ─── Internals ─────────────────────────────────────────────────
@@ -281,7 +303,7 @@ function appendPolylineSegments(
 
   // 3. Y sample + moving-avg smooth
   const rawY: number[] = smoothed.map((p) => {
-    const y = sampler.sampleHeightWorld(p.x, p.z);
+    const y = sampler.sampleHeightWorldCached(p.x, p.z);
     return Number.isFinite(y) ? y : NaN;
   });
   for (let i = 0; i < rawY.length; i += 1) {

@@ -25,11 +25,11 @@ import {
   moonPhaseTextureIndex,
   createMoonTexture,
   createStarDome
-} from "./proceduralTextures";
+} from "./proceduralTextures.js";
 import {
   createCloudLayer as createCloudPlaneLayer,
   type CloudLayerHandle
-} from "./cloudPlanes";
+} from "./cloudPlanes.js";
 
 export interface SkyDomeHandle {
   group: Group;
@@ -316,7 +316,7 @@ export function applySkyVisuals(
   handle.starDome.visible = options.starOpacity > 0.02;
 }
 
-export type { CloudLayerHandle } from "./cloudPlanes";
+export type { CloudLayerHandle } from "./cloudPlanes.js";
 
 /**
  * 3D 立体云朵：每朵 = 4-6 个 SphereGeometry "puff" 拼成的 cluster。

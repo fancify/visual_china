@@ -58,6 +58,13 @@ export class PyramidSampler {
     return (elev / this.verticalScale) * VERTICAL_EXAGGERATION;
   }
 
+  /** Sample height without triggering async chunk loads. Useful for broad overlays. */
+  sampleHeightWorldCached(x: number, z: number): number {
+    const elev = this.sampleElevationMetersWorldCached(x, z);
+    if (!Number.isFinite(elev)) return SEA_LEVEL;
+    return (elev / this.verticalScale) * VERTICAL_EXAGGERATION;
+  }
+
   /** Sample raw elevation (meters) at world (x, z). NaN if no data. */
   sampleElevationMetersWorld(x: number, z: number): number {
     const geo = unprojectWorldToGeo(
@@ -65,11 +72,29 @@ export class PyramidSampler {
       qinlingRegionBounds,
       qinlingRegionWorld
     );
-    return this.sampleElevationMetersGeo(geo.lon, geo.lat);
+    return this.sampleElevationMetersGeoInternal(geo.lon, geo.lat, true);
+  }
+
+  /** Sample raw elevation without triggering async chunk loads. */
+  sampleElevationMetersWorldCached(x: number, z: number): number {
+    const geo = unprojectWorldToGeo(
+      { x, z },
+      qinlingRegionBounds,
+      qinlingRegionWorld
+    );
+    return this.sampleElevationMetersGeoInternal(geo.lon, geo.lat, false);
   }
 
   /** Sample at lon/lat directly. */
   sampleElevationMetersGeo(lon: number, lat: number): number {
+    return this.sampleElevationMetersGeoInternal(lon, lat, true);
+  }
+
+  private sampleElevationMetersGeoInternal(
+    lon: number,
+    lat: number,
+    requestMissingChunks: boolean
+  ): number {
     if (!this.manifestRef) return NaN;
 
     // Try L0 first, walk up tiers if not available
@@ -82,7 +107,7 @@ export class PyramidSampler {
       const chunk = this.loader.getCachedChunk(tier, chunkX, chunkZ);
       if (!chunk) {
         // fire async load (don't await)
-        void this.loader.requestChunk(tier, chunkX, chunkZ);
+        if (requestMissingChunks) void this.loader.requestChunk(tier, chunkX, chunkZ);
         continue;
       }
       const v = sampleChunkBilinear(chunk, lon, lat);

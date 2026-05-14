@@ -2,38 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { Group, Mesh, PlaneGeometry } from "three";
-
 import {
   createLandMaskSamplerFromData,
-  createLandMaskGroupFromData,
   landMaskCanvasPoint
 } from "../src/game/terrain/landMaskRenderer.ts";
-
-test("land mask renderer turns coastline polygons into a single textured underlay plane", () => {
-  const group = createLandMaskGroupFromData({
-    schema: "visual-china.land-mask.v1",
-    polygons: [
-      [
-        [
-          [120, 31],
-          [121, 31],
-          [121, 30],
-          [120, 30],
-          [120, 31]
-        ]
-      ]
-    ]
-  });
-
-  assert.ok(group instanceof Group);
-  assert.equal(group.children.length, 1);
-  const mesh = group.children[0];
-  assert.ok(mesh instanceof Mesh);
-  assert.ok(mesh.geometry instanceof PlaneGeometry);
-  assert.equal(mesh.renderOrder, -6);
-  assert.equal(mesh.position.y, -2.92);
-});
 
 test("land mask canvas projection maps geographic bounds to texture corners", () => {
   assert.deepEqual(landMaskCanvasPoint(73, 53, 1000, 500), [0, 0]);
@@ -66,4 +38,22 @@ test("pyramid demo uses land mask for clipping, not as a visible coastal underla
   const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
   assert.match(source, /createLandMaskSamplerFromData/);
   assert.doesNotMatch(source, /scene\.add\(landMask\)/);
+});
+
+test("land mask module no longer exports the retired visible underlay renderer", () => {
+  const source = fs.readFileSync(new URL("../src/game/terrain/index.ts", import.meta.url), "utf8");
+  const moduleSource = fs.readFileSync(
+    new URL("../src/game/terrain/landMaskRenderer.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.doesNotMatch(source, /createLandMaskGroupFromData/);
+  assert.doesNotMatch(source, /createLandMaskRenderer/);
+  assert.doesNotMatch(moduleSource, /MeshBasicMaterial|CanvasTexture|PlaneGeometry/);
+});
+
+test("DEM pyramid build imports a script-safe land mask sampler, not local TS stubs", () => {
+  const source = fs.readFileSync(new URL("../scripts/build-dem-pyramid.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /src\/game\/terrain\/landMaskRenderer\.js/);
+  assert.match(source, /scripts\/land-mask-sampler\.mjs|\.\/land-mask-sampler\.mjs/);
 });

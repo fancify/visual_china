@@ -226,6 +226,8 @@ export interface PyramidMeshOptions {
   flatShading?: boolean;
   /** Optional vector land mask used to discard DEM cells that fall in ocean. */
   landMaskSampler?: LandMaskSampler | null;
+  /** Whether NaN/invalid DEM vertices should cut holes in the mesh. Default true. */
+  clipInvalidHeights?: boolean;
   /** Whether coastal land vertices receive a subtle beach color tint. */
   beachTintEnabled?: boolean;
 }
@@ -340,6 +342,11 @@ export function createPyramidChunkMesh(
       // GSHHG vector landMaskSampler 覆盖 DEM/ETOPO 的粗陆海分类。
     }
   }
+  if (opts.clipInvalidHeights === false) {
+    for (let i = 0; i < smoothed.length; i += 1) {
+      if (!Number.isFinite(smoothed[i])) smoothed[i] = 0;
+    }
+  }
 
   // Lift each vertex Y by smoothed heights.
   // PlaneGeometry rotateX(-π/2) 后 vertex row 0 = NORTH (local Y=+H/2 → world Z=-H/2),
@@ -374,8 +381,10 @@ export function createPyramidChunkMesh(
   const isNaNVertex = new Uint8Array(cellsPerChunk * cellsPerChunk);
   const cellLonStepBoundary = (bounds.east - bounds.west) / (cellsPerChunk - 1);
   const cellLatStepBoundary = (bounds.north - bounds.south) / (cellsPerChunk - 1);
-  for (let i = 0; i < smoothed.length; i += 1) {
-    if (!Number.isFinite(smoothed[i])) isNaNVertex[i] = 1;
+  if (opts.clipInvalidHeights !== false) {
+    for (let i = 0; i < smoothed.length; i += 1) {
+      if (!Number.isFinite(smoothed[i])) isNaNVertex[i] = 1;
+    }
   }
   if (sampler) {
     for (let r = 0; r < cellsPerChunk; r += 1) {

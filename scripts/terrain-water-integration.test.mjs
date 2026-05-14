@@ -22,6 +22,9 @@ import {
 const sampler = {
   sampleHeightWorld() {
     return 1;
+  },
+  sampleHeightWorldCached() {
+    return 1;
   }
 };
 
@@ -81,6 +84,12 @@ test("lake water is lighter than ocean and close to the river palette", () => {
     colorDistance(LAKE_WATER_COLOR, RIVER_WATER_COLOR) < 0.25,
     "lake color should sit closer to rivers than to open sea"
   );
+});
+
+test("lake renderer samples cached terrain height without prefetching nationwide DEM chunks", () => {
+  const source = fs.readFileSync(new URL("../src/game/terrain/lakeRenderer.ts", import.meta.url), "utf8");
+  assert.match(source, /sampleHeightWorldCached/);
+  assert.doesNotMatch(source, /sampler\.sampleHeightWorld\(/);
 });
 
 test("water surfaces expose subtle shimmer timing without changing base water style", () => {
@@ -153,6 +162,47 @@ test("lake mask sampler identifies lake interiors and holes", () => {
   assert.equal(mask.isWater(120.4, 30.4), true);
   assert.equal(mask.isWater(121, 30), false);
   assert.equal(mask.isWater(123, 30), false);
+});
+
+test("lake mask sampler filters high-rank reservoir rectangles from the demo lake layer", () => {
+  const mask = createLakeMaskSamplerFromBundle({
+    features: [
+      {
+        type: "Feature",
+        properties: { name: "Baidagang Shuiku", nameAlt: null, scalerank: 9 },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [[117.32, 38.76], [117.43, 38.76], [117.43, 38.68], [117.32, 38.68], [117.32, 38.76]]
+          ]
+        }
+      },
+      {
+        type: "Feature",
+        properties: { name: null, nameAlt: null, scalerank: 7 },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [[116.1, 38.9], [116.3, 38.9], [116.3, 38.8], [116.1, 38.8], [116.1, 38.9]]
+          ]
+        }
+      },
+      {
+        type: "Feature",
+        properties: { name: "Tai Hu", nameAlt: "Lake Tai", scalerank: 2 },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [[120, 31], [121, 31], [121, 30], [120, 30], [120, 31]]
+          ]
+        }
+      }
+    ]
+  });
+
+  assert.equal(mask.isWater(117.36, 38.72), false);
+  assert.equal(mask.isWater(116.2, 38.85), false);
+  assert.equal(mask.isWater(120.5, 30.5), true);
 });
 
 test("river renderer clips line segments outside land and inside lakes", () => {
@@ -237,6 +287,100 @@ test("river renderer clips river mouths to the coastline instead of dropping the
   assert.ok(Math.max(...lons) <= 120.501, "river should not continue offshore");
 });
 
+test("river loader builds a spatial candidate index instead of scanning the manifest every frame", () => {
+  const loader = new RiverLoader({ sampler });
+  loader.manifest = {
+    schemaVersion: "visual-china.rivers-pyramid.v1",
+    generatedAt: "test",
+    bounds: { west: 100, east: 130, south: 20, north: 50 },
+    minOrder: 4,
+    tierGrid: "L0",
+    totalPolylines: 4,
+    chunkCount: 4,
+    chunks: [
+      { x: 0, z: 0, file: "0_0.json", count: 1 },
+      { x: 1, z: 0, file: "1_0.json", count: 1 },
+      { x: 4, z: 0, file: "4_0.json", count: 1 },
+      { x: 1, z: 2, file: "1_2.json", count: 1 }
+    ]
+  };
+
+  const candidates = loader.findCandidateChunks(1, 0, 1);
+  assert.deepEqual(candidates, [{ x: 0, z: 0 }, { x: 1, z: 0 }]);
+  assert.ok(loader.getCandidateIndexSizeForTest() > 0);
+});
+
+test("river renderer samples cached terrain height without prefetching DEM chunks", () => {
+  const source = fs.readFileSync(new URL("../src/game/terrain/riverRenderer.ts", import.meta.url), "utf8");
+  assert.match(source, /sampleHeightWorldCached/);
+  assert.doesNotMatch(source, /sampler\.sampleHeightWorld\(/);
+});
+
+test("pyramid demo evicts river groups outside the active candidate radius", () => {
+  const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
+  assert.match(source, /activeRiverKeys/);
+  assert.match(source, /scene\.remove\(rh\.group\)/);
+  assert.match(source, /loadedRiverGroups\.delete\(key\)/);
+});
+
+test("pyramid demo defers non-critical overlays until after the first render opportunity", () => {
+  const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
+  assert.match(source, /async function initDeferredOverlays\(\)/);
+  assert.match(source, /await new Promise<void>\(\(resolve\) => requestAnimationFrame/);
+  assert.match(source, /void initDeferredOverlays\(\)/);
+  assert.match(source, /let debugOverlay: ReturnType<typeof createDebugOverlay> \| null = null/);
+  assert.match(source, /let riverLoader: RiverLoader \| null = null/);
+  assert.match(source, /if \(riverLoader\) \{/);
+});
+
+test("pyramid demo preload screen stages terrain and water before entering", () => {
+  const html = fs.readFileSync(new URL("../pyramid-demo.html", import.meta.url), "utf8");
+  const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
+  const poems = JSON.parse(fs.readFileSync(new URL("../src/data/tangThreeHundredPoems.json", import.meta.url), "utf8"));
+
+  assert.match(html, /id="preload"/);
+  assert.doesNotMatch(html, /preload-title/);
+  assert.doesNotMatch(html, /千里江山正在展开/);
+  assert.match(html, /body \{[\s\S]*background: #c7d5e3/);
+  assert.match(html, /#canvas \{[\s\S]*background: #c7d5e3/);
+  assert.match(html, /rgba\(246, 249, 244, 0\)/);
+  assert.match(html, /backdrop-filter: none/);
+  assert.match(html, /#preload-panel \{[\s\S]*text-align: center/);
+  assert.match(html, /#preload-panel \{[\s\S]*text-shadow: none/);
+  assert.match(html, /#preload-track \{[\s\S]*margin: 0 auto/);
+  assert.match(html, /@keyframes preload-sheen/);
+  assert.match(html, /id="preload-bar"/);
+  assert.ok(poems.length >= 300, "preload poetry should use the full Three Hundred Tang Poems corpus");
+  assert.ok(poems.every((poem) => poem.title && poem.author && poem.eraName && poem.yearLabel));
+  assert.ok(poems.every((poem) => Array.isArray(poem.lines) && poem.lines.length > 0));
+  assert.match(source, /tangThreeHundredPoems/);
+  assert.doesNotMatch(source, /\\\\n/);
+  assert.match(source, /sanitizePoemText/);
+  assert.match(source, /stripPoemParentheticals/);
+  assert.match(source, /replace\(\s*\/\[\\uFF08\\uFF09/);
+  assert.match(source, /一作\|通：\|又作\|或作/);
+  assert.match(source, /POEM_ROTATION_MS = 15_000/);
+  assert.match(source, /setInterval\(showRandomPreloadPoem, POEM_ROTATION_MS\)/);
+  assert.match(source, /preloadPoemMeta/);
+  assert.match(source, /animatePreloadProgress/);
+  assert.match(source, /DEMO_VIEW_RADIUS_UNITS = 360/);
+  assert.match(source, /viewRadiusUnits: DEMO_VIEW_RADIUS_UNITS/);
+  assert.match(source, /setPreloadProgress\(0\.22, "加载出生点附近 L0\.\.\."/);
+  assert.match(source, /await preloadTerrainChunks\(coreL0\)/);
+  assert.match(source, /setPreloadProgress\(0\.48, "加载远景 L3\.\.\."/);
+  assert.match(source, /await preloadTerrainChunks\(fallbackL3\)/);
+  assert.match(source, /setPreloadProgress\(0\.58, "构建预览地形\.\.\."/);
+  assert.match(source, /await handle\.updateVisibleAsync\(camera, scene\);\nrenderer\.render\(scene, camera\);\n\n\/\/ ocean plane/);
+  assert.match(source, /setPreloadProgress\(0\.86, "加载河流索引\.\.\."/);
+  assert.match(source, /setPreloadProgress\(0\.94, "构建当前视野地形\.\.\."/);
+  assert.match(source, /await handle\.updateVisibleAsync\(camera, scene\)/);
+  assert.match(source, /renderer\.render\(scene, camera\);\n\n\/\/ keys/);
+  assert.match(source, /createPyramidEnvironmentRuntime/);
+  assert.match(source, /enableSkyDome: true/);
+  assert.match(source, /pyramidEnvironment\.update\(dt\)/);
+  assert.match(source, /setTimeout\(hidePreload, 180\)/);
+});
+
 test("pyramid demo does not use the failed coastline overlay layer", () => {
   const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
   assert.doesNotMatch(source, /createCoastlineOceanOverlay/);
@@ -253,4 +397,10 @@ test("pyramid demo starts above Beijing at roughly 10km altitude", () => {
   assert.match(source, /BEIJING_START_GEO\s*=\s*\{\s*lat:\s*39\.9042,\s*lon:\s*116\.4074\s*\}/);
   assert.match(source, /START_ALTITUDE_WORLD_Y\s*=\s*21\.4/);
   assert.match(source, /camera\.position\.set\(startWorld\.x,\s*START_ALTITUDE_WORLD_Y,\s*startWorld\.z\)/);
+});
+
+test("pyramid demo does not expose temporary globals after terrain seam debugging", () => {
+  const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /pyramidHandle/);
+  assert.doesNotMatch(source, /验完即删/);
 });

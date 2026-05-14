@@ -27,7 +27,7 @@ import {
   removeStaleTierChunks
 } from "./dem-pyramid-cleanup.mjs";
 import { getEtopoOceanSampler } from "./etopo-ocean-mask.mjs";
-import { createLandMaskSamplerFromData } from "../src/game/terrain/landMaskRenderer.js";
+import { createLandMaskSamplerFromData } from "./land-mask-sampler.mjs";
 import {
   TIER_PARAMS,
   TIER_NAMES,

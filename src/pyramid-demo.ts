@@ -24,19 +24,89 @@ import {
   createLakeRenderer,
   loadLandMaskData,
   createMinimap,
-  createDebugOverlay
+  createDebugOverlay,
+  createPyramidEnvironmentRuntime
 } from "./game/terrain/index.js";
 import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
   qinlingRegionBounds,
   qinlingRegionWorld
 } from "./data/qinlingRegion.js";
+import tangThreeHundredPoems from "./data/tangThreeHundredPoems.json";
+import type { TierName } from "./game/terrain/pyramidTypes.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const statusBody = document.getElementById("status-body")!;
+const preload = document.getElementById("preload")!;
+const preloadPoem = document.getElementById("preload-poem")!;
+const preloadPoemMeta = document.getElementById("preload-poem-meta")!;
+const preloadMeta = document.getElementById("preload-meta")!;
+const preloadBar = document.getElementById("preload-bar") as HTMLDivElement;
 
 function setStatus(text: string): void {
   statusBody.innerHTML = text;
+}
+
+const POEM_ROTATION_MS = 15_000;
+let currentPreloadPoemIndex = -1;
+
+function stripPoemParentheticals(text: string): string {
+  return text
+    .replace(/（[^）]*）/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/【[^】]*】/g, "")
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/[\uFF08\uFF09()\[\]【】]+/g, "");
+}
+
+function sanitizePoemText(text: string): string {
+  if (/一作|通：|又作|或作/.test(text)) return "";
+  return stripPoemParentheticals(text)
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function showRandomPreloadPoem(): void {
+  let index = Math.floor(Math.random() * tangThreeHundredPoems.length);
+  if (tangThreeHundredPoems.length > 1 && index === currentPreloadPoemIndex) {
+    index = (index + 1) % tangThreeHundredPoems.length;
+  }
+  currentPreloadPoemIndex = index;
+  const poem = tangThreeHundredPoems[index];
+  const lines = poem.lines.map(sanitizePoemText).filter(Boolean);
+  preloadPoem.textContent = lines.join("\n");
+  preloadPoemMeta.textContent = `${poem.author}《${sanitizePoemText(poem.title)}》 · ${poem.eraName}（${poem.yearLabel}）`;
+}
+
+showRandomPreloadPoem();
+const preloadPoemTimer = window.setInterval(showRandomPreloadPoem, POEM_ROTATION_MS);
+
+let preloadTargetProgress = 0;
+let preloadDisplayedProgress = 0;
+let preloadProgressRaf = 0;
+
+function animatePreloadProgress(): void {
+  preloadDisplayedProgress += (preloadTargetProgress - preloadDisplayedProgress) * 0.08;
+  if (Math.abs(preloadTargetProgress - preloadDisplayedProgress) < 0.002) {
+    preloadDisplayedProgress = preloadTargetProgress;
+  }
+  preloadBar.style.width = `${Math.round(preloadDisplayedProgress * 1000) / 10}%`;
+  if (preloadDisplayedProgress < 1 || preloadTargetProgress < 1) {
+    preloadProgressRaf = requestAnimationFrame(animatePreloadProgress);
+  }
+}
+
+function setPreloadProgress(progress: number, text: string): void {
+  preloadMeta.textContent = text;
+  preloadTargetProgress = Math.max(preloadTargetProgress, Math.max(0, Math.min(1, progress)));
+  if (!preloadProgressRaf) preloadProgressRaf = requestAnimationFrame(animatePreloadProgress);
+}
+
+function hidePreload(): void {
+  if (preloadProgressRaf) cancelAnimationFrame(preloadProgressRaf);
+  window.clearInterval(preloadPoemTimer);
+  preloadBar.style.width = "100%";
+  preload.classList.add("hidden");
 }
 
 const scene = new Scene();
@@ -49,6 +119,7 @@ scene.fog = new Fog(0xc7d5e3, 360, 1250);
 // 项目垂直比例: worldY = meters / 500 * 1.07，因此 10000m ≈ 21.4u。
 const BEIJING_START_GEO = { lat: 39.9042, lon: 116.4074 };
 const START_ALTITUDE_WORLD_Y = 21.4;
+const DEMO_VIEW_RADIUS_UNITS = 360;
 const startWorld = projectGeoToWorld(
   BEIJING_START_GEO,
   qinlingRegionBounds,
@@ -80,6 +151,7 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+renderer.render(scene, camera);
 
 // keys
 const keys = new Set<string>();
@@ -107,22 +179,97 @@ canvas.addEventListener("pointermove", (e) => {
 
 // Natural Earth vector land mask feeds terrain hole-punching only. Rendering it
 // as a flat underlay creates visible pale coastal slabs where DEM is missing.
+setPreloadProgress(0.05, "读取海岸线...");
 setStatus("加载 coastline mask...");
 const landMaskData = await loadLandMaskData("/data/china");
 const landMaskSampler = createLandMaskSamplerFromData(landMaskData);
 
 // bootstrap pyramid
+setPreloadProgress(0.12, "读取地形索引...");
 setStatus("加载 pyramid manifest...");
 const handle = await bootstrapPyramidTerrain(scene, {
   baseUrl: "/data/dem",
-  viewRadiusUnits: 80,
+  viewRadiusUnits: DEMO_VIEW_RADIUS_UNITS,
   landMaskSampler
 });
 
-// 临时 debug (Y harmonization 验证 — 验完即删)
-(window as unknown as { scene: Scene; camera: PerspectiveCamera; pyramidHandle: typeof handle }).scene = scene;
-(window as unknown as { scene: Scene; camera: PerspectiveCamera; pyramidHandle: typeof handle }).camera = camera;
-(window as unknown as { scene: Scene; camera: PerspectiveCamera; pyramidHandle: typeof handle }).pyramidHandle = handle;
+const terrainManifest = await handle.loader.loadManifest();
+
+function currentL0Chunk(): { x: number; z: number } {
+  const l0 = terrainManifest.tiers.L0;
+  return {
+    x: Math.floor((BEIJING_START_GEO.lon - terrainManifest.bounds.west) / l0.chunkSizeDeg),
+    z: Math.floor((terrainManifest.bounds.north - BEIJING_START_GEO.lat) / l0.chunkSizeDeg)
+  };
+}
+
+function l0WindowForStart(viewRadiusUnits: number): { xMin: number; xMax: number; zMin: number; zMax: number } {
+  const l0 = terrainManifest.tiers.L0;
+  const westGeo = unprojectWorldToGeo(
+    { x: startWorld.x - viewRadiusUnits, z: startWorld.z },
+    qinlingRegionBounds,
+    qinlingRegionWorld
+  );
+  const eastGeo = unprojectWorldToGeo(
+    { x: startWorld.x + viewRadiusUnits, z: startWorld.z },
+    qinlingRegionBounds,
+    qinlingRegionWorld
+  );
+  const northGeo = unprojectWorldToGeo(
+    { x: startWorld.x, z: startWorld.z - viewRadiusUnits },
+    qinlingRegionBounds,
+    qinlingRegionWorld
+  );
+  const southGeo = unprojectWorldToGeo(
+    { x: startWorld.x, z: startWorld.z + viewRadiusUnits },
+    qinlingRegionBounds,
+    qinlingRegionWorld
+  );
+  const west = Math.min(westGeo.lon, eastGeo.lon);
+  const east = Math.max(westGeo.lon, eastGeo.lon);
+  const north = Math.max(northGeo.lat, southGeo.lat);
+  const south = Math.min(northGeo.lat, southGeo.lat);
+  return {
+    xMin: Math.max(l0.chunkRangeX[0], Math.floor((west - terrainManifest.bounds.west) / l0.chunkSizeDeg) - 1),
+    xMax: Math.min(l0.chunkRangeX[1], Math.floor((east - terrainManifest.bounds.west) / l0.chunkSizeDeg) + 1),
+    zMin: Math.max(l0.chunkRangeZ[0], Math.floor((terrainManifest.bounds.north - north) / l0.chunkSizeDeg) - 1),
+    zMax: Math.min(l0.chunkRangeZ[1], Math.floor((terrainManifest.bounds.north - south) / l0.chunkSizeDeg) + 1)
+  };
+}
+
+async function preloadTerrainChunks(chunks: { tier: TierName; x: number; z: number }[]): Promise<void> {
+  await Promise.all(chunks.map(({ tier, x, z }) => handle.loader.requestChunk(tier, x, z)));
+}
+
+setPreloadProgress(0.22, "加载出生点附近 L0...");
+const center = currentL0Chunk();
+const coreL0: { tier: TierName; x: number; z: number }[] = [];
+for (let x = center.x - 1; x <= center.x + 1; x += 1) {
+  for (let z = center.z - 1; z <= center.z + 1; z += 1) {
+    if (handle.loader.chunkExists("L0", x, z)) coreL0.push({ tier: "L0", x, z });
+  }
+}
+await preloadTerrainChunks(coreL0);
+
+setPreloadProgress(0.48, "加载远景 L3...");
+const startWindow = l0WindowForStart(DEMO_VIEW_RADIUS_UNITS);
+const l3Keys = new Set<string>();
+for (let x = startWindow.xMin; x <= startWindow.xMax; x += 1) {
+  for (let z = startWindow.zMin; z <= startWindow.zMax; z += 1) {
+    l3Keys.add(`${x >> 3}:${z >> 3}`);
+  }
+}
+const fallbackL3 = Array.from(l3Keys)
+  .map((key) => {
+    const [x, z] = key.split(":").map(Number);
+    return { tier: "L3" as TierName, x, z };
+  })
+  .filter(({ x, z }) => handle.loader.chunkExists("L3", x, z));
+await preloadTerrainChunks(fallbackL3);
+
+setPreloadProgress(0.58, "构建预览地形...");
+await handle.updateVisibleAsync(camera, scene);
+renderer.render(scene, camera);
 
 // ocean plane —— 修 B7 海洋漫灌
 // Y 压到 -3 — 陆地 fallback Y=0 牢牢遮住, 海洋区 chunks 不存在才露出
@@ -133,10 +280,20 @@ scene.add(oceanPlane);
 const oceanWaterSurface = oceanPlane.userData.waterSurface as
   | { setTime(time: number): void; setSunDirection(direction: Vector3): void }
   | undefined;
-oceanWaterSurface?.setSunDirection(sun.position.clone());
+const pyramidEnvironment = createPyramidEnvironmentRuntime({
+  scene,
+  renderer,
+  camera,
+  ambientLight: ambient,
+  sunLight: sun,
+  fog: scene.fog,
+  waterSurfaces: oceanWaterSurface ? [oceanWaterSurface] : [],
+  enableSkyDome: true
+});
 
 // lakes (Natural Earth 10m, 186 China lakes) — flat polygon meshes, Y 跟随 sampler
 // 查 terrain 海拔 (青海湖 ~6.8u, 鄱阳湖 ~0.03u). Sampler 未加载的 chunk fallback 海平面.
+setPreloadProgress(0.72, "加载湖泊与水面...");
 const lakeHandle = await createLakeRenderer({
   baseUrl: "/data/lakes",
   sampler: handle.sampler,
@@ -150,24 +307,18 @@ setStatus(`湖泊: ${lakeHandle.lakeCount} 个 polygon 加载`);
 const minimap = createMinimap({ corner: "top-right", width: 240, height: 165 });
 
 // debug overlay: 默认 hidden, 按 G 键切开（调试用 — chunk grid + 经纬度网格 + POI 桩）
-const manifest = await handle.loader.loadManifest();
-const debugOverlay = createDebugOverlay({
-  manifest,
-  geoGridStep: 5,
-  chunkLabelStride: 2,
-  showChunkGrid: true,
-  showPois: true,
-  showGeoGrid: true
-});
-debugOverlay.setVisible(false);
-scene.add(debugOverlay.group);
+let debugOverlay: ReturnType<typeof createDebugOverlay> | null = null;
 let lodTintActive = false;
 let flatShadingActive = false;
 let beachTintActive = true;
 
 window.addEventListener("keydown", (e) => {
   if (e.key === "g" || e.key === "G") {
-    debugOverlay.setVisible(!debugOverlay.group.visible);
+    if (debugOverlay) {
+      debugOverlay.setVisible(!debugOverlay.group.visible);
+    } else {
+      setStatus("调试层后台加载中...");
+    }
   }
   // D 键: 切 LOD tier 染色 debug — 鸟瞰看哪块是哪 tier (L0 绿/L1 蓝/L2 黄/L3 红)
   if (e.key === "d" || e.key === "D") {
@@ -196,16 +347,44 @@ window.addEventListener("keydown", (e) => {
 });
 
 // rivers
-const riverLoader = new RiverLoader({
+let riverLoader: RiverLoader | null = null;
+const loadedRiverGroups = new Map<string, ReturnType<RiverLoader["getCachedChunk"]>>();
+let activeRiverKeys = new Set<string>();
+
+setPreloadProgress(0.86, "加载河流索引...");
+const initialRiverLoader = new RiverLoader({
   baseUrl: "/data/rivers",
   sampler: handle.sampler,
   landMaskSampler,
   excludeWaterSampler: lakeHandle.waterMaskSampler
 });
-await riverLoader.loadManifest();
-const loadedRiverGroups = new Map<string, ReturnType<RiverLoader["getCachedChunk"]>>();
+await initialRiverLoader.loadManifest();
+riverLoader = initialRiverLoader;
 
-setStatus("已加载 manifest，开始流式 chunks...");
+setPreloadProgress(0.94, "构建当前视野地形...");
+setStatus("构建当前视野地形...");
+await handle.updateVisibleAsync(camera, scene);
+renderer.render(scene, camera);
+setPreloadProgress(1, "完成");
+setStatus("预加载完成，开始流式 chunks...");
+setTimeout(hidePreload, 180);
+
+async function initDeferredOverlays(): Promise<void> {
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+  const manifest = await handle.loader.loadManifest();
+  debugOverlay = createDebugOverlay({
+    manifest,
+    geoGridStep: 5,
+    chunkLabelStride: 2,
+    showChunkGrid: true,
+    showPois: true,
+    showGeoGrid: true
+  });
+  debugOverlay.setVisible(false);
+  scene.add(debugOverlay.group);
+  setStatus("河流 manifest 已加载，开始流式 chunks...");
+}
 
 // frame loop
 const moveSpeed = 1.5;
@@ -217,6 +396,7 @@ function animate(): void {
   lastFrame = now;
   frameCounter += 1;
   const waterTime = now * 0.001;
+  pyramidEnvironment.update(dt);
   oceanWaterSurface?.setTime(waterTime);
   lakeHandle.setTime(waterTime);
   for (const rh of loadedRiverGroups.values()) {
@@ -256,24 +436,33 @@ function animate(): void {
 
     // Rivers: 跟 camera 联动 — 把相机 world 位置反求到 L0 chunk grid.
     // radius 跟相机高度联动: 平视 radius=16, 高空俯视 radius=28 (~3000km, 覆盖 LOD L2 范围)
-    const camGeo = unprojectWorldToGeo(
-      { x: camera.position.x, z: camera.position.z },
-      qinlingRegionBounds,
-      qinlingRegionWorld
-    );
-    const camChunkX = Math.floor((camGeo.lon - qinlingRegionBounds.west) / 1.0);
-    const camChunkZ = Math.floor((qinlingRegionBounds.north - camGeo.lat) / 1.0);
-    const riverRadius = camera.position.y > 100 ? 28 : camera.position.y > 40 ? 20 : 14;
-    const candidates = riverLoader.findCandidateChunks(camChunkX, camChunkZ, riverRadius);
-    for (const { x, z } of candidates) {
-      const key = `${x}:${z}`;
-      if (loadedRiverGroups.has(key)) continue;
-      void riverLoader.requestChunk(x, z).then((rh) => {
-        if (!rh) return;
-        if (loadedRiverGroups.has(key)) return;
-        scene.add(rh.group);
-        loadedRiverGroups.set(key, rh);
-      });
+    if (riverLoader) {
+      const camGeo = unprojectWorldToGeo(
+        { x: camera.position.x, z: camera.position.z },
+        qinlingRegionBounds,
+        qinlingRegionWorld
+      );
+      const camChunkX = Math.floor((camGeo.lon - qinlingRegionBounds.west) / 1.0);
+      const camChunkZ = Math.floor((qinlingRegionBounds.north - camGeo.lat) / 1.0);
+      const riverRadius = camera.position.y > 100 ? 28 : camera.position.y > 40 ? 20 : 14;
+      const candidates = riverLoader.findCandidateChunks(camChunkX, camChunkZ, riverRadius);
+      activeRiverKeys = new Set(candidates.map(({ x, z }) => `${x}:${z}`));
+      for (const { x, z } of candidates) {
+        const key = `${x}:${z}`;
+        if (loadedRiverGroups.has(key)) continue;
+        void riverLoader.requestChunk(x, z).then((rh) => {
+          if (!rh) return;
+          if (!activeRiverKeys.has(key)) return;
+          if (loadedRiverGroups.has(key)) return;
+          scene.add(rh.group);
+          loadedRiverGroups.set(key, rh);
+        });
+      }
+      for (const [key, rh] of loadedRiverGroups) {
+        if (!rh || activeRiverKeys.has(key)) continue;
+        scene.remove(rh.group);
+        loadedRiverGroups.delete(key);
+      }
     }
   }
 
@@ -315,6 +504,7 @@ function animate(): void {
       `相机 world(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})<br />` +
         `cache: ${cacheN} chunks<br />` +
         `FPS: ${(1 / dt).toFixed(0)}<br />` +
+        `${pyramidEnvironment.statusText()}<br />` +
         `北京在 world(${startWorld.x.toFixed(1)}, ${startWorld.z.toFixed(1)})`
     );
   }
@@ -323,3 +513,4 @@ function animate(): void {
   requestAnimationFrame(animate);
 }
 animate();
+void initDeferredOverlays();

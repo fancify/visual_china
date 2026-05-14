@@ -1,38 +1,7 @@
-import { qinlingRegionBounds } from "../../data/qinlingRegion.js";
-
-type LonLat = [number, number];
-type PolygonRings = LonLat[][];
-
-export interface LandMaskData {
-  schema: "visual-china.land-mask.v1";
-  polygons: PolygonRings[];
-}
-
-export interface LandMaskSampler {
-  isLand(lon: number, lat: number): boolean;
-}
-
 const VECTOR_INDEX_BIN_DEG = 0.25;
 const RING_EDGE_BIN_DEG = 0.25;
 
-export function landMaskCanvasPoint(
-  lon: number,
-  lat: number,
-  width: number,
-  height: number
-): [number, number] {
-  const x =
-    ((lon - qinlingRegionBounds.west) /
-      (qinlingRegionBounds.east - qinlingRegionBounds.west)) *
-    width;
-  const y =
-    ((qinlingRegionBounds.north - lat) /
-      (qinlingRegionBounds.north - qinlingRegionBounds.south)) *
-    height;
-  return [x, y];
-}
-
-function ringBounds(ring: LonLat[]): { west: number; east: number; south: number; north: number } {
+function ringBounds(ring) {
   let west = Infinity;
   let east = -Infinity;
   let south = Infinity;
@@ -46,22 +15,11 @@ function ringBounds(ring: LonLat[]): { west: number; east: number; south: number
   return { west, east, south, north };
 }
 
-function containsBounds(
-  bounds: { west: number; east: number; south: number; north: number },
-  lon: number,
-  lat: number
-): boolean {
+function containsBounds(bounds, lon, lat) {
   return lon >= bounds.west && lon <= bounds.east && lat >= bounds.south && lat <= bounds.north;
 }
 
-interface IndexedEdge {
-  xi: number;
-  yi: number;
-  xj: number;
-  yj: number;
-}
-
-function pointInEdges(lon: number, lat: number, edges: IndexedEdge[]): boolean {
+function pointInEdges(lon, lat, edges) {
   let inside = false;
   for (const { xi, yi, xj, yj } of edges) {
     const intersects =
@@ -72,20 +30,8 @@ function pointInEdges(lon: number, lat: number, edges: IndexedEdge[]): boolean {
   return inside;
 }
 
-interface IndexedRing {
-  points: LonLat[];
-  bounds: { west: number; east: number; south: number; north: number };
-  edgeBins: Map<number, IndexedEdge[]>;
-}
-
-interface IndexedPolygon {
-  outer: IndexedRing;
-  holes: IndexedRing[];
-  bounds: { west: number; east: number; south: number; north: number };
-}
-
-function indexRing(ring: LonLat[]): IndexedRing {
-  const edgeBins = new Map<number, IndexedEdge[]>();
+function indexRing(ring) {
+  const edgeBins = new Map();
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
     const [xi, yi] = ring[i];
     const [xj, yj] = ring[j];
@@ -99,30 +45,28 @@ function indexRing(ring: LonLat[]): IndexedRing {
       else edgeBins.set(y, [edge]);
     }
   }
-  return { points: ring, bounds: ringBounds(ring), edgeBins };
+  return { bounds: ringBounds(ring), edgeBins };
 }
 
-function pointInIndexedRing(lon: number, lat: number, ring: IndexedRing): boolean {
+function pointInIndexedRing(lon, lat, ring) {
   const edges = ring.edgeBins.get(Math.floor(lat / RING_EDGE_BIN_DEG));
   return edges ? pointInEdges(lon, lat, edges) : false;
 }
 
-function createVectorLandMaskSampler(data: LandMaskData): LandMaskSampler {
-  const polygons: IndexedPolygon[] = data.polygons
+export function createLandMaskSamplerFromData(data) {
+  if (!data.polygons.length) return null;
+  const polygons = data.polygons
     .filter((rings) => rings.length > 0 && rings[0].length >= 3)
     .map((rings) => {
       const outer = indexRing(rings[0]);
       return {
         outer,
-        holes: rings
-          .slice(1)
-          .filter((ring) => ring.length >= 3)
-          .map(indexRing),
+        holes: rings.slice(1).filter((ring) => ring.length >= 3).map(indexRing),
         bounds: outer.bounds
       };
     });
-  const bins = new Map<string, IndexedPolygon[]>();
-  const binKey = (x: number, y: number) => `${x}:${y}`;
+  const bins = new Map();
+  const binKey = (x, y) => `${x}:${y}`;
 
   for (const polygon of polygons) {
     const x0 = Math.floor(polygon.bounds.west / VECTOR_INDEX_BIN_DEG);
@@ -140,7 +84,7 @@ function createVectorLandMaskSampler(data: LandMaskData): LandMaskSampler {
   }
 
   return {
-    isLand(lon: number, lat: number): boolean {
+    isLand(lon, lat) {
       const x = Math.floor(lon / VECTOR_INDEX_BIN_DEG);
       const y = Math.floor(lat / VECTOR_INDEX_BIN_DEG);
       const candidates = bins.get(binKey(x, y));
@@ -160,17 +104,4 @@ function createVectorLandMaskSampler(data: LandMaskData): LandMaskSampler {
       return false;
     }
   };
-}
-
-export function createLandMaskSamplerFromData(data: LandMaskData): LandMaskSampler | null {
-  if (data.polygons.length === 0) return null;
-  return createVectorLandMaskSampler(data);
-}
-
-export async function loadLandMaskData(baseUrl = "/data/china"): Promise<LandMaskData> {
-  const response = await fetch(`${baseUrl}/land-mask.json`);
-  if (!response.ok) {
-    throw new Error(`failed to load land mask: ${response.status} ${response.statusText}`);
-  }
-  return (await response.json()) as LandMaskData;
 }

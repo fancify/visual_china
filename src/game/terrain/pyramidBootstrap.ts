@@ -26,7 +26,7 @@ import {
 } from "./pyramidMesh.js";
 import type { TierName } from "./pyramidTypes.js";
 import type { LandMaskSampler } from "./landMaskRenderer.js";
-import { clampCoastalTargetTier } from "./coastalLod.js";
+import { clampCoastalTargetTier, l0ChunkWindowForCamera } from "./coastalLod.js";
 import { projectGeoToWorld } from "../mapOrientation.js";
 import { qinlingRegionBounds, qinlingRegionWorld } from "../../data/qinlingRegion.js";
 
@@ -36,6 +36,8 @@ export interface PyramidTerrainHandle {
   surfaceProvider: PyramidSurfaceProvider;
   /** 每帧 / camera 变动时调；async chunks 自加载 */
   updateVisible(camera: PerspectiveCamera, scene: Scene): void;
+  /** Preload path: resolves after the current visible terrain meshes are in the scene. */
+  updateVisibleAsync(camera: PerspectiveCamera, scene: Scene): Promise<void>;
   /** Debug: 切 L0-L3 tier 染色 (L0 绿/L1 蓝/L2 黄/L3 红) — 鸟瞰一眼看 tier 分布 */
   setDebugLodTint(active: boolean): void;
   /** Debug: 切 flatShading — 三角面分明 vs smooth blend */
@@ -72,6 +74,7 @@ export async function bootstrapPyramidTerrain(
 
   // mesh tracking: chunkKey → handle
   const meshHandles = new Map<string, ReturnType<typeof createPyramidChunkMesh>>();
+  let latestDesiredKeys = new Set<string>();
   const material = opts.material ?? new MeshPhongMaterial({
     vertexColors: true,
     flatShading: false,
@@ -89,19 +92,19 @@ export async function bootstrapPyramidTerrain(
   const viewRadius = opts.viewRadiusUnits ?? 100;
 
   // Distance-band LOD (mutable — setLodBands() 改这个 array, 下帧 updateVisible 用):
-  //   L0 (~434m cell)   0-150u    (~0-490km)  近景高细节
-  //   L1 (~867m cell)   150-300u  (~490-980km) 中景
-  //   L2 (~1734m cell)  300-600u  (~980-1968km) 远景
-  //   L3 (~3469m cell)  600u+     (~1968km+) horizon
-  // chunks 总数 ~308 (vs 旧 160/400/960 的 ~435, -29%), 三角形 ~-30%. 近场 0-490km 几
-  // 乎一样, 中远场山形棱角变粗换性能.
-  const lodBands: [number, number, number] = [150, 300, 600];
+  // Near terrain stays detailed; mid/far terrain steps down to avoid loading only L0.
+  // Coarse parent chunks that overlap finer selected children are filtered below.
+  const lodBands: [number, number, number] = [120, 220, 300];
 
   function key(tier: TierName, x: number, z: number): string {
     return `${tier}:${x}:${z}`;
   }
 
   function updateVisible(camera: PerspectiveCamera, scene_: Scene): void {
+    void updateVisibleAsync(camera, scene_);
+  }
+
+  async function updateVisibleAsync(camera: PerspectiveCamera, scene_: Scene): Promise<void> {
     // Mutually exclusive tier 选择：每个 L0 chunk grid location 只画一个 tier.
     // L0 在 chunk grid 上是最细粒度；其他 tier 都是 L0 的 2^n 聚合.
     //
@@ -114,11 +117,20 @@ export async function bootstrapPyramidTerrain(
     const camZ = camera.position.z;
 
     const desiredKeys = new Set<string>();
+    const desiredDistances = new Map<string, number>();
     const L0Meta = manifest.tiers.L0;
     if (!L0Meta) return;
     const L0SizeDeg = L0Meta.chunkSizeDeg;
-    const [xMin, xMax] = L0Meta.chunkRangeX;
-    const [zMin, zMax] = L0Meta.chunkRangeZ;
+    const [fullXMin, fullXMax] = L0Meta.chunkRangeX;
+    const [fullZMin, fullZMax] = L0Meta.chunkRangeZ;
+    const scanWindow = l0ChunkWindowForCamera(
+      camX,
+      camZ,
+      viewRadius,
+      L0SizeDeg,
+      manifest.bounds,
+      { xMin: fullXMin, xMax: fullXMax, zMin: fullZMin, zMax: fullZMax }
+    );
 
     // 每 L0 grid 位置选一 tier, Set dedup 自然合并多 L0 → 同 L1/L2/L3 chunk.
     // lodBands 是 mutable 外层闭包变量 — setLodBands() 改它, 下帧生效.
@@ -127,7 +139,10 @@ export async function bootstrapPyramidTerrain(
     // tier 解析: 按距离选 target tier, 不存在则 cascade 到 finer tier (codex P1 #1+2 修).
     // 直到找到一个 exists chunk 或所有 tier 都 missing. Manifest v2 用 chunks list 精确查;
     // v1 退到 range check.
-    function resolveTier(x: number, z: number): { tier: TierName; cx: number; cz: number } | null {
+    function resolveTier(
+      x: number,
+      z: number
+    ): { tier: TierName; cx: number; cz: number; distance: number } | null {
       const cLon = manifest.bounds.west + (x + 0.5) * L0SizeDeg;
       const cLat = manifest.bounds.north - (z + 0.5) * L0SizeDeg;
       const cWorld = projectGeoToWorld(
@@ -159,7 +174,7 @@ export async function bootstrapPyramidTerrain(
         const cz = z >> t;
         const exists = loader.chunkExists(tier, cx, cz);
         if (exists === true) {
-          return { tier, cx, cz };
+          return { tier, cx, cz, distance: dist };
         }
         if (exists === false) {
           continue; // manifest 明确没此 chunk, try finer
@@ -170,86 +185,161 @@ export async function bootstrapPyramidTerrain(
         if (cx < meta.chunkRangeX[0] || cx > meta.chunkRangeX[1]) continue;
         if (cz < meta.chunkRangeZ[0] || cz > meta.chunkRangeZ[1]) continue;
         if (loader.isKnownMissing(tier, cx, cz)) continue;
-        return { tier, cx, cz };
+        return { tier, cx, cz, distance: dist };
       }
       return null;
     }
 
-    for (let x = xMin; x <= xMax; x += 1) {
-      for (let z = zMin; z <= zMax; z += 1) {
+    for (let x = scanWindow.xMin; x <= scanWindow.xMax; x += 1) {
+      for (let z = scanWindow.zMin; z <= scanWindow.zMax; z += 1) {
         const sel = resolveTier(x, z);
         if (!sel) continue;
-        desiredKeys.add(key(sel.tier, sel.cx, sel.cz));
+        const chunkKey = key(sel.tier, sel.cx, sel.cz);
+        desiredKeys.add(chunkKey);
+        const prevDistance = desiredDistances.get(chunkKey);
+        if (prevDistance === undefined || sel.distance < prevDistance) {
+          desiredDistances.set(chunkKey, sel.distance);
+        }
       }
     }
 
-    // Request all desired chunks
-    for (const k of desiredKeys) {
-      if (meshHandles.has(k)) continue;
+    function tierIndex(tier: TierName): number {
+      return Number(tier.slice(1));
+    }
+
+    function footprintsOverlap(a: string, b: string): boolean {
+      const [at, axs, azs] = a.split(":");
+      const [bt, bxs, bzs] = b.split(":");
+      const ai = tierIndex(at as TierName);
+      const bi = tierIndex(bt as TierName);
+      const ax0 = Number(axs) << ai;
+      const ax1 = ((Number(axs) + 1) << ai) - 1;
+      const az0 = Number(azs) << ai;
+      const az1 = ((Number(azs) + 1) << ai) - 1;
+      const bx0 = Number(bxs) << bi;
+      const bx1 = ((Number(bxs) + 1) << bi) - 1;
+      const bz0 = Number(bzs) << bi;
+      const bz1 = ((Number(bzs) + 1) << bi) - 1;
+      return ax0 <= bx1 && ax1 >= bx0 && az0 <= bz1 && az1 >= bz0;
+    }
+
+    function addExistingChildChunks(parentKey: string): void {
+      const [tier, xs, zs] = parentKey.split(":");
+      const childTierIdx = tierIndex(tier as TierName) - 1;
+      if (childTierIdx < 0) return;
+      const childTier = `L${childTierIdx}` as TierName;
+      const baseX = Number(xs) * 2;
+      const baseZ = Number(zs) * 2;
+      for (let dx = 0; dx <= 1; dx += 1) {
+        for (let dz = 0; dz <= 1; dz += 1) {
+          const childX = baseX + dx;
+          const childZ = baseZ + dz;
+          if (!loader.chunkExists(childTier, childX, childZ)) continue;
+          const childKey = key(childTier, childX, childZ);
+          desiredKeys.add(childKey);
+          desiredDistances.set(childKey, desiredDistances.get(parentKey) ?? Infinity);
+        }
+      }
+    }
+
+    // Coarse chunks are whole parent meshes. If a parent overlaps a finer selected
+    // child, split the parent into child chunks instead of deleting it outright.
+    // This keeps mid/far coverage while preventing L2/L3 slabs from covering L0/L1.
+    let splitCoarse = true;
+    while (splitCoarse) {
+      splitCoarse = false;
+      const desiredList = Array.from(desiredKeys);
+      for (const coarseKey of desiredList) {
+        const coarseTier = tierIndex(coarseKey.split(":")[0] as TierName);
+        if (coarseTier === 0) continue;
+        const overlapsFiner = desiredList.some((otherKey) => {
+          if (otherKey === coarseKey) return false;
+          const otherTier = tierIndex(otherKey.split(":")[0] as TierName);
+          return otherTier < coarseTier && footprintsOverlap(coarseKey, otherKey);
+        });
+        if (!overlapsFiner) continue;
+        desiredKeys.delete(coarseKey);
+        addExistingChildChunks(coarseKey);
+        splitCoarse = true;
+      }
+    }
+    latestDesiredKeys = desiredKeys;
+
+    // Request all desired chunks, nearest first. LOD bands and cached-only overlay
+    // sampling keep this list small enough; capping here would create visible holes.
+    const requestKeys = Array.from(desiredKeys).sort(
+      (a, b) => (desiredDistances.get(a) ?? Infinity) - (desiredDistances.get(b) ?? Infinity)
+    );
+    await Promise.all(requestKeys.map(async (k) => {
+      if (meshHandles.has(k)) return;
       const [tier, xs, zs] = k.split(":");
       const x = Number(xs);
       const z = Number(zs);
-      void loader.requestChunk(tier as TierName, x, z).then((chunk) => {
-        if (!chunk) return;
-        if (meshHandles.has(k)) return; // race
-        const tierName = tier as TierName;
-        const meshMaterial = debugTintActive ? tierTintMaterials[tierName] : material;
-        const handle = createPyramidChunkMesh(chunk, {
-          material: meshMaterial,
-          landMaskSampler: opts.landMaskSampler,
-          beachTintEnabled: beachTintActive
-        });
-        scene_.add(handle.mesh);
-        meshHandles.set(k, handle);
-
-        // 跨 chunk 法线统一 (tierName 已上面定义).
-
-        // Step 1: 4 axis 邻居 edge harmonization
-        const east = meshHandles.get(key(tierName, x + 1, z));
-        if (east) harmonizeBoundaryNormals(handle, east, "east");
-        const south = meshHandles.get(key(tierName, x, z + 1));
-        if (south) harmonizeBoundaryNormals(handle, south, "south");
-        const west = meshHandles.get(key(tierName, x - 1, z));
-        if (west) harmonizeBoundaryNormals(west, handle, "east");
-        const north = meshHandles.get(key(tierName, x, z - 1));
-        if (north) harmonizeBoundaryNormals(north, handle, "south");
-
-        // Step 2: 4 corner 4-way harmonization
-        // 每角点收集所有已加载的共享 chunk + 对应 corner label
-        const nw = meshHandles.get(key(tierName, x - 1, z - 1));
-        const ne = meshHandles.get(key(tierName, x + 1, z - 1));
-        const sw = meshHandles.get(key(tierName, x - 1, z + 1));
-        const se = meshHandles.get(key(tierName, x + 1, z + 1));
-
-        // 本 chunk NW corner = 西邻 NE = 北邻 SW = NW-diag SE
-        const nwEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "NW" }];
-        if (west) nwEntries.push({ handle: west, corner: "NE" });
-        if (north) nwEntries.push({ handle: north, corner: "SW" });
-        if (nw) nwEntries.push({ handle: nw, corner: "SE" });
-        harmonizeCorner(nwEntries);
-
-        // 本 chunk NE corner = 东邻 NW = 北邻 SE = NE-diag SW
-        const neEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "NE" }];
-        if (east) neEntries.push({ handle: east, corner: "NW" });
-        if (north) neEntries.push({ handle: north, corner: "SE" });
-        if (ne) neEntries.push({ handle: ne, corner: "SW" });
-        harmonizeCorner(neEntries);
-
-        // 本 chunk SW corner = 西邻 SE = 南邻 NW = SW-diag NE
-        const swEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "SW" }];
-        if (west) swEntries.push({ handle: west, corner: "SE" });
-        if (south) swEntries.push({ handle: south, corner: "NW" });
-        if (sw) swEntries.push({ handle: sw, corner: "NE" });
-        harmonizeCorner(swEntries);
-
-        // 本 chunk SE corner = 东邻 SW = 南邻 NE = SE-diag NW
-        const seEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "SE" }];
-        if (east) seEntries.push({ handle: east, corner: "SW" });
-        if (south) seEntries.push({ handle: south, corner: "NE" });
-        if (se) seEntries.push({ handle: se, corner: "NW" });
-        harmonizeCorner(seEntries);
+      const chunk = await loader.requestChunk(tier as TierName, x, z);
+      if (!chunk) return;
+      if (!latestDesiredKeys.has(k)) return;
+      if (meshHandles.has(k)) return; // race
+      const tierName = tier as TierName;
+      const tierNumber = tierIndex(tierName);
+      const meshMaterial = debugTintActive ? tierTintMaterials[tierName] : material;
+      const handle = createPyramidChunkMesh(chunk, {
+        material: meshMaterial,
+        // Vector land mask owns coastline clipping. DEM NaNs are inpainted instead
+        // of cut, otherwise artificial rectangles/reservoir-like holes show inland.
+        landMaskSampler: tierNumber <= 1 ? opts.landMaskSampler : null,
+        clipInvalidHeights: false,
+        beachTintEnabled: beachTintActive
       });
-    }
+      scene_.add(handle.mesh);
+      meshHandles.set(k, handle);
+
+      // 跨 chunk 法线统一 (tierName 已上面定义).
+
+      // Step 1: 4 axis 邻居 edge harmonization
+      const east = meshHandles.get(key(tierName, x + 1, z));
+      if (east) harmonizeBoundaryNormals(handle, east, "east");
+      const south = meshHandles.get(key(tierName, x, z + 1));
+      if (south) harmonizeBoundaryNormals(handle, south, "south");
+      const west = meshHandles.get(key(tierName, x - 1, z));
+      if (west) harmonizeBoundaryNormals(west, handle, "east");
+      const north = meshHandles.get(key(tierName, x, z - 1));
+      if (north) harmonizeBoundaryNormals(north, handle, "south");
+
+      // Step 2: 4 corner 4-way harmonization
+      // 每角点收集所有已加载的共享 chunk + 对应 corner label
+      const nw = meshHandles.get(key(tierName, x - 1, z - 1));
+      const ne = meshHandles.get(key(tierName, x + 1, z - 1));
+      const sw = meshHandles.get(key(tierName, x - 1, z + 1));
+      const se = meshHandles.get(key(tierName, x + 1, z + 1));
+
+      // 本 chunk NW corner = 西邻 NE = 北邻 SW = NW-diag SE
+      const nwEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "NW" }];
+      if (west) nwEntries.push({ handle: west, corner: "NE" });
+      if (north) nwEntries.push({ handle: north, corner: "SW" });
+      if (nw) nwEntries.push({ handle: nw, corner: "SE" });
+      harmonizeCorner(nwEntries);
+
+      // 本 chunk NE corner = 东邻 NW = 北邻 SE = NE-diag SW
+      const neEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "NE" }];
+      if (east) neEntries.push({ handle: east, corner: "NW" });
+      if (north) neEntries.push({ handle: north, corner: "SE" });
+      if (ne) neEntries.push({ handle: ne, corner: "SW" });
+      harmonizeCorner(neEntries);
+
+      // 本 chunk SW corner = 西邻 SE = 南邻 NW = SW-diag NE
+      const swEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "SW" }];
+      if (west) swEntries.push({ handle: west, corner: "SE" });
+      if (south) swEntries.push({ handle: south, corner: "NW" });
+      if (sw) swEntries.push({ handle: sw, corner: "NE" });
+      harmonizeCorner(swEntries);
+
+      // 本 chunk SE corner = 东邻 SW = 南邻 NE = SE-diag NW
+      const seEntries: Parameters<typeof harmonizeCorner>[0] = [{ handle, corner: "SE" }];
+      if (east) seEntries.push({ handle: east, corner: "SW" });
+      if (south) seEntries.push({ handle: south, corner: "NE" });
+      if (se) seEntries.push({ handle: se, corner: "NW" });
+      harmonizeCorner(seEntries);
+    }));
 
     // Evict meshes outside desired set
     for (const [k, handle] of Array.from(meshHandles.entries())) {
@@ -318,6 +408,7 @@ export async function bootstrapPyramidTerrain(
     sampler,
     surfaceProvider,
     updateVisible,
+    updateVisibleAsync,
     setDebugLodTint,
     setFlatShading,
     setBeachTint,

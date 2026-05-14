@@ -81,6 +81,35 @@ interface IndexedLakePolygon {
   rings: number[][][];
 }
 
+function ringAreaDeg2(ring: number[][]): number {
+  let area = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    area += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+  }
+  return Math.abs(area) / 2;
+}
+
+function featureAreaDeg2(feature: LakeFeature): number {
+  const polys = feature.geometry.type === "Polygon"
+    ? [feature.geometry.coordinates as number[][][]]
+    : (feature.geometry.coordinates as number[][][][]);
+  let area = 0;
+  for (const rings of polys) {
+    if (rings.length) area += ringAreaDeg2(rings[0]);
+  }
+  return area;
+}
+
+function shouldRenderLakeFeature(feature: LakeFeature): boolean {
+  const name = `${feature.properties.name ?? ""} ${feature.properties.nameAlt ?? ""}`.toLowerCase();
+  if (/\b(shuiku|reservoir)\b/.test(name)) return false;
+
+  const scalerank = feature.properties.scalerank ?? 99;
+  if (scalerank >= 7 && featureAreaDeg2(feature) < 0.03) return false;
+
+  return true;
+}
+
 function ringBbox(ring: number[][]): IndexedLakePolygon["bbox"] {
   let west = Infinity;
   let east = -Infinity;
@@ -120,7 +149,7 @@ function pointInPolygon(lon: number, lat: number, rings: number[][][]): boolean 
 
 export function createLakeMaskSamplerFromBundle(bundle: LakeBundle): LakeMaskSampler {
   const polygons: IndexedLakePolygon[] = [];
-  for (const feature of bundle.features) {
+  for (const feature of bundle.features.filter(shouldRenderLakeFeature)) {
     const polys = feature.geometry.type === "Polygon"
       ? [feature.geometry.coordinates as number[][][]]
       : (feature.geometry.coordinates as number[][][][]);
@@ -155,6 +184,7 @@ export async function createLakeRenderer(
   const resp = await fetch(`${baseUrl}/china-lakes.json`);
   if (!resp.ok) throw new Error(`lake bundle fetch failed: HTTP ${resp.status}`);
   const bundle = (await resp.json()) as LakeBundle;
+  const lakeFeatures = bundle.features.filter(shouldRenderLakeFeature);
 
   const group = new Group();
   group.name = "lakes";
@@ -216,14 +246,15 @@ export async function createLakeRenderer(
     const c = ringCentroid(outer);
     let surfaceY = fallbackY;
     if (sampler) {
-      const y = sampler.sampleHeightWorld(toWorldXZ(c.lon, c.lat).x, toWorldXZ(c.lon, c.lat).z);
+      const wp = toWorldXZ(c.lon, c.lat);
+      const y = sampler.sampleHeightWorldCached(wp.x, wp.z);
       if (Number.isFinite(y)) surfaceY = y + surfaceLift;
     }
     mesh.position.y = surfaceY;
     return { mesh, centroidLon: c.lon, centroidLat: c.lat };
   }
 
-  for (const f of bundle.features) {
+  for (const f of lakeFeatures) {
     const polys = f.geometry.type === "Polygon"
       ? [f.geometry.coordinates as number[][][]]
       : (f.geometry.coordinates as number[][][][]);
@@ -242,7 +273,7 @@ export async function createLakeRenderer(
     if (!sampler) return;
     for (const e of entries) {
       const wp = toWorldXZ(e.centroidLon, e.centroidLat);
-      const y = sampler.sampleHeightWorld(wp.x, wp.z);
+      const y = sampler.sampleHeightWorldCached(wp.x, wp.z);
       if (Number.isFinite(y)) {
         e.mesh.position.y = y + surfaceLift;
       }
@@ -260,7 +291,7 @@ export async function createLakeRenderer(
   return {
     group,
     lakeCount: entries.length,
-    waterMaskSampler: createLakeMaskSamplerFromBundle(bundle),
+    waterMaskSampler: createLakeMaskSamplerFromBundle({ features: lakeFeatures }),
     setTime(time) {
       waterSurface.setTime(time);
     },
