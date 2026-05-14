@@ -7,7 +7,7 @@ tags: [poi, tang-755, principles, selection-spec]
 updated: 2026-05-14
 ---
 
-# Tang 755 POI 自然类立项原则（codex review 草案）
+# 唐 755 POI 自然类立项原则（codex review 草案）
 
 > **用途**：决定哪个候选条目独立立 POI、哪个归城市 doc、哪个增补
 > **不涉及**：写作 voice / source 验证 / 杜撰史实防范（这三层另有 spec，分别见 voice spec 与 [feedback-tang-llm-fabrication-patterns]）
@@ -143,7 +143,7 @@ T1-T3 时态硬约束  >  R3 文化独立白名单  >  R2 城市主轴绑定  > 
 
 ---
 
-## 4. Tang 755 时态约束（硬约束）
+## 4. 唐 755 时态约束（硬约束）
 
 ### T1 不用后世并称
 四大名楼 / 三大石窟 / 江南三大名楼 等近现代打包概念 → ❌
