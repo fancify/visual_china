@@ -40,7 +40,7 @@ const camera = new PerspectiveCamera(
   0.1,
   500
 );
-camera.position.set(30, 22, 30);
+camera.position.set(48, 35, 48);
 camera.lookAt(0, 0, 0);
 
 const renderer = new WebGLRenderer({ antialias: true });
@@ -59,14 +59,14 @@ scene.add(sun);
 
 // === Ground ===
 const ground = new Mesh(
-  new PlaneGeometry(80, 80),
+  new PlaneGeometry(120, 120),
   new MeshBasicMaterial({ color: 0xa8a294 })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.05;
 scene.add(ground);
 
-const grid = new GridHelper(80, 16, 0x8b8474, 0x8b8474);
+const grid = new GridHelper(120, 20, 0x8b8474, 0x8b8474);
 (grid.material as { opacity?: number; transparent?: boolean }).opacity = 0.25;
 (grid.material as { opacity?: number; transparent?: boolean }).transparent =
   true;
@@ -74,7 +74,7 @@ scene.add(grid);
 
 // === Lay out models in a 5×4 grid ===
 const entries = listAllArchetypeVariants();
-const cellSize = 10;
+const cellSize = 16;
 const cols = 5;
 
 // HTML overlay for labels
@@ -120,7 +120,7 @@ entries.forEach((entry, idx) => {
 
   labelMeta.push({
     el: label,
-    pos: new Vector3(x, -0.2, z + 4), // 模型下方稍前
+    pos: new Vector3(x, -0.2, z + cellSize * 0.4), // 模型下方稍前
   });
 });
 
