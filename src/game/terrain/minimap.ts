@@ -32,9 +32,179 @@ export interface MinimapOptions {
 export interface MinimapHandle {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  update(cameraWorldX: number, cameraWorldZ: number, cameraYaw: number): void;
+  update(cameraWorldX: number, cameraWorldZ: number, cameraYaw: number, timeOfDay?: number): void;
   setMode(mode: "compact" | "fullscreen"): void;
   dispose(): void;
+}
+
+export type MinimapTerrainKind = "ocean" | "lowland" | "hill" | "mountain" | "plateau";
+
+type MinimapPoiVisibilityInput = Pick<PoiEntry, "id" | "hierarchy">;
+
+interface MinimapDemAsset {
+  bounds: {
+    west: number;
+    east: number;
+    south: number;
+    north: number;
+  };
+  grid: {
+    columns: number;
+    rows: number;
+  };
+  heights: number[];
+  riverMask?: number[];
+}
+
+export interface MinimapTerrainColorSample {
+  height: number;
+  river: number;
+  shade: number;
+  fallbackKind: MinimapTerrainKind;
+}
+
+export interface MinimapRgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface MinimapNightOverlay {
+  color: string;
+  alpha: number;
+}
+
+const COMPACT_CITY_IDS = new Set(["changan", "taiyuan", "yangzhou", "yizhou"]);
+
+export function minimapPoiVisibleInMode(
+  poi: MinimapPoiVisibilityInput,
+  mode: "compact" | "fullscreen",
+  zoomFactor: number
+): boolean {
+  if (mode === "compact") {
+    return COMPACT_CITY_IDS.has(poi.id);
+  }
+
+  return (
+    poi.hierarchy === "gravity" ||
+    poi.hierarchy === "large" ||
+    (poi.hierarchy === "medium" && zoomFactor > 1.5) ||
+    (poi.hierarchy === "small" && zoomFactor > 3.0)
+  );
+}
+
+function approximateEastCoastLongitude(lat: number): number {
+  if (lat >= 40.8) return 121.0 + (lat - 40.8) * 0.55;
+  if (lat >= 37.2) return 119.1 + (lat - 37.2) * 0.48;
+  if (lat >= 31.0) return 121.2 - (lat - 31.0) * 0.07;
+  if (lat >= 27.0) return 119.0 + (lat - 27.0) * 0.18;
+  if (lat >= 23.0) return 116.2 + (lat - 23.0) * 0.7;
+  return 109.0 + (lat - 18.0) * 1.25;
+}
+
+export function abstractMinimapTerrainKindForGeo(
+  lat: number,
+  lon: number
+): MinimapTerrainKind {
+  const inBohaiBay = lat >= 37.0 && lat <= 41.2 && lon >= 117.4 && lon <= 122.5;
+  const inYellowSea = lat >= 31.0 && lat <= 38.6 && lon >= 120.2 && lon <= 126.0;
+  const inBeibuGulf = lat >= 18.0 && lat <= 22.3 && lon >= 106.2 && lon <= 110.2;
+  const inBayOfBengal = lat >= 18.0 && lat <= 23.5 && lon >= 88.0 && lon <= 94.5;
+  if (inBohaiBay || inYellowSea || inBeibuGulf || inBayOfBengal) {
+    return "ocean";
+  }
+
+  const coastLon = approximateEastCoastLongitude(lat);
+  if ((lon > coastLon && lat < 42.8) || (lat < 21.8 && lon > 108.2)) {
+    return "ocean";
+  }
+  if (lon >= 78 && lon <= 103 && lat >= 27.0 && lat <= 38.6) {
+    return "plateau";
+  }
+  if (
+    (lon >= 73 && lon <= 96 && lat >= 39.0 && lat <= 49.5) ||
+    (lon >= 96 && lon <= 106 && lat >= 25.0 && lat <= 33.5) ||
+    (lon >= 102 && lon <= 112.5 && lat >= 31.0 && lat <= 35.3)
+  ) {
+    return "mountain";
+  }
+  if (
+    (lon >= 111 && lon <= 116.8 && lat >= 35.0 && lat <= 41.5) ||
+    (lon >= 106.5 && lon <= 117.5 && lat >= 24.0 && lat <= 28.5) ||
+    (lon >= 116 && lon <= 120.5 && lat >= 24.0 && lat <= 29.5) ||
+    (lon >= 101 && lon <= 108 && lat >= 38.0 && lat <= 42.5)
+  ) {
+    return "hill";
+  }
+  return "lowland";
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function smoothstep(value: number, min: number, max: number): number {
+  if (min === max) return value < min ? 0 : 1;
+  const t = clamp01((value - min) / (max - min));
+  return t * t * (3 - 2 * t);
+}
+
+export function minimapNightOverlayForTime(timeOfDay: number): MinimapNightOverlay {
+  const normalized = ((timeOfDay % 24) + 24) % 24;
+  const evening = smoothstep(normalized, 17.6, 20.2);
+  const dawnClear = smoothstep(normalized, 5.2, 7.2);
+  const night = normalized >= 12 ? evening : 1 - dawnClear;
+  return {
+    color: "#0b2235",
+    alpha: Math.round(clamp01(night) * 0.42 * 1000) / 1000
+  };
+}
+
+function mixRgb(a: MinimapRgb, b: MinimapRgb, t: number): MinimapRgb {
+  return {
+    r: Math.round(lerp(a.r, b.r, t)),
+    g: Math.round(lerp(a.g, b.g, t)),
+    b: Math.round(lerp(a.b, b.b, t))
+  };
+}
+
+function shadeRgb(color: MinimapRgb, shade: number): MinimapRgb {
+  const s = lerp(0.72, 1.22, clamp01(shade));
+  return {
+    r: Math.round(Math.max(0, Math.min(255, color.r * s))),
+    g: Math.round(Math.max(0, Math.min(255, color.g * s))),
+    b: Math.round(Math.max(0, Math.min(255, color.b * s)))
+  };
+}
+
+export function minimapTerrainColorForSample(
+  sample: MinimapTerrainColorSample
+): MinimapRgb {
+  if (sample.fallbackKind === "ocean" && sample.height <= 2) {
+    return shadeRgb({ r: 44, g: 91, b: 111 }, sample.shade);
+  }
+
+  const height = Math.max(0, sample.height);
+  let base: MinimapRgb;
+  if (height > 2600) {
+    base = mixRgb({ r: 133, g: 120, b: 83 }, { r: 188, g: 176, b: 126 }, clamp01((height - 2600) / 2600));
+  } else if (height > 1200) {
+    base = mixRgb({ r: 108, g: 123, b: 76 }, { r: 143, g: 128, b: 87 }, clamp01((height - 1200) / 1400));
+  } else if (height > 420) {
+    base = mixRgb({ r: 123, g: 145, b: 86 }, { r: 101, g: 121, b: 75 }, clamp01((height - 420) / 780));
+  } else {
+    base = mixRgb({ r: 127, g: 151, b: 88 }, { r: 161, g: 159, b: 98 }, clamp01(height / 420));
+  }
+
+  const shaded = shadeRgb(base, sample.shade);
+  const river = clamp01(sample.river);
+  return river > 0.18
+    ? mixRgb(shaded, { r: 70, g: 128, b: 149 }, Math.min(0.72, river * 0.72))
+    : shaded;
 }
 
 // 调色板 — BotW 灵感: 暖纸张色 + 浅墨笔触
@@ -48,7 +218,15 @@ const PALETTE = {
   textDim: "rgba(180, 170, 140, 0.75)",
   player: "#ffe7a8",
   playerStroke: "rgba(0, 0, 0, 0.6)",
-  graticule: "rgba(216, 200, 175, 0.2)"
+  graticule: "rgba(216, 200, 175, 0.2)",
+  ocean: "rgba(48, 96, 114, 0.78)",
+  oceanInk: "rgba(108, 157, 166, 0.32)",
+  lowland: "rgba(150, 151, 96, 0.78)",
+  hill: "rgba(129, 136, 82, 0.84)",
+  mountain: "rgba(92, 103, 74, 0.92)",
+  plateau: "rgba(142, 122, 84, 0.86)",
+  coast: "rgba(231, 207, 139, 0.5)",
+  ink: "rgba(34, 48, 38, 0.28)"
 };
 
 // POI 视觉分类: 形状 + 颜色 + size 跟 hierarchy 联动
@@ -163,6 +341,8 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
   let lastCamX = 0;
   let lastCamZ = 0;
   let lastCamYaw = 0;
+  let lastTimeOfDay = 12;
+  let terrainAtlasCanvas: HTMLCanvasElement | null = null;
 
   function applyCSS(): void {
     canvas.style.position = "fixed";
@@ -241,6 +421,172 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     };
   }
 
+  function canvasToGeo(cx: number, cy: number): { lat: number; lon: number } {
+    const wp = canvasToWorld(cx, cy);
+    return unprojectWorldToGeo(
+      { x: wp.x, z: wp.z },
+      qinlingRegionBounds,
+      qinlingRegionWorld
+    );
+  }
+
+  function terrainFill(kind: MinimapTerrainKind): string {
+    switch (kind) {
+      case "ocean":
+        return PALETTE.ocean;
+      case "plateau":
+        return PALETTE.plateau;
+      case "mountain":
+        return PALETTE.mountain;
+      case "hill":
+        return PALETTE.hill;
+      case "lowland":
+      default:
+        return PALETTE.lowland;
+    }
+  }
+
+  function sampleDemHeight(asset: MinimapDemAsset, col: number, row: number): number {
+    const x = Math.max(0, Math.min(asset.grid.columns - 1, col));
+    const y = Math.max(0, Math.min(asset.grid.rows - 1, row));
+    return asset.heights[y * asset.grid.columns + x] ?? 0;
+  }
+
+  function geoForDemCell(asset: MinimapDemAsset, col: number, row: number): { lat: number; lon: number } {
+    const u = asset.grid.columns <= 1 ? 0 : col / (asset.grid.columns - 1);
+    const v = asset.grid.rows <= 1 ? 0 : row / (asset.grid.rows - 1);
+    return {
+      lon: lerp(asset.bounds.west, asset.bounds.east, u),
+      lat: lerp(asset.bounds.north, asset.bounds.south, v)
+    };
+  }
+
+  function buildMinimapTerrainAtlas(asset: MinimapDemAsset): HTMLCanvasElement {
+    const atlas = document.createElement("canvas");
+    atlas.width = asset.grid.columns;
+    atlas.height = asset.grid.rows;
+    const atlasCtx = atlas.getContext("2d");
+    if (!atlasCtx) throw new Error("minimap: terrain atlas context unavailable");
+    const image = atlasCtx.createImageData(asset.grid.columns, asset.grid.rows);
+    const data = image.data;
+
+    for (let row = 0; row < asset.grid.rows; row += 1) {
+      for (let col = 0; col < asset.grid.columns; col += 1) {
+        const height = sampleDemHeight(asset, col, row);
+        const west = sampleDemHeight(asset, col - 1, row);
+        const east = sampleDemHeight(asset, col + 1, row);
+        const north = sampleDemHeight(asset, col, row - 1);
+        const south = sampleDemHeight(asset, col, row + 1);
+        const slopeLight = ((west - east) * 0.0016 + (south - north) * 0.0011);
+        const shade = clamp01(0.54 + slopeLight);
+        const geo = geoForDemCell(asset, col, row);
+        const fallbackKind = abstractMinimapTerrainKindForGeo(geo.lat, geo.lon);
+        const river = asset.riverMask?.[row * asset.grid.columns + col] ?? 0;
+        const color = minimapTerrainColorForSample({ height, river, shade, fallbackKind });
+        const index = (row * asset.grid.columns + col) * 4;
+        data[index] = color.r;
+        data[index + 1] = color.g;
+        data[index + 2] = color.b;
+        data[index + 3] = 255;
+      }
+    }
+
+    atlasCtx.putImageData(image, 0, 0);
+    return atlas;
+  }
+
+  async function loadMinimapTerrainAtlas(): Promise<void> {
+    const response = await fetch("/data/china-lowres-dem.json");
+    if (!response.ok) throw new Error(`minimap DEM fetch failed: HTTP ${response.status}`);
+    const asset = (await response.json()) as MinimapDemAsset;
+    terrainAtlasCanvas = buildMinimapTerrainAtlas(asset);
+    update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
+  }
+
+  function drawTerrainAtlas(): boolean {
+    if (!terrainAtlasCanvas) return false;
+    const nw = projectGeoToWorld(
+      { lat: qinlingRegionBounds.north, lon: qinlingRegionBounds.west },
+      qinlingRegionBounds,
+      qinlingRegionWorld
+    );
+    const se = projectGeoToWorld(
+      { lat: qinlingRegionBounds.south, lon: qinlingRegionBounds.east },
+      qinlingRegionBounds,
+      qinlingRegionWorld
+    );
+    const topLeft = worldToCanvas(nw.x, nw.z);
+    const bottomRight = worldToCanvas(se.x, se.z);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(
+      terrainAtlasCanvas,
+      topLeft.x,
+      topLeft.y,
+      bottomRight.x - topLeft.x,
+      bottomRight.y - topLeft.y
+    );
+    return true;
+  }
+
+  function drawTerrainBaseMap(): void {
+    if (!drawTerrainAtlas()) {
+      drawAbstractTerrainMap();
+    }
+  }
+
+  function drawNightOverlay(timeOfDay: number): void {
+    const overlay = minimapNightOverlayForTime(timeOfDay);
+    if (overlay.alpha <= 0) return;
+    const { w, h } = getCanvasSize();
+    ctx.save();
+    ctx.globalAlpha = overlay.alpha;
+    ctx.fillStyle = overlay.color;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  function drawAbstractTerrainMap(): void {
+    const { w, h } = getCanvasSize();
+    const cell = state.mode === "fullscreen" ? 7 : 4;
+    for (let y = 0; y < h; y += cell) {
+      for (let x = 0; x < w; x += cell) {
+        const geo = canvasToGeo(x + cell * 0.5, y + cell * 0.5);
+        const kind = abstractMinimapTerrainKindForGeo(geo.lat, geo.lon);
+        ctx.fillStyle = terrainFill(kind);
+        ctx.fillRect(x, y, cell + 0.5, cell + 0.5);
+      }
+    }
+
+    drawMountainBrushes();
+  }
+
+  function drawMountainBrushes(): void {
+    const ranges = [
+      { points: [[78, 43], [84, 43.5], [91, 42.3], [97, 40.8]], width: 3.2 },
+      { points: [[91, 31.5], [96, 32.4], [101, 31.2]], width: 5.0 },
+      { points: [[102, 34], [106, 34.2], [110.5, 33.5], [113, 32.6]], width: 3.6 },
+      { points: [[111.5, 40.5], [113.2, 38.2], [114.5, 35.8]], width: 2.6 },
+      { points: [[107, 26.4], [111, 25.4], [115.5, 25.8], [118.8, 27.2]], width: 2.4 }
+    ] as const;
+
+    ctx.save();
+    ctx.strokeStyle = PALETTE.ink;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ranges.forEach((range) => {
+      ctx.lineWidth = range.width * (state.mode === "fullscreen" ? 1.35 : 0.8);
+      ctx.beginPath();
+      range.points.forEach(([lon, lat], index) => {
+        const wp = projectGeoToWorld({ lat, lon }, qinlingRegionBounds, qinlingRegionWorld);
+        const c = worldToCanvas(wp.x, wp.z);
+        if (index === 0) ctx.moveTo(c.x, c.y);
+        else ctx.lineTo(c.x, c.y);
+      });
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
   function drawPoiMarker(c: { x: number; y: number }, poi: PoiEntry, radius: number): void {
     const style = CATEGORY_STYLE[poi.category];
     ctx.fillStyle = style.color;
@@ -311,10 +657,11 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     }
   }
 
-  function update(cameraWorldX: number, cameraWorldZ: number, cameraYaw: number): void {
+  function update(cameraWorldX: number, cameraWorldZ: number, cameraYaw: number, timeOfDay = lastTimeOfDay): void {
     lastCamX = cameraWorldX;
     lastCamZ = cameraWorldZ;
     lastCamYaw = cameraYaw;
+    lastTimeOfDay = timeOfDay;
 
     // Compact 模式下 viewport 跟随相机 (相机在中心), fit-zoom 整中国
     if (state.mode === "compact") {
@@ -331,6 +678,10 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     ctx.fillStyle = PALETTE.paper;
     ctx.fillRect(0, 0, w, h);
 
+    // DEM 鸟瞰底图：加载前降级到抽象 2D 海陆/山带。
+    drawTerrainBaseMap();
+    drawNightOverlay(timeOfDay);
+
     // 经纬网格 (仅 fullscreen)
     drawGraticule();
 
@@ -341,18 +692,9 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     //   - fullscreen 3×+: 添 small (全 4 档)
     const fitScale = computeFitScale(w, h);
     const zoomFactor = state.pixelsPerUnit / fitScale;
-    const showLarge = state.mode === "fullscreen";
-    const showMedium = state.mode === "fullscreen" && zoomFactor > 1.5;
-    const showSmall = state.mode === "fullscreen" && zoomFactor > 3.0;
-
     ctx.font = "10px -apple-system, sans-serif";
     for (const poi of POI_REGISTRY) {
-      const visible =
-        poi.hierarchy === "gravity" ||
-        (poi.hierarchy === "large" && showLarge) ||
-        (poi.hierarchy === "medium" && showMedium) ||
-        (poi.hierarchy === "small" && showSmall);
-      if (!visible) continue;
+      if (!minimapPoiVisibleInMode(poi, state.mode, zoomFactor)) continue;
 
       const wp = projectGeoToWorld(
         { lat: poi.lat, lon: poi.lon },
@@ -367,10 +709,11 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
 
       // Label: gravity 始终标; 其他档 zoom 进显标
       const labelable =
+        (state.mode === "compact" && COMPACT_CITY_IDS.has(poi.id)) ||
         poi.hierarchy === "gravity" ||
         (poi.hierarchy === "large" && state.mode === "fullscreen" && zoomFactor > 1.1) ||
-        (poi.hierarchy === "medium" && showMedium) ||
-        (poi.hierarchy === "small" && showSmall);
+        (poi.hierarchy === "medium" && state.mode === "fullscreen" && zoomFactor > 1.5) ||
+        (poi.hierarchy === "small" && state.mode === "fullscreen" && zoomFactor > 3.0);
       if (labelable) {
         ctx.fillStyle = PALETTE.text;
         const label = poiLabel(poi.id);
@@ -458,7 +801,7 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     const worldAfter = canvasToWorld(cx, cy);
     state.centerX += worldBefore.x - worldAfter.x;
     state.centerZ += worldBefore.z - worldAfter.z;
-    update(lastCamX, lastCamZ, lastCamYaw);
+    update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
   }
 
   function onPointerDown(e: PointerEvent): void {
@@ -477,7 +820,7 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     state.dragLastY = e.clientY;
     state.centerX -= dx / state.pixelsPerUnit;
     state.centerZ -= dy / state.pixelsPerUnit;
-    update(lastCamX, lastCamZ, lastCamYaw);
+    update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
   }
   function onPointerUp(e: PointerEvent): void {
     if (state.dragging) {
@@ -490,7 +833,7 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
   function onResize(): void {
     applyCSS();
     resizeBackingStore();
-    update(lastCamX, lastCamZ, lastCamYaw);
+    update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
   }
 
   function setMode(mode: "compact" | "fullscreen"): void {
@@ -507,12 +850,15 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
       applyCSS();
       resizeBackingStore();
     }
-    update(lastCamX, lastCamZ, lastCamYaw);
+    update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
   }
 
   // initial layout
   applyCSS();
   resizeBackingStore();
+  void loadMinimapTerrainAtlas().catch((error: unknown) => {
+    console.warn("minimap DEM atlas unavailable; using abstract fallback", error);
+  });
 
   // event listeners
   window.addEventListener("keydown", onKeydown);

@@ -94,7 +94,19 @@ export function createMoonTexture(phaseOrSize = 0.5, size = 256): CanvasTexture 
     [0.42, 0.42, 0.055, 0.13],
     [0.57, 0.48, 0.08, 0.1],
     [0.47, 0.61, 0.065, 0.11],
-    [0.61, 0.62, 0.035, 0.09]
+    [0.61, 0.62, 0.035, 0.09],
+    [0.38, 0.55, 0.03, 0.08],
+    [0.52, 0.36, 0.04, 0.1],
+    [0.66, 0.44, 0.045, 0.09],
+    [0.35, 0.68, 0.026, 0.07],
+    [0.72, 0.57, 0.028, 0.08],
+    [0.50, 0.50, 0.018, 0.08],
+    [0.44, 0.33, 0.022, 0.07],
+    [0.58, 0.70, 0.024, 0.08],
+    [0.30, 0.48, 0.018, 0.06],
+    [0.69, 0.35, 0.02, 0.07],
+    [0.40, 0.74, 0.018, 0.06],
+    [0.56, 0.58, 0.015, 0.07]
   ];
 
   context.clearRect(0, 0, textureSize, textureSize);
@@ -112,10 +124,6 @@ export function createMoonTexture(phaseOrSize = 0.5, size = 256): CanvasTexture 
       const nz = Math.sqrt(1 - distanceSquared);
       const light = Math.max(0, nx * lightDirX + nz * lightDirZ);
 
-      if (light <= 0.01) {
-        continue;
-      }
-
       let craterShadow = 0;
       markings.forEach(([mx, my, mr, opacity]) => {
         const craterDx = nx - ((mx - 0.5) * textureSize) / radius;
@@ -124,16 +132,20 @@ export function createMoonTexture(phaseOrSize = 0.5, size = 256): CanvasTexture 
         craterShadow += Math.max(0, 1 - craterDistance / ((mr * textureSize) / radius)) * opacity;
       });
 
+      const surfaceNoise =
+        Math.sin((nx * 23.7 + ny * 5.9) * Math.PI) * 0.018 +
+        Math.sin((nx * -11.1 + ny * 19.4) * Math.PI) * 0.014;
       const edgeGlow = Math.pow(Math.max(0, 1 - Math.sqrt(distanceSquared)), 0.5);
-      const visibility = Math.pow(light, 0.8);
-      const albedo = 0.78 + edgeGlow * 0.12 - craterShadow * 0.28;
+      const earthshine = 0.075;
+      const visibility = Math.max(earthshine, Math.pow(light, 0.8));
+      const albedo = 0.76 + edgeGlow * 0.13 + surfaceNoise - craterShadow * 0.36;
       const brightness = 0.55 + visibility * 0.45;
       const index = (y * textureSize + x) * 4;
 
       data[index] = Math.round(232 * albedo * brightness);
       data[index + 1] = Math.round(236 * albedo * brightness);
       data[index + 2] = Math.round(224 * albedo * brightness);
-      data[index + 3] = Math.round(Math.min(1, visibility * 1.08) * 255);
+      data[index + 3] = 255;
     }
   }
 
@@ -142,6 +154,8 @@ export function createMoonTexture(phaseOrSize = 0.5, size = 256): CanvasTexture 
   const texture = new CanvasTexture(canvas);
   texture.needsUpdate = true;
   texture.userData.phase = phase;
+  texture.userData.markingCount = markings.length;
+  texture.userData.occludesFullDisc = true;
   return texture;
 }
 
@@ -149,7 +163,50 @@ export interface StarDomeData {
   positions: Float32Array;
   colors: Float32Array;
   phases: Float32Array;
+  namedStars: string[];
+  milkyWay: {
+    bandRatio: number;
+  };
 }
+
+interface BrightStarSeed {
+  name: string;
+  raHours: number;
+  decDeg: number;
+  magnitude: number;
+  color: [number, number, number];
+}
+
+const QINLING_REFERENCE_LATITUDE_DEG = 34;
+
+const brightNorthernStars: BrightStarSeed[] = [
+  { name: "Polaris", raHours: 2.53, decDeg: 89.26, magnitude: 1.98, color: [1.0, 0.95, 0.82] },
+  { name: "Dubhe", raHours: 11.06, decDeg: 61.75, magnitude: 1.79, color: [1.0, 0.84, 0.58] },
+  { name: "Merak", raHours: 11.03, decDeg: 56.38, magnitude: 2.37, color: [0.86, 0.92, 1.0] },
+  { name: "Phecda", raHours: 11.90, decDeg: 53.69, magnitude: 2.44, color: [0.92, 0.96, 1.0] },
+  { name: "Megrez", raHours: 12.26, decDeg: 57.03, magnitude: 3.31, color: [0.88, 0.94, 1.0] },
+  { name: "Alioth", raHours: 12.90, decDeg: 55.96, magnitude: 1.77, color: [0.9, 0.95, 1.0] },
+  { name: "Mizar", raHours: 13.40, decDeg: 54.93, magnitude: 2.23, color: [0.9, 0.95, 1.0] },
+  { name: "Alkaid", raHours: 13.79, decDeg: 49.31, magnitude: 1.86, color: [0.8, 0.9, 1.0] },
+  { name: "Vega", raHours: 18.62, decDeg: 38.78, magnitude: 0.03, color: [0.78, 0.88, 1.0] },
+  { name: "Altair", raHours: 19.85, decDeg: 8.87, magnitude: 0.77, color: [0.95, 0.97, 1.0] },
+  { name: "Deneb", raHours: 20.69, decDeg: 45.28, magnitude: 1.25, color: [0.82, 0.9, 1.0] },
+  { name: "Arcturus", raHours: 14.26, decDeg: 19.18, magnitude: -0.05, color: [1.0, 0.72, 0.42] },
+  { name: "Capella", raHours: 5.28, decDeg: 46.0, magnitude: 0.08, color: [1.0, 0.9, 0.62] },
+  { name: "Aldebaran", raHours: 4.60, decDeg: 16.51, magnitude: 0.85, color: [1.0, 0.62, 0.36] },
+  { name: "Betelgeuse", raHours: 5.92, decDeg: 7.41, magnitude: 0.5, color: [1.0, 0.46, 0.28] },
+  { name: "Rigel", raHours: 5.24, decDeg: -8.2, magnitude: 0.13, color: [0.7, 0.84, 1.0] },
+  { name: "Sirius", raHours: 6.75, decDeg: -16.72, magnitude: -1.46, color: [0.8, 0.9, 1.0] },
+  { name: "Procyon", raHours: 7.66, decDeg: 5.22, magnitude: 0.38, color: [1.0, 0.95, 0.8] },
+  { name: "Castor", raHours: 7.58, decDeg: 31.89, magnitude: 1.58, color: [0.9, 0.96, 1.0] },
+  { name: "Pollux", raHours: 7.76, decDeg: 28.03, magnitude: 1.14, color: [1.0, 0.82, 0.55] },
+  { name: "Regulus", raHours: 10.14, decDeg: 11.97, magnitude: 1.35, color: [0.82, 0.9, 1.0] },
+  { name: "Spica", raHours: 13.42, decDeg: -11.16, magnitude: 0.97, color: [0.72, 0.84, 1.0] },
+  { name: "Antares", raHours: 16.49, decDeg: -26.43, magnitude: 1.06, color: [1.0, 0.42, 0.25] },
+  { name: "Fomalhaut", raHours: 22.96, decDeg: -29.62, magnitude: 1.16, color: [0.85, 0.92, 1.0] },
+  { name: "Cassiopeia-Schedar", raHours: 0.68, decDeg: 56.54, magnitude: 2.24, color: [1.0, 0.78, 0.5] },
+  { name: "Cassiopeia-Caph", raHours: 0.15, decDeg: 59.15, magnitude: 2.28, color: [1.0, 0.96, 0.82] }
+];
 
 /**
  * 程序化星空 dome：上半球随机分布 + 银河平面密度偏置 + 单星亮度/色温差异。
@@ -168,6 +225,7 @@ export function createStarDome(count: number, radius: number): StarDomeData {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const phases = new Float32Array(count);
+  const namedStars: string[] = [];
 
   // LCG 伪随机：seed=137 写死保证可复现
   let seed = 137;
@@ -183,11 +241,27 @@ export function createStarDome(count: number, radius: number): StarDomeData {
   const galE2 = cross3(galPole, galE1);
 
   // 0.45 比例银河带：随机方位 + 小俯仰角（接近银面）
-  // 0.55 比例全天散布：上半球均匀
+  // 0.55 比例全天散布：完整天球均匀。可见性由 star shader 按当前地平线裁剪，
+  // 不能在数据层固定成上半球，否则星空绕北天极旋转时会把空白半球转进视野。
   const galacticBandRatio = 0.45;
-  const minSinElevation = 0.06;
 
-  for (let index = 0; index < count; index += 1) {
+  const realStarCount = Math.min(brightNorthernStars.length, count);
+  for (let index = 0; index < realStarCount; index += 1) {
+    const star = brightNorthernStars[index]!;
+    const p = equatorialToDomeDirection(star.raHours, star.decDeg);
+    positions[index * 3] = p.x * radius;
+    positions[index * 3 + 1] = p.y * radius;
+    positions[index * 3 + 2] = p.z * radius;
+
+    const brightness = Math.min(1, Math.max(0.35, 1.16 - (star.magnitude + 1.46) / 5.4));
+    colors[index * 3] = star.color[0] * brightness;
+    colors[index * 3 + 1] = star.color[1] * brightness;
+    colors[index * 3 + 2] = star.color[2] * brightness;
+    phases[index] = ((index * 0.61803398875) % 1) * Math.PI * 2;
+    namedStars.push(star.name);
+  }
+
+  for (let index = realStarCount; index < count; index += 1) {
     let dx: number, dy: number, dz: number;
 
     if (rand() < galacticBandRatio) {
@@ -205,22 +279,13 @@ export function createStarDome(count: number, radius: number): StarDomeData {
       dy = planeY * tiltCos + galPole.y * tiltSin;
       dz = planeZ * tiltCos + galPole.z * tiltSin;
     } else {
-      // 全天均匀：上半球（sin(elev) ∈ [minSinElev, 1]）
-      const sinElev = minSinElevation + rand() * (1 - minSinElevation);
+      // 全天均匀：完整球面（sin(elev) ∈ [-1, 1]）
+      const sinElev = -1 + rand() * 2;
       const cosElev = Math.sqrt(Math.max(0, 1 - sinElev * sinElev));
       const azimuth = rand() * Math.PI * 2;
       dx = Math.cos(azimuth) * cosElev;
       dy = sinElev;
       dz = Math.sin(azimuth) * cosElev;
-    }
-
-    // 强制提到地平线以上（dy < minSinElevation 的星点压回到水平面附近）
-    if (dy < minSinElevation) {
-      dy = minSinElevation + Math.abs(dy - minSinElevation) * 0.6;
-      const norm = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      dx /= norm;
-      dy /= norm;
-      dz /= norm;
     }
 
     positions[index * 3] = dx * radius;
@@ -250,7 +315,36 @@ export function createStarDome(count: number, radius: number): StarDomeData {
     phases[index] = rand() * Math.PI * 2;
   }
 
-  return { positions, colors, phases };
+  return {
+    positions,
+    colors,
+    phases,
+    namedStars,
+    milkyWay: {
+      bandRatio: galacticBandRatio
+    }
+  };
+}
+
+function equatorialToDomeDirection(raHours: number, decDeg: number) {
+  const ra = (raHours / 24) * Math.PI * 2;
+  const dec = (decDeg * Math.PI) / 180;
+  const lat = (QINLING_REFERENCE_LATITUDE_DEG * Math.PI) / 180;
+  const ncp = normalize3({ x: 0, y: Math.sin(lat), z: -Math.cos(lat) });
+  const east = { x: 1, y: 0, z: 0 };
+  const eq0 = normalize3(cross3(east, ncp));
+  const eq90 = cross3(ncp, eq0);
+  return normalize3({
+    x:
+      ncp.x * Math.sin(dec) +
+      (eq0.x * Math.cos(ra) + eq90.x * Math.sin(ra)) * Math.cos(dec),
+    y:
+      ncp.y * Math.sin(dec) +
+      (eq0.y * Math.cos(ra) + eq90.y * Math.sin(ra)) * Math.cos(dec),
+    z:
+      ncp.z * Math.sin(dec) +
+      (eq0.z * Math.cos(ra) + eq90.z * Math.sin(ra)) * Math.cos(dec)
+  });
 }
 
 function normalize3(v: { x: number; y: number; z: number }) {

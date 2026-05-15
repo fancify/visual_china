@@ -56,8 +56,8 @@
       place-items: center;
       padding: 24px;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0), rgba(226, 237, 226, 0)),
-        rgba(246, 249, 244, 0);
+        linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(226, 237, 226, 0.16)),
+        rgba(246, 249, 244, 0.58);
       backdrop-filter: none;
       transition: opacity 650ms ease, visibility 650ms ease;
     }
@@ -146,9 +146,10 @@
     <div id="status-body">加载中...</div>
   </div>
   <div id="controls">
-    WASD / 方向键: 移动相机<br />
-    Q / E: 上下<br />
-    鼠标拖动: 转视角
+    T: 时辰 · L: 季节 · K: 天气<br />
+    WASD: 镜头相对移动 · Shift: 加速 · P: 切坐骑<br />
+    Space/Ctrl: 升降 · 左/右键拖: 转视角<br />
+    F: 复位镜头 · M: 地图 · I: POI · `（反引号）: 调试面板
   </div>
   <script type="module" src="/src/pyramid-demo.ts"></script>
 </body>

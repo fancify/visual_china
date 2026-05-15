@@ -30,12 +30,15 @@ const GROUPS = {
     "compass-orientation",
     "camera-view",
     "camera-map-projection",
+    "minimap-abstract-map",
+    "character-runtime-contract",
     "text-label-layout",
     "perf-monitor",
     "ground-anchor-registry",
     "regression-baseline",   // S1 19-case snapshot
     "dem-pyramid-ocean-cleanup",
     "pyramid-coastal-lod",
+    "pyramid-environment-runtime",
     "ssot-drift",            // SSOT round 5 守卫
     "surface-provider",      // S3 SurfaceProvider contract + 默认实现
     "epoch-manifest"         // S4 EpochManifest schema + modern/tang manifests

@@ -437,11 +437,12 @@ test("E2 天气 lerp 单调（晴→雨 12 秒内插值不抖）", () => {
 });
 
 test("E3 天体地平线 fade 范围正确 (sky body horizon fade)", () => {
-  // skyBodyHorizonFade(altitude) 应在 altitude ∈ [-0.14, -0.04] 内 smoothstep 从 0 到 1
+  // Line B 天象接入后，日/月轮只在刚沉入地平线时快速 fade，避免半个太阳
+  // 还在地平线上方时就发灰。
   const above = skyBodyHorizonFade(0.5);    // 高在天上 → 1
   const at = skyBodyHorizonFade(0);          // 地平线 → 1
-  const fading = skyBodyHorizonFade(-0.08);  // 中间 → ~0.5
-  const below = skyBodyHorizonFade(-0.20);   // 沉地下 → 0
+  const fading = skyBodyHorizonFade(-0.02);  // 中间 → ~0.5
+  const below = skyBodyHorizonFade(-0.08);   // 沉地下 → 0
 
   assert.equal(above, 1, `body high in sky should be fully visible`);
   assert.equal(at, 1, `body at horizon should be fully visible`);

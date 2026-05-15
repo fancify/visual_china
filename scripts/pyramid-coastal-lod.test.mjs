@@ -74,7 +74,11 @@ test("terrain visibility requests the complete desired set without flooding high
 
   assert.match(source, /const lodBands: \[number, number, number\] = \[120, 220, 300\]/);
   assert.match(source, /updateVisibleAsync\(camera: PerspectiveCamera, scene: Scene\): Promise<void>/);
-  assert.match(source, /await Promise\.all\(requestKeys\.map/);
+  assert.match(source, /visibleUpdateRunning/);
+  assert.match(source, /visibleUpdateQueued/);
+  assert.match(source, /const chunkBuildBatchSize = 8/);
+  assert.match(source, /await Promise\.all\(batch\.map\(requestAndMountChunk\)\)/);
+  assert.match(source, /yieldFrameBetweenChunkBatches/);
   assert.match(source, /function footprintsOverlap/);
   assert.match(source, /function addExistingChildChunks/);
   assert.match(source, /split the parent into child chunks/);

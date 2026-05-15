@@ -90,6 +90,9 @@ export async function bootstrapPyramidTerrain(
   let debugTintActive = false;
   let beachTintActive = true;
   const viewRadius = opts.viewRadiusUnits ?? 100;
+  const chunkBuildBatchSize = 8;
+  let visibleUpdateRunning = false;
+  let visibleUpdateQueued = false;
 
   // Distance-band LOD (mutable — setLodBands() 改这个 array, 下帧 updateVisible 用):
   // Near terrain stays detailed; mid/far terrain steps down to avoid loading only L0.
@@ -100,8 +103,28 @@ export async function bootstrapPyramidTerrain(
     return `${tier}:${x}:${z}`;
   }
 
+  async function yieldFrameBetweenChunkBatches(): Promise<void> {
+    if (typeof requestAnimationFrame !== "function") return;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
   function updateVisible(camera: PerspectiveCamera, scene_: Scene): void {
-    void updateVisibleAsync(camera, scene_);
+    if (visibleUpdateRunning) {
+      visibleUpdateQueued = true;
+      return;
+    }
+    visibleUpdateRunning = true;
+    void updateVisibleAsync(camera, scene_)
+      .catch((error: unknown) => {
+        console.error("[pyramid] updateVisible failed", error);
+      })
+      .finally(() => {
+        visibleUpdateRunning = false;
+        if (visibleUpdateQueued) {
+          visibleUpdateQueued = false;
+          updateVisible(camera, scene_);
+        }
+      });
   }
 
   async function updateVisibleAsync(camera: PerspectiveCamera, scene_: Scene): Promise<void> {
@@ -276,12 +299,13 @@ export async function bootstrapPyramidTerrain(
     }
     latestDesiredKeys = desiredKeys;
 
-    // Request all desired chunks, nearest first. LOD bands and cached-only overlay
-    // sampling keep this list small enough; capping here would create visible holes.
+    // Request all desired chunks, nearest first. Do not cap the desired set: caps
+    // create visible holes. Instead, build the complete set in small batches so a
+    // large camera jump cannot monopolize the main thread for a single frame.
     const requestKeys = Array.from(desiredKeys).sort(
       (a, b) => (desiredDistances.get(a) ?? Infinity) - (desiredDistances.get(b) ?? Infinity)
     );
-    await Promise.all(requestKeys.map(async (k) => {
+    async function requestAndMountChunk(k: string): Promise<void> {
       if (meshHandles.has(k)) return;
       const [tier, xs, zs] = k.split(":");
       const x = Number(xs);
@@ -291,7 +315,6 @@ export async function bootstrapPyramidTerrain(
       if (!latestDesiredKeys.has(k)) return;
       if (meshHandles.has(k)) return; // race
       const tierName = tier as TierName;
-      const tierNumber = tierIndex(tierName);
       const meshMaterial = debugTintActive ? tierTintMaterials[tierName] : material;
       const handle = createPyramidChunkMesh(chunk, {
         material: meshMaterial,
@@ -352,7 +375,15 @@ export async function bootstrapPyramidTerrain(
       if (south) seEntries.push({ handle: south, corner: "NE" });
       if (se) seEntries.push({ handle: se, corner: "NW" });
       harmonizeCorner(seEntries);
-    }));
+    }
+
+    for (let i = 0; i < requestKeys.length; i += chunkBuildBatchSize) {
+      const batch = requestKeys.slice(i, i + chunkBuildBatchSize);
+      await Promise.all(batch.map(requestAndMountChunk));
+      if (i + chunkBuildBatchSize < requestKeys.length) {
+        await yieldFrameBetweenChunkBatches();
+      }
+    }
 
     // Evict meshes outside desired set
     for (const [k, handle] of Array.from(meshHandles.entries())) {

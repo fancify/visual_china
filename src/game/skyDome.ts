@@ -26,6 +26,11 @@ export interface CelestialDomeVector {
   altitude: number;
 }
 
+export interface StarDomeSiderealInput {
+  timeOfDay: number;
+  dayCount: number;
+}
+
 export const skyDomePolicy: SkyDomePolicy = {
   anchoring: "camera-centered",
   renderSpace: "world-sky-dome",
@@ -39,10 +44,10 @@ export const skyBodyStyle: {
 } = {
   moon: {
     textureTreatment: "flat-distant-disc",
-    minScale: 16,
-    maxScale: 22,
+    minScale: 22.5,
+    maxScale: 31.5,
     glowOpacity: 0.12,
-    radiusMultiplier: 0.985
+    radiusMultiplier: 0.86
   },
   sun: {
     textureTreatment: "soft-sky-glow",
@@ -52,6 +57,22 @@ export const skyBodyStyle: {
     radiusMultiplier: 0.98
   }
 };
+
+const QINLING_REFERENCE_LATITUDE_DEG = 34;
+const SIDEREAL_ADVANCE_PER_SOLAR_DAY = 1.00273790935;
+
+export const northernCelestialPole = new Vector3(
+  0,
+  Math.sin((QINLING_REFERENCE_LATITUDE_DEG * Math.PI) / 180),
+  -Math.cos((QINLING_REFERENCE_LATITUDE_DEG * Math.PI) / 180)
+).normalize();
+
+export function starDomeSiderealAngle(
+  { timeOfDay, dayCount }: StarDomeSiderealInput
+): number {
+  const turns = dayCount * SIDEREAL_ADVANCE_PER_SOLAR_DAY + timeOfDay / 24;
+  return (((turns % 1) + 1) % 1) * Math.PI * 2;
+}
 
 export function celestialDomeVector(
   { timeOfDay, body, radius = skyDomePolicy.radius }: CelestialDomeVectorInput
@@ -67,3 +88,4 @@ export function celestialDomeVector(
     altitude
   };
 }
+import { Vector3 } from "three";

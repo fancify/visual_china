@@ -62,11 +62,10 @@ interface StarTwinkleUniforms {
  * 升级，浏览器开销几乎不变。
  */
 const SKY_VERTEX = /* glsl */ `
-  varying vec3 vWorldPos;
+  varying vec3 vSkyDirection;
   void main() {
-    vec4 wp = modelMatrix * vec4(position, 1.0);
-    vWorldPos = wp.xyz;
-    gl_Position = projectionMatrix * viewMatrix * wp;
+    vSkyDirection = normalize(position);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 const SKY_FRAGMENT = /* glsl */ `
@@ -78,13 +77,21 @@ const SKY_FRAGMENT = /* glsl */ `
   uniform vec3 sunDirection;
   uniform float horizonSoftness;
   uniform float sunInfluence;
-  varying vec3 vWorldPos;
+  uniform float sunVisibility;
+  varying vec3 vSkyDirection;
+  const float PI = 3.141592653589793;
+  float hgPhase(float cosTheta, float g) {
+    float g2 = g * g;
+    float denom = pow(max(0.0001, 1.0 - 2.0 * g * cosTheta + g2), 1.5);
+    return (1.0 - g2) / (4.0 * PI * denom);
+  }
   void main() {
-    vec3 dir = normalize(vWorldPos);
+    vec3 dir = normalize(vSkyDirection);
+    vec3 sunDir3 = normalize(sunDirection);
     vec2 horizonVec = vec2(dir.x, dir.z);
     float horizonLen = length(horizonVec);
     vec2 horizonDir = horizonLen > 1e-4 ? horizonVec / horizonLen : vec2(1.0, 0.0);
-    vec2 sunVec = vec2(sunDirection.x, sunDirection.z);
+    vec2 sunVec = vec2(sunDir3.x, sunDir3.z);
     float sunLen = length(sunVec);
     vec2 sunDir = sunLen > 1e-4 ? sunVec / sunLen : vec2(1.0, 0.0);
     float sunAzimuth = dot(horizonDir, sunDir);
@@ -100,6 +107,15 @@ const SKY_FRAGMENT = /* glsl */ `
     vec3 sky = mix(horizonTint, zenithColor, t);
     float groundMix = smoothstep(0.0, -0.18, dir.y);
     sky = mix(sky, groundColor, groundMix * horizonSoftness);
+    float sunCos = clamp(dot(dir, sunDir3), -1.0, 1.0);
+    float mieForward = hgPhase(sunCos, 0.84);
+    float sunAngularGlow = smoothstep(0.90, 1.0, sunCos);
+    float broadSolarLift = smoothstep(0.28, 1.0, sunCos) * (1.0 - smoothstep(0.0, -0.18, dir.y));
+    sky += sunWarmColor * sunInfluence * sunVisibility * (
+      broadSolarLift * 0.08 +
+      sunAngularGlow * 0.18 +
+      clamp(mieForward * 0.045, 0.0, 0.28)
+    );
     gl_FragColor = vec4(sky, 1.0);
   }
 `;
@@ -116,7 +132,8 @@ function makeSkyShellMaterial(): ShaderMaterial {
       groundColor: { value: new Color(0x14201f) },
       sunDirection: { value: new Vector3(1, 0, 0) },
       horizonSoftness: { value: 0.55 },
-      sunInfluence: { value: 0 }
+      sunInfluence: { value: 0 },
+      sunVisibility: { value: 1 }
     },
     side: BackSide,
     depthTest: false,
@@ -138,22 +155,31 @@ function installStarTwinkle(material: PointsMaterial): void {
         `#include <common>
 attribute float phase;
 uniform float twinkleTime;
-varying float vTwinkle;`
+varying float vTwinkle;
+varying float vHorizonFade;`
       )
       .replace(
         "#include <color_vertex>",
         `#include <color_vertex>
-  vTwinkle = 0.55 + 0.45 * sin(twinkleTime * 1.6 + phase);`
+  vTwinkle = 0.55 + 0.45 * sin(twinkleTime * 1.6 + phase);
+  vec3 starWorldDirection = normalize((modelMatrix * vec4(position, 1.0)).xyz - cameraPosition);
+  vHorizonFade = smoothstep(-0.005, 0.045, starWorldDirection.y);`
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
         `#include <common>
-varying float vTwinkle;`
+varying float vTwinkle;
+varying float vHorizonFade;`
       )
       .replace(
         "vec4 diffuseColor = vec4( diffuse, opacity );",
-        "vec4 diffuseColor = vec4( diffuse * vTwinkle, opacity );"
+        "vec4 diffuseColor = vec4( diffuse * vTwinkle, opacity * vHorizonFade );"
+      )
+      .replace(
+        "#include <alphatest_fragment>",
+        `if ( vHorizonFade <= 0.001 ) discard;
+#include <alphatest_fragment>`
       );
     material.userData.shader = shader;
   };
@@ -191,6 +217,9 @@ export function createSkyDome(): SkyDomeHandle {
     "phase",
     new BufferAttribute(starDomeData.phases, 1)
   );
+  starDomeGeometry.userData.source = "real-northern-bright-stars-plus-procedural-background";
+  starDomeGeometry.userData.namedStars = starDomeData.namedStars;
+  starDomeGeometry.userData.milkyWay = starDomeData.milkyWay;
   const starDomeMaterial = new PointsMaterial({
     vertexColors: true,
     size: 0.95,
@@ -207,14 +236,14 @@ export function createSkyDome(): SkyDomeHandle {
   group.add(starDome);
 
   const sunDiscTexture = createCircleTexture(
-    "rgba(255, 230, 180, 1)",
-    "rgba(255, 100, 60, 0)",
+    "rgba(255, 244, 214, 1)",
+    "rgba(255, 206, 116, 0)",
     256,
     [
-      { offset: 0, color: "rgba(255, 230, 180, 1)" },
-      { offset: 0.45, color: "rgba(255, 200, 130, 0.7)" },
-      { offset: 0.65, color: "rgba(255, 150, 80, 0.25)" },
-      { offset: 1, color: "rgba(255, 100, 60, 0)" }
+      { offset: 0, color: "rgba(255, 250, 226, 1)" },
+      { offset: 0.38, color: "rgba(255, 238, 184, 0.86)" },
+      { offset: 0.66, color: "rgba(255, 209, 124, 0.12)" },
+      { offset: 1, color: "rgba(255, 206, 116, 0)" }
     ]
   );
   const sunDiscMaterial = new SpriteMaterial({
@@ -284,6 +313,7 @@ export function applySkyVisuals(
     horizonCoolColor?: Color;
     groundColor?: Color;
     sunInfluence?: number;
+    sunVisibility?: number;
     moonPhase?: number;
   }
 ): void {
@@ -310,6 +340,7 @@ export function applySkyVisuals(
   }
   handle.shellMaterial.uniforms.groundColor.value.copy(ground);
   handle.shellMaterial.uniforms.sunInfluence.value = options.sunInfluence ?? 0;
+  handle.shellMaterial.uniforms.sunVisibility.value = options.sunVisibility ?? 1;
   handle.starDomeMaterial.opacity = options.starOpacity;
   // 白天 starOpacity 接近 0，但 GPU 仍要处理 5000 个 point 的顶点+片元——
   // visible:false 让它整体跳过 draw call，省一笔白天的 GPU 浪费。

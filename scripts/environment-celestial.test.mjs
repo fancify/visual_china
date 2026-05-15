@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { celestialCycle } from "../src/game/celestial.js";
+import {
+  celestialCycle,
+  celestialVisibilityModifiers,
+  rainbowPotential
+} from "../src/game/celestial.js";
+import { EnvironmentController } from "../src/game/environment.ts";
 
 test("clear night stays readable and exposes moon, stars, and clouds", () => {
   const visuals = celestialCycle({
@@ -73,4 +78,110 @@ test("sunrise clears stars quickly and deep night allows an opaque moon", () => 
   assert.ok(sunrise.starOpacity <= 0.05, "sunrise should collapse star visibility");
   assert.ok(predawn.starOpacity > sunrise.starOpacity, "predawn should still carry visible stars");
   assert.equal(midnight.moonOpacity, 1, "deep night moon should be fully opaque");
+});
+
+test("default climate context is neutral and bounded", async () => {
+  const climate = await import("../src/game/climateContext.ts");
+  const context = climate.defaultClimateContext();
+
+  assert.equal(context.zone, "temperate-inland");
+  assert.equal(context.latitude, 34.3);
+  assert.equal(context.elevationMeters, 600);
+  assert.ok(context.humidity >= 0 && context.humidity <= 1);
+  assert.ok(context.aridity >= 0 && context.aridity <= 1);
+  assert.ok(context.waterProximity >= 0 && context.waterProximity <= 1);
+});
+
+test("climate modifiers make wet regions mistier and dry regions clearer", async () => {
+  const climate = await import("../src/game/climateContext.ts");
+
+  const wet = climate.climateVisualModifiers({
+    zone: "jiangnan-water",
+    latitude: 30.2,
+    elevationMeters: 20,
+    waterProximity: 0.95,
+    humidity: 0.9,
+    aridity: 0.08
+  });
+  const dry = climate.climateVisualModifiers({
+    zone: "western-dryland",
+    latitude: 42.8,
+    elevationMeters: 900,
+    waterProximity: 0.05,
+    humidity: 0.18,
+    aridity: 0.86
+  });
+
+  assert.ok(wet.fogDensityMul > dry.fogDensityMul);
+  assert.ok(wet.mistOpacityAdd > dry.mistOpacityAdd);
+  assert.ok(dry.dryHazeAdd > wet.dryHazeAdd);
+  assert.ok(wet.cloudOpacityAdd > dry.cloudOpacityAdd);
+});
+
+test("geo climate helper separates Jiangnan, western dryland, plateau, and north China", async () => {
+  const climate = await import("../src/game/climateContext.ts");
+
+  const jiangnan = climate.climateContextForGeo(30.2, 120.2, { waterProximity: 0.7 });
+  const western = climate.climateContextForGeo(40.0, 88.0, { elevationMeters: 900 });
+  const plateau = climate.climateContextForGeo(32.0, 91.0, { elevationMeters: 4100 });
+  const north = climate.climateContextForGeo(38.5, 115.5, { elevationMeters: 80 });
+
+  assert.equal(jiangnan.zone, "jiangnan-water");
+  assert.equal(western.zone, "western-dryland");
+  assert.equal(plateau.zone, "tibetan-plateau");
+  assert.equal(north.zone, "north-china-plain");
+  assert.ok(jiangnan.humidity > north.humidity);
+  assert.ok(western.aridity > north.aridity);
+  assert.ok(plateau.elevationMeters >= 4100);
+});
+
+test("celestial visibility favors dry high places over humid lowlands", () => {
+  const dryHigh = celestialVisibilityModifiers({
+    cloudOpacity: 0.18,
+    humidity: 0.15,
+    elevationMeters: 4200,
+    moonPhase: 0.02
+  });
+  const wetLow = celestialVisibilityModifiers({
+    cloudOpacity: 0.48,
+    humidity: 0.9,
+    elevationMeters: 20,
+    moonPhase: 0.52
+  });
+
+  assert.ok(dryHigh.starVisibilityMul > wetLow.starVisibilityMul);
+  assert.ok(dryHigh.milkyWayVisibilityMul > wetLow.milkyWayVisibilityMul);
+  assert.ok(wetLow.moonGlareCut > dryHigh.moonGlareCut);
+});
+
+test("rainbow potential requires moisture and low sun", () => {
+  const afterRainLowSun = rainbowPotential({
+    solarAltitude: 0.18,
+    precipitationOpacity: 0.45,
+    humidity: 0.78,
+    cloudOpacity: 0.25
+  });
+  const dryNoon = rainbowPotential({
+    solarAltitude: 0.86,
+    precipitationOpacity: 0,
+    humidity: 0.16,
+    cloudOpacity: 0.1
+  });
+
+  assert.ok(afterRainLowSun > 0.2);
+  assert.equal(dryNoon, 0);
+});
+
+test("manual snow requests are rejected outside winter", () => {
+  const controller = new EnvironmentController();
+
+  controller.state.dayOfYear = 198;
+  controller.state.season = "summer";
+  controller.setWeather("snow", 0);
+  assert.notEqual(controller.state.weather, "snow");
+
+  controller.state.dayOfYear = 17.5;
+  controller.state.season = "winter";
+  controller.setWeather("snow", 0);
+  assert.equal(controller.state.weather, "snow");
 });

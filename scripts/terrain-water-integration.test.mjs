@@ -343,7 +343,7 @@ test("pyramid demo preload screen stages terrain and water before entering", () 
   assert.doesNotMatch(html, /千里江山正在展开/);
   assert.match(html, /body \{[\s\S]*background: #c7d5e3/);
   assert.match(html, /#canvas \{[\s\S]*background: #c7d5e3/);
-  assert.match(html, /rgba\(246, 249, 244, 0\)/);
+  assert.match(html, /rgba\(246, 249, 244, 0\.58\)/);
   assert.match(html, /backdrop-filter: none/);
   assert.match(html, /#preload-panel \{[\s\S]*text-align: center/);
   assert.match(html, /#preload-panel \{[\s\S]*text-shadow: none/);
@@ -356,6 +356,8 @@ test("pyramid demo preload screen stages terrain and water before entering", () 
   assert.match(source, /tangThreeHundredPoems/);
   assert.doesNotMatch(source, /\\\\n/);
   assert.match(source, /sanitizePoemText/);
+  assert.match(source, /splitPoemIntoSentenceLines/);
+  assert.match(source, /[。！？]/);
   assert.match(source, /stripPoemParentheticals/);
   assert.match(source, /replace\(\s*\/\[\\uFF08\\uFF09/);
   assert.match(source, /一作\|通：\|又作\|或作/);
@@ -364,7 +366,10 @@ test("pyramid demo preload screen stages terrain and water before entering", () 
   assert.match(source, /preloadPoemMeta/);
   assert.match(source, /animatePreloadProgress/);
   assert.match(source, /DEMO_VIEW_RADIUS_UNITS = 360/);
+  assert.match(source, /MAX_RENDER_PIXEL_RATIO = 1\.5/);
+  assert.match(source, /renderer\.setPixelRatio\(Math\.min\(window\.devicePixelRatio, MAX_RENDER_PIXEL_RATIO\)\)/);
   assert.match(source, /viewRadiusUnits: DEMO_VIEW_RADIUS_UNITS/);
+  assert.match(source, /handle\.setLodBands\(\[60, 120, 180\]\)/);
   assert.match(source, /setPreloadProgress\(0\.22, "加载出生点附近 L0\.\.\."/);
   assert.match(source, /await preloadTerrainChunks\(coreL0\)/);
   assert.match(source, /setPreloadProgress\(0\.48, "加载远景 L3\.\.\."/);
@@ -375,7 +380,8 @@ test("pyramid demo preload screen stages terrain and water before entering", () 
   assert.match(source, /setPreloadProgress\(0\.86, "加载河流索引\.\.\."/);
   assert.match(source, /setPreloadProgress\(0\.94, "构建当前视野地形\.\.\."/);
   assert.match(source, /await handle\.updateVisibleAsync\(camera, scene\)/);
-  assert.match(source, /renderer\.render\(scene, camera\);\n\n\/\/ keys/);
+  // 2026-05-15: control redesign — `// keys` 注释段改为 `// 输入：所有键位 SSOT ...`
+  assert.match(source, /renderer\.render\(scene, camera\);\n\n\/\/ 输入：所有键位 SSOT/);
   assert.doesNotMatch(source, /createPyramidEnvironmentRuntime/);
   assert.doesNotMatch(source, /pyramidEnvironment\.update\(dt\)/);
   assert.match(source, /setTimeout\(hidePreload, 180\)/);
@@ -386,10 +392,34 @@ test("pyramid demo does not use the failed coastline overlay layer", () => {
   assert.doesNotMatch(source, /createCoastlineOceanOverlay/);
 });
 
-test("pyramid demo exposes a beach tint compare toggle", () => {
+test("pyramid demo exposes a beach tint compare toggle via DebugPanel", () => {
   const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
-  assert.match(source, /setBeachTint/);
-  assert.match(source, /e\.key === "b"/);
+  // 2026-05-15: control redesign — B 散键废，统一进 DebugPanel onBeachTintToggle 回调。
+  assert.match(source, /onBeachTintToggle/);
+  assert.match(source, /handle\.setBeachTint/);
+});
+
+test("pyramid demo wires debug toggles + wheel zoom through InputManager", () => {
+  const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
+  // 2026-05-15: control redesign — G/R/F/D/wheel 散键迁到 InputManager + DebugPanel。
+  assert.match(source, /CAMERA_ZOOM_MIN/);
+  assert.match(source, /PLAYER_TURN_SPEED/);
+  // Wheel 通过 InputManager 的 camera.zoom action 派发
+  assert.match(source, /inputManager\.on\("camera\.zoom"/);
+  // 调试 toggle 走 DebugPanel 回调
+  assert.match(source, /onFlatShadingToggle/);
+  assert.match(source, /handle\.setFlatShading/);
+  assert.match(source, /onLodTintToggle/);
+  assert.match(source, /handle\.setDebugLodTint/);
+  // F 重新定义为 follow cam 复位（不再是 "拉近 10m"）
+  assert.match(source, /inputManager\.on\("camera\.followReset"/);
+  // 旧散键 keydown handler 必须不复活
+  assert.doesNotMatch(source, /e\.key === "g"/);
+  assert.doesNotMatch(source, /e\.key === "r"/);
+  assert.doesNotMatch(source, /e\.key === "b"/);
+  // playerInput.left/right 仍 null 化（A/D 喂角色 turn，不直接移动）
+  assert.match(source, /playerInput\.left = false/);
+  assert.match(source, /playerInput\.right = false/);
 });
 
 test("pyramid demo starts above Beijing at roughly 10km altitude", () => {

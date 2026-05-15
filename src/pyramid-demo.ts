@@ -26,13 +26,38 @@ import {
   createMinimap,
   createDebugOverlay
 } from "./game/terrain/index.js";
+import { createSkyDome } from "./game/atmosphereLayer.js";
+import { createCloudLayer } from "./game/cloudPlanes.js";
+import {
+  EnvironmentController,
+  type Season,
+  type Weather
+} from "./game/environment.js";
+import {
+  advancePyramidTimePreset,
+  applyPyramidEnvironmentRuntime,
+  pyramidEnvironmentStatus
+} from "./game/pyramidEnvironmentRuntime.js";
+import { WindManager } from "./game/windManager.js";
 import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
   qinlingRegionBounds,
   qinlingRegionWorld
 } from "./data/qinlingRegion.js";
 import tangThreeHundredPoems from "./data/tangThreeHundredPoems.json";
+import {
+  applyCameraFollowPose,
+  applyCharacterEmissive,
+  cameraFollowPoseForCharacterPlayer,
+  characterEmissive,
+  characterInputFromKeySet,
+  characterMountOffsets,
+  createCharacterPlayerRuntime
+} from "./game/player/characterRuntime.js";
 import type { TierName } from "./game/terrain/pyramidTypes.js";
+import { createInputManager } from "./game/input/InputManager.js";
+import { createDebugPanel } from "./game/input/DebugPanel.js";
+import { tintCloudFlightVisual } from "./game/skeletal/flightVisuals.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const statusBody = document.getElementById("status-body")!;
@@ -65,6 +90,13 @@ function sanitizePoemText(text: string): string {
     .trim();
 }
 
+function splitPoemIntoSentenceLines(lines: string[]): string[] {
+  const text = lines.map(sanitizePoemText).filter(Boolean).join("");
+  const sentenceLines = text.match(/[^。！？!?]+[。！？!?]/g)?.map((line) => line.trim()) ?? [];
+  if (sentenceLines.length > 0) return sentenceLines;
+  return lines.map(sanitizePoemText).filter(Boolean);
+}
+
 function showRandomPreloadPoem(): void {
   let index = Math.floor(Math.random() * tangThreeHundredPoems.length);
   if (tangThreeHundredPoems.length > 1 && index === currentPreloadPoemIndex) {
@@ -72,7 +104,7 @@ function showRandomPreloadPoem(): void {
   }
   currentPreloadPoemIndex = index;
   const poem = tangThreeHundredPoems[index];
-  const lines = poem.lines.map(sanitizePoemText).filter(Boolean);
+  const lines = splitPoemIntoSentenceLines(poem.lines);
   preloadPoem.textContent = lines.join("\n");
   preloadPoemMeta.textContent = `${poem.author}《${sanitizePoemText(poem.title)}》 · ${poem.eraName}（${poem.yearLabel}）`;
 }
@@ -119,6 +151,20 @@ scene.fog = new Fog(0xc7d5e3, 360, 1250);
 const BEIJING_START_GEO = { lat: 39.9042, lon: 116.4074 };
 const START_ALTITUDE_WORLD_Y = 21.4;
 const DEMO_VIEW_RADIUS_UNITS = 360;
+const GROUND_CAMERA_DISTANCE = 22;
+const FLIGHT_CAMERA_DISTANCE = 34;
+const CLOSE_CAMERA_DISTANCE = 1.6;       // F 键拉近：与人物等高水平视角的舒适距离
+const CAMERA_OVERRIDE_MIN = 0.5;         // 滚轮在 override 模式下最近 0.5m（贴脸）
+const CAMERA_OVERRIDE_MAX = 90;
+const DEFAULT_CAMERA_PITCH = 0;          // 水平视角（不俯视），让 horizon 在角色头部高度
+// pitch 范围放宽到 ≈ [-85°, +85°]——近乎全 sphere，可一直拖到天顶看天
+const CAMERA_PITCH_MIN = -Math.PI / 2 + 0.1;
+const CAMERA_PITCH_MAX = Math.PI / 2 - 0.1;
+const MOUSE_YAW_SENSITIVITY = 0.005;
+const MOUSE_PITCH_SENSITIVITY = 0.004;
+const CAMERA_ZOOM_MIN = 0.55;
+const CAMERA_ZOOM_MAX = 2.4;
+const PLAYER_TURN_SPEED = 2.2;
 const startWorld = projectGeoToWorld(
   BEIJING_START_GEO,
   qinlingRegionBounds,
@@ -140,40 +186,183 @@ scene.add(ambient);
 const sun = new DirectionalLight(0xffeab8, 1.05); // 偏暖金
 sun.position.set(60, 110, 40);
 scene.add(sun);
+const moonLight = new DirectionalLight(0xb9cfff, 0.18);
+moonLight.position.set(-60, 80, -40);
+scene.add(moonLight);
+const rimLight = new DirectionalLight(0x86b5c0, 0.18);
+rimLight.position.set(-80, 45, 100);
+scene.add(rimLight);
+
+const environmentController = new EnvironmentController();
+const query = new URLSearchParams(window.location.search);
+const queryWeather = query.get("weather");
+const querySeason = query.get("season");
+const queryTime = Number(query.get("time"));
+if (Number.isFinite(queryTime) && queryTime >= 0 && queryTime < 24) {
+  environmentController.state.timeOfDay = queryTime;
+}
+if (querySeason && ["spring", "summer", "autumn", "winter"].includes(querySeason)) {
+  environmentController.state.season = querySeason as Season;
+}
+if (queryWeather && ["clear", "windy", "cloudy", "rain", "storm", "snow", "mist"].includes(queryWeather)) {
+  environmentController.setWeather(queryWeather as Weather, 0);
+}
+const windManager = new WindManager();
+const skyDome = createSkyDome();
+scene.add(skyDome.group);
+const cloudLayer = createCloudLayer();
+scene.add(cloudLayer.group);
+let cloudDriftSeconds = 0;
 
 // renderer
 const renderer = new WebGLRenderer({ canvas, antialias: true });
+const MAX_RENDER_PIXEL_RATIO = 1.5;
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_RENDER_PIXEL_RATIO));
+let oceanWaterSurface:
+  | {
+      setTime(time: number): void;
+      setSunDirection(direction: Vector3): void;
+      setShimmerStrength?(strength: number): void;
+    }
+  | undefined;
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+function syncPyramidEnvironment(elapsedSeconds: number, deltaSeconds: number): void {
+  applyPyramidEnvironmentRuntime({
+    environment: environmentController,
+    cameraPosition: camera.position,
+    elapsedSeconds,
+    deltaSeconds,
+    fog: scene.fog as Fog,
+    ambientLight: ambient,
+    sunLight: sun,
+    moonLight,
+    rimLight,
+    renderer,
+    skyDome,
+    oceanWaterSurface,
+    cloud: {
+      layer: cloudLayer,
+      driftSeconds: cloudDriftSeconds,
+      windDirection: windManager.uniforms.direction.value,
+      updateDriftSeconds(nextDriftSeconds) {
+        cloudDriftSeconds = nextDriftSeconds;
+      }
+    }
+  });
+}
+syncPyramidEnvironment(performance.now() * 0.001, 0);
 renderer.render(scene, camera);
 
-// keys
-const keys = new Set<string>();
-window.addEventListener("keydown", (e) => keys.add(e.key.toLowerCase()));
-window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+// 输入：所有键位 SSOT 在 src/game/input/bindings.ts；改键改那里。
+const inputManager = createInputManager({ pointerTarget: canvas });
 
-// mouse
-let pointerDown = false;
-let lastMouse: { x: number; y: number } = { x: 0, y: 0 };
-let yaw = 0;
-let pitch = -0.3;
-canvas.addEventListener("pointerdown", (e) => {
-  pointerDown = true;
-  lastMouse = { x: e.clientX, y: e.clientY };
+// alt+digit 动画 clip 选择保留为 legacy 路径（直接喂给 characterInputFromKeySet）。
+// 未来 DebugPanel 加一个 clip 下拉就可以彻底删掉。
+const legacyAltDigitKeys = new Set<string>();
+window.addEventListener("keydown", (e) => {
+  if (e.altKey && /^Digit[1-9]$/.test(e.code)) {
+    legacyAltDigitKeys.add(`alt+${e.code.slice(5)}`);
+    e.preventDefault();
+  }
 });
-canvas.addEventListener("pointerup", () => (pointerDown = false));
-canvas.addEventListener("pointermove", (e) => {
-  if (!pointerDown) return;
-  const dx = e.clientX - lastMouse.x;
-  const dy = e.clientY - lastMouse.y;
-  yaw -= dx * 0.005;
-  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch - dy * 0.005));
-  lastMouse = { x: e.clientX, y: e.clientY };
+window.addEventListener("keyup", (e) => {
+  if (/^Digit[1-9]$/.test(e.code)) {
+    legacyAltDigitKeys.delete(`alt+${e.code.slice(5)}`);
+  }
+});
+
+// 2026-05-15 v2: 完全解耦镜头方位 + camera-relative 移动
+//   - cameraAzimuth：镜头围绕角色的"世界绝对角度"（鼠标 X + Q/E 驱动）
+//   - cameraPitch：镜头俯仰（鼠标 Y 驱动）
+//   - characterHeading：角色当前朝向；由 WASD 决定（W = 沿镜头 forward 走）
+//   - 三者互不影响。鼠标只动镜头、键盘只动人物。
+//
+// 历史对比：之前 cameraYaw 是"相对 heading 偏移"，camera 跟人物转一起转——会导致
+// 转人物时画面跟着甩；现在拆成绝对角度，转人物时镜头位置不变。
+let characterHeading = 0;
+let cameraAzimuth = 0;
+let cameraPitch = DEFAULT_CAMERA_PITCH;
+let cameraDistanceScale = 1;
+let cameraDistanceOverride: number | null = null;
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+// LMB 或 RMB 拖拽 — X 反向（match BotW/WoW/Skyrim: 右拖 = 镜头绕人物 CW，世界往左飘）
+inputManager.on("camera.rotate", (payload) => {
+  if (payload.kind !== "drag") return;
+  cameraAzimuth -= payload.deltaX * MOUSE_YAW_SENSITIVITY;
+  cameraPitch = clampNumber(
+    cameraPitch + payload.deltaY * MOUSE_PITCH_SENSITIVITY,
+    CAMERA_PITCH_MIN,
+    CAMERA_PITCH_MAX
+  );
+});
+
+inputManager.on("camera.zoom", (payload) => {
+  if (payload.kind !== "wheel") return;
+  const zoomStep = payload.delta > 0 ? 1.1 : 0.9;
+  if (cameraDistanceOverride !== null) {
+    cameraDistanceOverride = clampNumber(
+      cameraDistanceOverride * zoomStep,
+      CAMERA_OVERRIDE_MIN,
+      CAMERA_OVERRIDE_MAX
+    );
+  } else {
+    // 滚轮缩到 scale*GROUND_DIST <= CLOSE_CAMERA_DISTANCE 时切到 override 模式继续往内推
+    const nextScale = cameraDistanceScale * zoomStep;
+    const minNonOverrideDistance = GROUND_CAMERA_DISTANCE * CAMERA_ZOOM_MIN;
+    if (nextScale * GROUND_CAMERA_DISTANCE < minNonOverrideDistance && zoomStep < 1) {
+      // 切到 override 继续往近推
+      cameraDistanceOverride = minNonOverrideDistance * zoomStep;
+    } else {
+      cameraDistanceScale = clampNumber(nextScale, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX);
+    }
+  }
+});
+
+inputManager.on("camera.followReset", () => {
+  // F 键：完整复位 — 镜头到人物正后上方，人物屏幕居中
+  cameraDistanceOverride = CLOSE_CAMERA_DISTANCE;
+  cameraDistanceScale = 1;
+  cameraAzimuth = characterHeading;     // 镜头位置与人物朝向一致 (正后方)
+  cameraPitch = DEFAULT_CAMERA_PITCH;
+  setStatus(`镜头复位: 正后方 ${CLOSE_CAMERA_DISTANCE}m 靠上`);
+});
+
+inputManager.on("camera.overview", () => {
+  cameraDistanceOverride = null;
+  cameraDistanceScale = CAMERA_ZOOM_MAX;
+  setStatus("鸟瞰模式");
+});
+
+// V — 沉浸模式 (pointer lock)：原生 PointerLock API。Esc 自动释放。
+let immersionLocked = false;
+inputManager.on("camera.toggleImmersion", () => {
+  if (immersionLocked) {
+    document.exitPointerLock?.();
+  } else {
+    canvas.requestPointerLock?.();
+  }
+});
+document.addEventListener("pointerlockchange", () => {
+  immersionLocked = document.pointerLockElement === canvas;
+  setStatus(immersionLocked ? "沉浸模式: 鼠标已锁定 (Esc 退出)" : "沉浸模式退出");
+});
+// 沉浸模式下 mousemove 直接更新 cameraAzimuth / cameraPitch（pointer lock 不会 fire drag）
+window.addEventListener("mousemove", (e) => {
+  if (!immersionLocked) return;
+  cameraAzimuth -= e.movementX * 0.003;
+  cameraPitch = clampNumber(
+    cameraPitch + e.movementY * 0.0025,
+    CAMERA_PITCH_MIN,
+    CAMERA_PITCH_MAX
+  );
 });
 
 // Natural Earth vector land mask feeds terrain hole-punching only. Rendering it
@@ -191,6 +380,10 @@ const handle = await bootstrapPyramidTerrain(scene, {
   viewRadiusUnits: DEMO_VIEW_RADIUS_UNITS,
   landMaskSampler
 });
+// Keep the nationwide L3 backdrop, but switch to coarser terrain sooner in the
+// character demo. At Beijing start this cuts the active terrain set from about
+// 155 chunks to about 94 without reintroducing missing-tile holes.
+handle.setLodBands([60, 120, 180]);
 
 const terrainManifest = await handle.loader.loadManifest();
 
@@ -279,9 +472,7 @@ renderer.render(scene, camera);
 // 只负责 base + ripple + fresnel + (no sun glint, BotW 风).
 const oceanPlane = createOceanPlane({ seaLevelY: -3 });
 scene.add(oceanPlane);
-const oceanWaterSurface = oceanPlane.userData.waterSurface as
-  | { setTime(time: number): void; setSunDirection(direction: Vector3): void }
-  | undefined;
+oceanWaterSurface = oceanPlane.userData.waterSurface as typeof oceanWaterSurface;
 oceanWaterSurface?.setSunDirection(sun.position.clone());
 
 // lakes (Natural Earth 10m, 186 China lakes) — flat polygon meshes, Y 跟随 sampler
@@ -299,45 +490,129 @@ setStatus(`湖泊: ${lakeHandle.lakeCount} 个 polygon 加载`);
 // 小地图
 const minimap = createMinimap({ corner: "top-right", width: 240, height: 165 });
 
-// debug overlay: 默认 hidden, 按 G 键切开（调试用 — chunk grid + 经纬度网格 + POI 桩）
-let debugOverlay: ReturnType<typeof createDebugOverlay> | null = null;
-let lodTintActive = false;
-let flatShadingActive = false;
-let beachTintActive = true;
-
-window.addEventListener("keydown", (e) => {
-  if (e.key === "g" || e.key === "G") {
-    if (debugOverlay) {
-      debugOverlay.setVisible(!debugOverlay.group.visible);
-    } else {
-      setStatus("调试层后台加载中...");
+setPreloadProgress(0.78, "加载角色与飞行器...");
+const playerRuntime = await createCharacterPlayerRuntime({
+  scene,
+  sampler: {
+    sampleSurfaceHeight(x: number, z: number): number {
+      return handle.sampler.sampleHeightWorld(x, z);
     }
-  }
-  // D 键: 切 LOD tier 染色 debug — 鸟瞰看哪块是哪 tier (L0 绿/L1 蓝/L2 黄/L3 红)
-  if (e.key === "d" || e.key === "D") {
-    lodTintActive = !lodTintActive;
-    handle.setDebugLodTint(lodTintActive);
-    setStatus(lodTintActive
-      ? "LOD 染色: L0 绿 / L1 蓝 / L2 黄 / L3 红 (再按 D 关)"
-      : "LOD 染色关闭");
-  }
-  // F 键: 切 flatShading debug — 三角面分明 vs smooth blend
-  if (e.key === "f" || e.key === "F") {
-    flatShadingActive = !flatShadingActive;
-    handle.setFlatShading(flatShadingActive);
-    setStatus(flatShadingActive
-      ? "Flat shading: 三角面分明 (再按 F 关 — 回 smooth)"
-      : "Smooth shading 恢复");
-  }
-  // B 键: 切沙滩色带 — 对比海岸线原始颜色 vs 低平岸线轻微沙色过渡
-  if (e.key === "b" || e.key === "B") {
-    beachTintActive = !beachTintActive;
-    handle.setBeachTint(beachTintActive);
-    setStatus(beachTintActive
-      ? "沙滩色带开启 (按 B 关闭对比)"
-      : "沙滩色带关闭 (按 B 开启对比)");
+  },
+  initialPosition: { x: startWorld.x, z: startWorld.z },
+  search: window.location.search
+});
+
+function syncCameraToPlayer(): void {
+  const playerPosition = playerRuntime.position();
+  const baseDistance = playerRuntime.travelMode() === "ground"
+    ? GROUND_CAMERA_DISTANCE
+    : FLIGHT_CAMERA_DISTANCE;
+  const cameraDistance = cameraDistanceOverride ?? baseDistance * cameraDistanceScale;
+  // 解耦：pose function 的 azimuth = heading + cameraYaw；我们传 heading=0、
+  // cameraYaw=cameraAzimuth 让镜头方位完全由 cameraAzimuth 决定（绝对世界角）
+  const pose = cameraFollowPoseForCharacterPlayer({
+    target: playerPosition,
+    heading: 0,
+    cameraYaw: cameraAzimuth,
+    cameraPitch,
+    distance: cameraDistance,
+    height: playerRuntime.travelMode() === "ground" ? 3.2 : 6.5
+  });
+  applyCameraFollowPose(camera, pose);
+}
+
+syncCameraToPlayer();
+
+// debug overlay 句柄；DebugPanel 通过下面的 toggle 回调控制可见性。
+let debugOverlay: ReturnType<typeof createDebugOverlay> | null = null;
+let lastFpsSample = 60;
+
+const debugPanel = createDebugPanel({
+  onFlatShadingToggle(active) {
+    handle.setFlatShading(active);
+  },
+  onLodTintToggle(active) {
+    handle.setDebugLodTint(active);
+  },
+  onOverlayToggle(active) {
+    if (debugOverlay) debugOverlay.setVisible(active);
+    else setStatus("调试层后台加载中...");
+  },
+  onBeachTintToggle(active) {
+    handle.setBeachTint(active);
+  },
+  onGroundOffsetChange(v) {
+    characterMountOffsets.ground = v;
+  },
+  onSwordOffsetChange(v) {
+    characterMountOffsets.sword = v;
+  },
+  onCloudOffsetChange(v) {
+    characterMountOffsets.cloud = v;
+  },
+  initialMountOffsets: {
+    ground: characterMountOffsets.ground,
+    sword: characterMountOffsets.sword,
+    cloud: characterMountOffsets.cloud
+  },
+  onCharacterEmissiveChange(v) {
+    characterEmissive.intensity = v;
+    applyCharacterEmissive();
+  },
+  initialCharacterEmissive: characterEmissive.intensity,
+  onTimeChange(hour) {
+    environmentController.state.timeOfDay = hour;
+  },
+  onWeatherChange(weather) {
+    environmentController.setWeather(weather);
+  },
+  onSeasonChange(season) {
+    environmentController.state.season = season;
+  },
+  getStats() {
+    return {
+      fps: lastFpsSample,
+      chunks: handle.loader.cacheSize(),
+      timeOfDay: environmentController.state.timeOfDay,
+      weather: environmentController.state.weather,
+      season: environmentController.state.season
+    };
   }
 });
+// 同步初始状态
+debugPanel.setBeachTint(true);
+
+// ── 主键位 action 订阅 ────────────────────────────────────────────────
+inputManager.on("world.cycleTime", () => {
+  const timePreset = advancePyramidTimePreset(environmentController);
+  setStatus(`时间切换: ${timePreset.label} · ${pyramidEnvironmentStatus(environmentController)}`);
+});
+inputManager.on("world.cycleSeason", () => {
+  environmentController.advanceSeason();
+  setStatus(`季节切换: ${pyramidEnvironmentStatus(environmentController)}`);
+});
+inputManager.on("world.cycleWeather", () => {
+  environmentController.advanceWeather();
+  setStatus(`天气切换中: ${pyramidEnvironmentStatus(environmentController)}`);
+});
+
+inputManager.on("debug.togglePanel", () => {
+  const visible = debugPanel.toggle();
+  if (visible) inputManager.pushContext("debugPanel");
+  else inputManager.popContext("debugPanel");
+});
+
+inputManager.on("ui.dismiss", () => {
+  if (debugPanel.isVisible()) {
+    debugPanel.setVisible(false);
+    inputManager.popContext("debugPanel");
+    return;
+  }
+  if (immersionLocked) {
+    document.exitPointerLock?.();
+  }
+});
+
 
 // rivers
 let riverLoader: RiverLoader | null = null;
@@ -380,7 +655,6 @@ async function initDeferredOverlays(): Promise<void> {
 }
 
 // frame loop
-const moveSpeed = 1.5;
 let lastFrame = performance.now();
 let frameCounter = 0;
 function animate(): void {
@@ -389,38 +663,56 @@ function animate(): void {
   lastFrame = now;
   frameCounter += 1;
   const waterTime = now * 0.001;
+  environmentController.update(dt);
+  windManager.update(dt, environmentController.getWindState());
+  // 合并 InputManager 派生的 movement keys + legacy alt+digit
+  const mergedKeys = new Set<string>([
+    ...inputManager.characterKeys().asSet(),
+    ...legacyAltDigitKeys
+  ]);
+  const playerInput = characterInputFromKeySet(mergedKeys);
+  // Q/E 绕角色 orbit 镜头（改 cameraAzimuth）
+  const cameraYawInput = (inputManager.isPressed("camera.yawLeft") ? 1 : 0)
+                       - (inputManager.isPressed("camera.yawRight") ? 1 : 0);
+  if (cameraYawInput !== 0) {
+    cameraAzimuth -= cameraYawInput * PLAYER_TURN_SPEED * dt;
+  }
+  // WASD → 相对镜头方向走（不再是相对角色身体方向）
+  //   - camera forward (xz) = (cos(az), -sin(az))
+  //   - camera right (xz) = up × back = (0,1,0) × (-cos(az), 0, sin(az)) = (sin(az), 0, cos(az))
+  //   - W=forward, S=back, A=strafe left, D=strafe right
+  // 人物 heading 自动转到移动方向（BotW 风：往哪走就面向哪）
+  const wasdF = (playerInput.forward ? 1 : 0) - (playerInput.backward ? 1 : 0);
+  const wasdR = (playerInput.right ? 1 : 0) - (playerInput.left ? 1 : 0);
+  if (wasdF !== 0 || wasdR !== 0) {
+    const fwdX = Math.cos(cameraAzimuth);
+    const fwdZ = -Math.sin(cameraAzimuth);
+    const rightX = Math.sin(cameraAzimuth);
+    const rightZ = Math.cos(cameraAzimuth);
+    const moveX = wasdF * fwdX + wasdR * rightX;
+    const moveZ = wasdF * fwdZ + wasdR * rightZ;
+    // CharacterController 内部 forward = (cos H, -sin H)；要让人物走 (moveX, moveZ)
+    // 需要解 cos H = moveX, -sin H = moveZ → H = atan2(-moveZ, moveX)
+    characterHeading = Math.atan2(-moveZ, moveX);
+    playerInput.forward = true;
+    playerInput.backward = false;
+  }
+  playerInput.left = false;
+  playerInput.right = false;
+  const player = playerRuntime.update(dt, playerInput, characterHeading);
+  if (playerInput.directClipDigit !== null) {
+    legacyAltDigitKeys.delete(`alt+${playerInput.directClipDigit}`);
+  }
+  lastFpsSample = dt > 0 ? 1 / dt : lastFpsSample;
+  syncCameraToPlayer();
+  syncPyramidEnvironment(waterTime, dt);
+  // Sprite 不响应光照——手动 tint 筋斗云 sprite 让它跟场景同步明暗
+  tintCloudFlightVisual(playerRuntime.cloudVisual, ambient.intensity * 1.4, ambient.color);
   oceanWaterSurface?.setTime(waterTime);
   lakeHandle.setTime(waterTime);
   for (const rh of loadedRiverGroups.values()) {
     if (rh) updateRiverGroupShimmer(rh.group, waterTime);
   }
-
-  // movement
-  const fwd = new Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-  const right = new Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-  const v = moveSpeed * dt * 60;
-  if (keys.has("w") || keys.has("arrowup")) camera.position.addScaledVector(fwd, v);
-  if (keys.has("s") || keys.has("arrowdown")) camera.position.addScaledVector(fwd, -v);
-  if (keys.has("a") || keys.has("arrowleft")) camera.position.addScaledVector(right, -v);
-  if (keys.has("d") || keys.has("arrowright")) camera.position.addScaledVector(right, v);
-  if (keys.has("e")) camera.position.y += v;
-  if (keys.has("q")) camera.position.y -= v;
-  if (keys.has("shift")) {
-    // boost
-    if (keys.has("w") || keys.has("arrowup")) camera.position.addScaledVector(fwd, v * 4);
-  }
-
-  // look
-  const forward = new Vector3(
-    -Math.cos(pitch) * Math.sin(yaw),
-    Math.sin(pitch),
-    -Math.cos(pitch) * Math.cos(yaw)
-  );
-  camera.lookAt(
-    camera.position.x + forward.x,
-    camera.position.y + forward.y,
-    camera.position.z + forward.z
-  );
 
   // update pyramid (visible chunks)
   if (frameCounter % 10 === 0) {
@@ -430,7 +722,7 @@ function animate(): void {
     // radius 跟相机高度联动: 平视 radius=16, 高空俯视 radius=28 (~3000km, 覆盖 LOD L2 范围)
     if (riverLoader) {
       const camGeo = unprojectWorldToGeo(
-        { x: camera.position.x, z: camera.position.z },
+        { x: player.position.x, z: player.position.z },
         qinlingRegionBounds,
         qinlingRegionWorld
       );
@@ -486,17 +778,24 @@ function animate(): void {
 
   // minimap (每 6 帧更新一次足够)
   if (frameCounter % 6 === 0) {
-    minimap.update(camera.position.x, camera.position.z, yaw);
+    minimap.update(player.position.x, player.position.z, player.heading, environmentController.state.timeOfDay);
+  }
+
+  // debug panel stats 刷新（panel 显示时才更新）
+  if (frameCounter % 10 === 0 && debugPanel.isVisible()) {
+    debugPanel.refreshStats();
   }
 
   // status
   if (frameCounter % 30 === 0) {
     const cacheN = handle.loader.cacheSize();
     setStatus(
-      `相机 world(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})<br />` +
-        `cache: ${cacheN} chunks<br />` +
-        `FPS: ${(1 / dt).toFixed(0)}<br />` +
-        `北京在 world(${startWorld.x.toFixed(1)}, ${startWorld.z.toFixed(1)})`
+        `玩家 ${player.travelMode} · ${player.movementMode} · speed ${player.speed.toFixed(2)}<br />` +
+        `玩家 world(${player.position.x.toFixed(1)}, ${player.position.y.toFixed(1)}, ${player.position.z.toFixed(1)})<br />` +
+        `相机 world(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})<br />` +
+        `${pyramidEnvironmentStatus(environmentController)}<br />` +
+        `cache: ${cacheN} chunks · FPS: ${lastFpsSample.toFixed(0)}<br />` +
+        `WASD 镜头相对走 · 左/右键拖镜头 · P 切坐骑 · \` 调试`
     );
   }
 

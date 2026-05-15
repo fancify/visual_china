@@ -18,6 +18,7 @@ async function loadGameModules() {
   // .ts。改成跟其他模块一样走 transpile。
   const transpileTargets = [
     "atmosphereLayer.ts",
+    "climateContext.ts",
     "cloudPlanes.ts",
     "environment.ts",
     "proceduralTextures.ts",
@@ -193,11 +194,11 @@ test("sun and moon horizon fade stay full at the horizon and only collapse after
     "disc fade should stay effectively full at the horizon"
   );
   assert.ok(
-    environment.skyBodyHorizonFade(-0.04) >= 0.99,
-    "disc fade should stay full while the center has only just dipped below the horizon"
+    Math.abs(environment.skyBodyHorizonFade(-0.02) - 0.5) < 0.08,
+    "disc fade should be halfway through the current narrow below-horizon window"
   );
   assert.ok(
-    environment.skyBodyHorizonFade(-0.14) <= 0.01,
+    environment.skyBodyHorizonFade(-0.08) <= 0.01,
     "disc fade should collapse once the body is meaningfully below the horizon"
   );
 });
@@ -237,11 +238,11 @@ test("environment maps the sun across an east-noon-west arc and exposes the syno
   const midnight = controller.computeVisuals();
   assert.ok(midnight.sunDirection.y < 0, "midnight sun should stay below the horizon");
 
-  controller.state.dayOfYear = 14.75;
+  controller.state.dayCount = 14.75;
   const fullMoon = controller.computeVisuals();
   assert.ok(Math.abs(fullMoon.moonPhase - 0.5) < 1e-9, "half a synodic month should land on full moon");
 
-  controller.state.dayOfYear = 29.5;
+  controller.state.dayCount = 29.5;
   const resetMoon = controller.computeVisuals();
   assert.ok(resetMoon.moonPhase < 1e-9, "one synodic month should wrap back to new moon");
 });
@@ -257,7 +258,7 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
     assert.equal(dome.moonDiscMaterial.depthWrite, true);
     assert.deepEqual(
       dome.sunDiscMaterial.map.userData.gradientStops.map((stop) => stop.offset),
-      [0, 0.45, 0.65, 1],
+      [0, 0.38, 0.66, 1],
       "sun disc should use the tighter warm-core gradient"
     );
 
@@ -265,6 +266,24 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
     assert.ok(phaseAttribute, "star dome should expose per-star twinkle phase");
     assert.equal(phaseAttribute.itemSize, 1);
     assert.equal(phaseAttribute.count, 5000);
+    assert.ok(
+      dome.starDome.geometry.userData.namedStars.includes("Polaris"),
+      "star dome should seed named northern bright stars"
+    );
+    assert.equal(
+      dome.starDome.geometry.userData.milkyWay.bandRatio,
+      0.45,
+      "star dome should expose the procedural Milky Way band ratio"
+    );
+    assert.equal(
+      dome.moonDiscMaterial.map.userData.occludesFullDisc,
+      true,
+      "moon texture should render the whole disc so phase lighting can show earthshine"
+    );
+    assert.ok(
+      dome.moonDiscMaterial.map.userData.markingCount >= 16,
+      "moon texture should carry richer procedural surface markings"
+    );
 
     const fragmentShader = dome.shellMaterial.fragmentShader;
     assert.match(fragmentShader, /uniform vec3 sunDirection;/);
@@ -302,20 +321,23 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
   }
 });
 
-test("cloud layer uses three low procedural planes instead of puff sprites", async () => {
+test("cloud layer uses a distributed procedural patch deck instead of puff sprites", async () => {
   const restoreDocument = installCanvasStub();
   try {
     const { atmosphereLayer } = await loadGameModules();
     const cloudLayer = atmosphereLayer.createCloudLayer();
 
-    assert.equal(cloudLayer.sprites.length, 3);
-    assert.equal(cloudLayer.planes.length, 3);
-    assert.deepEqual(cloudLayer.planes.map((cloud) => cloud.userData.heightOffset), [8, 12, 16]);
+    assert.equal(cloudLayer.sprites.length, 12);
+    assert.equal(cloudLayer.planes.length, 12);
+    assert.deepEqual(
+      cloudLayer.planes.slice(0, 4).map((cloud) => cloud.userData.heightOffset),
+      [28, 36, 44, 26]
+    );
 
     cloudLayer.planes.forEach((cloud, index) => {
       assert.equal(cloud.children.length, 0);
       assert.ok(
-        Number(cloud.userData.driftSpeed) >= 0.4,
+        Number(cloud.userData.driftSpeed) >= 0.3,
         `cloud ${index} drift speed should be positive, got ${cloud.userData.driftSpeed}`
       );
     });
