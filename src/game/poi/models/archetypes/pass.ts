@@ -1,121 +1,135 @@
 import * as THREE from "three";
 import {
   TANG_PALETTE,
-  buildHipRoof,
+  buildPagoda,
   buildRammedEarthWall,
   buildSimpleHall,
-  buildPagoda,
-  buildColumn,
 } from "../tangParts.js";
-
-// 共通几何资源 (lazy reuse via local consts inside function to keep file simple)
 
 /**
  * 关隘建筑原型 (pass / 关).
  *
- * 共通: 两侧 placeholder 山 (CylinderGeometry 8-segment cone) + 中间夯土城墙.
- *
- * - minor: 单座关楼 + 木栅门
- * - major: 双层关楼 + 更高山 + 左右延伸长城 + 右山顶烽燧
- *
- * @param variant 'minor' | 'major'
- * @returns THREE.Group, name = "pass_" + variant
+ * 唐风重做: 关隘先是地形, 再是建筑。两侧用岩肩/山脊夹出山口,
+ * 城墙贴山延伸, 关楼坐在门洞上, 不再用巨大锥体代表山体。
  */
 export function buildPass(variant: "minor" | "major"): THREE.Group {
   const group = new THREE.Group();
   group.name = `pass_${variant}`;
 
   const isMajor = variant === "major";
-  const mountainHeight = isMajor ? 8 : 5.5;
-  const mountainRadius = 2;
-  const mountainSpacing = 4; // 左右山中心间距
+  const throatWidth = isMajor ? 4.4 : 3.4;
 
-  // ----- 两侧山 (placeholder cone) -----
-  const mountainGeom = new THREE.CylinderGeometry(
-    0,
-    mountainRadius,
-    mountainHeight,
-    8,
+  group.add(buildPassRockShoulder("pass_left_rock", -1, isMajor));
+  group.add(buildPassRockShoulder("pass_right_rock", 1, isMajor));
+  if (isMajor) {
+    group.add(buildPassRidge("pass_left_ridge", -1));
+    group.add(buildPassRidge("pass_right_ridge", 1));
+  }
+
+  const throat = new THREE.Mesh(
+    new THREE.BoxGeometry(throatWidth, 0.04, isMajor ? 2.5 : 1.8),
+    new THREE.MeshLambertMaterial({ color: 0x7f7564 }),
   );
-  const mountainMat = new THREE.MeshStandardMaterial({
-    color: TANG_PALETTE.shiHui,
-    roughness: 0.95,
-    metalness: 0,
-  });
+  throat.name = "pass_throat_path";
+  throat.position.y = 0.02;
+  group.add(throat);
 
-  const leftMountain = new THREE.Mesh(mountainGeom, mountainMat);
-  leftMountain.name = "pass_mountain_left";
-  leftMountain.position.set(-mountainSpacing / 2, mountainHeight / 2, 0);
-  group.add(leftMountain);
-
-  const rightMountain = new THREE.Mesh(mountainGeom, mountainMat);
-  rightMountain.name = "pass_mountain_right";
-  rightMountain.position.set(mountainSpacing / 2, mountainHeight / 2, 0);
-  group.add(rightMountain);
-
-  // ----- 中间夯土城墙 -----
-  const centerWall = buildRammedEarthWall(4, 1.5, 0.6);
+  const centerWall = buildRammedEarthWall(isMajor ? 4.2 : 3.2, isMajor ? 1.35 : 1.05, 0.55);
   centerWall.name = "pass_center_wall";
-  centerWall.position.set(0, 0, 0);
   group.add(centerWall);
 
-  if (!isMajor) {
-    // ----- minor: 单座关楼 -----
-    const gateTower = buildSimpleHall(2, 1.5, 2);
-    gateTower.name = "pass_gate_tower";
-    // 关楼坐落于城墙上方 (城墙高 1.5)
-    gateTower.position.set(0, 1.5, 0);
-    group.add(gateTower);
+  const gateTower = buildSimpleHall(isMajor ? 2.25 : 1.7, isMajor ? 1.35 : 1.0, isMajor ? 1.25 : 0.95);
+  gateTower.name = "pass_gate_tower";
+  gateTower.position.y = isMajor ? 1.26 : 0.98;
+  group.add(gateTower);
 
-    // 木栅门: 1 个 muSe BoxGeometry plane, 在关楼前
-    const gateGeom = new THREE.BoxGeometry(1, 1.2, 0.1);
-    const gateMat = new THREE.MeshStandardMaterial({
-      color: TANG_PALETTE.muSe,
-      roughness: 0.85,
-      metalness: 0,
-    });
-    const woodenGate = new THREE.Mesh(gateGeom, gateMat);
-    woodenGate.name = "pass_wooden_gate";
-    // 关楼前方 (z 正向, 离开城墙一点点)
-    woodenGate.position.set(0, 0.6, 0.4);
-    group.add(woodenGate);
-  } else {
-    // ----- major: 双层关楼 -----
-    const lowerHall = buildSimpleHall(2.5, 2, 2);
-    lowerHall.name = "pass_gate_tower_lower";
-    lowerHall.position.set(0, 0, 0);
-    group.add(lowerHall);
+  const gate = new THREE.Mesh(
+    new THREE.BoxGeometry(isMajor ? 1.0 : 0.75, isMajor ? 0.95 : 0.72, 0.08),
+    new THREE.MeshLambertMaterial({ color: TANG_PALETTE.muSe }),
+  );
+  gate.name = "pass_wooden_gate";
+  gate.position.set(0, isMajor ? 0.48 : 0.36, 0.36);
+  group.add(gate);
 
-    const upperHall = buildSimpleHall(2.5, 2, 2);
-    upperHall.name = "pass_gate_tower_upper";
-    upperHall.position.set(0, 2, 0);
-    group.add(upperHall);
-
-    // 左右延伸长城: 各加 1 段 buildRammedEarthWall(3, 1.5, 0.6)
-    // 中心城墙长 4, 左右延伸段长 3, 沿 x 轴对齐
-    const leftExtension = buildRammedEarthWall(3, 1.5, 0.6);
+  if (isMajor) {
+    const leftExtension = buildRammedEarthWall(2.5, 1.1, 0.45);
     leftExtension.name = "pass_wall_extension_left";
-    // 中心城墙左端 = -2, 延伸段中心 = -2 - 1.5 = -3.5
-    leftExtension.position.set(-3.5, 0, 0);
+    leftExtension.position.set(-2.95, 0, -0.12);
+    leftExtension.rotation.y = -0.16;
     group.add(leftExtension);
 
-    const rightExtension = buildRammedEarthWall(3, 1.5, 0.6);
+    const rightExtension = buildRammedEarthWall(2.5, 1.1, 0.45);
     rightExtension.name = "pass_wall_extension_right";
-    rightExtension.position.set(3.5, 0, 0);
+    rightExtension.position.set(2.95, 0, -0.12);
+    rightExtension.rotation.y = 0.16;
     group.add(rightExtension);
 
-    // 烽燧 (单座 pagoda) 在右山顶, 旁靠右山 base
-    const beacon = buildPagoda(1, 0.8);
+    const beacon = buildPagoda(3, 0.42);
     beacon.name = "pass_beacon_tower";
-    // 右山在 x = +2, 山高 8m -> y=4 处贴右山 base 侧
-    beacon.position.set(mountainSpacing / 2, 4, 0);
+    beacon.position.set(3.05, 1.35, -0.45);
     group.add(beacon);
   }
 
-  // 触发引用以避免未使用警告 (buildHipRoof / buildColumn 当前 variant 未直接使用)
-  // 保留 import 以备后续 variant 扩展;若 TS 严格 unused-import 报错由 tsconfig 决定.
-  void buildHipRoof;
-  void buildColumn;
+  return group;
+}
+
+function buildPassRockShoulder(name: string, side: -1 | 1, tall: boolean): THREE.Group {
+  const group = new THREE.Group();
+  group.name = name;
+  const mat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui });
+  const moss = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.taiLv });
+  const x = side * (tall ? 2.65 : 2.1);
+
+  const lower = new THREE.Mesh(makeTaperedBlock(1.75, tall ? 2.25 : 1.75, 1.8, 0.72), mat);
+  lower.name = `${name}_lower_mass`;
+  lower.position.set(x, 0, 0);
+  lower.rotation.z = side * 0.05;
+  group.add(lower);
+
+  const upper = new THREE.Mesh(makeTaperedBlock(1.18, tall ? 1.25 : 0.9, 1.25, 0.62), moss);
+  upper.name = `${name}_weathered_cap`;
+  upper.position.set(x + side * 0.12, tall ? 1.75 : 1.35, -0.08);
+  upper.rotation.z = side * 0.08;
+  group.add(upper);
 
   return group;
+}
+
+function buildPassRidge(name: string, side: -1 | 1): THREE.Group {
+  const group = new THREE.Group();
+  group.name = name;
+  const ridge = new THREE.Mesh(
+    makeTaperedBlock(2.8, 1.0, 1.45, 0.68),
+    new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui }),
+  );
+  ridge.name = `${name}_long_slope`;
+  ridge.position.set(side * 3.2, 0, -0.65);
+  ridge.rotation.z = side * 0.16;
+  ridge.rotation.y = side * 0.08;
+  group.add(ridge);
+  return group;
+}
+
+function makeTaperedBlock(width: number, height: number, depth: number, topScale: number): THREE.BufferGeometry {
+  const hw = width / 2;
+  const hd = depth / 2;
+  const thw = hw * topScale;
+  const thd = hd * topScale;
+  const vertices = new Float32Array([
+    -hw, 0, -hd, hw, 0, -hd, hw, 0, hd, -hw, 0, hd,
+    -thw, height, -thd, thw, height, -thd, thw, height, thd, -thw, height, thd,
+  ]);
+  const indices = [
+    0, 1, 2, 0, 2, 3,
+    4, 7, 6, 4, 6, 5,
+    0, 4, 5, 0, 5, 1,
+    1, 5, 6, 1, 6, 2,
+    2, 6, 7, 2, 7, 3,
+    3, 7, 4, 3, 4, 0,
+  ];
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
 }

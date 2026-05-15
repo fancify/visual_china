@@ -2,12 +2,11 @@
  * City archetype — 城市原型 (small / medium / large)
  *
  * 视觉构成:
- *   - 四面 buildRammedEarthWall 围合城墙 (东西南北)
- *   - 四角城门楼 (用小 buildSimpleHall 当门楼)
+ *   - 连续闭合夯土城墙 (东西南北 + 角部补墙)
  *   - 内部按 size 分级:
  *       small  ~3m: 2-3 民居 box + 1 buildSimpleHall (官衙)
- *       medium ~5m: 4-5 建筑, 含 buildSimpleHall + 双层楼 (2 个 simpleHall 叠加)
- *       large  ~8m: 双重城墙 + 4 高城门 + 3-4 simpleHall + 1 个 buildPagoda (5 层)
+ *       medium ~5m: 4-5 建筑, 含 buildSimpleHall + 带腰檐双层楼
+ *       large  ~8m: 双重城墙 + 3-4 simpleHall + 1 个 buildPagoda (5 层)
  *
  * 坐标系: 城市中心在原点 (0, 0, 0); 地面 = y=0.
  */
@@ -15,6 +14,7 @@
 import * as THREE from "three";
 import {
   TANG_PALETTE,
+  buildHipRoof,
   buildRammedEarthWall,
   buildSimpleHall,
   buildPagoda,
@@ -30,100 +30,201 @@ interface CityDims {
   wallHeight: number;
   /** 城墙厚度. */
   wallThickness: number;
-  /** 城门楼宽 (小 simpleHall). */
-  gateWidth: number;
-  /** 城门楼高 (柱高). */
-  gateHeight: number;
 }
 
 function getDims(size: CitySize): CityDims {
   switch (size) {
     case "small":
-      return { outerSide: 3, wallHeight: 0.6, wallThickness: 0.18, gateWidth: 0.6, gateHeight: 0.6 };
+      return { outerSide: 3, wallHeight: 0.6, wallThickness: 0.18 };
     case "medium":
-      return { outerSide: 5, wallHeight: 0.9, wallThickness: 0.25, gateWidth: 0.9, gateHeight: 0.9 };
+      return { outerSide: 5, wallHeight: 0.9, wallThickness: 0.25 };
     case "large":
-      return { outerSide: 8, wallHeight: 1.4, wallThickness: 0.35, gateWidth: 1.2, gateHeight: 1.4 };
+      return { outerSide: 8, wallHeight: 1.4, wallThickness: 0.35 };
   }
 }
 
-/** 把一段夯土墙摆到指定一边 (north/south/east/west). */
-function placeWall(
+/** 连续夯土城墙: 四边 + 四角补块, 南侧留门洞, 避免四角断开. */
+function buildContinuousCityWall(
   group: THREE.Group,
-  side: "north" | "south" | "east" | "west",
   outerSide: number,
   wallHeight: number,
   wallThickness: number,
 ): void {
-  const wall = buildRammedEarthWall(outerSide, wallHeight, wallThickness, false);
-  wall.name = `city_wall_${side}`;
+  const mat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.hangHuang });
   const half = outerSide / 2;
-  switch (side) {
-    case "north":
-      wall.position.set(0, 0, -half);
-      break;
-    case "south":
-      wall.position.set(0, 0, half);
-      break;
-    case "east":
-      wall.position.set(half, 0, 0);
-      wall.rotation.y = Math.PI / 2;
-      break;
-    case "west":
-      wall.position.set(-half, 0, 0);
-      wall.rotation.y = Math.PI / 2;
-      break;
-  }
-  group.add(wall);
-}
+  const gateWidth = Math.max(wallThickness * 2.4, outerSide * 0.18);
+  const gateOpeningHeight = wallHeight * 0.62;
+  const gateLintelHeight = wallHeight - gateOpeningHeight;
+  const southSegmentLength = (outerSide - gateWidth) / 2;
 
-/** 在 4 角放城门楼 (小 simpleHall). */
-function placeGates(
-  group: THREE.Group,
-  outerSide: number,
-  gateWidth: number,
-  gateHeight: number,
-  prefix: string,
-): void {
-  const half = outerSide / 2;
+  const addWallSegment = (name: string, length: number, x: number, z: number, rotationY = 0): void => {
+    const wall = buildRammedEarthWall(length, wallHeight, wallThickness, false);
+    wall.name = name;
+    wall.rotation.y = rotationY;
+    wall.position.set(x, 0, z);
+    group.add(wall);
+  };
+
+  addWallSegment("city_wall_north", outerSide, 0, -half);
+  addWallSegment("city_wall_south_west", southSegmentLength, -(gateWidth + southSegmentLength) / 2, half);
+  addWallSegment("city_wall_south_east", southSegmentLength, (gateWidth + southSegmentLength) / 2, half);
+  addWallSegment("city_wall_east", outerSide, half, 0, Math.PI / 2);
+  addWallSegment("city_wall_west", outerSide, -half, 0, Math.PI / 2);
+
+  const lintel = new THREE.Mesh(
+    new THREE.BoxGeometry(gateWidth, gateLintelHeight, wallThickness),
+    mat,
+  );
+  lintel.name = "city_wall_south_door_lintel";
+  lintel.position.set(0, gateOpeningHeight + gateLintelHeight / 2, half);
+  group.add(lintel);
+
+  const threshold = new THREE.Mesh(
+    new THREE.BoxGeometry(gateWidth * 0.9, 0.04, wallThickness * 1.25),
+    new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui }),
+  );
+  threshold.name = "city_wall_south_gate_threshold";
+  threshold.position.set(0, 0.02, half);
+  group.add(threshold);
+
   const corners: Array<[number, number, string]> = [
     [half, half, "se"],
     [-half, half, "sw"],
     [half, -half, "ne"],
     [-half, -half, "nw"],
   ];
-  for (const [cx, cz, tag] of corners) {
-    const gate = buildSimpleHall(gateWidth, gateWidth, gateHeight);
-    gate.name = `${prefix}_gate_${tag}`;
-    gate.position.set(cx, 0, cz);
-    group.add(gate);
+  for (const [x, z, name] of corners) {
+    const corner = new THREE.Mesh(
+      new THREE.BoxGeometry(wallThickness, wallHeight, wallThickness),
+      mat,
+    );
+    corner.name = `city_wall_corner_${name}`;
+    corner.position.set(x, wallHeight / 2, z);
+    group.add(corner);
   }
 }
 
-/** 内部民居 box (低矮 hangHuang 夯黄). */
-function makeHouse(width: number, height: number, depth: number, x: number, z: number, name: string): THREE.Mesh {
-  const geom = new THREE.BoxGeometry(width, height, depth);
-  geom.translate(0, height / 2, 0);
-  const mesh = new THREE.Mesh(geom, new THREE.MeshLambertMaterial({ color: TANG_PALETTE.hangHuang }));
-  mesh.name = name;
-  mesh.position.set(x, 0, z);
-  return mesh;
+/** 内部民居: 小红墙 + 灰黑屋顶, 避免像夯土块一样和建筑混在一起. */
+function makeHouse(width: number, height: number, depth: number, x: number, z: number, name: string): THREE.Group {
+  const group = new THREE.Group();
+  group.name = name;
+
+  const plinthH = Math.max(0.025, height * 0.08);
+  const bodyH = height * 0.72;
+  const plinth = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 1.06, plinthH, depth * 1.04),
+    new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui }),
+  );
+  plinth.name = `${name}_plinth`;
+  plinth.position.y = plinthH / 2;
+  group.add(plinth);
+
+  const bodyGeom = new THREE.BoxGeometry(width * 0.76, bodyH, depth * 0.7);
+  bodyGeom.translate(0, plinthH + bodyH / 2, 0);
+  const body = new THREE.Mesh(bodyGeom, new THREE.MeshLambertMaterial({ color: TANG_PALETTE.zhuHong }));
+  body.name = `${name}_body`;
+  group.add(body);
+
+  const roof = buildHipRoof(width * 0.95, depth * 0.9, height * 0.28);
+  roof.name = `${name}_city_house_roof`;
+  roof.position.y = plinthH + bodyH;
+  group.add(roof);
+
+  group.position.set(x, 0, z);
+  return group;
 }
 
-/** 双层楼: 2 个 simpleHall 叠加 (上层略小). */
+function buildStoryBody(width: number, depth: number, height: number, name: string): THREE.Group {
+  const group = new THREE.Group();
+  group.name = name;
+
+  const wallGeom = new THREE.BoxGeometry(width, height, depth);
+  wallGeom.translate(0, height / 2, 0);
+  const wall = new THREE.Mesh(wallGeom, new THREE.MeshLambertMaterial({ color: TANG_PALETTE.zhuHong }));
+  wall.name = `${name}_wall`;
+  group.add(wall);
+
+  const columnRadius = Math.min(width, depth) * 0.035;
+  const columnInset = Math.min(width, depth) * 0.08;
+  const columns: Array<[number, number]> = [
+    [-width / 2 + columnInset, -depth / 2 + columnInset],
+    [width / 2 - columnInset, -depth / 2 + columnInset],
+    [-width / 2 + columnInset, depth / 2 - columnInset],
+    [width / 2 - columnInset, depth / 2 - columnInset],
+  ];
+  for (const [x, z] of columns) {
+    const columnGeom = new THREE.CylinderGeometry(columnRadius, columnRadius, height, 8);
+    columnGeom.translate(0, height / 2, 0);
+    const column = new THREE.Mesh(columnGeom, new THREE.MeshLambertMaterial({ color: TANG_PALETTE.zhuHong }));
+    column.name = `${name}_column`;
+    column.position.set(x, 0, z);
+    group.add(column);
+  }
+
+  return group;
+}
+
+function buildBeltRoof(width: number, depth: number, y: number): THREE.Group {
+  const group = new THREE.Group();
+  group.name = "city_twoStoryHall_beltRoof";
+  const material = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.daiHei });
+  const overhang = Math.min(width, depth) * 0.16;
+  const thick = Math.min(width, depth) * 0.08;
+
+  const frontBackWidth = width + overhang * 2;
+  const sideDepth = depth + overhang * 2;
+  const slabs: Array<[string, number, number, number, number]> = [
+    ["front", frontBackWidth, overhang, 0, -depth / 2 - overhang / 2],
+    ["back", frontBackWidth, overhang, 0, depth / 2 + overhang / 2],
+    ["left", overhang, sideDepth, -width / 2 - overhang / 2, 0],
+    ["right", overhang, sideDepth, width / 2 + overhang / 2, 0],
+  ];
+
+  for (const [name, slabWidth, slabDepth, x, z] of slabs) {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(slabWidth, thick, slabDepth), material);
+    slab.name = `city_twoStoryHall_beltRoof_${name}`;
+    slab.position.set(x, y, z);
+    group.add(slab);
+  }
+
+  return group;
+}
+
+/** 双层楼: 下层墙体 + 一圈腰檐 + 上层墙体 + 顶屋顶. */
 function buildTwoStoryHall(width: number, depth: number, storyHeight: number): THREE.Group {
   const group = new THREE.Group();
   group.name = "city_twoStoryHall";
 
-  const lower = buildSimpleHall(width, depth, storyHeight);
-  lower.name = "city_twoStoryHall_lower";
-  group.add(lower);
+  const plinthHeight = Math.max(0.04, storyHeight * 0.08);
+  const storyBodyHeight = storyHeight * 0.5;
+  const beltY = plinthHeight + storyBodyHeight;
 
-  const upper = buildSimpleHall(width * 0.78, depth * 0.78, storyHeight * 0.85);
-  upper.name = "city_twoStoryHall_upper";
-  // simpleHall 屋顶在 height + height*0.5 处, lower 顶点 ≈ storyHeight*1.5
-  upper.position.y = storyHeight * 1.55;
-  group.add(upper);
+  const plinth = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 1.12, plinthHeight, depth * 1.08),
+    new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui }),
+  );
+  plinth.name = "city_twoStoryHall_plinth";
+  plinth.position.y = plinthHeight / 2;
+  group.add(plinth);
+
+  const lowerBody = buildStoryBody(width, depth, storyBodyHeight, "city_twoStoryHall_lowerBody");
+  lowerBody.position.y = plinthHeight;
+  group.add(lowerBody);
+
+  const beltRoof = buildBeltRoof(width, depth, beltY);
+  group.add(beltRoof);
+
+  const upperWidth = width * 0.78;
+  const upperDepth = depth * 0.78;
+  const upperBodyHeight = storyBodyHeight * 0.88;
+  const upperBody = buildStoryBody(upperWidth, upperDepth, upperBodyHeight, "city_twoStoryHall_upperBody");
+  upperBody.position.y = beltY;
+  group.add(upperBody);
+
+  const topRoof = buildHipRoof(upperWidth * 1.15, upperDepth * 1.15, storyHeight * 0.44);
+  topRoof.name = "city_twoStoryHall_topRoof";
+  topRoof.position.y = beltY + upperBodyHeight;
+  group.add(topRoof);
 
   return group;
 }
@@ -133,27 +234,21 @@ export function buildCity(size: CitySize): THREE.Group {
   group.name = `city_${size}`;
 
   const dims = getDims(size);
-  const { outerSide, wallHeight, wallThickness, gateWidth, gateHeight } = dims;
+  const { outerSide, wallHeight, wallThickness } = dims;
 
-  // ── 外城墙 (4 段) ──
-  placeWall(group, "north", outerSide, wallHeight, wallThickness);
-  placeWall(group, "south", outerSide, wallHeight, wallThickness);
-  placeWall(group, "east", outerSide, wallHeight, wallThickness);
-  placeWall(group, "west", outerSide, wallHeight, wallThickness);
-
-  // ── 4 角城门楼 ──
-  placeGates(group, outerSide, gateWidth, gateHeight, "city");
+  // ── 外城墙: 连续闭合夯土墙, 不在四角放小楼 ──
+  buildContinuousCityWall(group, outerSide, wallHeight, wallThickness);
 
   // ── 内部建筑 ──
   if (size === "small") {
     // 2-3 民居 + 1 simpleHall (官衙)
-    group.add(makeHouse(0.55, 0.4, 0.5, -0.7, 0.5, "city_house_1"));
-    group.add(makeHouse(0.5, 0.35, 0.5, 0.6, 0.6, "city_house_2"));
-    group.add(makeHouse(0.5, 0.4, 0.55, 0, -0.4, "city_house_3"));
+    group.add(makeHouse(0.42, 0.28, 0.38, -0.9, 0.7, "city_house_1"));
+    group.add(makeHouse(0.38, 0.26, 0.36, 0.85, 0.75, "city_house_2"));
+    group.add(makeHouse(0.38, 0.26, 0.36, -0.85, -0.65, "city_house_3"));
 
     const yamen = buildSimpleHall(1.0, 0.8, 0.55);
     yamen.name = "city_yamen";
-    yamen.position.set(0.3, 0, 0);
+    yamen.position.set(0.25, 0, -0.15);
     group.add(yamen);
   } else if (size === "medium") {
     // 4-5 建筑: simpleHall (官衙) + 2 层楼 + 3 民居
@@ -162,23 +257,20 @@ export function buildCity(size: CitySize): THREE.Group {
     yamen.position.set(0, 0, -0.6);
     group.add(yamen);
 
-    const tower = buildTwoStoryHall(1.0, 0.9, 0.7);
-    tower.position.set(1.2, 0, 0.8);
+    const tower = buildTwoStoryHall(0.9, 0.82, 0.7);
+    tower.position.set(1.45, 0, 1.05);
     group.add(tower);
 
-    group.add(makeHouse(0.7, 0.55, 0.6, -1.3, 0.7, "city_house_1"));
-    group.add(makeHouse(0.65, 0.5, 0.55, -1.2, -0.7, "city_house_2"));
-    group.add(makeHouse(0.7, 0.5, 0.6, 0, 1.0, "city_house_3"));
+    group.add(makeHouse(0.52, 0.34, 0.46, -1.65, 1.2, "city_house_1"));
+    group.add(makeHouse(0.5, 0.32, 0.44, -1.7, -1.3, "city_house_2"));
+    group.add(makeHouse(0.48, 0.3, 0.42, 0.55, 1.45, "city_house_3"));
   } else {
-    // large: 双重城墙 + 4 高城门 + 3-4 simpleHall + buildPagoda (5 层)
+    // large: 双重城墙 + 3-4 simpleHall + buildPagoda (5 层)
     // 中间一圈小墙 (内城)
-    const innerSide = outerSide * 0.55;
+    const innerSide = outerSide * 0.7;
     const innerHeight = wallHeight * 0.7;
     const innerThick = wallThickness * 0.7;
-    placeWall(group, "north", innerSide, innerHeight, innerThick);
-    placeWall(group, "south", innerSide, innerHeight, innerThick);
-    placeWall(group, "east", innerSide, innerHeight, innerThick);
-    placeWall(group, "west", innerSide, innerHeight, innerThick);
+    buildContinuousCityWall(group, innerSide, innerHeight, innerThick);
 
     // 主官衙 (大 simpleHall)
     const palace = buildSimpleHall(2.0, 1.6, 1.2);

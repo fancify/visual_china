@@ -15,7 +15,7 @@
  *   - 每个函数 pure (每次 new geometry, 不 cache)
  *   - 主部件独立 Mesh, 装饰可 merge 减 draw call
  *   - MeshLambertMaterial + TANG_PALETTE
- *   - 飞檐效果: corner cone 倾斜 ~30°
+ *   - 飞檐效果: 连续檐板 + 轻微上翘角板, 避免尖刺感
  */
 
 import * as THREE from "three";
@@ -27,7 +27,7 @@ import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUti
 
 export const TANG_PALETTE = {
   zhuHong: 0xa6362d,    // 朱红 (柱)
-  daiHei: 0x2a2520,     // 黛黑 (瓦)
+  daiHei: 0x3f403b,     // 灰黑瓦
   hangHuang: 0xa68a5b,  // 夯黄 (墙)
   shiHui: 0xb8b0a3,     // 灰白 (石阙)
   taiLv: 0x4a5d3a,      // 苔绿 (废墟)
@@ -93,6 +93,38 @@ function buildRoofSlope(
   return geom;
 }
 
+/** 轻微上翘的角檐板: 用薄板表达飞檐走势, 不用 cone spike. */
+function buildLiftedCornerEaves(
+  width: number,
+  depth: number,
+  ridgeHeight: number,
+): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const cornerW = Math.min(width, depth) * 0.16;
+  const cornerD = cornerW * 0.82;
+  const cornerH = ridgeHeight * 0.08;
+  const cornerX = width / 2 - cornerW * 0.22;
+  const cornerZ = depth / 2 - cornerD * 0.22;
+  const lift = Math.PI / 18;
+
+  const configs: Array<[number, number, number, number]> = [
+    [cornerX, cornerZ, lift, -lift],
+    [-cornerX, cornerZ, -lift, -lift],
+    [cornerX, -cornerZ, lift, lift],
+    [-cornerX, -cornerZ, -lift, lift],
+  ];
+
+  for (const [x, z, rz, rx] of configs) {
+    const plate = new THREE.BoxGeometry(cornerW, cornerH, cornerD);
+    plate.rotateZ(rz);
+    plate.rotateX(rx);
+    plate.translate(x, ridgeHeight * 0.03, z);
+    parts.push(plate);
+  }
+
+  return mergeOrFirst(parts);
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // 1. buildHipRoof — 歇山顶
 // ──────────────────────────────────────────────────────────────────────────
@@ -124,6 +156,12 @@ export function buildHipRoof(
   const eaveBoardMesh = new THREE.Mesh(eaveBoardGeom, lambert(TANG_PALETTE.daiHei));
   eaveBoardMesh.name = "hipRoof_eaveBoard";
   group.add(eaveBoardMesh);
+
+  const shadowSkirtGeom = new THREE.BoxGeometry(width * 0.94, ridgeHeight * 0.18, depth * 0.94);
+  shadowSkirtGeom.translate(0, -ridgeHeight * 0.10, 0);
+  const shadowSkirtMesh = new THREE.Mesh(shadowSkirtGeom, lambert(TANG_PALETTE.daiHei));
+  shadowSkirtMesh.name = "hipRoof_shadowSkirt";
+  group.add(shadowSkirtMesh);
 
   // ── 4 个屋顶斜面 (tile 瓦面) ──
   // 前后 (沿 z 倾斜): bottomWidth = width, topWidth = ridgeLen, depth = depth/2
@@ -178,37 +216,11 @@ export function buildHipRoof(
   chiwenMesh.name = "hipRoof_chiwen";
   group.add(chiwenMesh);
 
-  // ── 4 角飞檐 (corner upturn) — 屋顶角"小翘起", 含蓄如鸱吻附属, 不像独立 spike ──
-  // 缩小 + 几乎贴近屋顶角 (不再像牛角向外伸)
-  const eaveGeoms: THREE.BufferGeometry[] = [];
-  const eaveLen = Math.min(width, depth) * 0.10; // 大幅缩小
-  const eaveR = eaveLen * 0.30;                  // 圆润一点
-  const eaveTilt = Math.PI / 3;                  // 60° 几乎直立 (含蓄翘起)
-  const cornerOffsetX = width / 2;
-  const cornerOffsetZ = depth / 2;
-
-  // yawRad: 把 +z 方向 (cone 倾斜后尖端外伸方向) 旋转到对应角的对角线方向
-  const eaveConfigs: Array<[number, number, number]> = [
-    [cornerOffsetX, cornerOffsetZ, Math.PI / 4],         // +x +z 角, 尖端朝 (+x,+z)
-    [-cornerOffsetX, cornerOffsetZ, -Math.PI / 4],       // -x +z 角, 尖端朝 (-x,+z)
-    [cornerOffsetX, -cornerOffsetZ, 3 * Math.PI / 4],    // +x -z 角, 尖端朝 (+x,-z)
-    [-cornerOffsetX, -cornerOffsetZ, -3 * Math.PI / 4],  // -x -z 角, 尖端朝 (-x,-z)
-  ];
-
-  for (const [cx, cz, yawRad] of eaveConfigs) {
-    const eave = new THREE.ConeGeometry(eaveR, eaveLen, 4);
-    // 1) 把 base 移到 y=0 (默认 base 在 y=-eaveLen/2)
-    eave.translate(0, eaveLen / 2, 0);
-    // 2) 沿 x 轴向 +z 方向倾倒 45° (apex 朝 +z 上方)
-    eave.rotateX(-eaveTilt);
-    // 3) 绕 y 转到对应角的对角线 yaw
-    eave.rotateY(yawRad);
-    // 4) 平移到屋顶底部 4 角; 略略上抬一点点避免与水平檐口板穿模
-    eave.translate(cx, ridgeHeight * 0.02, cz);
-    eaveGeoms.push(eave);
-  }
-
-  const eaveMesh = new THREE.Mesh(mergeOrFirst(eaveGeoms), lambert(TANG_PALETTE.daiHei));
+  // ── 4 角飞檐: 连续角板轻抬, 不做独立尖刺 ──
+  const eaveMesh = new THREE.Mesh(
+    buildLiftedCornerEaves(width, depth, ridgeHeight),
+    lambert(TANG_PALETTE.daiHei),
+  );
   eaveMesh.name = "hipRoof_eaves";
   group.add(eaveMesh);
 
@@ -588,6 +600,15 @@ export function buildSimpleHall(
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = "simpleHall";
+  const bodyHeight = height * 0.5;
+
+  const plinthHeight = Math.max(0.04, height * 0.08);
+  const bodyTopY = plinthHeight + bodyHeight;
+  const plinthGeom = new THREE.BoxGeometry(width * 1.08, plinthHeight, depth * 1.04);
+  plinthGeom.translate(0, plinthHeight / 2, 0);
+  const plinthMesh = new THREE.Mesh(plinthGeom, lambert(TANG_PALETTE.shiHui));
+  plinthMesh.name = "simpleHall_stonePlinth";
+  group.add(plinthMesh);
 
   // ── 4 柱 ──
   const columnPositions: Array<[number, number]> = [
@@ -598,39 +619,45 @@ export function buildSimpleHall(
   ];
 
   for (const [cx, cz] of columnPositions) {
-    const col = buildColumn(height, TANG_PALETTE.zhuHong);
-    col.position.set(cx, 0, cz);
+    const col = buildColumn(bodyHeight, TANG_PALETTE.zhuHong);
+    col.position.set(cx, plinthHeight, cz);
     group.add(col);
   }
 
   // ── 中间墙 (zhuHong 红墙) ──
   // 后墙
   const wallThick = Math.min(width, depth) * 0.04;
-  const wallHeight = height * 0.85;
+  const wallHeight = bodyHeight * 0.96;
   const backWallGeom = new THREE.BoxGeometry(width * 0.78, wallHeight, wallThick);
-  backWallGeom.translate(0, wallHeight / 2 + height * 0.08, depth / 2 - depth * 0.12);
+  backWallGeom.translate(0, plinthHeight + wallHeight / 2, depth / 2 - depth * 0.12);
   const backWallMesh = new THREE.Mesh(backWallGeom, lambert(TANG_PALETTE.zhuHong));
   backWallMesh.name = "simpleHall_backWall";
   group.add(backWallMesh);
 
+  const frontWallGeom = new THREE.BoxGeometry(width * 0.50, wallHeight, wallThick);
+  frontWallGeom.translate(0, plinthHeight + wallHeight / 2, -depth / 2 + depth * 0.12);
+  const frontWallMesh = new THREE.Mesh(frontWallGeom, lambert(TANG_PALETTE.zhuHong));
+  frontWallMesh.name = "simpleHall_frontWall";
+  group.add(frontWallMesh);
+
   // 左右侧墙 (较短)
   const sideWallLen = depth * 0.55;
   const leftWallGeom = new THREE.BoxGeometry(wallThick, wallHeight, sideWallLen);
-  leftWallGeom.translate(-width / 2 + width * 0.12, wallHeight / 2 + height * 0.08, 0);
+  leftWallGeom.translate(-width / 2 + width * 0.12, plinthHeight + wallHeight / 2, 0);
   const leftWallMesh = new THREE.Mesh(leftWallGeom, lambert(TANG_PALETTE.zhuHong));
   leftWallMesh.name = "simpleHall_leftWall";
   group.add(leftWallMesh);
 
   const rightWallGeom = new THREE.BoxGeometry(wallThick, wallHeight, sideWallLen);
-  rightWallGeom.translate(width / 2 - width * 0.12, wallHeight / 2 + height * 0.08, 0);
+  rightWallGeom.translate(width / 2 - width * 0.12, plinthHeight + wallHeight / 2, 0);
   const rightWallMesh = new THREE.Mesh(rightWallGeom, lambert(TANG_PALETTE.zhuHong));
   rightWallMesh.name = "simpleHall_rightWall";
   group.add(rightWallMesh);
 
   // ── 横梁 (柱顶一圈, 连接 4 柱, muSe 木色) ──
   // 让屋顶有明确的"承重梁"视觉, 不再悬浮于柱顶之上
-  const beamThick = height * 0.06;
-  const beamY = height - beamThick / 2;
+  const beamThick = bodyHeight * 0.08;
+  const beamY = bodyTopY - beamThick / 2;
   const beamSize = Math.min(width, depth) * 0.92;
   // 前梁 + 后梁 (沿 x 方向)
   const beamFG = new THREE.BoxGeometry(width * 0.98, beamThick, beamThick);
@@ -655,17 +682,24 @@ export function buildSimpleHall(
   beamRM.name = "simpleHall_beam_right";
   group.add(beamRM);
 
+  const sealHeight = bodyHeight * 0.12;
+  const sealGeom = new THREE.BoxGeometry(width * 0.94, sealHeight, depth * 0.88);
+  sealGeom.translate(0, bodyTopY - sealHeight / 2, 0);
+  const sealMesh = new THREE.Mesh(sealGeom, lambert(TANG_PALETTE.daiHei));
+  sealMesh.name = "simpleHall_roofSeal";
+  group.add(sealMesh);
+
   // ── 4 柱顶斗拱 (让屋顶 "坐" 在斗拱上) ──
   const bracketScale = Math.min(width, depth) * 0.10;
   for (const [cx, cz] of columnPositions) {
     const bracket = buildBracketSet(bracketScale);
-    bracket.position.set(cx, height + beamThick * 0.5, cz);
+    bracket.position.set(cx, bodyTopY - beamThick, cz);
     group.add(bracket);
   }
 
-  // ── 顶部 hipRoof — 紧贴梁/斗拱顶面 ──
+  // ── 顶部 hipRoof — eave board 的 y=0 直接压在 bodyTopY 上 ──
   const roof = buildHipRoof(width * 1.15, depth * 1.15, height * 0.5);
-  roof.position.y = height + bracketScale * 1.5; // 斗拱高度之上
+  roof.position.y = bodyTopY;
   group.add(roof);
 
   return group;

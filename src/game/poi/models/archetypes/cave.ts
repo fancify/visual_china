@@ -5,96 +5,90 @@ import {
 } from "../tangParts.js";
 
 /**
- * Cave archetype — 石窟 (e.g. 敦煌莫高窟 / 龙门 / 云冈 风格)
+ * Cave archetype — 石窟.
  *
- * 设计:
- * - 倾斜山崖墙面 (~6m 宽 × 4m 高), 灰白 shiHui
- * - 崖面上 5–7 个黑色窟口 (daiHei), 半嵌入崖体
- * - 崖前露天大佛 (莲花座 + 锥形身 + 球形头, jinHuang 鎏金)
- * - 崖下一座小寺院 (buildSimpleHall)
- * - 崖底散布 5 株苔绿杂草
+ * 唐风重做: 崖面是主体, 洞龛成排, 崖脚有栈道与小寺。
  */
 export function buildCave(): THREE.Group {
   const group = new THREE.Group();
   group.name = "cave_default";
 
-  // 1. 倾斜山崖墙面 (后倾约 22.5°)
   const cliffMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui });
-  const cliffGeo = new THREE.BoxGeometry(6, 4, 0.5);
-  const cliff = new THREE.Mesh(cliffGeo, cliffMat);
+  const darkMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.daiHei });
+  const woodMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.muSe });
+  const goldMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.jinHuang });
+
+  const cliff = new THREE.Group();
   cliff.name = "cave_cliff";
-  cliff.position.set(0, 2, 0);
-  cliff.rotation.x = -Math.PI / 8;
+  const strata = [
+    { w: 6.4, h: 1.2, y: 0.6, z: -0.05 },
+    { w: 6.0, h: 1.15, y: 1.75, z: -0.12 },
+    { w: 5.5, h: 1.05, y: 2.85, z: -0.18 },
+    { w: 4.8, h: 0.9, y: 3.8, z: -0.26 },
+  ];
+  strata.forEach((spec, i) => {
+    const stratum = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, 0.5), cliffMat);
+    stratum.name = `cave_cliff_stratum_${i}`;
+    stratum.position.set(0, spec.y, spec.z);
+    stratum.rotation.x = -Math.PI / 16;
+    cliff.add(stratum);
+  });
   group.add(cliff);
 
-  // 2. 5–7 个窟口 (daiHei 黛黑), 半嵌入崖面
-  const grottoMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.daiHei });
-  const grottoPositions: ReadonlyArray<readonly [number, number]> = [
-    [-1.8, 1.0],
-    [-0.9, 2.4],
-    [0.1, 1.3],
-    [0.4, 3.0],
-    [1.3, 0.7],
-    [1.7, 2.1],
-  ];
-  grottoPositions.forEach(([x, y], i) => {
-    const grottoGeo = new THREE.BoxGeometry(0.5, 0.7, 0.3);
-    const grotto = new THREE.Mesh(grottoGeo, grottoMat);
-    grotto.name = `cave_grotto_${i}`;
-    // 嵌入崖面 (cliff 旋转 -PI/8, z=-0.15 表示沿崖面法线内嵌)
-    grotto.position.set(x, y, -0.15);
-    // 跟随崖面倾斜方向
-    grotto.rotation.x = -Math.PI / 8;
-    group.add(grotto);
-  });
+  buildGrottoRow(group, 0, 0.95, [-2.2, -1.25, -0.25, 0.95, 1.9], darkMat);
+  buildGrottoRow(group, 1, 2.0, [-1.75, -0.75, 0.35, 1.45], darkMat);
+  buildGrottoRow(group, 2, 3.05, [-1.1, 0.0, 1.1], darkMat);
 
-  // 3. 露天大佛 (中央 x=0)
-  const buddhaMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.jinHuang });
-  const lotusMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui });
+  const walkway = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.08, 0.26), woodMat);
+  walkway.name = "cave_plank_walkway";
+  walkway.position.set(0, 0.42, 0.55);
+  group.add(walkway);
 
-  // 3a. 莲花座 (8 瓣)
-  const lotusGeo = new THREE.CylinderGeometry(0.7, 0.6, 0.3, 8);
-  const lotus = new THREE.Mesh(lotusGeo, lotusMat);
-  lotus.name = "cave_buddha_lotus";
-  lotus.position.set(0, 0.5, 1.5);
-  group.add(lotus);
+  for (const x of [-2.4, -1.2, 0, 1.2, 2.4]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.38, 0.07), woodMat);
+    post.name = "cave_walkway_post";
+    post.position.set(x, 0.62, 0.66);
+    group.add(post);
+  }
 
-  // 3b. 身体 (锥形袈裟)
-  const bodyGeo = new THREE.ConeGeometry(0.6, 2, 12);
-  const body = new THREE.Mesh(bodyGeo, buddhaMat);
+  const buddha = new THREE.Group();
+  buddha.name = "cave_buddha_niche";
+  const niche = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.7, 0.18), darkMat);
+  niche.name = "cave_buddha_dark_niche";
+  niche.position.set(0, 1.38, 0.42);
+  buddha.add(niche);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.48, 1.15, 12), goldMat);
   body.name = "cave_buddha_body";
-  body.position.set(0, 1.5, 1.5);
-  group.add(body);
-
-  // 3c. 头 (球形)
-  const headGeo = new THREE.SphereGeometry(0.4, 16, 12);
-  const head = new THREE.Mesh(headGeo, buddhaMat);
+  body.position.set(0, 1.05, 0.58);
+  buddha.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8), goldMat);
   head.name = "cave_buddha_head";
-  head.position.set(0, 2.7, 1.5);
-  group.add(head);
+  head.position.set(0, 1.78, 0.58);
+  buddha.add(head);
+  group.add(buddha);
 
-  // 4. 山崖下小寺院 (右前方)
-  const hall = buildSimpleHall(1.5, 1, 1.2);
+  const hall = buildSimpleHall(1.35, 0.9, 0.95);
   hall.name = "cave_temple_hall";
-  hall.position.set(1.5, 0, 2);
+  hall.position.set(2.15, 0, 1.45);
   group.add(hall);
 
-  // 5. 杂草 5 株 (苔绿, 散布崖下)
-  const grassMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.taiLv });
-  const grassPositions: ReadonlyArray<readonly [number, number]> = [
-    [-1.7, 1.2],
-    [-0.8, 2.6],
-    [0.5, 1.6],
-    [1.1, 2.9],
-    [1.9, 1.4],
-  ];
-  grassPositions.forEach(([x, z], i) => {
-    const grassGeo = new THREE.ConeGeometry(0.1, 0.2, 4);
-    const grass = new THREE.Mesh(grassGeo, grassMat);
-    grass.name = `cave_grass_${i}`;
-    grass.position.set(x, 0.1, z);
-    group.add(grass);
-  });
-
   return group;
+}
+
+function buildGrottoRow(
+  group: THREE.Group,
+  row: number,
+  y: number,
+  xs: readonly number[],
+  material: THREE.Material,
+): void {
+  xs.forEach((x, i) => {
+    const width = row === 0 ? 0.48 : 0.38;
+    const height = row === 0 ? 0.62 : 0.52;
+    const grotto = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.18), material);
+    grotto.name = `cave_grotto_row${row}_${i}`;
+    grotto.position.set(x, y, 0.24);
+    grotto.rotation.x = -Math.PI / 16;
+    group.add(grotto);
+  });
 }

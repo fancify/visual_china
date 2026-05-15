@@ -60,6 +60,7 @@ const GROUPS = {
     "hud-proximity",
     "hud-hover-runtime",
     "scenic-poi-visuals",
+    "poi-tang-style-models",
     "ancient-poi-visuals",
     "route-ribbon",
     "plank-road-renderer",

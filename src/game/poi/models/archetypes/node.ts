@@ -2,10 +2,8 @@ import * as THREE from "three";
 import {
   TANG_PALETTE,
   buildHipRoof,
-  buildSimpleHall,
   buildHuaBiao,
   buildColumn,
-  buildBracketSet,
 } from "../tangParts.js";
 
 /**
@@ -172,56 +170,51 @@ export function buildNode(
       group.add(building);
     });
   } else {
-    // ----- tower: 3 层楼阁 (类塔结构: 墙体 + 水平檐口 + 顶层歇山顶) -----
-    // 设计: 不用 buildSimpleHall 叠加 (会产生重复柱+横梁+斗拱混乱)
-    // 改用 box 墙体 (zhuHong) + 水平檐口板 (daiHei) + 4 角斗拱
-    // 最顶层用 buildHipRoof 收顶
+    // ----- tower: 3 层楼阁: 墙柱同高 + 一圈腰檐 + 顶层歇山顶 -----
     const zhuMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.zhuHong });
     const daiMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.daiHei });
+    const plinthMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.shiHui });
     const layers = [
-      { w: 2.8, d: 2.8, h: 2.0 }, // 底层最大
-      { w: 2.4, d: 2.4, h: 1.6 },
-      { w: 2.0, d: 2.0, h: 1.4 }, // 顶层最小
+      { w: 2.8, d: 2.8, h: 1.35 },
+      { w: 2.35, d: 2.35, h: 1.15 },
+      { w: 1.95, d: 1.95, h: 1.0 },
     ];
-    let curY = 0;
+
+    const plinthH = 0.18;
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(3.1, plinthH, 3.1), plinthMat);
+    plinth.name = "tower_plinth";
+    plinth.position.y = plinthH / 2;
+    group.add(plinth);
+
+    let curY = plinthH;
     layers.forEach((spec, i) => {
-      // 1) 墙体 (整层红色 box)
       const wallGeom = new THREE.BoxGeometry(spec.w, spec.h, spec.d);
       const wall = new THREE.Mesh(wallGeom, zhuMat);
       wall.position.set(0, curY + spec.h / 2, 0);
       wall.name = `tower_wall_${i + 1}`;
       group.add(wall);
 
-      curY += spec.h;
-
-      // 2) 4 角斗拱 (在墙顶, 角落)
       const hw = spec.w / 2;
       const hd = spec.d / 2;
       const corners: Array<[number, number]> = [
-        [-hw + 0.1, -hd + 0.1],
-        [hw - 0.1, -hd + 0.1],
-        [-hw + 0.1, hd - 0.1],
-        [hw - 0.1, hd - 0.1],
+        [-hw + 0.12, -hd + 0.12],
+        [hw - 0.12, -hd + 0.12],
+        [-hw + 0.12, hd - 0.12],
+        [hw - 0.12, hd - 0.12],
       ];
       corners.forEach((c, j) => {
-        const bracket = buildBracketSet(0.25);
-        bracket.position.set(c[0], curY, c[1]);
-        bracket.name = `tower_bracket_${i + 1}_${j}`;
-        group.add(bracket);
+        const column = buildColumn(spec.h, TANG_PALETTE.zhuHong);
+        column.name = `tower_column_${i + 1}_${j}`;
+        column.position.set(c[0], curY, c[1]);
+        group.add(column);
       });
 
-      // 3) 中间层用水平檐口板 (顶层不加, 用 hipRoof 替代)
+      curY += spec.h;
+
       if (i < layers.length - 1) {
-        const eaveOverhang = 1.35;
-        const eaveThick = 0.15;
-        const eaveGeom = new THREE.BoxGeometry(spec.w * eaveOverhang, eaveThick, spec.d * eaveOverhang);
-        const eave = new THREE.Mesh(eaveGeom, daiMat);
-        eave.position.set(0, curY + 0.25 + eaveThick / 2, 0); // 斗拱顶之上
-        eave.name = `tower_eave_${i + 1}`;
-        group.add(eave);
-        curY += 0.25 + eaveThick + 0.05; // 斗拱高 + 檐口厚 + 间隔
-      } else {
-        curY += 0.25; // 斗拱高
+        const beltRoof = buildTowerBeltRoof(spec.w, spec.d, curY, `tower_beltRoof_${i + 1}`, daiMat);
+        group.add(beltRoof);
+        curY += 0.16;
       }
     });
 
@@ -237,6 +230,36 @@ export function buildNode(
     huaBiao.name = "tower_huabiao";
     huaBiao.position.set(0, 0, 2);
     group.add(huaBiao);
+    group.scale.setScalar(0.5);
+  }
+
+  return group;
+}
+
+function buildTowerBeltRoof(
+  width: number,
+  depth: number,
+  y: number,
+  prefix: string,
+  material: THREE.Material,
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = prefix;
+
+  const overhang = 0.36;
+  const thick = 0.16;
+  const slabs: Array<[string, number, number, number, number]> = [
+    ["front", width + overhang * 2, overhang, 0, -depth / 2 - overhang / 2],
+    ["back", width + overhang * 2, overhang, 0, depth / 2 + overhang / 2],
+    ["left", overhang, depth + overhang * 2, -width / 2 - overhang / 2, 0],
+    ["right", overhang, depth + overhang * 2, width / 2 + overhang / 2, 0],
+  ];
+
+  for (const [name, slabWidth, slabDepth, x, z] of slabs) {
+    const eave = new THREE.Mesh(new THREE.BoxGeometry(slabWidth, thick, slabDepth), material);
+    eave.name = `${prefix}_${name}`;
+    eave.position.set(x, y + thick / 2, z);
+    group.add(eave);
   }
 
   return group;

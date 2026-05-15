@@ -9,9 +9,12 @@ import "./style.css";
 
 import {
   AmbientLight,
+  BoxGeometry,
   Color,
+  ConeGeometry,
   DirectionalLight,
   GridHelper,
+  Group,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
@@ -91,19 +94,9 @@ document.body.appendChild(labelLayer);
 
 const labelMeta: Array<{ el: HTMLElement; pos: Vector3 }> = [];
 
-entries.forEach((entry, idx) => {
-  const col = idx % cols;
-  const row = Math.floor(idx / cols);
-  const x = (col - (cols - 1) / 2) * cellSize;
-  const z = (row - 1) * cellSize;
-
-  const builder = resolvePoiModel(entry);
-  const group = builder();
-  group.position.set(x, 0, z);
-  scene.add(group);
-
-  // Label
+function makeOverlayLabel(text: string, className = ""): HTMLElement {
   const label = document.createElement("div");
+  label.className = className;
   label.style.position = "absolute";
   label.style.transform = "translate(-50%, -50%)";
   label.style.padding = "5px 12px";
@@ -116,11 +109,67 @@ entries.forEach((entry, idx) => {
   label.style.whiteSpace = "nowrap";
   label.style.letterSpacing = "0.05em";
   label.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+  label.textContent = text;
+  labelLayer.appendChild(label);
+  return label;
+}
 
+function addWorldDirectionMarker(): void {
+  // World axis contract: north = -Z, south = +Z, east = +X, west = -X.
+  const group = new Group();
+  group.name = "poi_demo_world_direction_marker";
+  group.position.set(-24, 0.03, 34);
+
+  const northMat = new MeshBasicMaterial({ color: 0x2f3f2b });
+  const southMat = new MeshBasicMaterial({ color: 0x5e4b3b });
+
+  const northShaft = new Mesh(new BoxGeometry(0.16, 0.05, 5.0), northMat);
+  northShaft.name = "direction_north_shaft";
+  northShaft.position.set(0, 0.04, -2.1);
+  group.add(northShaft);
+
+  const northHead = new Mesh(new ConeGeometry(0.5, 1.0, 3), northMat);
+  northHead.name = "direction_north_head";
+  northHead.rotation.x = -Math.PI / 2;
+  northHead.rotation.z = Math.PI;
+  northHead.position.set(0, 0.07, -4.9);
+  group.add(northHead);
+
+  const eastWest = new Mesh(new BoxGeometry(5.2, 0.04, 0.12), southMat);
+  eastWest.name = "direction_east_west_axis";
+  eastWest.position.y = 0.035;
+  group.add(eastWest);
+
+  scene.add(group);
+
+  const labels: Array<[string, Vector3]> = [
+    ["N 北", new Vector3(-24, 1.0, 28.2)],
+    ["S 南", new Vector3(-24, 1.0, 39.5)],
+    ["E 东", new Vector3(-18.2, 1.0, 34)],
+    ["W 西", new Vector3(-29.8, 1.0, 34)],
+  ];
+  for (const [text, pos] of labels) {
+    labelMeta.push({ el: makeOverlayLabel(text, "poi-direction-label"), pos });
+  }
+}
+
+addWorldDirectionMarker();
+
+entries.forEach((entry, idx) => {
+  const col = idx % cols;
+  const row = Math.floor(idx / cols);
+  const x = (col - (cols - 1) / 2) * cellSize;
+  const z = (row - 1) * cellSize;
+
+  const builder = resolvePoiModel(entry);
+  const group = builder();
+  group.position.set(x, 0, z);
+  scene.add(group);
+
+  // Label
   // 显示文本: archetype + variant/size (中文友好)
   const labelText = formatLabel(entry);
-  label.textContent = labelText;
-  labelLayer.appendChild(label);
+  const label = makeOverlayLabel(labelText);
 
   labelMeta.push({
     el: label,
@@ -220,8 +269,29 @@ hud.style.borderRadius = "4px";
 hud.style.fontFamily = "'PingFang SC', 'Helvetica Neue', sans-serif";
 hud.style.fontSize = "13px";
 hud.style.pointerEvents = "none";
+hud.style.zIndex = "20";
 hud.innerHTML = `
   <div style="font-size: 15px; font-weight: 500; margin-bottom: 4px;">大唐 755 POI 视觉原型库</div>
   <div style="opacity: 0.85;">8 类 archetype × 17 variant — 鼠标拖拽旋转 / 滚轮缩放</div>
 `;
 document.body.appendChild(hud);
+
+const directionHud = document.createElement("div");
+directionHud.style.position = "fixed";
+directionHud.style.top = "10px";
+directionHud.style.right = "10px";
+directionHud.style.padding = "8px 12px";
+directionHud.style.background = "rgba(40, 30, 25, 0.78)";
+directionHud.style.color = "#f4e4c1";
+directionHud.style.borderRadius = "4px";
+directionHud.style.fontFamily = "'PingFang SC', 'Helvetica Neue', sans-serif";
+directionHud.style.fontSize = "13px";
+directionHud.style.lineHeight = "1.5";
+directionHud.style.pointerEvents = "none";
+directionHud.style.zIndex = "20";
+directionHud.innerHTML = `
+  <div style="font-weight: 600;">方位</div>
+  <div>北 north = -Z</div>
+  <div>南 +Z · 东 +X · 西 -X</div>
+`;
+document.body.appendChild(directionHud);
