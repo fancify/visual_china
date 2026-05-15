@@ -126,14 +126,23 @@ async function loadRegistry(): Promise<PoiRegistry> {
 }
 
 // 全局 + 档位 scale (per user 指令)
-const GLOBAL_SCALE = 1 / 5; // 所有 model 缩小 5 倍
+const GLOBAL_SCALE = 1 / 5; // 所有 model 缩小 5 倍 — small city 用此值 → 0.6m 实际边长
+
+// City archetype 内置 size: small=3m, medium=5m, large=8m
+// 要让最终边长按 user ratio (small : medium : large = 1 : 1.2 : 1.44),
+// scale 须抵消内置 size 差异:
+//   medium_scale = GLOBAL * (3/5) * 1.2 = 0.144
+//   large_scale  = GLOBAL * (3/8) * 1.44 = 0.108
+// 这样 small=0.6m / medium=0.72m / large=0.864m, 边长比正好 1:1.2:1.44
+const CITY_MEDIUM_SCALE = GLOBAL_SCALE * (3 / 5) * 1.2;
+const CITY_LARGE_SCALE = GLOBAL_SCALE * (3 / 8) * 1.2 * 1.2;
+
 function poiScale(entry: PoiEntry): number {
-  // 城市档位: small 为 base, medium = small × 1.2, large = medium × 1.2
   if (entry.archetype === "city") {
-    if (entry.size === "medium") return GLOBAL_SCALE * 1.2;
-    if (entry.size === "large") return GLOBAL_SCALE * 1.2 * 1.2; // = 1.44x
+    if (entry.size === "medium") return CITY_MEDIUM_SCALE;
+    if (entry.size === "large") return CITY_LARGE_SCALE;
   }
-  // 帝陵 / 关塞 / 名楼 — 缩小为当前的 1/3 (相对全局基准)
+  // 帝陵 / 关塞 / 名楼 — 缩小为当前的 1/3
   if (entry.archetype === "mausoleum" && entry.variant === "imperial") {
     return GLOBAL_SCALE / 3;
   }
