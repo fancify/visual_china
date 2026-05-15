@@ -46,9 +46,11 @@ public/data/regions/qinling/slice-l1.json
 logs/
 .obsidian/
 
-# Terrain rewrite v2 — pyramid + rivers data (build artifacts, regenerable from FABDEM + HydroSHEDS)
-public/data/dem/
-public/data/rivers/
+# Legacy main.ts demo 用的 pre-baked chunks (2.1 GB)。pyramid-demo (active) 不加载
+# 这些。如要 npm run dev index.html，得 `npm run build:chunks` 重新烤
+public/data/regions/qinling/chunks/
+
+# (2026-05-16 起 dem/ 和 rivers/ 进 git，让协作者 clone 后直接跑 demo 不用额外传数据)
 
 # Tang 历史地理参考材料 (谭其骧地图集 + CHGIS) - 数 GB, 第三方版权
 data/references/
