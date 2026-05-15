@@ -11,7 +11,8 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, "index.html"),
         chinaLowres: resolve(__dirname, "china-lowres.html"),
-        poiArchetypeDemo: resolve(__dirname, "poi-archetype-demo.html")
+        poiArchetypeDemo: resolve(__dirname, "poi-archetype-demo.html"),
+        poiMapDemo: resolve(__dirname, "poi-map-demo.html")
       },
       output: {
         manualChunks: {
