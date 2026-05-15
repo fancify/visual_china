@@ -126,7 +126,7 @@ async function loadRegistry(): Promise<PoiRegistry> {
 }
 
 // 全局 + 档位 scale (per user 指令)
-const GLOBAL_SCALE = 1 / 5; // 所有 model 缩小 5 倍 — small city 用此值 → 0.6m 实际边长
+const GLOBAL_SCALE = 1 / 15; // 所有 model 缩小 15 倍 (5 × 3) — small city 实际边长 0.2m
 
 // City archetype 内置 size: small=3m, medium=5m, large=8m
 // 要让最终边长按 user ratio (small : medium : large = 1 : 1.2 : 1.44),
