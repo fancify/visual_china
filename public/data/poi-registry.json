@@ -1,0 +1,5530 @@
+{
+  "epoch": "tang-tianbao-14",
+  "epochYear": 755,
+  "generatedAt": "2026-05-15T07:51:30.881Z",
+  "totalEntries": 284,
+  "stats": {
+    "byArchetype": {
+      "city": 165,
+      "mountain": 14,
+      "ruin": 29,
+      "temple": 15,
+      "cave": 8,
+      "pass": 15,
+      "mausoleum": 11,
+      "node": 27
+    },
+    "bySubfolder": {
+      "cities": 165,
+      "scenic": 11,
+      "relics": 90,
+      "transport": 18
+    }
+  },
+  "entries": [
+    {
+      "id": "炳灵寺石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 35.8,
+        "lon": 103
+      },
+      "visualHierarchy": "large",
+      "displayName": "炳灵寺石窟",
+      "oneLiner": "凿在小积石山黄河西岸赭色丹霞崖壁上的石窟群——第 169 窟内一行西秦建弘元年（420）墨书题记，是中国现存最早纪年的佛教石窟铭文；755 时的它是河州安乡郡西北小积石山的旧窟新凿之地，沿河湟道行人多过此礼佛。",
+      "docPath": "docs/05-epoch/tang-755/relics/炳灵寺石窟.md",
+      "category": "relic",
+      "aliases": [
+        "唐述窟（唐代俗称）",
+        "灵岩寺（一说唐代别称）",
+        "仙巴炳灵（藏语原意\"千佛\"）",
+        "炳灵寺"
+      ]
+    },
+    {
+      "id": "克孜尔石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 41.7833,
+        "lon": 82.505
+      },
+      "visualHierarchy": "large",
+      "displayName": "克孜尔石窟",
+      "oneLiner": "龟兹（屈支）境内、木扎提河谷崖壁——中国境内最早的大型佛教石窟之一，3-9 世纪相续凿造；龟兹画风（菱形格本生故事）自此向东传至敦煌；玄奘 629 西行至龟兹记\"伽蓝百余所、僧徒五千余人\"——克孜尔即其一片。",
+      "docPath": "docs/05-epoch/tang-755/relics/克孜尔石窟.md",
+      "category": "relic",
+      "aliases": [
+        "克孜尔千佛洞",
+        "屈支千佛洞（唐人若称、未明记此名）",
+        "龟兹石窟群（克孜尔为主体之一）"
+      ],
+      "extinctionTier": "A3-frontier"
+    },
+    {
+      "id": "龙门石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 34.555,
+        "lon": 112.4717
+      },
+      "visualHierarchy": "large",
+      "displayName": "龙门石窟",
+      "oneLiner": "河南府洛阳南郊伊阙，东都门外的帝室石窟；北魏迁洛后凿石为佛，至高宗、武后朝以卢舍那大像压住伊水两山。",
+      "docPath": "docs/05-epoch/tang-755/relics/龙门石窟.md",
+      "category": "relic",
+      "aliases": [
+        "伊阙石窟",
+        "伊阙",
+        "龙门",
+        "龙门山"
+      ]
+    },
+    {
+      "id": "麦积山石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 34.3528,
+        "lon": 106.0028
+      },
+      "visualHierarchy": "medium",
+      "displayName": "麦积山石窟",
+      "oneLiner": "陇右秦州第一佛山、西陲泥塑石窟之冠——天水郡上邽县东南六十里麦积山中、后秦弘始间（399-416）始凿、北魏 + 西魏 + 北周三朝高峰、隋唐续凿；唐 755 时已 350 年、是秦州境内最大佛教圣地；再过七年（762）吐蕃陷秦州、麦积山随陇右失唐控制约百年——盛唐西陲泥塑高峰的物理终点。",
+      "docPath": "docs/05-epoch/tang-755/relics/麦积山石窟.md",
+      "category": "relic",
+      "aliases": [
+        "麦积崖",
+        "麦积窟",
+        "麦积山"
+      ]
+    },
+    {
+      "id": "天龙山石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 37.7117,
+        "lon": 112.4297
+      },
+      "visualHierarchy": "medium",
+      "displayName": "天龙山石窟",
+      "oneLiner": "晋阳南郊四十里一片砂岩山间的皇家石窟群——东魏（534-550）始凿、北齐（550-577）高氏续凿、隋唐相承——唐高宗至武则天朝（650-705）是开凿主期；755 时是河东道太原府（北都）南郊最重要的佛教圣地、与晋阳作为北朝皇家政治舞台的物理关系不可分割——千余年后，这片石窟在 20 世纪初（1920s-1930s）被大规模盗凿、佛首与造像散失海外，是中国近代文物流失最沉痛的一处 anchor。",
+      "docPath": "docs/05-epoch/tang-755/relics/天龙山石窟.md",
+      "category": "relic",
+      "aliases": [
+        "天龙山石窟群",
+        "晋阳天龙山石窟"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "响堂山石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 36.5167,
+        "lon": 114.2167
+      },
+      "visualHierarchy": "medium",
+      "displayName": "响堂山石窟",
+      "oneLiner": "邺都 ↔ 晋阳道上的北齐皇家石窟——北齐文宣帝高洋一朝（550-559）始凿、武成帝高湛 + 后主高纬续凿，至北齐末（577）历三十年；位磁州/邯郸郡治滏阳县西南鼓山、距邺都遗址约六十里；755 时是磁州境内的北齐遗产 + 邺都北郊礼佛之所；再过四年（759）即将成邺城之败的战场背景。",
+      "docPath": "docs/05-epoch/tang-755/relics/响堂山石窟.md",
+      "category": "relic",
+      "aliases": [
+        "响堂寺",
+        "响堂山",
+        "鼓山石窟",
+        "北响堂",
+        "南响堂"
+      ],
+      "extinctionTier": "C"
+    },
+    {
+      "id": "须弥山石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 36.2825,
+        "lon": 106.1875
+      },
+      "visualHierarchy": "medium",
+      "displayName": "须弥山石窟",
+      "oneLiner": "萧关道侧的西陲佛窟——原州平凉郡平高县西北五十里、六盘山北段的赭红色丹霞崖上凿出的石窟群；北魏太和年间（477-499）始凿、历西魏、北周、隋、唐五代续凿；唐高宗、武则天朝（650-705）开凿盛、留下二十米六的弥勒倚坐大佛（今第 5 窟）——755 时是萧关西出河西、陇右间的佛教 anchor；再过 7 年（762-763）吐蕃东扩、原州陷蕃、须弥山随之入蕃。",
+      "docPath": "docs/05-epoch/tang-755/relics/须弥山石窟.md",
+      "category": "relics",
+      "aliases": [
+        "须弥山",
+        "须弥山佛窟",
+        "圆光寺石窟（明清后续称）"
+      ]
+    },
+    {
+      "id": "云冈石窟",
+      "archetype": "cave",
+      "position": {
+        "lat": 40.11,
+        "lon": 113.13
+      },
+      "visualHierarchy": "large",
+      "displayName": "云冈石窟",
+      "oneLiner": "北魏皇家鲜卑佛教的物理 anchor——文成帝和平元年（460）始凿、沙门统昙曜主持、凿昙曜五窟（今 16-20 窟）于平城西武州山；至孝文帝太和十八年（494）迁洛前主体完工——为北魏前期 35 年所造；755 时距始凿已 295 年、距迁洛 261 年——以云州云中郡治云中县西约 16 里武州山石窟身份存在（属河东节度），主体造像 + 部分寺院犹存、但自孝文帝迁洛后渐冷落、是盛唐北方塞下\"北魏皇家佛教\"最完整的物理遗存。",
+      "docPath": "docs/05-epoch/tang-755/relics/云冈石窟.md",
+      "category": "relic",
+      "aliases": [
+        "武州山石窟",
+        "武州塞石窟",
+        "灵岩寺",
+        "昙曜五窟（指 16-20 窟主体）"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "安西大都护",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 41.72,
+        "lon": 82.93
+      },
+      "visualHierarchy": "large",
+      "displayName": "安西大都护",
+      "oneLiner": "大唐最西的一座节度治所——长安以西七千里，玉门关外、天山南麓渭干河冲积绿洲（塔里木河支流），一城节制安西四镇与天山以南诸羁縻州。",
+      "docPath": "docs/05-epoch/tang-755/cities/安西大都护.md",
+      "category": "city",
+      "aliases": [
+        "龟兹",
+        "屈支",
+        "屈茨",
+        "库车",
+        "安西四镇治",
+        "皮朗故城"
+      ]
+    },
+    {
+      "id": "安州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 31.26,
+        "lon": 113.69
+      },
+      "visualHierarchy": "small",
+      "displayName": "安州",
+      "oneLiner": "淮南道安州，742-758 年间名\"安陆郡\"——治安陆县（今湖北安陆市），涢水绕城、白兆山在西；李白开元十五年（727）出蜀后入赘前宰相许圉师孙女家，\"酒隐安陆，蹉跎十年\"——是盛唐诗人在长江以北、汉水以东最重的一段寓所。",
+      "docPath": "docs/05-epoch/tang-755/cities/安州.md",
+      "category": "city",
+      "aliases": [
+        "安陆郡（742-758）",
+        "安陆"
+      ]
+    },
+    {
+      "id": "巴州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 31.86,
+        "lon": 106.77
+      },
+      "visualHierarchy": "small",
+      "displayName": "巴州",
+      "oneLiner": "米仓道南段腰心的山州——清化郡治化城县（今四川巴中市），与梁州、兴州同属山南西道，是大唐自汉中翻米仓山入巴东诸州的脊梁锁扣。",
+      "docPath": "docs/05-epoch/tang-755/cities/巴州.md",
+      "category": "city",
+      "aliases": [
+        "清化郡（742-758）",
+        "化城",
+        "巴中"
+      ]
+    },
+    {
+      "id": "白崖城",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 25.45,
+        "lon": 100.55
+      },
+      "visualHierarchy": "small",
+      "displayName": "白崖城",
+      "oneLiner": "南诏王族蒙氏起家的故里——洱海以南、弥渡盆地东侧的一座石崖城堡，蒙舍诏（六诏中最南一支）的早期根据地；755 时虽不再是政令中心（国都已迁太和城十六年），却仍是大蒙国王廷礼制上的\"祖庭\"，六诏归一后唯一保留蒙舍诏旧名的故地。",
+      "docPath": "docs/05-epoch/tang-755/cities/白崖城.md",
+      "category": "city",
+      "aliases": [
+        "Baiya",
+        "白岩",
+        "红崖（明改名，755 不预支）",
+        "蒙舍诏故地",
+        "弥渡红崖"
+      ]
+    },
+    {
+      "id": "北庭大都护",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 44.07,
+        "lon": 89.18
+      },
+      "visualHierarchy": "large",
+      "displayName": "北庭大都护",
+      "oneLiner": "天山北道的总根脚——大唐藩戍最远的一座节度治，城下是瀚海军的旗鼓，城外是突骑施余部的牧场。",
+      "docPath": "docs/05-epoch/tang-755/cities/北庭大都护.md",
+      "category": "city",
+      "aliases": [
+        "庭州",
+        "金满县",
+        "北庭府",
+        "别失八里（元代名）"
+      ]
+    },
+    {
+      "id": "汴州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.8,
+        "lon": 114.34
+      },
+      "visualHierarchy": "medium",
+      "displayName": "汴州",
+      "oneLiner": "河南道上州，唐人口中\"通济渠中段那座驿城\"——城西北十里是战国魏惠王迁都的大梁旧地，城东南便是隋大业初凿成的汴水（通济渠），漕舟自洛阳来、入淮南去，半数停在此城。",
+      "docPath": "docs/05-epoch/tang-755/cities/汴州.md",
+      "category": "city",
+      "aliases": [
+        "陈留郡（742-757 间正名）",
+        "大梁（战国魏都旧名，故址在唐汴州城西北）",
+        "浚仪（唐汴州治县）",
+        "开封（唐汴州属县；北宋以后升府始为城名）",
+        "汴京 / 东京 / 汴梁（北宋及以后名号，755 严禁用作主名）"
+      ]
+    },
+    {
+      "id": "邠州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 35.04,
+        "lon": 108.08
+      },
+      "visualHierarchy": "small",
+      "displayName": "邠州",
+      "oneLiner": "关中西北那一座小州——新平郡治新平县（今陕西彬州），泾水自北而南穿境，长安自此循泾水驿道西北行约 500 唐里（《旧唐书》493 里）而至；周人发祥的豳地，便是这里。",
+      "docPath": "docs/05-epoch/tang-755/cities/邠州.md",
+      "category": "city",
+      "aliases": [
+        "新平郡（742-758）",
+        "豳州（开元十三年/725 前用名）",
+        "彬州（清雍正后及今）"
+      ]
+    },
+    {
+      "id": "拨换城",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 41.17,
+        "lon": 80.27
+      },
+      "visualHierarchy": "medium",
+      "displayName": "拨换城",
+      "oneLiner": "安西治所龟兹（今库车）西约五百里、塔里木盆地北缘龟兹—疏勒中道上的第一大镇——唐之姑墨州治、安西节度辖下\"四镇之外\"最重的一处镇戍；高仙芝两次西征皆自此中转出兵。",
+      "docPath": "docs/05-epoch/tang-755/cities/拨换城.md",
+      "category": "city",
+      "aliases": [
+        "姑墨",
+        "姑墨州",
+        "跋禄迦（玄奘梵文音译）",
+        "阿克苏（突厥语 Aksu \"白水\"，后世通名，755 时不可用）"
+      ]
+    },
+    {
+      "id": "亳州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 33.86,
+        "lon": 115.78
+      },
+      "visualHierarchy": "medium",
+      "displayName": "亳州",
+      "oneLiner": "河南道东南上州，唐人口中\"谯郡\"——城治谯县是曹魏三曹龙兴之地，城南属县苦县（666 改真源 / 689-690 改仙源 / 705 复真源）则是老子故里，玄宗朝因姓李奉老子至盛，亲祀太清宫便在此郡。",
+      "docPath": "docs/05-epoch/tang-755/cities/亳州.md",
+      "category": "city",
+      "aliases": [
+        "谯郡（742-758 官称）",
+        "谯（州治县名，秦汉以来旧名）",
+        "真源（742 后老子故里苦县改称真源县；五代后唐再改鹿邑）",
+        "苦县（汉唐间老子故里旧名）"
+      ]
+    },
+    {
+      "id": "沧州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 38.3,
+        "lon": 116.86
+      },
+      "visualHierarchy": "medium",
+      "displayName": "沧州",
+      "oneLiner": "河北道沧州，742-757 年间名\"景城郡\"——渤海西岸的下口州治，治清池县；盛唐时黄河自滑、汴东北流，经此一带入渤海，沿海煮盐自汉以来便兴，是盛唐河朔东部的盐课重镇。",
+      "docPath": "docs/05-epoch/tang-755/cities/沧州.md",
+      "category": "city",
+      "aliases": [
+        "景城郡（742-758 官称）",
+        "长芦（后世盐场通称，本 doc 仅在历史长河 hedge 引）"
+      ]
+    },
+    {
+      "id": "常州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 31.78,
+        "lon": 119.97
+      },
+      "visualHierarchy": "medium",
+      "displayName": "常州",
+      "oneLiner": "江南东道晋陵郡治，太湖北岸的一座旧城——江南运河自润州南下、过此再东南通苏杭，是润州与苏州之间的中段大州。",
+      "docPath": "docs/05-epoch/tang-755/cities/常州.md",
+      "category": "city",
+      "aliases": [
+        "晋陵郡（天宝元年至乾元元年间官称 742-758）",
+        "毗陵郡（隋大业三年至唐武德三年间官称）",
+        "毗陵",
+        "武进"
+      ]
+    },
+    {
+      "id": "郴州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 25.79,
+        "lon": 113.02
+      },
+      "visualHierarchy": "small",
+      "displayName": "郴州",
+      "oneLiner": "江南西道最南一上州，治郴县（今湖南郴州城区），耒水上游谷地一座小城——城南即五岭北麓，骑田岭一道山口通往岭南韶州、连州，是大唐江南西道与岭南五府经略接界的山间隘口之一。",
+      "docPath": "docs/05-epoch/tang-755/cities/郴州.md",
+      "category": "city",
+      "aliases": [
+        "桂阳郡（742-758 官称）",
+        "郴县（州治县名）"
+      ]
+    },
+    {
+      "id": "陈州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 33.73,
+        "lon": 114.88
+      },
+      "visualHierarchy": "small",
+      "displayName": "陈州",
+      "oneLiner": "河南道东南一上州，治宛丘县（今河南周口市淮阳区），742-758 年间名\"淮阳郡\"——城坐颍水中游北岸，春秋陈国故都所在；城北郊有古地太昊陵（伏羲陵），陈州境内最古的一段标签。",
+      "docPath": "docs/05-epoch/tang-755/cities/陈州.md",
+      "category": "city",
+      "aliases": [
+        "淮阳郡（742-758 官称）",
+        "宛丘（州治县名）",
+        "陈（春秋陈国都旧名）"
+      ]
+    },
+    {
+      "id": "滁州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 32.3,
+        "lon": 118.3
+      },
+      "visualHierarchy": "small",
+      "displayName": "滁州",
+      "oneLiner": "淮南道江北一小州、扬州西去陆路二百余里的一处腰节——治清流县（今安徽滁州市），742-758 年间名\"永阳郡\"；城南琅琊山林壑深秀，盛唐时已有山名，唯尚未因后世欧阳修《醉翁亭记》而著称天下。",
+      "docPath": "docs/05-epoch/tang-755/cities/滁州.md",
+      "category": "city",
+      "aliases": [
+        "永阳郡（742-758）",
+        "清流"
+      ]
+    },
+    {
+      "id": "楚州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 33.59,
+        "lon": 119.02
+      },
+      "visualHierarchy": "medium",
+      "displayName": "楚州",
+      "oneLiner": "淮南道楚州，742-758 年间名\"淮阴郡\"——治山阳县，邗沟北端与泗水入淮处之间的运河节点；古淮阴侯韩信故里。",
+      "docPath": "docs/05-epoch/tang-755/cities/楚州.md",
+      "category": "city",
+      "aliases": [
+        "淮阴郡（742-758 官称）",
+        "山阳",
+        "东楚州（隋唐之际短暂）"
+      ]
+    },
+    {
+      "id": "大勃律",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 35.3,
+        "lon": 75.63
+      },
+      "visualHierarchy": "medium",
+      "displayName": "大勃律",
+      "oneLiner": "葱岭以西、印度河上游一处高山峡谷里的吐蕃属国——盛唐天宝十二载（753）封常清平定后名义复归唐、复置都督府，但 755 时吐蕃势力仍在；这是大唐军威所及最西南的一座羁縻城，与北面小勃律（吉尔吉特）合称\"两勃律\"，是 8 世纪中叶唐蕃在葱岭外争夺的关键节点。",
+      "docPath": "docs/05-epoch/tang-755/cities/大勃律.md",
+      "category": "city",
+      "aliases": [
+        "Baltistan（今地）",
+        "巴尔蒂",
+        "婆罗门（旧唐书卷一九八·西戎传或作此称，与古印度\"婆罗门国\"易混）",
+        "Po-lu chen-po（敦煌古藏文，\"大勃律\"对译）",
+        "Bal（古藏文简称）"
+      ]
+    },
+    {
+      "id": "代州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 39.07,
+        "lon": 112.95
+      },
+      "visualHierarchy": "medium",
+      "displayName": "代州",
+      "oneLiner": "河东道北门一州，治雁门县（今山西代县）——城在雁门关之南，太原北上出塞的必经一站；北接朔方、单于诸羁縻府，是河东节度使北翼的咽喉。",
+      "docPath": "docs/05-epoch/tang-755/cities/代州.md",
+      "category": "city",
+      "aliases": [
+        "雁门郡（742-758 官称）",
+        "雁门",
+        "肆州（北周名，577-585）",
+        "代县（盛唐州治县名）"
+      ]
+    },
+    {
+      "id": "丹州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 36.05,
+        "lon": 110.18
+      },
+      "visualHierarchy": "small",
+      "displayName": "丹州",
+      "oneLiner": "关内道东北一州、黄河西岸——治义川县（今陕西延安市宜川县），742-758 年间名\"咸宁郡\"；与河东道隔黄河相望；与同州同在黄河西岸，一南一北，隋代壶口瀑布即在本州东境黄河上下游。",
+      "docPath": "docs/05-epoch/tang-755/cities/丹州.md",
+      "category": "city",
+      "aliases": [
+        "咸宁郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "义川"
+      ]
+    },
+    {
+      "id": "单于府",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 40.27,
+        "lon": 111.55
+      },
+      "visualHierarchy": "medium",
+      "displayName": "单于府",
+      "oneLiner": "漠南突厥羁縻诸州的总根脚——大唐于阴山之南、黄河之北所立的一座都护治；治在北魏旧都盛乐之北、云中故城一带，管的是东突厥灭后散于阴山南北的部落。",
+      "docPath": "docs/05-epoch/tang-755/cities/单于府.md",
+      "category": "city",
+      "aliases": [
+        "云中都护府（664-669 旧名）",
+        "单于府",
+        "漠南都护",
+        "云中故城（北魏盛乐）"
+      ]
+    },
+    {
+      "id": "道州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 25.53,
+        "lon": 111.6
+      },
+      "visualHierarchy": "small",
+      "displayName": "道州",
+      "oneLiner": "江南西道道州治所，治弘道县（今湖南永州市道县）——潇水中游、五岭萌渚岭北麓的湘桂边小州，755 时尚是江华郡寻常中州，元结刺道州尚在八年后。",
+      "docPath": "docs/05-epoch/tang-755/cities/道州.md",
+      "category": "city",
+      "aliases": [
+        "江华郡（742-758）",
+        "弘道（州治县）",
+        "营道"
+      ]
+    },
+    {
+      "id": "登州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 37.81,
+        "lon": 120.76
+      },
+      "visualHierarchy": "low",
+      "displayName": "登州",
+      "oneLiner": "河南道东端胶东半岛北角的中都督府，742-758 年间名\"东牟郡\"——隔黄海与新罗对望，新罗使臣海路入唐的登陆港。",
+      "docPath": "docs/05-epoch/tang-755/cities/登州.md",
+      "category": "city",
+      "aliases": [
+        "东牟郡（742-758）",
+        "蓬莱"
+      ]
+    },
+    {
+      "id": "邓州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 32.68,
+        "lon": 112.09
+      },
+      "visualHierarchy": "medium",
+      "displayName": "邓州",
+      "oneLiner": "山南东道东南门户的中州，742-758 年间名\"南阳郡\"——治穰县（今河南邓州市，非今南阳市），是长安南下经武关、襄州、江陵这条南北驿道里襄州正北的一站；地理上是南阳盆地的南半，也是诸葛亮\"躬耕于南阳\"两说里南阳一支的着落处。",
+      "docPath": "docs/05-epoch/tang-755/cities/邓州.md",
+      "category": "city",
+      "aliases": [
+        "南阳郡（742-758）",
+        "穰",
+        "邓林（古传）"
+      ]
+    },
+    {
+      "id": "定州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 38.51,
+        "lon": 114.99
+      },
+      "visualHierarchy": "medium",
+      "displayName": "定州",
+      "oneLiner": "河北道中北部一州，治安喜县（今河北定州）——太行山东麓南北驿道的中段一站，博陵崔氏的郡望所在。",
+      "docPath": "docs/05-epoch/tang-755/cities/定州.md",
+      "category": "city",
+      "aliases": [
+        "博陵郡（742-758 官称）",
+        "中山（古名，战国中山国故地）",
+        "安喜（州治县名）"
+      ]
+    },
+    {
+      "id": "东京龙原府",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 42.86,
+        "lon": 130.37
+      },
+      "visualHierarchy": "low",
+      "displayName": "东京龙原府",
+      "oneLiner": "后世五京之一；755 时或已为龙原府 / 栅城府雏形，日本道已通——自此城东出图们江口，便是渤海通日本的\"日本道\"起点。",
+      "docPath": "docs/05-epoch/tang-755/cities/东京龙原府.md",
+      "category": "city",
+      "aliases": [
+        "龙原府",
+        "栅城府",
+        "Tonggyeong",
+        "Longyuan-fu",
+        "八连城（今地）"
+      ]
+    },
+    {
+      "id": "端州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 23.05,
+        "lon": 112.46
+      },
+      "visualHierarchy": "medium",
+      "displayName": "端州",
+      "oneLiner": "岭南道端州，742-758 年间名\"高要郡\"——西江中游北岸的一座下州，城东羚羊峡为西江三峡之一、城北七星岩唐时已名，端砚自唐于斧柯山下始产；亦是盛唐贬流岭南、自广州西溯的第一站。",
+      "docPath": "docs/05-epoch/tang-755/cities/端州.md",
+      "category": "city",
+      "aliases": [
+        "高要郡（742-758）",
+        "高要"
+      ]
+    },
+    {
+      "id": "鄂州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 30.54,
+        "lon": 114.32
+      },
+      "visualHierarchy": "medium",
+      "displayName": "鄂州",
+      "oneLiner": "江南西道鄂州治所，唐人口中『江夏』——长江与汉水交汇南岸的中游门户；城西临江一面立着黄鹤楼，崔颢一首七律压住盛唐题楼诗的头名。",
+      "docPath": "docs/05-epoch/tang-755/cities/鄂州.md",
+      "category": "city",
+      "aliases": [
+        "江夏郡（742-757）",
+        "鄂州都督府（短暂）",
+        "江夏（县治名）"
+      ]
+    },
+    {
+      "id": "坊州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 35.59,
+        "lon": 109.27
+      },
+      "visualHierarchy": "small",
+      "displayName": "坊州",
+      "oneLiner": "关内道北线南端那一座上州——治中部县（今陕西延安市黄陵县），桥山在县中，黄帝陵即在桥山之上；天宝元年至乾元元年（742-758）官称\"中部郡\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/坊州.md",
+      "category": "city",
+      "aliases": [
+        "中部郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "中部",
+        "坊城（武德二年杨思政所筑）"
+      ]
+    },
+    {
+      "id": "房州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 32.1,
+        "lon": 110.74
+      },
+      "visualHierarchy": "medium",
+      "displayName": "房州",
+      "oneLiner": "山南东道西陲一州，治房陵县（今湖北十堰房县）——汉江上游、群山环抱，盛唐\"中州流放罪臣\"之地，中宗李显废为庐陵王后在此居十四年。",
+      "docPath": "docs/05-epoch/tang-755/cities/房州.md",
+      "category": "city",
+      "aliases": [
+        "房陵郡（742-758 官称）",
+        "房陵",
+        "房陵县（州治县名）"
+      ]
+    },
+    {
+      "id": "汾州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 37.27,
+        "lon": 111.78
+      },
+      "visualHierarchy": "medium",
+      "displayName": "汾州",
+      "oneLiner": "河东道中段一州，治隰城县（今山西汾阳）——汾水自北而南穿境而过，太原南下晋、绛、蒲的官驿道在此过站。",
+      "docPath": "docs/05-epoch/tang-755/cities/汾州.md",
+      "category": "city",
+      "aliases": [
+        "西河郡（742-758 官称）",
+        "隰城（州治县名，唐时正写\"隰城县\"）",
+        "汾阳（明清后之县名/今名，非唐称）"
+      ]
+    },
+    {
+      "id": "凤州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 33.91,
+        "lon": 106.52
+      },
+      "visualHierarchy": "medium",
+      "displayName": "凤州",
+      "oneLiner": "蜀道北口的中转小城——陈仓道下散关后第一座郡治，玄宗 756 西奔入蜀的第三宿；山南西道辖境最北的一州，嘉陵江源头落在它境内。",
+      "docPath": "docs/05-epoch/tang-755/cities/凤州.md",
+      "category": "city",
+      "aliases": [
+        "河池郡（742-758）",
+        "梁泉（州治所在县名）",
+        "故道（汉魏旧县名，凤州前身之一）"
+      ]
+    },
+    {
+      "id": "鄜州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 35.99,
+        "lon": 109.38
+      },
+      "visualHierarchy": "small",
+      "displayName": "鄜州",
+      "oneLiner": "关内道鄜延北部那一座上州——治洛交县（今陕西富县），长安东北约五百唐里（《旧唐书》），沿洛水谷地北上是关中通陇朔之要；天宝元年至乾元元年（742-758）官称\"洛交郡\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/鄜州.md",
+      "category": "city",
+      "aliases": [
+        "洛交郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "敷州（西魏旧名）",
+        "富州（金元改名后用名，755 时未用）"
+      ]
+    },
+    {
+      "id": "涪州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 29.71,
+        "lon": 107.39
+      },
+      "visualHierarchy": "small",
+      "displayName": "涪州",
+      "oneLiner": "山南东道西南端长江南岸一州——治涪陵县（今重庆市涪陵区），乌江自南而来于城下北入长江，是荔枝道自蜀入秦的起点；州因涪陵水（乌江）而名，州境为古巴郡涪陵县地。",
+      "docPath": "docs/05-epoch/tang-755/cities/涪州.md",
+      "category": "city",
+      "aliases": [
+        "涪陵郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "涪陵（州治县名）"
+      ]
+    },
+    {
+      "id": "福州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 26.07,
+        "lon": 119.3
+      },
+      "visualHierarchy": "medium",
+      "displayName": "福州",
+      "oneLiner": "江南东道长乐郡治，唐人口中的\"福州\"——闽中山间一片冲积小平原上的州城，闽江入海前最后一段台地之畔；福建经略使所驻，自此南去是泉、漳、潮诸州，北上越仙霞岭便入两浙。",
+      "docPath": "docs/05-epoch/tang-755/cities/福州.md",
+      "category": "city",
+      "aliases": [
+        "长乐郡（742-758）",
+        "闽县",
+        "闽州（711-725）",
+        "泉州（隋至唐武德间 = 今福州，与后世闽南泉州非同地）",
+        "建州（武德五至六年 622-623 间一短期名号）",
+        "东冶（汉闽越故名）"
+      ]
+    },
+    {
+      "id": "抚州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 27.95,
+        "lon": 116.36
+      },
+      "visualHierarchy": "small",
+      "displayName": "抚州",
+      "oneLiner": "江南西道东部抚河（盱江）流域一中州——治临川县（今江西抚州临川区），洪州东南内地一州，盱江北流出鄱阳湖水系入赣江。",
+      "docPath": "docs/05-epoch/tang-755/cities/抚州.md",
+      "category": "city",
+      "aliases": [
+        "临川郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "临川（州治县名）"
+      ]
+    },
+    {
+      "id": "复州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 30.37,
+        "lon": 113.45
+      },
+      "visualHierarchy": "small",
+      "displayName": "复州",
+      "oneLiner": "山南东道江汉平原南岸那一座小州——治沔阳县（今湖北仙桃市沔城回族镇），汉水中下游右岸湖网间的小郡（旧书不标州望、新书作上；本项目按户口口径降读，户 8,210 偏下州）；天宝元年至乾元元年（742-758）官称\"竟陵郡\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/复州.md",
+      "category": "city",
+      "aliases": [
+        "竟陵郡（742-758）",
+        "沔阳",
+        "沔阳郡（隋大业）",
+        "沔州（隋开皇短暂相涉）"
+      ]
+    },
+    {
+      "id": "甘州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 38.93,
+        "lon": 100.45
+      },
+      "visualHierarchy": "medium",
+      "displayName": "甘州",
+      "oneLiner": "河西走廊正中那一州——东接凉州、西通肃州沙州，黑河自州城西、北侧外流过，焉支山在东南——唐人称\"张掖郡\"的所在。",
+      "docPath": "docs/05-epoch/tang-755/cities/甘州.md",
+      "category": "city",
+      "aliases": [
+        "张掖郡（742-757）",
+        "甘州"
+      ]
+    },
+    {
+      "id": "葛逻禄",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 46.5,
+        "lon": 83
+      },
+      "visualHierarchy": "low",
+      "displayName": "葛逻禄",
+      "oneLiner": "西突厥别部、三姓部族联盟（谋落 / 炽俟 / 踏实力），居北庭都护府西北至中亚草原一线——755 时尚在北庭羁縻名分内（贞观二十三年 649 内属，显庆二年 657 西突厥平后分置阴山、大漠、玄池三都督府；后又分炽俟别置金附州），但天宝十载（751）怛逻斯之战时其中亚一支已倒戈助大食败高仙芝；安史乱后唐西陲崩，葛逻禄独立西迁，9 世纪后融入喀喇汗朝。",
+      "docPath": "docs/05-epoch/tang-755/cities/葛逻禄.md",
+      "category": "city",
+      "aliases": [
+        "Karluk",
+        "Qarluq",
+        "三姓葛逻禄",
+        "谋落",
+        "炽俟",
+        "踏实力"
+      ]
+    },
+    {
+      "id": "瓜州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 40.51,
+        "lon": 95.85
+      },
+      "visualHierarchy": "medium",
+      "displayName": "瓜州",
+      "oneLiner": "河西走廊倒数第二州——东去肃州、西通沙州，唐人口中\"瓜沙\"的\"瓜\"；玄奘 627 西行至此偷渡玉门关，由此入莫贺延碛八百里无人地。",
+      "docPath": "docs/05-epoch/tang-755/cities/瓜州.md",
+      "category": "city",
+      "aliases": [
+        "晋昌郡（742-757 官称）",
+        "常乐郡（隋大业三年 607 改瓜州为常乐郡）",
+        "锁阳城（唐瓜州治所遗址名，元后通称）"
+      ]
+    },
+    {
+      "id": "广州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 23.13,
+        "lon": 113.27
+      },
+      "visualHierarchy": "large",
+      "displayName": "广州",
+      "oneLiner": "岭南五府经略治所，唐人口中的\"南海\"——天下最南端的一座大州；珠江口外，大食、波斯、师子国、诃陵的海舶一年一度乘信风而来。",
+      "docPath": "docs/05-epoch/tang-755/cities/广州.md",
+      "category": "city",
+      "aliases": [
+        "南海郡",
+        "番禺",
+        "五羊城",
+        "广州府"
+      ]
+    },
+    {
+      "id": "桂州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 25.27,
+        "lon": 110.29
+      },
+      "visualHierarchy": "medium",
+      "displayName": "桂州",
+      "oneLiner": "岭南道桂州，742-757 年间名\"始安郡\"——岭南五府经略之\"桂管\"治所；漓江北岸、城北接湘水越岭、城南通广州，自秦灵渠以来便是长江—珠江两大水系的咽喉。",
+      "docPath": "docs/05-epoch/tang-755/cities/桂州.md",
+      "category": "city",
+      "aliases": [
+        "始安郡（742-757",
+        "757-758）",
+        "建陵郡（757 短期）",
+        "临桂",
+        "桂管"
+      ]
+    },
+    {
+      "id": "海州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.6,
+        "lon": 119.17
+      },
+      "visualHierarchy": "medium",
+      "displayName": "海州",
+      "oneLiner": "河南道海州，742-757 年间名\"东海郡\"——黄海西岸的港门州治，治朐山县；通新罗、日本的海路主端在登州与扬州、明州，海州只是黄海西岸的辅助节点，城外有东汉孔望山摩崖造像。",
+      "docPath": "docs/05-epoch/tang-755/cities/海州.md",
+      "category": "city",
+      "aliases": [
+        "东海郡（742-758 官称）",
+        "朐山",
+        "朐县（汉至隋之古县名）"
+      ]
+    },
+    {
+      "id": "瀚海军",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 44.07,
+        "lon": 89.18
+      },
+      "visualHierarchy": "small",
+      "displayName": "瀚海军",
+      "oneLiner": "北庭三军之首——驻北庭大都护府治金满县附郭，常额兵一万二千、马四千二百，是大唐天山北道的总军本镇。",
+      "docPath": "docs/05-epoch/tang-755/cities/瀚海军.md",
+      "category": "city",
+      "aliases": [
+        "Hanhai-jun",
+        "北庭附郭军",
+        "北庭三军之首",
+        "庭州内城军治"
+      ]
+    },
+    {
+      "id": "杭州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 30.27,
+        "lon": 120.16
+      },
+      "visualHierarchy": "medium",
+      "displayName": "杭州",
+      "oneLiner": "江南东道余杭郡治，钱塘江口的州城；唐人提起这地方，先想到的是潮水——再过半个世纪，李泌、白居易才把这地方的另一面（西湖）凿出来。",
+      "docPath": "docs/05-epoch/tang-755/cities/杭州.md",
+      "category": "city",
+      "aliases": [
+        "余杭郡（742-757）",
+        "钱塘",
+        "杭州都督府（贞观时短暂）",
+        "临安府（南宋后名号）"
+      ]
+    },
+    {
+      "id": "濠州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 32.91,
+        "lon": 117.36
+      },
+      "visualHierarchy": "low",
+      "displayName": "濠州",
+      "oneLiner": "淮南道淮水中游南岸一下州，治钟离县（今安徽滁州市凤阳县临淮关一带，近蚌埠市区）——西邻寿州，扼淮水南岸；742-758 年间官名\"钟离郡\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/濠州.md",
+      "category": "city",
+      "aliases": [
+        "钟离郡（742-758）",
+        "钟离"
+      ]
+    },
+    {
+      "id": "和州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 31.74,
+        "lon": 118.35
+      },
+      "visualHierarchy": "medium",
+      "displayName": "和州",
+      "oneLiner": "淮南道最南端的州治、长江北岸渡江门户，742-757 年间名\"历阳郡\"——城在历阳县（今安徽马鞍山市和县），与江南宣州当涂、润州对岸的牛渚一线隔江相望；李白《横江词》六首即作于此一段江北。",
+      "docPath": "docs/05-epoch/tang-755/cities/和州.md",
+      "category": "city",
+      "aliases": [
+        "历阳郡（742-758）",
+        "历阳",
+        "当涂（汉名）"
+      ]
+    },
+    {
+      "id": "河中府",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 34.86,
+        "lon": 110.32
+      },
+      "visualHierarchy": "large",
+      "displayName": "河中府",
+      "oneLiner": "蒲州，河东郡——黄河自北南奔到此一折东去，渡口是秦晋之间最大的一道；岸上四头铁牛系着浮桥，是开元天子亲监铸的。",
+      "docPath": "docs/05-epoch/tang-755/cities/河中府.md",
+      "category": "city",
+      "aliases": [
+        "蒲州（汉至唐前期州名）",
+        "河东郡（742-756 间正官名）",
+        "河中府（756 至德元载后名号，760 乾元三年定）",
+        "永济（明清以后县名）"
+      ]
+    },
+    {
+      "id": "河州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 35.6,
+        "lon": 103.21
+      },
+      "visualHierarchy": "small",
+      "displayName": "河州",
+      "oneLiner": "陇右道最南那一座小下州——枹罕（今临夏市）位于大夏河谷，洮河自南向北汇入黄河；黄河在州域北缘流过。",
+      "docPath": "docs/05-epoch/tang-755/cities/河州.md",
+      "category": "city",
+      "aliases": [
+        "安乡郡（742-757）",
+        "枹罕"
+      ]
+    },
+    {
+      "id": "衡州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 26.9,
+        "lon": 112.61
+      },
+      "visualHierarchy": "medium",
+      "displayName": "衡州",
+      "oneLiner": "江南西道湘水中游一处中州，治衡阳县（今湖南衡阳）——城正北二十余里便是南岳衡山，七十二峰自此起脚。",
+      "docPath": "docs/05-epoch/tang-755/cities/衡州.md",
+      "category": "city",
+      "aliases": [
+        "衡阳郡（742-758 官称）",
+        "衡阳（州治县名）",
+        "衡山郡（隋大业 607-唐武德 621 间官称）"
+      ]
+    },
+    {
+      "id": "洪州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 28.68,
+        "lon": 115.86
+      },
+      "visualHierarchy": "large",
+      "displayName": "洪州",
+      "oneLiner": "江南西道望州，唐人口中的\"洪都\"——赣江出鄱阳湖之口、章江抚河两水交会处那座有滕王阁的城；从此沿赣水南上越大庾岭，便是岭南。",
+      "docPath": "docs/05-epoch/tang-755/cities/洪州.md",
+      "category": "city",
+      "aliases": [
+        "豫章郡（742-757）",
+        "洪都",
+        "南昌（治县名）"
+      ]
+    },
+    {
+      "id": "湖州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 30.89,
+        "lon": 120.09
+      },
+      "visualHierarchy": "medium",
+      "displayName": "湖州",
+      "oneLiner": "江南东道吴兴郡治，治乌程县——太湖南岸的一座旧州，与苏州隔湖相望；春秋谓之菰城，三国孙吴置吴兴，盛唐时是江南诸州中产丝、产茶、出文士的一档上州。",
+      "docPath": "docs/05-epoch/tang-755/cities/湖州.md",
+      "category": "city",
+      "aliases": [
+        "吴兴郡（742-758 官称）",
+        "乌程（州治县名）",
+        "菰城（春秋古名，传楚春申君封地）"
+      ]
+    },
+    {
+      "id": "华州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.51,
+        "lon": 109.77
+      },
+      "visualHierarchy": "medium",
+      "displayName": "华州",
+      "oneLiner": "关中东屏，华阴郡治；华山立于城南、潼关守于城东——长安东去约一百八十唐里那一座京畿辅郡，西岳脚下的州城。",
+      "docPath": "docs/05-epoch/tang-755/cities/华州.md",
+      "category": "city",
+      "aliases": [
+        "华阴郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "西岳州（异称，史志偶见，非正式建制名）"
+      ]
+    },
+    {
+      "id": "滑州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 35.58,
+        "lon": 114.52
+      },
+      "visualHierarchy": "small",
+      "displayName": "滑州",
+      "oneLiner": "河南道黄河南岸的重渡之州——治白马县（今河南安阳市滑县），742-758 年间名\"灵昌郡\"，与北岸黎阳（今河南鹤壁市浚县）夹河对望，白马津是唐时黄河中游南北通车的主渡之一。",
+      "docPath": "docs/05-epoch/tang-755/cities/滑州.md",
+      "category": "city",
+      "aliases": [
+        "灵昌郡（742-758）",
+        "白马（治县）",
+        "东郡（隋大业三年-唐武德元年）"
+      ]
+    },
+    {
+      "id": "回纥牙廷",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 47.2,
+        "lon": 102.83
+      },
+      "visualHierarchy": "medium",
+      "displayName": "回纥牙廷",
+      "oneLiner": "漠北回纥可汗的王帐所在，鄂尔浑河谷里一处毡帐与夯土并存的草原都城；唐廷与回纥使节、互市往来已密，但长安文人与普通民众对此尚不甚知其名——再过两年，葛勒可汗的儿子叶护就要率四千骑南下助唐收复两京。",
+      "docPath": "docs/05-epoch/tang-755/cities/回纥牙廷.md",
+      "category": "city",
+      "aliases": [
+        "鄂尔浑王廷",
+        "回纥牙帐",
+        "Ordu-Balik（\"汗城\"，9 世纪后世名）",
+        "哈拉和林（13 世纪蒙古帝国都，更后世名）"
+      ]
+    },
+    {
+      "id": "吉州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 27.11,
+        "lon": 114.99
+      },
+      "visualHierarchy": "small",
+      "displayName": "吉州",
+      "oneLiner": "江南西道赣江中游一上州——治庐陵县（今江西吉安一带），洪州正南、虔州正北，是赣江干流自洪州南上越大庾岭线上的中段州治。",
+      "docPath": "docs/05-epoch/tang-755/cities/吉州.md",
+      "category": "city",
+      "aliases": [
+        "庐陵郡（742-758）",
+        "庐陵（治县名）"
+      ]
+    },
+    {
+      "id": "冀州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 37.55,
+        "lon": 115.58
+      },
+      "visualHierarchy": "medium",
+      "displayName": "冀州",
+      "oneLiner": "河北道腹心一上州，742-758 年间名\"信都郡\"——治信都县（今河北衡水市冀州区）；古名\"冀\"上承《禹贡》九州之首（但唐冀州只居其一隅，不可混），战国属赵，与赵、邢、沧、景、定诸州交错共撑河北中段。",
+      "docPath": "docs/05-epoch/tang-755/cities/冀州.md",
+      "category": "city",
+      "aliases": [
+        "信都郡（742-758 官称）",
+        "信都"
+      ]
+    },
+    {
+      "id": "嘉州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 29.56,
+        "lon": 103.77
+      },
+      "visualHierarchy": "medium",
+      "displayName": "嘉州",
+      "oneLiner": "岷江、青衣江、大渡河三水汇成一处的盆地北口——城东岩壁上有一尊已凿了四十二年、才到半截的弥勒大像，匠人还在凿，海通老和尚已圆寂十余年。",
+      "docPath": "docs/05-epoch/tang-755/cities/嘉州.md",
+      "category": "city",
+      "aliases": [
+        "犍为郡（742-758 间正名）",
+        "龙游",
+        "眉山郡（隋大业三年/607 至唐武德元年/618 间）"
+      ]
+    },
+    {
+      "id": "建州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 26.65,
+        "lon": 118.32
+      },
+      "visualHierarchy": "small",
+      "displayName": "建州",
+      "oneLiner": "江南东道东南端闽中山区一州——治建安县（今建瓯），闽江上游建溪盘城而过，州境西据武夷山脉、东出仙霞岭与衢州接壤，是闽北山中第一个有汉人州县体制的治所。",
+      "docPath": "docs/05-epoch/tang-755/cities/建州.md",
+      "category": "city",
+      "aliases": [
+        "建安郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "建安（治县，东汉献帝建安年间置县得名）"
+      ]
+    },
+    {
+      "id": "江陵",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 30.35,
+        "lon": 112.19
+      },
+      "visualHierarchy": "large",
+      "displayName": "江陵",
+      "oneLiner": "长江中游第一大都督府，山南东道治所；春秋楚国旧郢故地——纪南城已废为荒台，江陵新城则坐看大江东去六百里。",
+      "docPath": "docs/05-epoch/tang-755/cities/江陵.md",
+      "category": "city",
+      "aliases": [
+        "江陵郡（742-757 间正式郡名）",
+        "荆州大都督府",
+        "郢（春秋楚故都古名，距江陵城北约 5 公里之纪南城）"
+      ]
+    },
+    {
+      "id": "江州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 29.71,
+        "lon": 116
+      },
+      "visualHierarchy": "medium",
+      "displayName": "江州",
+      "oneLiner": "江南西道一处中州，唐人口中\"浔阳\"的那个浔阳——长江南岸、鄱阳湖湖口、庐山下；东林寺已立四百年，山下柴桑还留着陶潜旧宅几间。",
+      "docPath": "docs/05-epoch/tang-755/cities/江州.md",
+      "category": "city",
+      "aliases": [
+        "浔阳郡（742-757）",
+        "寻阳 / 浔阳",
+        "江州都督府（短暂）",
+        "九江府（明清后名号）"
+      ]
+    },
+    {
+      "id": "绛州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 35.62,
+        "lon": 111.22
+      },
+      "visualHierarchy": "medium",
+      "displayName": "绛州",
+      "oneLiner": "河东道南段汾水谷地一州，治正平县——春秋晋国晚期都\"新田\"故地，西望蒲州（河中府）渡河、北接晋州，是关中东出蒲津之后入河东腹地的第一段腰节。",
+      "docPath": "docs/05-epoch/tang-755/cities/绛州.md",
+      "category": "city",
+      "aliases": [
+        "绛郡（742-758 官称）",
+        "正平（州治县名）",
+        "新田（春秋晋景公以下晋都，前 585 迁此）"
+      ]
+    },
+    {
+      "id": "交州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 21.03,
+        "lon": 105.85
+      },
+      "visualHierarchy": "large",
+      "displayName": "交州",
+      "oneLiner": "安南都护府治所，唐人口中\"交趾\"——岭南道之尽南，红河三角洲上一座汉以来九百年的郡治；自此往南便是日南、林邑，再无大唐州县。",
+      "docPath": "docs/05-epoch/tang-755/cities/交州.md",
+      "category": "city",
+      "aliases": [
+        "宋平郡（742-757）",
+        "安南都护府治",
+        "镇南都护府（天宝-至德间名号，史源异文）",
+        "交趾（古名 / 南越国—汉时郡名）",
+        "大罗城（中晚唐高骈所筑，755 时未立）"
+      ]
+    },
+    {
+      "id": "金城",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 35.85,
+        "lon": 129.22
+      },
+      "visualHierarchy": "medium",
+      "displayName": "金城",
+      "oneLiner": "新罗王都，唐人口中的\"海东属国\"之都；自徐罗伐建国九百年的旧城，盛唐时正与长安遥相仿筑——城坊、官制、僧侣、留学生几尽循唐。",
+      "docPath": "docs/05-epoch/tang-755/cities/金城.md",
+      "category": "city",
+      "aliases": [
+        "庆州（高丽太祖 940 改称至今）",
+        "金城（盛唐时新罗都名）",
+        "徐罗伐（古名/三国时代）",
+        "东京（高丽成宗 987 年升格之名号，非新罗五京之一）"
+      ]
+    },
+    {
+      "id": "晋州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 36.08,
+        "lon": 111.52
+      },
+      "visualHierarchy": "medium",
+      "displayName": "晋州",
+      "oneLiner": "河东道汾水中段一州，治临汾县（今山西临汾）——古传尧都平阳所在，中镇霍山在其北境，盛唐玄宗朝几次北幸河东都过此城。",
+      "docPath": "docs/05-epoch/tang-755/cities/晋州.md",
+      "category": "city",
+      "aliases": [
+        "平阳郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "临汾县（州治县名）",
+        "唐（古地名 — 即尧、舜禅前唐尧之\"唐\"，非\"唐朝\"之唐；此处指地不指代）",
+        "平阳（古传尧都所在）"
+      ]
+    },
+    {
+      "id": "廓州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 36.05,
+        "lon": 100.83
+      },
+      "visualHierarchy": "small",
+      "displayName": "廓州",
+      "oneLiner": "陇右道最西南那一座小下州——治广威县，黄河自西南峡口下行至此始入河谷，州境南面便是吐蕃，是大唐沿黄河上游所设的最西一州。",
+      "docPath": "docs/05-epoch/tang-755/cities/廓州.md",
+      "category": "city",
+      "aliases": [
+        "宁塞郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "化成（先天元年 712 至天宝元年 742 治县旧名）",
+        "化隆（北魏至先天元年治县更旧名）",
+        "广威（天宝元年 742 起治县名）",
+        "隋澆河郡"
+      ]
+    },
+    {
+      "id": "兰州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 36.06,
+        "lon": 103.83
+      },
+      "visualHierarchy": "medium",
+      "displayName": "兰州",
+      "oneLiner": "陇右道兰州，742-757 年间名\"金城郡\"——黄河北贴城外约一里、城在河南阶地上的州治；东出陇山入秦，西去乌鞘岭入凉州，是唐人由关中赴河西的中段一站。",
+      "docPath": "docs/05-epoch/tang-755/cities/兰州.md",
+      "category": "city",
+      "aliases": [
+        "金城郡（742-758）",
+        "金城（汉至唐之古郡名——注：非新罗都金城）"
+      ]
+    },
+    {
+      "id": "阆州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 31.56,
+        "lon": 105.97
+      },
+      "visualHierarchy": "small",
+      "displayName": "阆州",
+      "oneLiner": "剑南道东部嘉陵江中游一上州——治阆中县（今四川阆中市），嘉陵江盘曲三面绕城；金牛道自利州南下经此可换舟，州境为古巴西郡地。",
+      "docPath": "docs/05-epoch/tang-755/cities/阆州.md",
+      "category": "city",
+      "aliases": [
+        "阆中郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "阆中（州治县名）",
+        "隆州（隋开皇三年 583 至唐先天元年 712 旧名）",
+        "巴西郡（隋大业三年 607 旧名）"
+      ]
+    },
+    {
+      "id": "雷州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 20.91,
+        "lon": 110.1
+      },
+      "visualHierarchy": "medium",
+      "displayName": "雷州",
+      "oneLiner": "岭南道雷州下州一座，治海康县——雷州半岛南端伸入南海的一座边远郡治，城南徐闻一线是大唐渡琼州海峡入海南诸州的唯一津口。",
+      "docPath": "docs/05-epoch/tang-755/cities/雷州.md",
+      "category": "city",
+      "aliases": [
+        "海康郡（742-758 官称）",
+        "海康（州治县名）",
+        "合州（隋开皇九年/589 置；大业初废——一段短暂前身）"
+      ]
+    },
+    {
+      "id": "黎州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 29.21,
+        "lon": 102.65
+      },
+      "visualHierarchy": "small",
+      "displayName": "黎州",
+      "oneLiner": "剑南道西南边角的一座下州，742-758 年间名\"洪源郡\"——治汉源县（今四川汉源县老城一带），大渡河上游南岸，西出便接吐蕃东境与西山诸羁縻部落，领羁縻五十四州，是唐人入剑南最西南的一处官治、亦是茶入西山的起点之一。",
+      "docPath": "docs/05-epoch/tang-755/cities/黎州.md",
+      "category": "city",
+      "aliases": [
+        "洪源郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "汉源（治县名）",
+        "黎水（得名）"
+      ]
+    },
+    {
+      "id": "利州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 32.43,
+        "lon": 105.84
+      },
+      "visualHierarchy": "medium",
+      "displayName": "利州",
+      "oneLiner": "蜀道金牛道北段冲口，益昌郡治、嘉陵江穿城——长安南下入蜀，过散关、越秦岭、出阳平关之后，第一座大州。",
+      "docPath": "docs/05-epoch/tang-755/cities/利州.md",
+      "category": "city",
+      "aliases": [
+        "益昌郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "绵谷（州治县名）",
+        "西益州（北魏旧名）"
+      ]
+    },
+    {
+      "id": "廉州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 21.67,
+        "lon": 109.2
+      },
+      "visualHierarchy": "small",
+      "displayName": "廉州",
+      "oneLiner": "岭南道邕管（一说容管）下辖一座下州，治合浦县——北部湾东岸的边远海港，汉以来九百年的合浦古港之上，南珠之乡。",
+      "docPath": "docs/05-epoch/tang-755/cities/廉州.md",
+      "category": "city",
+      "aliases": [
+        "合浦郡（742-758 官称）",
+        "合浦"
+      ]
+    },
+    {
+      "id": "凉州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 37.93,
+        "lon": 102.64
+      },
+      "visualHierarchy": "large",
+      "displayName": "凉州",
+      "oneLiner": "唐人口中的\"国家西门户\"——河西节度使治所，七里十万家，自此向西便是安西、北庭。",
+      "docPath": "docs/05-epoch/tang-755/cities/凉州.md",
+      "category": "city",
+      "aliases": [
+        "姑臧",
+        "武威",
+        "西凉府",
+        "雍州（汉武初）"
+      ]
+    },
+    {
+      "id": "梁州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 33.07,
+        "lon": 107.02
+      },
+      "visualHierarchy": "large",
+      "displayName": "梁州",
+      "oneLiner": "山南西道治所，唐人口中\"蜀道北口\"的那座盆地之城——四道下秦岭于此交会，再三道入巴蜀亦由此分；汉高祖称汉中王、诸葛丞相屯沔阳，两段旧事都落在这一州境内。",
+      "docPath": "docs/05-epoch/tang-755/cities/梁州.md",
+      "category": "city",
+      "aliases": [
+        "汉中郡（742-757 间正名）",
+        "梁州都督府",
+        "南郑",
+        "兴元府（兴元元年 / 784 后名号；755 严禁用作主名）"
+      ]
+    },
+    {
+      "id": "辽西故城",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 41.54,
+        "lon": 121.24
+      },
+      "visualHierarchy": "medium",
+      "displayName": "辽西故城",
+      "oneLiner": "安东都护府的最后一处寄治，唐人口中\"六都护\"东端的那一处——大凌河西岸医巫闾山东麓的一座边城，治所自平壤一路南徙、西徙、内徙，到天宝二载（743）落在这里。",
+      "docPath": "docs/05-epoch/tang-755/cities/辽西故城.md",
+      "category": "city",
+      "aliases": [
+        "安东都护府寄治",
+        "辽西故城（义县遗址）",
+        "渝州（唐时县名）"
+      ]
+    },
+    {
+      "id": "灵州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 37.99,
+        "lon": 106.2
+      },
+      "visualHierarchy": "large",
+      "displayName": "灵州",
+      "oneLiner": "朔方节度使治所——755 年它还是河套上一座边塞军城；次年即将在此发生一件改变王朝命运的事。",
+      "docPath": "docs/05-epoch/tang-755/cities/灵州.md",
+      "category": "city",
+      "aliases": [
+        "灵武郡（天宝元年 742 改郡名，755 当代官称）",
+        "灵武（俗称、亦为肃宗即位后大都督府名）",
+        "朔方治所",
+        "回乐县（州治所在县）"
+      ]
+    },
+    {
+      "id": "庐州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 31.82,
+        "lon": 117.23
+      },
+      "visualHierarchy": "medium",
+      "displayName": "庐州",
+      "oneLiner": "淮南道巢湖北岸一州，治合肥县——742-758 间官称庐江郡；曹魏旧合肥城、张辽逍遥津之地，唐人言\"合肥、寿春为中路\"的合肥便是此城。",
+      "docPath": "docs/05-epoch/tang-755/cities/庐州.md",
+      "category": "city",
+      "aliases": [
+        "庐江郡（742-758）",
+        "合肥"
+      ]
+    },
+    {
+      "id": "泸州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 28.87,
+        "lon": 105.44
+      },
+      "visualHierarchy": "small",
+      "displayName": "泸州",
+      "oneLiner": "剑南道南端长江北岸一下州都督府——治泸川县（今四川泸州老城江阳一带），长江与沱江于城下交汇，南通戎州、姚州与南诏之路在此换舟，州境与黔中道相接、内多\"夷獠\"羁縻。",
+      "docPath": "docs/05-epoch/tang-755/cities/泸州.md",
+      "category": "city",
+      "aliases": [
+        "泸川郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "泸川（州治县名）"
+      ]
+    },
+    {
+      "id": "潞州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 36.2,
+        "lon": 113.12
+      },
+      "visualHierarchy": "medium",
+      "displayName": "潞州",
+      "oneLiner": "河东道东南角，上党郡治；山西东南一片高地的锁钥——玄宗李隆基潜邸所在，三年别驾起家之州，盛唐北幸赋诗之地。",
+      "docPath": "docs/05-epoch/tang-755/cities/潞州.md",
+      "category": "city",
+      "aliases": [
+        "上党郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "上党",
+        "潞州大都督府（开元十七年/729 升）"
+      ]
+    },
+    {
+      "id": "轮台",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 43.83,
+        "lon": 87.62
+      },
+      "visualHierarchy": "low",
+      "displayName": "轮台",
+      "oneLiner": "唐北庭大都护府治庭州下辖三县（金满、轮台、蒲类）之一——治在庭州西南、天山北麓一处绿洲（今新疆乌鲁木齐市一带），是天山北道自庭州西去碎叶的官道首站；岑参北庭诗中\"轮台\"二字多泛指北庭节度辖境而非确指此县治。",
+      "docPath": "docs/05-epoch/tang-755/cities/轮台.md",
+      "category": "city",
+      "aliases": [
+        "Luntai",
+        "唐轮台县（≠ 汉轮台县，异地）"
+      ]
+    },
+    {
+      "id": "逻些",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 29.65,
+        "lon": 91.11
+      },
+      "visualHierarchy": "gravity",
+      "displayName": "逻些",
+      "oneLiner": "吐蕃国都，唐人口中那座\"西海上的雪国王城\"——文成公主西嫁至此已逾百年，祖拉康主殿端坐的那一尊释迦像，还是当年她从长安携去的。",
+      "docPath": "docs/05-epoch/tang-755/cities/逻些.md",
+      "category": "city",
+      "aliases": [
+        "拉萨",
+        "Rasa",
+        "逻娑",
+        "罗些",
+        "逻娑川（指其所在拉萨河谷）"
+      ]
+    },
+    {
+      "id": "洛阳",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 34.68,
+        "lon": 112.45
+      },
+      "visualHierarchy": "gravity",
+      "displayName": "洛阳",
+      "oneLiner": "天宝十四载冬，东都的米仓与诗坛——再过月余，安禄山的胡骑将自北道直叩定鼎门。",
+      "docPath": "docs/05-epoch/tang-755/cities/洛阳.md",
+      "category": "city",
+      "aliases": [
+        "东都",
+        "神都（武周时期）",
+        "雒阳",
+        "河南府",
+        "西京（五代后晋后汉时期）"
+      ]
+    },
+    {
+      "id": "绵州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 31.46,
+        "lon": 104.74
+      },
+      "visualHierarchy": "small",
+      "displayName": "绵州",
+      "oneLiner": "剑南道东北部涪江上游一上州——治巴西县（今四川绵阳一带），金牛道自剑州南下经此可至汉州、益州；州境昌明县青莲乡是李白童年所居。",
+      "docPath": "docs/05-epoch/tang-755/cities/绵州.md",
+      "category": "city",
+      "aliases": [
+        "巴西郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "巴西县（州治县名）",
+        "金山郡（隋大业旧名）"
+      ]
+    },
+    {
+      "id": "明州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 29.88,
+        "lon": 121.55
+      },
+      "visualHierarchy": "medium",
+      "displayName": "明州",
+      "oneLiner": "江南东道余姚郡治，治鄮县（今浙江宁波）——开元二十六年（738）析越州东境新立的一座州，越州的东面海门、四明山下的青瓷与佛寺之乡。",
+      "docPath": "docs/05-epoch/tang-755/cities/明州.md",
+      "category": "city",
+      "aliases": [
+        "余姚郡（742-758 官称）",
+        "鄮县（州治县名）",
+        "四明（境内四明山，州中别号）"
+      ]
+    },
+    {
+      "id": "莫州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 38.71,
+        "lon": 116.1
+      },
+      "visualHierarchy": "medium",
+      "displayName": "莫州",
+      "oneLiner": "河北道莫州，742-758 年间名\"文安郡\"——河北平原中段、大清河上游近白洋淀一片低洼地的一处上州，治莫县（今河北沧州市任丘市鄚州镇）；州名\"莫\"乃开元十三年（725）由\"鄚\"改字而来，前后只差一个偏旁。",
+      "docPath": "docs/05-epoch/tang-755/cities/莫州.md",
+      "category": "city",
+      "aliases": [
+        "文安郡（742-758 官称）",
+        "莫县（州治县名）",
+        "鄚州（景云二年 / 711 — 开元十三年 / 725 旧字）"
+      ]
+    },
+    {
+      "id": "平壤",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 39.02,
+        "lon": 125.74
+      },
+      "visualHierarchy": "low",
+      "displayName": "平壤",
+      "oneLiner": "高句丽长寿王 427 年迁来的旧都，至总章元年（668）唐灭高句丽止凡 241 年——755 时已非唐辖，归新罗近二十年；唐人记忆里只剩长寿王旧都 + 668 旧战场。",
+      "docPath": "docs/05-epoch/tang-755/cities/平壤.md",
+      "category": "city",
+      "aliases": [
+        "Pyongyang",
+        "浿江故都",
+        "长安城（高句丽都名）",
+        "王险城（汉以前卫满朝鲜都之古名，同址异名）",
+        "长寿王旧都"
+      ]
+    },
+    {
+      "id": "平州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 39.85,
+        "lon": 118.91
+      },
+      "visualHierarchy": "small",
+      "displayName": "平州",
+      "oneLiner": "河北道最东北、唐境出入关外的咽喉——治卢龙县（今河北秦皇岛卢龙县），742-758 年间名\"北平郡\"；东去渝关（即后世山海关地，755 时只有渝关 / 卢龙塞之名）一日程，是幽州东出营州 / 平卢路的中段一站。",
+      "docPath": "docs/05-epoch/tang-755/cities/平州.md",
+      "category": "city",
+      "aliases": [
+        "北平郡（742-758）",
+        "卢龙",
+        "卢龙塞（汉名）"
+      ]
+    },
+    {
+      "id": "蒲昌",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 42.87,
+        "lon": 90.21
+      },
+      "visualHierarchy": "low",
+      "displayName": "蒲昌",
+      "oneLiner": "唐西州（742-758 间官称交河郡）下辖五县最东的一县——治在今新疆吐鲁番市鄯善县一带，吐鲁番盆地东端的一处绿洲驿站，伊州西路上自伊吾入西州所经之地。",
+      "docPath": "docs/05-epoch/tang-755/cities/蒲昌.md",
+      "category": "city",
+      "aliases": [
+        "蒲昌县（唐县名）",
+        "鲁克沁（今名指向之一）",
+        "蒲昌海（罗布泊古名，非本县但同名易混）"
+      ]
+    },
+    {
+      "id": "蒲类军",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 43.6,
+        "lon": 92.82
+      },
+      "visualHierarchy": "small",
+      "displayName": "蒲类军",
+      "oneLiner": "北庭大都护府蒲类县境内、蒲类海（汉名，今巴里坤湖）北岸的军戍据点——史称蒲类海军镇，戍庭州东境、压伊州方向的牧部，常额戍卒约数千；非唐正式\"某某军\"军号，是地理性军镇。",
+      "docPath": "docs/05-epoch/tang-755/cities/蒲类军.md",
+      "category": "city",
+      "aliases": [
+        "Pulei-haijun-zhen",
+        "蒲类（北庭辖县）",
+        "蒲类府（永徽元年 650 所置）",
+        "蒲类海驻军"
+      ]
+    },
+    {
+      "id": "岐州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 34.52,
+        "lon": 107.39
+      },
+      "visualHierarchy": "large",
+      "displayName": "岐州",
+      "oneLiner": "关中西冲，扶风郡治；周原千年，凤鸣岐山——长安西去二百里那一座旧城，秦岭以北、渭水北岸，京畿的西门户。",
+      "docPath": "docs/05-epoch/tang-755/cities/岐州.md",
+      "category": "city",
+      "aliases": [
+        "扶风郡（天宝元年 742 至至德元载 756 改名前用名）",
+        "凤翔郡（至德元载 756 改扶风郡为凤翔郡）",
+        "雍（春秋秦都旧名）",
+        "凤翔府（至德二载十二月/公历 758 年正月前后升府名号，本 doc 主体不取此名）"
+      ]
+    },
+    {
+      "id": "蕲州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 30.24,
+        "lon": 115.43
+      },
+      "visualHierarchy": "small",
+      "displayName": "蕲州",
+      "oneLiner": "淮南道长江北岸一州、大别山南麓——治蕲春县（今湖北黄冈市蕲春县），742-758 年间名\"蕲春郡\"；蕲水自北而南入江，与江南江州、鄂州一线隔江对望。",
+      "docPath": "docs/05-epoch/tang-755/cities/蕲州.md",
+      "category": "city",
+      "aliases": [
+        "蕲春郡（742-758）",
+        "蕲春"
+      ]
+    },
+    {
+      "id": "虔州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 25.83,
+        "lon": 114.94
+      },
+      "visualHierarchy": "small",
+      "displayName": "虔州",
+      "oneLiner": "江南西道最南一上州——治赣县（今江西赣州），章贡二水于城下合流为赣江南源，州南翻大庾岭即入岭南韶州，是开元四年（716）张九龄凿通大庾岭新道之后，江南向岭南南北通衢的岭北门户。",
+      "docPath": "docs/05-epoch/tang-755/cities/虔州.md",
+      "category": "city",
+      "aliases": [
+        "南康郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "赣县（州治县名）",
+        "赣州（南宋绍兴 23 年 1153 改名之后用名，不预支）"
+      ]
+    },
+    {
+      "id": "黔州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 29.3,
+        "lon": 108.16
+      },
+      "visualHierarchy": "small",
+      "displayName": "黔州",
+      "oneLiner": "黔中道一道之治、黔州都督府所在——治彭水县（今重庆市彭水苗族土家族自治县），乌江中游一座山深州薄的下州，统辖周边五十余羁縻州，是大唐西南向\"溪洞蛮\"\"徭僚\"诸部投放秩序的那一只手。",
+      "docPath": "docs/05-epoch/tang-755/cities/黔州.md",
+      "category": "city",
+      "aliases": [
+        "黔中郡（742-758 官称）",
+        "黔安郡（隋大业 607-618）",
+        "彭水（州治县名）"
+      ]
+    },
+    {
+      "id": "钦州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 21.95,
+        "lon": 108.62
+      },
+      "visualHierarchy": "small",
+      "displayName": "钦州",
+      "oneLiner": "岭南道邕管（一说容管）下辖一座下州，治钦江县——北部湾北岸的海口州城，宁氏世袭俚帅之地，盛唐辖境最南海岸上一处远州。",
+      "docPath": "docs/05-epoch/tang-755/cities/钦州.md",
+      "category": "city",
+      "aliases": [
+        "宁越郡（742-758 官称）",
+        "钦江（州治县名 / 江名）",
+        "安京（汉合浦郡安京县，钦州前身一支）"
+      ]
+    },
+    {
+      "id": "秦州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.58,
+        "lon": 105.73
+      },
+      "visualHierarchy": "medium",
+      "displayName": "秦州",
+      "oneLiner": "陇山以西第一州，渭水上游的麦积山下——长安出陇州再西便至此城，自此分两道：北循渭水入陇右、南越青泥岭入梁州。",
+      "docPath": "docs/05-epoch/tang-755/cities/秦州.md",
+      "category": "city",
+      "aliases": [
+        "天水郡（742-758 官称）",
+        "上邽（州治县名）",
+        "秦州都督府（武德 619 后短暂置废）"
+      ]
+    },
+    {
+      "id": "青州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 36.69,
+        "lon": 118.48
+      },
+      "visualHierarchy": "medium",
+      "displayName": "青州",
+      "oneLiner": "齐地旧都的层叠之上、海岱之间那一上州——西去洛阳一千五百里、东北望渤海，新罗渤海使臣自登莱上岸西行入京，多经此城。",
+      "docPath": "docs/05-epoch/tang-755/cities/青州.md",
+      "category": "city",
+      "aliases": [
+        "北海郡（742-758 官称）",
+        "齐（古名，先秦齐国故地）",
+        "益都（州治县名）"
+      ]
+    },
+    {
+      "id": "庆州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 35.71,
+        "lon": 107.64
+      },
+      "visualHierarchy": "medium",
+      "displayName": "庆州",
+      "oneLiner": "关内道北部一州，治安化县（今甘肃庆阳）——长安正北约六百唐里，沿子午岭东麓驿道北上灵州、朔方的中段一站。",
+      "docPath": "docs/05-epoch/tang-755/cities/庆州.md",
+      "category": "city",
+      "aliases": [
+        "安化郡（742-758 官称）",
+        "安化县（州治县名）",
+        "庆阳府（明清升府后之名号，非唐称）"
+      ]
+    },
+    {
+      "id": "琼州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 20.02,
+        "lon": 110.35
+      },
+      "visualHierarchy": "small",
+      "displayName": "琼州",
+      "oneLiner": "岭南道琼州，742-758 年间名\"琼山郡\"——治琼山县（今海南海口琼山区），盛唐海南岛五州之北州；岛中五指山远望，下州户口寥落，曾一度失于黎獠。",
+      "docPath": "docs/05-epoch/tang-755/cities/琼州.md",
+      "category": "city",
+      "aliases": [
+        "琼山郡（742-758）",
+        "琼山"
+      ]
+    },
+    {
+      "id": "衢州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 28.97,
+        "lon": 118.87
+      },
+      "visualHierarchy": "small",
+      "displayName": "衢州",
+      "oneLiner": "江南东道东南山区一上州——治信安县（今衢州市），处钱塘江最上游谷地、武夷仙霞两山之间，自婺州西部析出未及七十年的新州。",
+      "docPath": "docs/05-epoch/tang-755/cities/衢州.md",
+      "category": "city",
+      "aliases": [
+        "信安郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "信安（州治县名）",
+        "衢州（垂拱二年 686 定名）"
+      ]
+    },
+    {
+      "id": "泉州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 24.89,
+        "lon": 118.59
+      },
+      "visualHierarchy": "small",
+      "displayName": "泉州",
+      "oneLiner": "江南东道清源郡治——治晋江县（今福建泉州鲤城区），闽中东南山海之州；晋江入海口北岸，长乐郡（福州）西南五百余里，唐时是闽中山海间一处中下小州，远未及宋元后那番\"东方第一大港\"光景。",
+      "docPath": "docs/05-epoch/tang-755/cities/泉州.md",
+      "category": "city",
+      "aliases": [
+        "清源郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "晋江（州治县名）",
+        "武荣州（圣历二年 699 至景云二年 711 旧名）",
+        "泉州（景云二年 711 定名后；区别于隋至唐武德间另一同名\"泉州\"= 今福州）"
+      ]
+    },
+    {
+      "id": "容州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 22.86,
+        "lon": 110.56
+      },
+      "visualHierarchy": "medium",
+      "displayName": "容州",
+      "oneLiner": "岭南道容州，742-757 年间名\"普宁郡\"——岭南五管之一容管经略使治，城在北流江北岸，北出鬼门关接桂江—西江入广州，南循北流江—南流江通钦廉出南海，是岭南腹地至南海的中段一站。",
+      "docPath": "docs/05-epoch/tang-755/cities/容州.md",
+      "category": "city",
+      "aliases": [
+        "普宁郡（742-758）",
+        "普宁",
+        "铜州（隋）",
+        "容管",
+        "容州都督府"
+      ]
+    },
+    {
+      "id": "润州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 32.2,
+        "lon": 119.45
+      },
+      "visualHierarchy": "large",
+      "displayName": "润州",
+      "oneLiner": "江南东道腹心、漕运咽喉，唐人口中的\"京口\"——长江南岸渡江门户，江南河北端入江口；自孙吴以来便是江南扼江的要地，王湾\"海日生残夜，江春入旧年\"即作于此城北固山下。",
+      "docPath": "docs/05-epoch/tang-755/cities/润州.md",
+      "category": "city",
+      "aliases": [
+        "丹阳郡（742-757）",
+        "京口",
+        "南徐",
+        "润州都督府"
+      ]
+    },
+    {
+      "id": "沙州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 40.14,
+        "lon": 94.66
+      },
+      "visualHierarchy": "large",
+      "displayName": "沙州",
+      "oneLiner": "河西节度使辖最西的一州，唐人称\"瓜沙\"的\"沙\"——出此城西南便是阳关，西北便是玉门关，再西便是西域。",
+      "docPath": "docs/05-epoch/tang-755/cities/沙州.md",
+      "category": "city",
+      "aliases": [
+        "敦煌郡",
+        "瓜沙",
+        "三危山下",
+        "沙州都督府"
+      ]
+    },
+    {
+      "id": "陕州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.78,
+        "lon": 111.1
+      },
+      "visualHierarchy": "medium",
+      "displayName": "陕州",
+      "oneLiner": "河南道陕州，742-757 年间名\"陕郡\"——黄河南岸一座中州，城东南夹于崤山之间、城西黄河三门峡险段当漕运咽喉，是关中粮运东出洛阳前最难走的一段。",
+      "docPath": "docs/05-epoch/tang-755/cities/陕州.md",
+      "category": "city",
+      "aliases": [
+        "陕郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "陕（古名，春秋虢国旧地）"
+      ]
+    },
+    {
+      "id": "鄯州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 36.62,
+        "lon": 101.78
+      },
+      "visualHierarchy": "large",
+      "displayName": "鄯州",
+      "oneLiner": "唐蕃之间最近的一座唐城——节度使大旗下，十三万陇右兵的总根脚。",
+      "docPath": "docs/05-epoch/tang-755/cities/鄯州.md",
+      "category": "city",
+      "aliases": [
+        "西平郡",
+        "鄯城",
+        "青唐（宋）",
+        "西宁州（元）",
+        "西宁卫（明）",
+        "西宁府（清）"
+      ]
+    },
+    {
+      "id": "商州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 33.87,
+        "lon": 109.93
+      },
+      "visualHierarchy": "small",
+      "displayName": "商州",
+      "oneLiner": "长安东南越秦岭出武关的第一座州——上洛郡治上洛县（今陕西商洛市商州区），武关道中段的山州。",
+      "docPath": "docs/05-epoch/tang-755/cities/商州.md",
+      "category": "city",
+      "aliases": [
+        "上洛郡（742-758）",
+        "上洛"
+      ]
+    },
+    {
+      "id": "上京龙泉府",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 44.1,
+        "lon": 129.36
+      },
+      "visualHierarchy": "medium",
+      "displayName": "上京龙泉府",
+      "oneLiner": "渤海国新都，文王大钦茂正自中京迁来——一座仿长安规制的方城，正在牡丹江南岸的山间盆地里夯起。",
+      "docPath": "docs/05-epoch/tang-755/cities/上京龙泉府.md",
+      "category": "city",
+      "aliases": [
+        "忽汗城",
+        "龙泉府",
+        "上京"
+      ]
+    },
+    {
+      "id": "韶州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 24.81,
+        "lon": 113.59
+      },
+      "visualHierarchy": "medium",
+      "displayName": "韶州",
+      "oneLiner": "岭南道一处下州，治曲江县（今广东韶关）——大庾岭路南口、曹溪禅宗祖庭、开元宰相张九龄的故里，三事系于一州。",
+      "docPath": "docs/05-epoch/tang-755/cities/韶州.md",
+      "category": "city",
+      "aliases": [
+        "始兴郡（742-758 官称）",
+        "曲江（州治县名）"
+      ]
+    },
+    {
+      "id": "寿州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 32.55,
+        "lon": 116.79
+      },
+      "visualHierarchy": "medium",
+      "displayName": "寿州",
+      "oneLiner": "淮南道淮水中游一州，治寿春县（今安徽寿县）——楚考烈王二十二载迁都之地，淝水西陲；唐人称\"寿春\"或\"寿春郡\"，控淮水南北舟楫之冲。",
+      "docPath": "docs/05-epoch/tang-755/cities/寿州.md",
+      "category": "city",
+      "aliases": [
+        "寿春郡（742-758 官称）",
+        "寿春",
+        "州来（春秋蔡昭侯都地）"
+      ]
+    },
+    {
+      "id": "疏勒",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 39.47,
+        "lon": 75.99
+      },
+      "visualHierarchy": "large",
+      "displayName": "疏勒",
+      "oneLiner": "安西四镇之西镇，葱岭东口——塔里木盆地最西的一座绿洲城邦，自此再西出便登帕米尔高原；唐人识它有三：佉沙、玉与玛瑙之乡、玄奘归途上停过约一月的伽蓝之国。",
+      "docPath": "docs/05-epoch/tang-755/cities/疏勒.md",
+      "category": "city",
+      "aliases": [
+        "佉沙（梵文音译，玄奘译）",
+        "喀什噶尔（后世突厥语名）",
+        "疏勒镇",
+        "疏勒都督府"
+      ]
+    },
+    {
+      "id": "朔州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 39.33,
+        "lon": 112.43
+      },
+      "visualHierarchy": "low",
+      "displayName": "朔州",
+      "oneLiner": "河东道北翼下州，治善阳县（今山西朔州市）——雁门关北六十唐里，代州正北越关第一州；秦汉马邑故地，唐河东节度北防边镇。",
+      "docPath": "docs/05-epoch/tang-755/cities/朔州.md",
+      "category": "city",
+      "aliases": [
+        "马邑郡（742-758 官称）",
+        "善阳（州治县名）",
+        "马邑（秦汉旧县名）"
+      ]
+    },
+    {
+      "id": "思州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 28.55,
+        "lon": 108.2
+      },
+      "visualHierarchy": "small",
+      "displayName": "思州",
+      "oneLiner": "黔中道治下、乌江上游一座山深谷狭的下州——治务川县（今贵州铜仁市沿河土家族自治县东、乌江东岸；唐务川县治所，宋后迁治今务川县城），742-758 年间官称\"宁夷郡\"，是黔州都督府西南向苗、仡佬诸部投放秩序的偏边一站。",
+      "docPath": "docs/05-epoch/tang-755/cities/思州.md",
+      "category": "city",
+      "aliases": [
+        "宁夷郡（742-758 官称）",
+        "务川（州治县名）"
+      ]
+    },
+    {
+      "id": "泗州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 33,
+        "lon": 118.55
+      },
+      "visualHierarchy": "medium",
+      "displayName": "泗州",
+      "oneLiner": "河南道东南一州，治临淮县（今江苏淮安市盱眙县境东、后陷洪泽湖中；唐泗州 755 治临淮，非治宿预、非今安徽泗县）——742-758 年间官名\"临淮郡\"；汴渠（通济渠）东南端入淮、泗水自北南下入淮的双河枢纽，盛唐江淮漕路咽喉之一。",
+      "docPath": "docs/05-epoch/tang-755/cities/泗州.md",
+      "category": "city",
+      "aliases": [
+        "临淮郡（742-758 官称）",
+        "宿预（旧治；735 前）",
+        "下邳郡（隋大业 607-618 短期）"
+      ]
+    },
+    {
+      "id": "宋州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 34.41,
+        "lon": 115.65
+      },
+      "visualHierarchy": "large",
+      "displayName": "宋州",
+      "oneLiner": "河南道东部一上州，唐人口中的\"睢阳\"——商代亳、周宋国、西汉梁国——三段古都的层叠之地；通济渠自西北贯东南，过此入淮泗。",
+      "docPath": "docs/05-epoch/tang-755/cities/宋州.md",
+      "category": "city",
+      "aliases": [
+        "睢阳郡（742-757）",
+        "梁国（西汉）",
+        "商丘（古地名 + 今地名）",
+        "应天府（北宋大中祥符七年/1014 后）",
+        "归德府（明清后）"
+      ]
+    },
+    {
+      "id": "苏毗",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 29.25,
+        "lon": 88.88
+      },
+      "visualHierarchy": "small",
+      "displayName": "苏毗",
+      "oneLiner": "吐蕃赞普麾下\"五茹\"之一的苏毗茹——年楚河谷里那群古藏部族的旧土，755 这一冬正酝酿着一场被赞普镇压下去的反叛。",
+      "docPath": "docs/05-epoch/tang-755/cities/苏毗.md",
+      "category": "city",
+      "aliases": [
+        "孙波",
+        "Sumpa",
+        "sum-pa（藏文）",
+        "苏毗茹"
+      ]
+    },
+    {
+      "id": "苏州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 31.3,
+        "lon": 120.59
+      },
+      "visualHierarchy": "large",
+      "displayName": "苏州",
+      "oneLiner": "江南东道腹心州，唐人口中的\"吴郡\"——春秋阖闾故城、江南运河中段，盛唐尚未到它最盛的时候。",
+      "docPath": "docs/05-epoch/tang-755/cities/苏州.md",
+      "category": "city",
+      "aliases": [
+        "吴郡（天宝元年至至德二载 / 乾元元年间官称）",
+        "姑苏",
+        "平江府（北宋政和三年后名号，755 时不可用）"
+      ]
+    },
+    {
+      "id": "肃州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 39.74,
+        "lon": 98.5
+      },
+      "visualHierarchy": "small",
+      "displayName": "肃州",
+      "oneLiner": "河西走廊西段中转一州——东接甘州、西邻瓜州，南屏祁连，自此再西经瓜州至沙州约 600 余里。",
+      "docPath": "docs/05-epoch/tang-755/cities/肃州.md",
+      "category": "city",
+      "aliases": [
+        "酒泉郡（742-757）"
+      ]
+    },
+    {
+      "id": "碎叶",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 42.83,
+        "lon": 75.21
+      },
+      "visualHierarchy": "medium",
+      "displayName": "碎叶",
+      "oneLiner": "楚河南岸、天山西陲外的一座旧四镇城——曾是安西最远的一支驻军（692-719），719 后唐戍兵撤，三说并存（突骑施 / 唐羁縻挂名 / 西突厥后继）；玄奘 627 西行经此称\"素叶水城\"，唐人后世又附会作李白出生地——但李白生于碎叶系一说，并非定论。",
+      "docPath": "docs/05-epoch/tang-755/cities/碎叶.md",
+      "category": "city",
+      "aliases": [
+        "素叶（玄奘音译）",
+        "素叶水城",
+        "Ak-Beshim（现代考古遗址名）",
+        "Suyab（西文转写）"
+      ]
+    },
+    {
+      "id": "台州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 28.66,
+        "lon": 121.43
+      },
+      "visualHierarchy": "medium",
+      "displayName": "台州",
+      "oneLiner": "江南东道台州，742-758 年间名\"临海郡\"——治临海县，灵江入海口上溯之地；州南八十里即天台山，天台宗祖庭所在——这一处佛门的分量，已盖过州城本身。",
+      "docPath": "docs/05-epoch/tang-755/cities/台州.md",
+      "category": "city",
+      "aliases": [
+        "临海郡（742-758）",
+        "临海",
+        "海州（唐武德四年/621 短暂用名）"
+      ]
+    },
+    {
+      "id": "太和城",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 25.65,
+        "lon": 100.13
+      },
+      "visualHierarchy": "large",
+      "displayName": "太和城",
+      "oneLiner": "南诏王都，唐人口中\"云南王\"的居处；夹苍山洱海立城，是大唐西南方向最大邻邦的心脏——四年前（751）鲜于仲通伐南诏 6 万军覆于西洱河、去年（754）李宓 7 万再覆，两役累计 13 万死伤大半，骨陈洱海与城外。",
+      "docPath": "docs/05-epoch/tang-755/cities/太和城.md",
+      "category": "city",
+      "aliases": [
+        "大理西",
+        "太和村",
+        "南诏王都",
+        "阳苴咩城（后期都，大历十四年 / 779 异牟寻迁；755 时仍在太和）"
+      ]
+    },
+    {
+      "id": "太原",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 37.73,
+        "lon": 112.48
+      },
+      "visualHierarchy": "gravity",
+      "displayName": "太原",
+      "oneLiner": "天宝十四载冬，唐人称\"北都\"的山中三城——汾水从中穿过，李渊在此起兵，盛唐百年的\"龙兴之地\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/太原.md",
+      "category": "city",
+      "aliases": [
+        "晋阳",
+        "北都",
+        "北京（玄宗朝改称）",
+        "并州（前名）",
+        "龙城（俗称）",
+        "大明城（东城别名）"
+      ]
+    },
+    {
+      "id": "潭州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 28.23,
+        "lon": 112.94
+      },
+      "visualHierarchy": "medium",
+      "displayName": "潭州",
+      "oneLiner": "江南西道湘水中游一州，治长沙县（今湖南长沙）——屈贾故地：屈原沉汨罗、贾谊贬长沙王太傅，两人之名压住盛唐人提起这一片湘中之地的所有想象。",
+      "docPath": "docs/05-epoch/tang-755/cities/潭州.md",
+      "category": "city",
+      "aliases": [
+        "长沙郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "长沙县（州治县名）",
+        "临湘（汉旧名）"
+      ]
+    },
+    {
+      "id": "唐州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 32.99,
+        "lon": 113.39
+      },
+      "visualHierarchy": "medium",
+      "displayName": "唐州",
+      "oneLiner": "河南道南端一上州，治比阳县（今河南驻马店市泌阳县一带，非今唐河县），742-758 年间名\"淮安郡\"——城在桐柏山西麓、唐河上游北岸；州名\"唐\"取自境内唐河，与江苏淮安（唐为楚州）同名\"淮安郡\"而完全不同地。（至德二载(757)后割属山南东道——755 这一刻仍隶河南道。）",
+      "docPath": "docs/05-epoch/tang-755/cities/唐州.md",
+      "category": "city",
+      "aliases": [
+        "淮安郡（742-758 官称）",
+        "比阳（州治县名）",
+        "显州（隋开皇 589-607 旧名）"
+      ]
+    },
+    {
+      "id": "洮州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 34.69,
+        "lon": 103.36
+      },
+      "visualHierarchy": "small",
+      "displayName": "洮州",
+      "oneLiner": "陇右道最南那一座小下州——治临潭县（今甘肃临潭一带），坐在洮河上游谷地上，正卡在唐与吐蕃的西南前线；天宝元年至乾元元年（742-758）官称\"临洮郡\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/洮州.md",
+      "category": "city",
+      "aliases": [
+        "临洮郡（742-758）",
+        "临潭"
+      ]
+    },
+    {
+      "id": "同州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.79,
+        "lon": 109.94
+      },
+      "visualHierarchy": "medium",
+      "displayName": "同州",
+      "oneLiner": "关中东门，冯翊郡治；长安东北二百唐里那一座京畿辅郡，黄河西岸沙苑监养着大唐的官马，蒲津渡口对望河东。",
+      "docPath": "docs/05-epoch/tang-755/cities/同州.md",
+      "category": "city",
+      "aliases": [
+        "冯翊郡（天宝元年 742 至至德二载 757 改名前用名）",
+        "同州都督府（武德间短暂置）",
+        "大荔（北朝旧县名，今同名县为 1914 年后由朝邑改置一线之事，755 时不用此名作州县名）"
+      ]
+    },
+    {
+      "id": "维州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 31.43,
+        "lon": 103.17
+      },
+      "visualHierarchy": "small",
+      "displayName": "维州",
+      "oneLiner": "剑南道最西那一座小下州——薛城（今四川阿坝州理县薛城镇）卡在岷江上游一处高山深谷里，唐与吐蕃东境在此反复争夺百余年。",
+      "docPath": "docs/05-epoch/tang-755/cities/维州.md",
+      "category": "city",
+      "aliases": [
+        "维川郡（742-758）",
+        "薛城",
+        "薛州（隋）"
+      ]
+    },
+    {
+      "id": "魏州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 36.27,
+        "lon": 115.1
+      },
+      "visualHierarchy": "medium",
+      "displayName": "魏州",
+      "oneLiner": "河北道腹心一州——黄河北岸冲积平原上的最大州，户十六万冠河北一道；安史平后此城便是\"魏博节度使\"的治所——\"长安天子，魏府牙军\"由此立。",
+      "docPath": "docs/05-epoch/tang-755/cities/魏州.md",
+      "category": "city",
+      "aliases": [
+        "魏郡（742-758 官称）",
+        "贵乡（州治县名，旧称至 621 改贵乡）"
+      ]
+    },
+    {
+      "id": "温州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 27.99,
+        "lon": 120.69
+      },
+      "visualHierarchy": "small",
+      "displayName": "温州",
+      "oneLiner": "江南东道温州，742-758 年间名\"永嘉郡\"——治永嘉县（今温州鹿城），瓯江入海口上一座山海之间的小州；武则天上元二年（675）始析括州永嘉、安固二县置温州——盛唐里这是一座相对偏远新设的边海州治。",
+      "docPath": "docs/05-epoch/tang-755/cities/温州.md",
+      "category": "city",
+      "aliases": [
+        "永嘉郡（742-758）",
+        "永嘉（治县）",
+        "温州（上元二年 675 定名）"
+      ]
+    },
+    {
+      "id": "武州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 33.39,
+        "lon": 104.92
+      },
+      "visualHierarchy": "small",
+      "displayName": "武州",
+      "oneLiner": "山南西道西北端一座下州——治将利县（今甘肃陇南武都老城一带），白龙江上游山间小城；西接吐蕃、北邻党项、境内氐羌杂居，是大唐西陲山地一隅。",
+      "docPath": "docs/05-epoch/tang-755/cities/武州.md",
+      "category": "city",
+      "aliases": [
+        "武都郡（742-758 官称）",
+        "将利（州治县名）",
+        "阶州（后周显德二年/955 改名，非唐时名）"
+      ]
+    },
+    {
+      "id": "婺州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 29.08,
+        "lon": 119.65
+      },
+      "visualHierarchy": "small",
+      "displayName": "婺州",
+      "oneLiner": "江南东道中部一上州——治金华县（今浙江金华），婺江、兰江、钱塘江上游一段汇于州境；州因分野婺女星而得名，州治金华为浙中陆水转运枢纽。",
+      "docPath": "docs/05-epoch/tang-755/cities/婺州.md",
+      "category": "city",
+      "aliases": [
+        "东阳郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "金华（州治县名）",
+        "婺女（婺州得名所本，分野婺女星）"
+      ]
+    },
+    {
+      "id": "西州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 42.85,
+        "lon": 89.52
+      },
+      "visualHierarchy": "large",
+      "displayName": "西州",
+      "oneLiner": "唐人西出阳关之后的第一座大州——安西都护府初治所在，玄奘与高昌王结为兄弟之地；755 年的官称是『交河郡』（天宝元年改，至德二载方复名西州），但唐人嘴里、私文契里仍多写\"西州\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/西州.md",
+      "category": "city",
+      "aliases": [
+        "交河郡（天宝元年 742 至至德二载 757）",
+        "高昌（旧国名兼治县名）",
+        "火洲（因火焰山）"
+      ]
+    },
+    {
+      "id": "夏州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 37.99,
+        "lon": 108.85
+      },
+      "visualHierarchy": "medium",
+      "displayName": "夏州",
+      "oneLiner": "关内道北线一州，治朔方县——城即十六国大夏赫连勃勃所筑统万城，长安以北约一千二百唐里，朔方节度使辖境东翼、扼河套南口的旧夷都。",
+      "docPath": "docs/05-epoch/tang-755/cities/夏州.md",
+      "category": "city",
+      "aliases": [
+        "朔方郡（742-758 官称）",
+        "统万城（赫连勃勃 413 建城本名）",
+        "大夏国都（十六国）",
+        "白城子（明清以后俗称）"
+      ]
+    },
+    {
+      "id": "相州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 36.1,
+        "lon": 114.36
+      },
+      "visualHierarchy": "medium",
+      "displayName": "相州",
+      "oneLiner": "河北道南端上州，742-757 年间名\"邺郡\"——治安阳县，州治本身在豫北平原南缘；城西北六十余里漳水南岸即魏晋以来五朝古都邺城故址，盛唐人提\"邺\"二字时所指便是那一片旧迹，而非州城所在。",
+      "docPath": "docs/05-epoch/tang-755/cities/相州.md",
+      "category": "city",
+      "aliases": [
+        "邺郡（742-758）",
+        "邺（古名 — 指城西北古邺城旧址，非 755 时州治）"
+      ]
+    },
+    {
+      "id": "襄州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 32.01,
+        "lon": 112.14
+      },
+      "visualHierarchy": "large",
+      "displayName": "襄州",
+      "oneLiner": "山南东道治所，唐人口中的\"襄阳\"——汉水中游第一城，孟浩然方逝十五年，李白王维笔下的岘山、鹿门、鱼梁洲都在此。",
+      "docPath": "docs/05-epoch/tang-755/cities/襄州.md",
+      "category": "city",
+      "aliases": [
+        "襄阳郡（742-757）",
+        "襄阳"
+      ]
+    },
+    {
+      "id": "小勃律",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 36.3,
+        "lon": 74.7
+      },
+      "visualHierarchy": "small",
+      "displayName": "小勃律",
+      "oneLiner": "葱岭（帕米尔）西南支、印度河上游北支吉尔吉特河谷的一处高山小国——747 年高仙芝翻坦驹岭擒小勃律王之地，是盛唐军威西达葱岭外、北截吐蕃中亚孔道的最远一仗。",
+      "docPath": "docs/05-epoch/tang-755/cities/小勃律.md",
+      "category": "city",
+      "aliases": [
+        "Gilgit（后世达尔德语 / 突厥语化名，唐时未必通行—hedge）",
+        "吉尔吉特",
+        "Bru-zha（敦煌古藏文）",
+        "Po-lu chung（藏文异写）",
+        "阿弩越（连云堡所在地之异名，史料异文）"
+      ]
+    },
+    {
+      "id": "邢州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 37.07,
+        "lon": 114.51
+      },
+      "visualHierarchy": "medium",
+      "displayName": "邢州",
+      "oneLiner": "河北道邢州，742-757 年间名\"钜鹿郡\"——治龙冈县；古战场\"巨鹿\"在境内（前 207 项羽破釜沉舟之地），唐时邢窑白瓷已盛——所谓\"南青北白\"的北白便指此一窑系。",
+      "docPath": "docs/05-epoch/tang-755/cities/邢州.md",
+      "category": "city",
+      "aliases": [
+        "钜鹿郡（742-758 官称）",
+        "邢（商代古地）"
+      ]
+    },
+    {
+      "id": "兴州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 33.33,
+        "lon": 106.16
+      },
+      "visualHierarchy": "medium",
+      "displayName": "兴州",
+      "oneLiner": "山南西道下州一座，治顺政县——嘉陵江与故道水（八渡河）交汇处的一座山城，盛唐\"陈仓—金牛\"两条蜀道的换乘节点。",
+      "docPath": "docs/05-epoch/tang-755/cities/兴州.md",
+      "category": "city",
+      "aliases": [
+        "顺政郡（742-758 官称）",
+        "顺政（州治县名）"
+      ]
+    },
+    {
+      "id": "徐州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.26,
+        "lon": 117.18
+      },
+      "visualHierarchy": "medium",
+      "displayName": "徐州",
+      "oneLiner": "河南道东端上州，742-757 年间名\"彭城郡\"——古传彭祖封邑、西楚霸王项羽建都之地；淮北平原上四方辐辏之城，西接汴宋、东出海州、北望兖鲁、南趋淮泗。",
+      "docPath": "docs/05-epoch/tang-755/cities/徐州.md",
+      "category": "city",
+      "aliases": [
+        "彭城郡（742-758）",
+        "彭城",
+        "西楚都（古名——项羽前 206 都彭城）"
+      ]
+    },
+    {
+      "id": "许州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 34.04,
+        "lon": 113.85
+      },
+      "visualHierarchy": "medium",
+      "displayName": "许州",
+      "oneLiner": "河南道颍水中游一上州——治长社县（今河南许昌市），742-758 年间官名\"颍川郡\"；城地即东汉末年献帝许都旧址，曹操在此屯田二十四年。",
+      "docPath": "docs/05-epoch/tang-755/cities/许州.md",
+      "category": "city",
+      "aliases": [
+        "颍川郡（742-758）",
+        "长社",
+        "许都（汉）"
+      ]
+    },
+    {
+      "id": "宣州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 30.95,
+        "lon": 118.76
+      },
+      "visualHierarchy": "medium",
+      "displayName": "宣州",
+      "oneLiner": "江南西道东部一州，治宣城县（今安徽宣城）——长江南岸丘陵地带、青弋江畔的\"谢公旧治\"，谢朓楼下、敬亭山前，是盛唐李白晚年最常停的一座江南小城。",
+      "docPath": "docs/05-epoch/tang-755/cities/宣州.md",
+      "category": "city",
+      "aliases": [
+        "宣城郡（742-758 官称）",
+        "宣城（治县名 / 民间通名）",
+        "宛陵（汉至南朝旧名）"
+      ]
+    },
+    {
+      "id": "雅隆",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 29.24,
+        "lon": 91.77
+      },
+      "visualHierarchy": "medium",
+      "displayName": "雅隆",
+      "oneLiner": "吐蕃赞普世系的发祥地——雅鲁藏布江南岸一道狭谷里的祖陵心脏；755 这一冬，赤德祖赞的新坟正要在琼结山下夯起。",
+      "docPath": "docs/05-epoch/tang-755/cities/雅隆.md",
+      "category": "city",
+      "aliases": [
+        "Yarlung",
+        "雅鲁",
+        "Phying-ba（敦煌古藏文，指琼结一带）",
+        "雅砻",
+        "山南"
+      ]
+    },
+    {
+      "id": "雅州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 30.01,
+        "lon": 103.04
+      },
+      "visualHierarchy": "small",
+      "displayName": "雅州",
+      "oneLiner": "剑南道西南边角的一座下州，742-758 年间名\"卢山郡\"——青衣江穿城而过、蒙顶山在城北、西出便接吐蕃东境与南诏北界，是唐人入剑南最西南的一处官治。",
+      "docPath": "docs/05-epoch/tang-755/cities/雅州.md",
+      "category": "city",
+      "aliases": [
+        "卢山郡（742-758）",
+        "严道（治县名）",
+        "临邛郡（隋大业三年 / 607 至唐武德元年 / 618 间用名）"
+      ]
+    },
+    {
+      "id": "焉耆",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 42.06,
+        "lon": 86.57
+      },
+      "visualHierarchy": "medium",
+      "displayName": "焉耆",
+      "oneLiner": "安西四镇之东镇，龙姓焉耆王城——博斯腾湖西畔一处水网绿洲；玄奘西行称之\"阿耆尼\"，唐人识它有二：自西州过来的第一站、自龟兹回长安的第一站。",
+      "docPath": "docs/05-epoch/tang-755/cities/焉耆.md",
+      "category": "city",
+      "aliases": [
+        "阿耆尼（梵文音译，玄奘译）",
+        "焉耆都督府",
+        "卡喇沙尔（突厥后世名）",
+        "焉耆镇",
+        "乌夷（一作\"乌耆\"，魏晋异称）"
+      ]
+    },
+    {
+      "id": "兖州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 35.55,
+        "lon": 116.78
+      },
+      "visualHierarchy": "medium",
+      "displayName": "兖州",
+      "oneLiner": "河南道东部一上州——《禹贡》九州之一的\"兖\"，孔子故里曲阜所在，李白东鲁卜居、李杜同游的那座鲁地大城。",
+      "docPath": "docs/05-epoch/tang-755/cities/兖州.md",
+      "category": "city",
+      "aliases": [
+        "鲁郡（742-758）",
+        "瑕丘（州治县名）",
+        "鲁（古名）"
+      ]
+    },
+    {
+      "id": "扬州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 32.4,
+        "lon": 119.43
+      },
+      "visualHierarchy": "gravity",
+      "displayName": "扬州",
+      "oneLiner": "天宝十四载冬，长江北岸最富的一座城——三段运河在此交汇，胡舶系缆，鉴真一年前自此第六次扬帆东渡。",
+      "docPath": "docs/05-epoch/tang-755/cities/扬州.md",
+      "category": "city",
+      "aliases": [
+        "江都",
+        "江都郡",
+        "邗",
+        "广陵",
+        "维扬"
+      ]
+    },
+    {
+      "id": "姚州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 25.73,
+        "lon": 101.24
+      },
+      "visualHierarchy": "small",
+      "displayName": "姚州",
+      "oneLiner": "剑南道西南最外的一座下州，唐姚州都督府治——天宝九载（750）阁罗凤攻陷、751 与 754 两次南征唐军覆师其后，755 这一刻名义仍在大唐版图，实际已是南诏阁罗凤的占领地。",
+      "docPath": "docs/05-epoch/tang-755/cities/姚州.md",
+      "category": "city",
+      "aliases": [
+        "姚城（治县名）",
+        "姚州都督府",
+        "云南郡(742-758)",
+        "天宝战刚失之州"
+      ]
+    },
+    {
+      "id": "伊州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 42.8,
+        "lon": 93.51
+      },
+      "visualHierarchy": "medium",
+      "displayName": "伊州",
+      "oneLiner": "沙州（敦煌）以西、西州（高昌）以东的中继州——河西节度使在天山以南诸州中位置最东的一州（沙州以西、西州以东中继）、东天山一线的西陲门户，盛唐州县制再向西便是西域诸国。",
+      "docPath": "docs/05-epoch/tang-755/cities/伊州.md",
+      "category": "city",
+      "aliases": [
+        "伊吾郡（742-757 间官称）",
+        "伊吾",
+        "哈密（明清后通称，755 时不可用）"
+      ]
+    },
+    {
+      "id": "易州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 39.35,
+        "lon": 115.5
+      },
+      "visualHierarchy": "small",
+      "displayName": "易州",
+      "oneLiner": "河北道太行山东麓一州——治易县（今河北保定易县），742-758 年间名\"上谷郡\"；州境一水即古易水，战国燕国南界，荆轲西渡刺秦之处。",
+      "docPath": "docs/05-epoch/tang-755/cities/易州.md",
+      "category": "city",
+      "aliases": [
+        "上谷郡（742-758）",
+        "易县"
+      ]
+    },
+    {
+      "id": "益州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 30.66,
+        "lon": 104.07
+      },
+      "visualHierarchy": "gravity",
+      "displayName": "益州",
+      "oneLiner": "天宝十四载冬，西南半个天下唯一的大城——再过半年，将成为玄宗仓皇南奔的终点。",
+      "docPath": "docs/05-epoch/tang-755/cities/益州.md",
+      "category": "city",
+      "aliases": [
+        "成都",
+        "蜀郡",
+        "益州大都督府",
+        "锦官城",
+        "锦城",
+        "蓉城（中晚唐始）"
+      ]
+    },
+    {
+      "id": "银州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 37.95,
+        "lon": 109.9
+      },
+      "visualHierarchy": "small",
+      "displayName": "银州",
+      "oneLiner": "关内道北线一座下州——治儒林县，与今宁夏银川市无涉；城在无定河中游（今陕西榆林市横山、米脂一带），742-758 年间名\"银川郡\"，是夏州东南邻、党项拓拔氏内徙后的一处根据地。",
+      "docPath": "docs/05-epoch/tang-755/cities/银州.md",
+      "category": "city",
+      "aliases": [
+        "银川郡（742-758 官称）",
+        "儒林（州治县名）"
+      ]
+    },
+    {
+      "id": "营州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 41.57,
+        "lon": 120.45
+      },
+      "visualHierarchy": "large",
+      "displayName": "营州",
+      "oneLiner": "平卢节度使治，安禄山起家的城；河北道东北角的边镇，前燕慕容氏曾以此为都，唐人口中\"龙城旧地\"。",
+      "docPath": "docs/05-epoch/tang-755/cities/营州.md",
+      "category": "city",
+      "aliases": [
+        "柳城郡",
+        "龙城",
+        "柳城"
+      ]
+    },
+    {
+      "id": "颍州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 32.9,
+        "lon": 115.81
+      },
+      "visualHierarchy": "small",
+      "displayName": "颍州",
+      "oneLiner": "河南道东南一中州，治汝阴县（今安徽阜阳市），742-758 年间名\"汝阴郡\"——城坐颍水中游北岸，南距颍水入淮口（颍上一段）百里许，是江淮之间循颍水北上中原的一处水陆中转，亦《史记》所载春秋齐相管仲\"颍上人\"故里（同游之鲍叔牙籍贯则属地方传说，详下）所在。",
+      "docPath": "docs/05-epoch/tang-755/cities/颍州.md",
+      "category": "city",
+      "aliases": [
+        "汝阴郡（742-758）",
+        "汝阴"
+      ]
+    },
+    {
+      "id": "邕州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 22.82,
+        "lon": 108.37
+      },
+      "visualHierarchy": "medium",
+      "displayName": "邕州",
+      "oneLiner": "岭南五府经略之一邕管之治——朗宁郡治、宣化县治；邕江北岸，西望南诏，南通诸蛮——大唐辖境西南向陆路上最远的一处经略守捉。",
+      "docPath": "docs/05-epoch/tang-755/cities/邕州.md",
+      "category": "city",
+      "aliases": [
+        "朗宁郡（742-758）",
+        "宣化",
+        "邕管",
+        "南晋州（621-634）"
+      ]
+    },
+    {
+      "id": "永昌",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 25.12,
+        "lon": 99.16
+      },
+      "visualHierarchy": "small",
+      "displayName": "永昌",
+      "oneLiner": "南诏西陲军镇，哀牢故地——汉永昌郡治在此，755 时为南诏永昌节度新置（天宝末-至德间）所辖，扼西南丝路（永昌道）东段；西略寻传、骠国、抵腾冲一线为大历后异牟寻朝才完成。是大唐西南方向最远的一处汉名旧城。",
+      "docPath": "docs/05-epoch/tang-755/cities/永昌.md",
+      "category": "city",
+      "aliases": [
+        "Yong-chang",
+        "哀牢",
+        "不韦（汉永昌郡治）",
+        "永昌郡（汉至晋）",
+        "永昌节度（南诏）"
+      ]
+    },
+    {
+      "id": "永州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 26.43,
+        "lon": 111.62
+      },
+      "visualHierarchy": "medium",
+      "displayName": "永州",
+      "oneLiner": "江南西道永州治所，治零陵县（今湖南永州市零陵区）——湘水与潇水合流之处，南楚边境一座中州小城，755 时尚是州县小郡，柳宗元贬此尚在五十年后。",
+      "docPath": "docs/05-epoch/tang-755/cities/永州.md",
+      "category": "city",
+      "aliases": [
+        "零陵郡（742-758 官称）",
+        "零陵",
+        "零陵县（州治县名）"
+      ]
+    },
+    {
+      "id": "幽州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 39.85,
+        "lon": 116.3
+      },
+      "visualHierarchy": "large",
+      "displayName": "幽州",
+      "oneLiner": "天宝十四载冬，安禄山起兵地——这座城在十一月初九清晨号炮一响，盛唐就此翻面。",
+      "docPath": "docs/05-epoch/tang-755/cities/幽州.md",
+      "category": "city",
+      "aliases": [
+        "范阳",
+        "幽州大都督府",
+        "范阳郡",
+        "蓟城",
+        "蓟"
+      ]
+    },
+    {
+      "id": "于阗",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 37.1,
+        "lon": 79.93
+      },
+      "visualHierarchy": "large",
+      "displayName": "于阗",
+      "oneLiner": "安西四镇之南镇，塔里木南道一大绿洲城邦——梵名瞿萨旦那（意\"地乳\"），唐人识它有三：尉迟氏王国、玉之所出、玄奘归途上停过七个月的伽蓝之国。",
+      "docPath": "docs/05-epoch/tang-755/cities/于阗.md",
+      "category": "city",
+      "aliases": [
+        "瞿萨旦那（梵文音译，玄奘译）",
+        "和田（现代汉名）",
+        "尉迟氏王城",
+        "毗沙（毗沙都督府）",
+        "于田（9 世纪后改名）"
+      ]
+    },
+    {
+      "id": "渝州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 29.56,
+        "lon": 106.55
+      },
+      "visualHierarchy": "small",
+      "displayName": "渝州",
+      "oneLiner": "嘉陵江入长江口一下州——治巴县（今重庆老城渝中半岛），州名\"渝\"取自嘉陵江下游古名渝水；两《唐书》归道有出入：旧志列山南西道末、新志归剑南采访使，是巴蜀通黔中、走荆襄的水上节点。",
+      "docPath": "docs/05-epoch/tang-755/cities/渝州.md",
+      "category": "city",
+      "aliases": [
+        "南平郡（天宝元年 742 至乾元元年 758 改名前用名）",
+        "巴县（州治县名）",
+        "巴郡（隋大业旧名）"
+      ]
+    },
+    {
+      "id": "岳州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 29.37,
+        "lon": 113.13
+      },
+      "visualHierarchy": "medium",
+      "displayName": "岳州",
+      "oneLiner": "江南西道岳州治所，唐人口中『巴陵』——洞庭湖东北岸、长江入湖口南畔的水驿要冲；城西临湖一面立着岳阳楼，开元四年张说改建之后，便成了俯瞰洞庭的天下名楼。",
+      "docPath": "docs/05-epoch/tang-755/cities/岳州.md",
+      "category": "city",
+      "aliases": [
+        "巴陵郡（742-758）",
+        "巴陵",
+        "罗州（隋大业短暂）"
+      ]
+    },
+    {
+      "id": "越州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 30,
+        "lon": 120.58
+      },
+      "visualHierarchy": "medium",
+      "displayName": "越州",
+      "oneLiner": "江南东道会稽郡治，山阴县所在；春秋越国故都，王羲之兰亭、马臻鉴湖、贺知章故里——唐人提\"越\"，脑中先是水，再是会稽山，再是那一篇《兰亭》。",
+      "docPath": "docs/05-epoch/tang-755/cities/越州.md",
+      "category": "city",
+      "aliases": [
+        "会稽郡（742-757）",
+        "山阴",
+        "越州大都督府（短暂时期）",
+        "绍兴府（南宋建炎四年 1130 后名号）"
+      ]
+    },
+    {
+      "id": "云州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 40.08,
+        "lon": 113.3
+      },
+      "visualHierarchy": "medium",
+      "displayName": "云州",
+      "oneLiner": "河东道北缘一州，治云中县（今山西大同）——雁门关北、阴山南麓的一座边州，城即北魏平城故地；后突厥、回纥前线，安史乱中 757 年史思明军一度攻陷。",
+      "docPath": "docs/05-epoch/tang-755/cities/云州.md",
+      "category": "city",
+      "aliases": [
+        "云中郡（742-758 官称）",
+        "云中",
+        "平城（北魏 398-494 都城旧名）",
+        "大同府（明清以后升府之名号，非唐称）"
+      ]
+    },
+    {
+      "id": "泽州",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 35.5,
+        "lon": 112.85
+      },
+      "visualHierarchy": "large",
+      "displayName": "泽州",
+      "oneLiner": "河东道东南南端一上州——治晋城县（今山西晋城市城区），742-758 年间官名\"高平郡\"；城据太行八陉之\"太行陉\"北口，与潞州共扼太行—怀庆盆地通道；境内长平为战国长平之战（前 260）故地。",
+      "docPath": "docs/05-epoch/tang-755/cities/泽州.md",
+      "category": "city",
+      "aliases": [
+        "高平郡（742-758）",
+        "长平郡（隋大业）",
+        "晋城（治县）"
+      ]
+    },
+    {
+      "id": "长安",
+      "archetype": "city",
+      "size": "large",
+      "position": {
+        "lat": 34.27,
+        "lon": 108.95
+      },
+      "visualHierarchy": "gravity",
+      "displayName": "长安",
+      "oneLiner": "天宝十四载冬，唐人称\"百万家\"的城——炊烟仍起，安禄山的兵锋已离它一千八百里。",
+      "docPath": "docs/05-epoch/tang-755/cities/长安.md",
+      "category": "city",
+      "aliases": [
+        "西京",
+        "京师",
+        "京兆",
+        "大兴城（隋名）"
+      ]
+    },
+    {
+      "id": "长岭府",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 41.73,
+        "lon": 125.94
+      },
+      "visualHierarchy": "low",
+      "displayName": "长岭府",
+      "oneLiner": "渤海后世\"五京十五府\"中的长岭府——治瑕州，主流定于今吉林通化一带，扼上京 / 西京鸭绿府之间的山岭通道；755 时或仅为府辖境之雏形，独立府治之号未必已立。",
+      "docPath": "docs/05-epoch/tang-755/cities/长岭府.md",
+      "category": "city",
+      "aliases": [
+        "Changryong-bu",
+        "瑕州治",
+        "长岭府"
+      ]
+    },
+    {
+      "id": "振州",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 18.35,
+        "lon": 109.18
+      },
+      "visualHierarchy": "small",
+      "displayName": "振州",
+      "oneLiner": "岭南道振州，742-758 年间名\"延德郡\"——治宁远县（今海南三亚崖州区，非今三亚市区），盛唐海南岛五州之南州、大唐辖境最南端的州治；天宝七载（748）鉴真第五次东渡漂海至此，留振州约一年方北返。",
+      "docPath": "docs/05-epoch/tang-755/cities/振州.md",
+      "category": "city",
+      "aliases": [
+        "延德郡（742-758）",
+        "宁远"
+      ]
+    },
+    {
+      "id": "中京显德府",
+      "archetype": "city",
+      "size": "small",
+      "position": {
+        "lat": 42.55,
+        "lon": 129.01
+      },
+      "visualHierarchy": "low",
+      "displayName": "中京显德府",
+      "oneLiner": "渤海五京之一，文王大钦茂自旧国敖东城迁来的第二都——755 当年正是它把\"都\"的身份让给上京龙泉府的过渡之年。",
+      "docPath": "docs/05-epoch/tang-755/cities/中京显德府.md",
+      "category": "city",
+      "aliases": [
+        "显德府",
+        "Hyondok",
+        "Xian-de-fu",
+        "西古城（今地）"
+      ]
+    },
+    {
+      "id": "梓州",
+      "archetype": "city",
+      "size": "medium",
+      "position": {
+        "lat": 31.1,
+        "lon": 105.09
+      },
+      "visualHierarchy": "medium",
+      "displayName": "梓州",
+      "oneLiner": "剑南道梓州（梓潼郡），治郪县——盆地东北、涪江西岸的一座中州，按天宝户口、剑南东部州治，梓州为剑南道仅次益州的第二城；唐人称\"东川\"之始，杜甫安史乱后流寓于此一年余，《闻官军收河南河北》即此城所作。",
+      "docPath": "docs/05-epoch/tang-755/cities/梓州.md",
+      "category": "city",
+      "aliases": [
+        "梓潼郡（742-758 间正名）",
+        "郪（古县名，州治所在）",
+        "潼州（西魏置，初名）"
+      ]
+    },
+    {
+      "id": "北魏邙山陵群",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.78,
+        "lon": 112.65
+      },
+      "visualHierarchy": "large",
+      "displayName": "北魏邙山陵群",
+      "oneLiner": "北魏迁都洛阳后的五帝陵——孝文帝长陵 + 宣武帝景陵 + 孝明帝定陵 + 孝庄帝静陵 等；499-531 年间陆续葬入（499 长陵起、至 531 静陵）；755 时已立 220-260 年、邙山土堆累累——唐人在邙山耕作 / 出洛阳东行时每见的废陵；是北朝中期最重要的陵群之一。",
+      "docPath": "docs/05-epoch/tang-755/relics/北魏邙山陵群.md",
+      "category": "relic",
+      "aliases": [
+        "北魏五陵",
+        "北邙北魏陵",
+        "邙山北魏帝陵"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "南朝陵墓石刻群",
+      "archetype": "mausoleum",
+      "variant": "tomb",
+      "position": {
+        "lat": 32.0117,
+        "lon": 119.45
+      },
+      "visualHierarchy": "large",
+      "displayName": "南朝陵墓石刻群",
+      "oneLiner": "建康-丹阳-句容三地分布的南朝（宋齐梁陈）四代帝陵 + 石刻群——420-589 年间陆续葬入；755 时已立 160-330 年、废陵已废 166 年（589 隋灭陈）；麒麟、天禄、辟邪石兽千年立田野——是中国南朝雕塑唯一大规模遗存。",
+      "docPath": "docs/05-epoch/tang-755/relics/南朝陵墓石刻群.md",
+      "category": "relic",
+      "aliases": [
+        "南朝石刻",
+        "麒麟石刻",
+        "天禄辟邪石刻",
+        "建康-丹阳南朝陵",
+        "江左帝陵"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "隋文帝泰陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.295,
+        "lon": 108.09
+      },
+      "visualHierarchy": "large",
+      "displayName": "隋文帝泰陵",
+      "oneLiner": "隋文帝杨坚与文献皇后独孤伽罗合葬陵——仁寿二年（602）八月皇后先葬；仁寿四年（604）十月文帝合葬；位京兆府武功县西原（今陕西咸阳杨陵区五泉镇王上村）；755 时已立 151 年——是中国\"二度统一\"开国之主的陵；与淮南道广陵郡江都县雷塘隋炀帝墓配对成\"隋兴-隋亡\" arc；唐皇室自觉与隋皇室同出关陇集团（杨坚是李渊姨父、李渊与杨广是姨表兄弟）。",
+      "docPath": "docs/05-epoch/tang-755/relics/隋文帝泰陵.md",
+      "category": "relic",
+      "aliases": [
+        "泰陵",
+        "隋高祖陵",
+        "文献后合葬陵"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "隋炀帝墓",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 32.4633,
+        "lon": 119.3833
+      },
+      "visualHierarchy": "medium",
+      "displayName": "隋炀帝墓",
+      "oneLiner": "隋亡帝身处所——大业十四年（618）三月炀帝被弑于江都宫、萧后草葬流珠堂；唐武德五年（622）改葬江都西吴公台下、贞观元年（627）说改葬雷塘——755 时炀帝陵已在江都北郊雷塘约 130 年；唐淮南道广陵郡江都县北十里、湖塘草冢一座，是唐人凭吊隋亡的物理 anchor。",
+      "docPath": "docs/05-epoch/tang-755/relics/隋炀帝墓.md",
+      "category": "relic",
+      "aliases": [
+        "炀帝陵",
+        "隋炀帝雷塘陵",
+        "杨广墓",
+        "江都炀帝陵"
+      ],
+      "extinctionTier": "B1"
+    },
+    {
+      "id": "唐定陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.8806,
+        "lon": 108.9772
+      },
+      "visualHierarchy": "medium",
+      "displayName": "唐定陵",
+      "oneLiner": "唐中宗李显陵——景龙四年（710）六月中宗被韦后毒杀、景云元年（710）十一月葬定陵；富平县龙泉山为穴；755 时已 45 年、陵阙石刻俱在——是中宗\"二度即位、被韦后毒杀\" 的悲剧陵。",
+      "docPath": "docs/05-epoch/tang-755/relics/唐定陵.md",
+      "category": "relic",
+      "aliases": [
+        "中宗陵",
+        "富平定陵"
+      ]
+    },
+    {
+      "id": "唐惠陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.7522,
+        "lon": 109.6306
+      },
+      "visualHierarchy": "medium",
+      "displayName": "唐惠陵",
+      "oneLiner": "让皇帝李宪陵——玄宗长兄、原睿宗朝合礼应立的太子；景云元年（710）让太子位给三弟李隆基（玄宗）；开元二十九年（741）卒、玄宗追封\"让皇帝\"号、葬惠陵；与桥陵同县不同陵、距桥陵约 5 公里——是中国陵墓史最特殊的\"让位之陵\"。",
+      "docPath": "docs/05-epoch/tang-755/relics/唐惠陵.md",
+      "category": "relic",
+      "aliases": [
+        "让皇帝陵",
+        "让陵",
+        "宁王陵（李宪生前封爵）",
+        "唐惠陵"
+      ]
+    },
+    {
+      "id": "唐乾陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.5847,
+        "lon": 108.2278
+      },
+      "visualHierarchy": "large",
+      "displayName": "唐乾陵",
+      "oneLiner": "唐高宗李治 + 武则天合葬陵——双帝合葬：高宗葬 684、武则天葬 706；唐六陵中唯一未被五代温韬盗发的一座（《新五代史》\"唯乾陵风雨不可发\"）；755 时已立 71 年、陵阙石刻俱在——梁山主峰为穴、神道有无字碑 + 述圣纪碑。",
+      "docPath": "docs/05-epoch/tang-755/relics/唐乾陵.md",
+      "category": "relic",
+      "aliases": [
+        "高宗陵",
+        "武后陵",
+        "梁山陵",
+        "乾县梁山陵"
+      ]
+    },
+    {
+      "id": "唐桥陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.7861,
+        "lon": 109.7261
+      },
+      "visualHierarchy": "medium",
+      "displayName": "唐桥陵",
+      "oneLiner": "唐睿宗李旦陵——开元四年（716）六月睿宗崩、十月葬桥陵；蒲城县丰山为穴、是玄宗为父建造的陵——开元朝盛唐石刻艺术的代表；755 时已 39 年、陵前石刻完整、是诸唐陵中艺术水准最高的一座。",
+      "docPath": "docs/05-epoch/tang-755/relics/唐桥陵.md",
+      "category": "relic",
+      "aliases": [
+        "睿宗陵",
+        "蒲城桥陵",
+        "大孝皇帝陵"
+      ]
+    },
+    {
+      "id": "唐献陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.7397,
+        "lon": 108.9583
+      },
+      "visualHierarchy": "medium",
+      "displayName": "唐献陵",
+      "oneLiner": "唐高祖李渊陵——贞观九年（635）五月高祖崩、十月葬献陵；唐陵首座，三原县三十里、太宗依旧礼\"积土为陵\"——非昭陵以下因山为陵；755 时已 120 年、陵阙仍立、岁有遣使祭祀。",
+      "docPath": "docs/05-epoch/tang-755/relics/唐献陵.md",
+      "category": "relic",
+      "aliases": [
+        "高祖陵",
+        "神尧皇帝陵"
+      ]
+    },
+    {
+      "id": "唐昭陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 34.6233,
+        "lon": 108.4906
+      },
+      "visualHierarchy": "large",
+      "displayName": "唐昭陵",
+      "oneLiner": "唐太宗李世民陵——贞观十年六月长孙皇后崩、葬昭陵（昭陵营建之始）；贞观二十三年（649）八月太宗葬此——唐\"因山为陵\"首座、九嵕山主峰为穴；755 时已 119 年、陪葬墓近 200 座——唐六陵规模最大者。",
+      "docPath": "docs/05-epoch/tang-755/relics/唐昭陵.md",
+      "category": "relic",
+      "aliases": [
+        "文皇帝陵",
+        "太宗陵",
+        "九嵕山陵"
+      ]
+    },
+    {
+      "id": "雍布拉康藏王陵",
+      "archetype": "mausoleum",
+      "variant": "imperial",
+      "position": {
+        "lat": 29.0167,
+        "lon": 91.7589
+      },
+      "visualHierarchy": "large",
+      "displayName": "雍布拉康藏王陵",
+      "oneLiner": "吐蕃发祥地——雅隆河谷：雍布拉康在乃东扎西曲登（藏文传说\"吐蕃第一座宫殿\"）、藏王陵在琼结河南岸（755 年前后赤德祖赞卒、将归葬于此；赤松德赞少年即位）——两处相距约 30 公里、是吐蕃帝国的物理起点与王陵集中地。",
+      "docPath": "docs/05-epoch/tang-755/relics/雍布拉康藏王陵.md",
+      "category": "relic",
+      "aliases": [
+        "雍布拉冈",
+        "雅隆雍布",
+        "琼结藏王墓群（藏王陵）"
+      ],
+      "extinctionTier": "A3-foreign"
+    },
+    {
+      "id": "峨眉山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 29.5197,
+        "lon": 103.3322
+      },
+      "visualHierarchy": "large",
+      "displayName": "峨眉山",
+      "oneLiner": "蜀地最大的一座山——嘉州西七里、青衣江北、岷江西；东晋慧持自庐山西入蜀立白水寺、自此佛教在峨眉立根；李白少年蜀人、登峨眉留\"蜀国多仙山、峨眉邈难匹\"——755 时是蜀地名山、佛道并修。",
+      "docPath": "docs/05-epoch/tang-755/scenic/峨眉山.md",
+      "category": "scenic",
+      "aliases": [
+        "大峨山（与二峨、三峨并称三峨；峨眉本山即大峨）"
+      ]
+    },
+    {
+      "id": "恒山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 38.9622,
+        "lon": 114.6231
+      },
+      "visualHierarchy": "large",
+      "displayName": "恒山",
+      "oneLiner": "北岳——唐人口中的\"恒山\"——天宝五载玄宗诏封\"安天王\"；实际指河北曲阳之山（古恒山 / 大茂山）、非今山西浑源恒山——浑源改祀是清顺治十七年（1660）以后的事。",
+      "docPath": "docs/05-epoch/tang-755/scenic/恒山.md",
+      "category": "scenic",
+      "aliases": [
+        "北岳",
+        "古恒山",
+        "大茂山（唐宋以后通称）",
+        "神仙山（民间称谓）",
+        "常山（汉初避文帝刘恒讳改）"
+      ]
+    },
+    {
+      "id": "衡山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 27.3036,
+        "lon": 112.6886
+      },
+      "visualHierarchy": "large",
+      "displayName": "衡山",
+      "oneLiner": "南岳，唐人口中\"配朱鸟\"的山——天宝五载玄宗诏封\"司天王\"；天台宗祖庭之一、南宗禅怀让一脉之祖庭——衡山在 755 时既是国家祀典、亦是佛道双圣山。",
+      "docPath": "docs/05-epoch/tang-755/scenic/衡山.md",
+      "category": "scenic",
+      "aliases": [
+        "南岳",
+        "朱陵洞天",
+        "寿岳（南宋朱熹始定;唐时无此称）"
+      ]
+    },
+    {
+      "id": "华山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 34.4833,
+        "lon": 110.0833
+      },
+      "visualHierarchy": "large",
+      "displayName": "华山",
+      "oneLiner": "西岳，唐人口中的\"太华\"；关中东屏、国家祀典之山——先天二年玄宗诏封\"金天王\"，李白送友入云台，杜甫望峰而未登。",
+      "docPath": "docs/05-epoch/tang-755/scenic/华山.md",
+      "category": "scenic",
+      "aliases": [
+        "太华山",
+        "西岳",
+        "华阴山"
+      ]
+    },
+    {
+      "id": "黄山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 30.1283,
+        "lon": 118.1656
+      },
+      "visualHierarchy": "medium",
+      "displayName": "黄山",
+      "oneLiner": "歙州黟县境内的一座大山——唐天宝六载（747）玄宗诏改\"黟山\"为\"黄山\"，因轩辕黄帝传说；755 时是江南尚不显的一座山、改名才 8 年；唯李白一首《送温处士》留诗——真正显于明清以后。",
+      "docPath": "docs/05-epoch/tang-755/scenic/黄山.md",
+      "category": "scenic",
+      "aliases": [
+        "黟山（唐天宝六载/747 改名前；旧名）",
+        "三天子都山（《山海经·海内东经》古称之一说；史源略异）"
+      ]
+    },
+    {
+      "id": "兰亭",
+      "archetype": "mountain",
+      "position": {
+        "lat": 29.9892,
+        "lon": 120.5103
+      },
+      "visualHierarchy": "medium",
+      "displayName": "兰亭",
+      "oneLiner": "越州山阴城西南约十二里兰渚之畔的水边小亭——东晋永和九年三月三日王羲之与谢安、孙绰等四十一人于此修禊、流觞曲水、即席作《兰亭集序》——书法第一行书、文学千古名篇之诞生地；755 时去永和禊集已四百零二年、真迹陪葬昭陵已一百零六年，唐人凭吊的是摹本与一片荒废故地。",
+      "docPath": "docs/05-epoch/tang-755/relics/兰亭.md",
+      "category": "relic",
+      "aliases": [
+        "兰亭故地",
+        "兰渚",
+        "山阴兰亭",
+        "永和禊集地"
+      ],
+      "extinctionTier": "A3"
+    },
+    {
+      "id": "庐山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 29.55,
+        "lon": 115.97
+      },
+      "visualHierarchy": "large",
+      "displayName": "庐山",
+      "oneLiner": "江州浔阳郡境内名山，唐人口中的\"匡庐\"；慧远东林、陶潜南山——使它早成南方佛门与隐逸之山。",
+      "docPath": "docs/05-epoch/tang-755/scenic/庐山.md",
+      "category": "scenic",
+      "aliases": [
+        "匡庐",
+        "匡山",
+        "庐阜",
+        "南障山"
+      ]
+    },
+    {
+      "id": "鹿门别业",
+      "archetype": "mountain",
+      "position": {
+        "lat": 32.0083,
+        "lon": 112.2333
+      },
+      "visualHierarchy": "medium",
+      "displayName": "鹿门别业",
+      "oneLiner": "襄州襄阳城东南二十唐里鹿门山中的诗人故居——孟浩然 (689-740) 晚年隐居十数年、于此作《夜归鹿门歌》——天宝十四载这一刻、距浩然食鲜疾发卒已十五年；鹿门别业荒废，但盛唐人凭吊浩然故宅、犹是从襄阳出南门、循汉江东岸往鹿门山的一日游。",
+      "docPath": "docs/05-epoch/tang-755/relics/鹿门别业.md",
+      "category": "relic",
+      "aliases": [
+        "鹿门山别业",
+        "孟浩然旧居",
+        "浩然故宅",
+        "鹿门旧隐"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "渼陂湖",
+      "archetype": "mountain",
+      "position": {
+        "lat": 34.1086,
+        "lon": 108.6058
+      },
+      "visualHierarchy": "medium",
+      "displayName": "渼陂湖",
+      "oneLiner": "鄠县西南、终南山下一片唐时大湖——杜甫与岑参兄弟泛舟于此作《渼陂行》，那是 755 前夜的盛唐最后一夏；今缩为田畔小水。",
+      "docPath": "docs/05-epoch/tang-755/scenic/渼陂湖.md",
+      "category": "scenic",
+      "aliases": [
+        "渼陂",
+        "城西陂（唐人合称鄠县西诸陂，含渼陂）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "嵩山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 34.5,
+        "lon": 113.04
+      },
+      "visualHierarchy": "large",
+      "displayName": "嵩山",
+      "oneLiner": "五岳中岳，唐河南府登封县境；周人称嵩高，汉武立太室祠——武周登封以后，山名便带着一层天中帝气。",
+      "docPath": "docs/05-epoch/tang-755/scenic/嵩山.md",
+      "category": "scenic",
+      "aliases": [
+        "中岳",
+        "嵩高",
+        "嵩高山",
+        "崇高",
+        "外方山（先秦）"
+      ]
+    },
+    {
+      "id": "太白山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 34.0058,
+        "lon": 107.7833
+      },
+      "visualHierarchy": "large",
+      "displayName": "太白山",
+      "oneLiner": "扶风郡郿县南山，秦岭主峰、长安南望的雪线——李太白以星为字，登峰近月，汉唐祠祀把太白星与山神系在一处。",
+      "docPath": "docs/05-epoch/tang-755/scenic/太白山.md",
+      "category": "scenic",
+      "aliases": [
+        "太乙",
+        "太一山",
+        "太白"
+      ]
+    },
+    {
+      "id": "泰山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 36.2566,
+        "lon": 117.101
+      },
+      "visualHierarchy": "large",
+      "displayName": "泰山",
+      "oneLiner": "兖州乾封县北的东岳，唐人心中的五岳之首、帝王告成于天地之山；自《尚书》\"岱宗\"到开元封禅，崖石仍留玄宗一笔。",
+      "docPath": "docs/05-epoch/tang-755/scenic/泰山.md",
+      "category": "scenic",
+      "aliases": [
+        "岱宗",
+        "岱山",
+        "东岳",
+        "岱岳"
+      ]
+    },
+    {
+      "id": "天台山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 29.1583,
+        "lon": 121.0286
+      },
+      "visualHierarchy": "large",
+      "displayName": "天台山",
+      "oneLiner": "台州临海郡天台县境内的浙东佛道圣山——隋开皇十一年（591）智顗大师与晋王杨广共建国清寺、立中国佛教第一个本土宗派\"天台宗\"——盛唐 755 时是江南东道佛教祖庭、亦是司马承祯早年隐修的道教圣地、佛道共构。",
+      "docPath": "docs/05-epoch/tang-755/relics/天台山.md",
+      "category": "relic",
+      "aliases": [
+        "天台（盛唐通称）",
+        "桐柏山（道教别称、与道教桐柏宫呼应）",
+        "浙东佛山"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "终南山",
+      "archetype": "mountain",
+      "position": {
+        "lat": 34,
+        "lon": 108.95
+      },
+      "visualHierarchy": "large",
+      "displayName": "终南山",
+      "oneLiner": "长安南屏，唐人口中的\"南山\"；太乙近天都，终南成捷径——城南八百里山脊收着盛唐士人的归隐、问道与回望。",
+      "docPath": "docs/05-epoch/tang-755/scenic/终南山.md",
+      "category": "scenic",
+      "aliases": [
+        "南山",
+        "中南山",
+        "太一山",
+        "地肺山",
+        "周南山"
+      ]
+    },
+    {
+      "id": "灞桥",
+      "archetype": "node",
+      "variant": "bridge",
+      "position": {
+        "lat": 34.29,
+        "lon": 109.06
+      },
+      "visualHierarchy": "medium",
+      "displayName": "灞桥",
+      "oneLiner": "京兆府 万年县 东郊 灞水 之上的一座大桥——秦汉以来已有桥、王莽始建国元年/9 改名\"长存桥\"而终复\"灞桥\"旧名；唐 755 时是长安东出第一渡——出春明门东三十唐里即至桥、过桥即出关中东向；唐人折柳送别成例、\"灞桥折柳\"是中国送别文化的物理 anchor。",
+      "docPath": "docs/05-epoch/tang-755/relics/灞桥.md",
+      "category": "relic",
+      "aliases": [
+        "霸桥",
+        "长存桥（王莽改名）",
+        "灞水桥",
+        "灞陵桥（唐宋后或与汉灞陵相连而称）"
+      ],
+      "extinctionTier": "B2"
+    },
+    {
+      "id": "褒斜道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 0,
+        "lon": 0
+      },
+      "visualHierarchy": "medium",
+      "displayName": "褒斜道",
+      "oneLiner": "蜀道八条中最直的一条，关中通汉中的\"近路\"；战国秦昭王便已凿栈，三国出此口者赵云邓芝、五丈原前的诸葛亮，唐人沿用如旧。",
+      "docPath": "docs/05-epoch/tang-755/transport/褒斜道.md",
+      "category": "transport",
+      "aliases": [
+        "斜谷道",
+        "褒斜栈",
+        "斜谷路"
+      ]
+    },
+    {
+      "id": "陈仓道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 33.8,
+        "lon": 106.6
+      },
+      "visualHierarchy": "large",
+      "displayName": "陈仓道",
+      "oneLiner": "蜀道八条中最古老也最长的一条，唐人口中的\"故道\"；秦末韩信\"明修栈道，暗渡陈仓\"即此线，诸葛亮二出祁山亦由此南返——盛唐时虽已让位金牛道，仍是关中入巴蜀的官道之一。",
+      "docPath": "docs/05-epoch/tang-755/transport/陈仓道.md",
+      "category": "transport",
+      "aliases": [
+        "故道",
+        "周道",
+        "嘉陵故道"
+      ]
+    },
+    {
+      "id": "登州港",
+      "archetype": "node",
+      "variant": "port",
+      "position": {
+        "lat": 37.81,
+        "lon": 120.76
+      },
+      "visualHierarchy": "medium",
+      "displayName": "登州港",
+      "oneLiner": "渤海湾口的盛唐海港——登州港在河南道登州（742-758 名\"东牟郡\"）治蓬莱县海岸；755 时是唐与新罗、日本北航路的起点——自登州出黄海 → 朝鲜半岛西海岸 → 新罗 → 日本九州博多；与南端明州港、苏州港的南航路并立、共同构成盛唐东出海三大海口；同时是蓬莱方丈瀛洲三神山的传说之地——秦皇汉武东巡求仙皆至此岸；755 时港中楼船 + 商舶 + 使节舸 出入有时、是河南道东端面海的物理 anchor。蓬莱阁（北宋嘉祐六年/1061 始建）此时未立——盛唐时登州港所见、只是面海低丘与几处渔村码头。",
+      "docPath": "docs/05-epoch/tang-755/relics/登州港.md",
+      "category": "relic",
+      "aliases": [
+        "蓬莱海口",
+        "东牟郡海口",
+        "登州海口"
+      ]
+    },
+    {
+      "id": "福州港",
+      "archetype": "node",
+      "variant": "port",
+      "position": {
+        "lat": 26.05,
+        "lon": 119.4
+      },
+      "visualHierarchy": "medium",
+      "displayName": "福州港",
+      "oneLiner": "江南东道东南海岸的新兴海港——福州港在长乐郡闽县治东、闽江入海口一带；是闽中诸州（福州 + 建州 + 汀州 + 漳州 + 泉州）海上出口与江南、岭南、海外通商的物理 anchor。与广州港的胡舶云集、明州港的江南近海枢纽、登莱二州的渤海北通新罗渤海相比——755 时福州港尚是新港：闽中开发自永嘉八姓入闽（311 后）以来缓慢累积，至开元天宝之际方初见海港气象；其大港地位要等到中晚唐 + 五代闽国 + 北宋方真正成形。盛唐六港（广州 + 交州 + 明州 + 登州 + 莱州 + 福州）之一席——但 755 这一刻仍以转口闽中山货海产为主，胡舶偶来而非常驻。",
+      "docPath": "docs/05-epoch/tang-755/relics/福州港.md",
+      "category": "relics",
+      "aliases": [
+        "闽江口",
+        "闽县东津",
+        "东冶港（汉旧称、唐人偶用古名）"
+      ]
+    },
+    {
+      "id": "瓜洲渡",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 32.2167,
+        "lon": 119.4333
+      },
+      "visualHierarchy": "medium",
+      "displayName": "瓜洲渡",
+      "oneLiner": "江北最重要的长江渡江津口——瓜洲在长江北岸、江都县南郊三十余唐里；是江北 ↔ 江南的渡江点（对岸为京口），与\"邗沟入江口\"毗邻但不等同：邗沟入江口是邗沟水道与长江交接的水道分界点，瓜洲渡则是江岸上的渡江津口，二者相距约二十唐里、共同构成大运河南端 ↔ 长江的中转枢纽。与江南岸京口（润州治）隔一江相望，江都 + 京口 + 瓜洲三地一江一渡形成\"江口三镇\"；755 时江南诸道粮米先集江都、再经邗沟入江口入江、于瓜洲渡一带换江船，是盛唐漕运南端的物理 anchor；天宝十四载十二月丁酉叛军陷东京洛阳（公历 756 年 1 月）、通济渠北端失、漕路中断、瓜洲一带的繁忙骤断。",
+      "docPath": "docs/05-epoch/tang-755/relics/瓜洲渡.md",
+      "category": "relics",
+      "aliases": [
+        "瓜洲",
+        "瓜步渡（古地另存）",
+        "邗沟入江口（毗邻独立 POI）"
+      ]
+    },
+    {
+      "id": "官渡",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 34.7833,
+        "lon": 114.0833
+      },
+      "visualHierarchy": "medium",
+      "displayName": "官渡",
+      "oneLiner": "汴水北侧的\"以弱胜强\"古战场——建安五年（200）曹操以二三万守此、败袁绍十万南下之师；自此曹操由群雄之一转为未来天下半壁；755 时唐人见的是郑州中牟县东北约三十里一片平畴间的古战场遗址 + 鸿沟分支官渡水东流。",
+      "docPath": "docs/05-epoch/tang-755/relics/官渡.md",
+      "category": "relic",
+      "aliases": [
+        "官渡水",
+        "官渡口",
+        "官渡古战场"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "鹳雀楼",
+      "archetype": "node",
+      "variant": "tower",
+      "position": {
+        "lat": 34.855,
+        "lon": 110.315
+      },
+      "visualHierarchy": "medium",
+      "displayName": "鹳雀楼",
+      "oneLiner": "蒲州城西南角黄河东岸的三层瞭望楼——北周时立、初为黄河前哨；至盛唐而成北方第一名楼，王之涣开元间题《登鹳雀楼》\"欲穷千里目、更上一层楼\"已传 20 余年——755 时是黄河系名楼的顶峰。",
+      "docPath": "docs/05-epoch/tang-755/relics/鹳雀楼.md",
+      "category": "relic",
+      "aliases": [
+        "鹳鹊楼（古字异写）",
+        "蒲州鹳雀楼"
+      ],
+      "extinctionTier": "B2"
+    },
+    {
+      "id": "广州市舶司",
+      "archetype": "node",
+      "variant": "port",
+      "position": {
+        "lat": 23.12,
+        "lon": 113.26
+      },
+      "visualHierarchy": "large",
+      "displayName": "广州市舶司",
+      "oneLiner": "中国第一个专管海外贸易的官职 + 海上丝路东端的财政咽喉——开元二年（714）史源首见为安南市舶使（周庆立）；广州为后起主设地，具体年份阙；755 时由宦官以\"中使\"身份充任，登舶验货、抽分进奉；是盛唐财政、外交、海舶贸易三股线在岭南海岸打的一个结。",
+      "docPath": "docs/05-epoch/tang-755/relics/广州市舶司.md",
+      "category": "relic",
+      "aliases": [
+        "广州市舶使",
+        "市舶使",
+        "唐市舶使衙署"
+      ]
+    },
+    {
+      "id": "黄鹤楼",
+      "archetype": "node",
+      "variant": "tower",
+      "position": {
+        "lat": 30.547,
+        "lon": 114.305
+      },
+      "visualHierarchy": "medium",
+      "displayName": "黄鹤楼",
+      "oneLiner": "鄂州江夏县治西二里黄鹄矶上的瞭望楼——孙权魏黄初二年（221）自公安都鄂、改鄂名武昌；越二年吴黄武二年（223）筑夏口城、楼立西南角矶上为军事用；至南朝齐始作观景楼用、称黄鹤楼；755 时是盛唐江南名楼，崔颢《黄鹤楼》\"昔人已乘黄鹤去\"已传诵二十年。",
+      "docPath": "docs/05-epoch/tang-755/relics/黄鹤楼.md",
+      "category": "relic",
+      "aliases": [
+        "黄鹄楼（早期异写）",
+        "夏口城西南楼（三国吴 始建期称谓）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "金牛道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "start": "{lat",
+        "lon": "104.28}]",
+        "end": "{lat",
+        "via": "[{name",
+        "lat": 30.99,
+        "{name": "\"汉州\""
+      },
+      "visualHierarchy": "large",
+      "displayName": "金牛道",
+      "oneLiner": "汉中至成都的一千一百里官道，唐人口中真正的\"蜀道\"；秦惠王伪以金牛诱蜀、五丁力士开山入秦的那条路——天宝十五载六月，玄宗循此入蜀。",
+      "docPath": "docs/05-epoch/tang-755/transport/金牛道.md",
+      "category": "transport",
+      "aliases": [
+        "蜀栈道",
+        "蜀道",
+        "石牛道",
+        "南栈道"
+      ]
+    },
+    {
+      "id": "莱州港",
+      "archetype": "node",
+      "variant": "port",
+      "position": {
+        "lat": 37.18,
+        "lon": 119.93
+      },
+      "visualHierarchy": "medium",
+      "displayName": "莱州港",
+      "oneLiner": "胶东半岛西部的渤海湾口——莱州港在河南道莱州/东莱郡治掖县的东海岸（今山东烟台莱州市一带、临今莱州湾），与登州港（蓬莱）同在胶东半岛、合称胶东两海口；登州偏东北、临黄海、北航日本朝鲜 + 渡渤海至辽东；莱州偏西、临渤海湾、北航辽东半岛 + 渤海湾沿岸 + 渤海国——是 755 时唐廷与渤海国（698-926）+ 辽东 / 平卢节度沿海联络的主要海口之一；755 时正名\"东莱郡\"（天宝元年/742 改）、治掖县（汉以来旧县）；行政属河南道；与平卢节度仅有海路联动（平卢治营州、765 后才南迁青州）——755 十一月安禄山起兵后平卢节度由侯希逸守、又自营州南渡海至青州、莱州港一带正是其海路撤退的物理走廊。",
+      "docPath": "docs/05-epoch/tang-755/relics/莱州港.md",
+      "category": "relic",
+      "aliases": [
+        "东莱郡（742-758）",
+        "掖县东海口",
+        "莱州海口"
+      ]
+    },
+    {
+      "id": "荔枝道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 0,
+        "lon": 0
+      },
+      "visualHierarchy": "large",
+      "displayName": "荔枝道",
+      "oneLiner": "玄宗朝特设的一条南北快驿，自涪州妃子园直插长安一千一百里；驿马七日七夜不歇，只为一筐荔枝送到骊山时仍带着南国的露气。",
+      "docPath": "docs/05-epoch/tang-755/transport/荔枝道.md",
+      "category": "transport",
+      "aliases": [
+        "洋巴道",
+        "涪州贡荔道",
+        "子午-巴东快驿"
+      ]
+    },
+    {
+      "id": "洛阳-江都道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 33.5,
+        "lon": 117
+      },
+      "visualHierarchy": "large",
+      "displayName": "洛阳-江都道",
+      "oneLiner": "唐廷漕东南粮米的主线 + 江南赴京使节路——自洛阳东南行、沿通济渠经汴州 + 宋州 + 泗州 + 楚州、再过邗沟入广陵郡治扬州城；水陆并行：水路是隋大业元年开的通济渠 + 重浚的邗沟、陆路是沿渠两岸的驿馆驰道；755 时是盛唐财政命脉——半年后安史起、东都陷而江都未陷、漕运一度断绝。",
+      "docPath": "docs/05-epoch/tang-755/transport/洛阳-江都道.md",
+      "category": "transport",
+      "aliases": [
+        "通济渠驿路",
+        "汴渠 + 邗沟道",
+        "江淮漕路",
+        "东都至江都水陆道"
+      ]
+    },
+    {
+      "id": "米仓道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": "{lat: 32.40, lon: 106.85}    # 米仓山主脊大致中点（汉中-巴中之间）",
+      "visualHierarchy": "large",
+      "displayName": "米仓道",
+      "oneLiner": "蜀道八条之一，跨米仓山接梁州与巴州——盛唐唐人口中的\"巴岭路\"：山南西道东半的入汉脊梁，月下追韩信的截贤岭就在这条路上。",
+      "docPath": "docs/05-epoch/tang-755/transport/米仓道.md",
+      "category": "transport",
+      "aliases": [
+        "米仓山道",
+        "巴岭路",
+        "大行道"
+      ]
+    },
+    {
+      "id": "明州港",
+      "archetype": "node",
+      "variant": "port",
+      "position": {
+        "lat": 29.88,
+        "lon": 121.55
+      },
+      "visualHierarchy": "medium",
+      "displayName": "明州港",
+      "oneLiner": "唐 东海航线的江南启动点——明州港在 江南东道明州（755 时正名余姚郡）治鄮县东海岸、甬江入海口一带；明州州本身是开元二十六年（738）才自越州东境析出的新州，至 755 年仅立 17 年——州与港俱为盛唐玄宗朝的新生事物；与南海路的广州港 + 北海路的登州港并立，广州主南海、登州主朝鲜半岛与黄海北岸、明州主东海与日本——盛唐三向海贸的东向起点；但盛唐 755 时明州港的真正繁盛尚未到来——日本遣唐使以明州为主登陆港、是中晚唐（9 世纪起、承和五年/838 小野篁那批后期才确立）的事；755 这一刻的明州港是一座新港、海舶虽已往来、规模远未到中晚唐\"四明海舶岁岁来\"的盛境。",
+      "docPath": "docs/05-epoch/tang-755/relics/明州港.md",
+      "category": "relic",
+      "aliases": [
+        "鄮县东海港",
+        "明州海口",
+        "甬江口",
+        "四明海口"
+      ]
+    },
+    {
+      "id": "蒲津渡",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 34.853,
+        "lon": 110.308
+      },
+      "visualHierarchy": "high",
+      "displayName": "蒲津渡",
+      "oneLiner": "蒲州城西门外黄河上铁索浮桥——战国秦晋故渡、北周斛律羌定木舟形制；开元十二年/724 唐玄宗诏张说监铸 8 铁牛 + 4 铁人 + 2 铁山 + 铁柱 + 铁索维之——是大唐最大规模铁器铸造工程、亦是关中 ↔ 河东 物理生命线；唐 755 时为关中入河东第一渡（蒲津渡向北 / 东北 入河东方向；长安东出洛阳方向另走潼关）。",
+      "docPath": "docs/05-epoch/tang-755/relics/蒲津渡.md",
+      "category": "relic",
+      "aliases": [
+        "蒲津关",
+        "蒲坂渡",
+        "蒲津桥",
+        "大庆桥（开元定名）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "祁山道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 34.4,
+        "lon": 105.4
+      },
+      "visualHierarchy": "large",
+      "displayName": "祁山道",
+      "oneLiner": "蜀道八条里最绕陇右的一条——秦州至梁州约八百里，西汉水、嘉陵江相牵，唐人提起祁山多半为商队与边军；那段千古最熟的\"六出祁山\"，已是五百年前一位丞相在这条道上往返的旧事。",
+      "docPath": "docs/05-epoch/tang-755/transport/祁山道.md",
+      "category": "transport",
+      "aliases": [
+        "祁山路",
+        "祁山故道",
+        "陇蜀道",
+        "天水-汉中道"
+      ]
+    },
+    {
+      "id": "泉州港",
+      "archetype": "node",
+      "variant": "port",
+      "position": {
+        "lat": 24.8741,
+        "lon": 118.6757
+      },
+      "visualHierarchy": "medium",
+      "displayName": "泉州港",
+      "oneLiner": "福建新兴的海港——泉州港在江南东道泉州清源郡晋江县治南郊、晋江入海口与后渚一带；唐景云二年（711）方自武荣州改置泉州、至 755 时设州才四十四年——是盛唐福建沿海一处仍在起步的新兴港务，远不如同道北的福州港繁盛、更不及岭南广州的市舶巨埠。755 时无市舶使（市舶使制此期专设于广州，泉州设市舶司要待北宋元祐二年/1087）；海舶以大食、波斯、师子国偶到，福建三港（福州 + 泉州 + 漳州）中泉州居中；中晚唐渐兴 + 五代闽国奠基 + 两宋成为中国第一大港 + 元代马可·波罗见其盛景——但盛唐 755 这一刻、泉州港尚是江南东道海岸线上一处年轻的津口。",
+      "docPath": "docs/05-epoch/tang-755/relics/泉州港.md",
+      "category": "relics",
+      "aliases": [
+        "清源郡海口",
+        "后渚港",
+        "晋江口（毗邻独立水道概念）"
+      ]
+    },
+    {
+      "id": "傥骆道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 33.6,
+        "lon": 107.85
+      },
+      "visualHierarchy": "large",
+      "displayName": "傥骆道",
+      "oneLiner": "蜀道八条里最险一线，自周至骆谷口入秦岭、四百二十里出洋州傥水口；唐人皆知此道捷而绝，民商寡有问津，军兴方启——曹魏钟会伐蜀走的是它，德宗奔梁州走的也是它。",
+      "docPath": "docs/05-epoch/tang-755/transport/傥骆道.md",
+      "category": "transport",
+      "aliases": [
+        "骆谷道",
+        "傥谷道",
+        "骆谷路",
+        "周洋道"
+      ]
+    },
+    {
+      "id": "滕王阁",
+      "archetype": "node",
+      "variant": "tower",
+      "position": {
+        "lat": 28.6826,
+        "lon": 115.8821
+      },
+      "visualHierarchy": "large",
+      "displayName": "滕王阁",
+      "oneLiner": "唐高祖第二十二子滕王李元婴 永徽四年（653）任洪州都督时所立——立于豫章县西郊赣江与抚河汇口处；上元二年（675）王勃过洪州即席作《秋日登洪府滕王阁饯别序》——自此滕王阁不只是一座江南郡阁、是中国文学最有名的一座楼；755 时建阁已 102 年、王勃序传世已 80 年——是江南正在使用中的名楼。",
+      "docPath": "docs/05-epoch/tang-755/relics/滕王阁.md",
+      "category": "relic",
+      "aliases": [
+        "滕阁",
+        "洪府滕王阁",
+        "西山滕王阁（明清异称、非唐人语）"
+      ],
+      "extinctionTier": "B2"
+    },
+    {
+      "id": "铜雀台",
+      "archetype": "node",
+      "variant": "tower",
+      "position": {
+        "lat": 36.3389,
+        "lon": 114.4994
+      },
+      "visualHierarchy": "large",
+      "displayName": "铜雀台",
+      "oneLiner": "邺都西城墙上的曹操三座高台——建安九年取邺、十五年筑铜雀，自此邺城成为曹魏霸府、建安文学之核；755 时唐人见的是相州境内一片废城——北周大象二年焚邺已 175 年。",
+      "docPath": "docs/05-epoch/tang-755/relics/铜雀台.md",
+      "category": "relic",
+      "aliases": [
+        "邺三台",
+        "邺中三台",
+        "铜爵台（《邺中记》异写）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "长安-范阳道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 39,
+        "lon": 115
+      },
+      "visualHierarchy": "large",
+      "displayName": "长安-范阳道",
+      "oneLiner": "唐自长安经河东至幽州（范阳）的官道——长安 → 蒲津渡黄河 → 蒲州 → 太原 → 雁门 → 蔚州 → 妫州 → 幽州；755 时一身两面：白日是河东、河北诸州奏报与漕调的通衢、夜里是安禄山自天宝十载/751 兼河东节度使、至 755 兼范阳/平卢/河东三镇约四年所养出的\"东北一只巨臂\"伸回长安的潜在动脉；十一月初九（癸亥, 公历 755 年 12 月 16 日）即由这条道反向南下、揭开安史之乱。",
+      "docPath": "docs/05-epoch/tang-755/transport/长安-范阳道.md",
+      "category": "transport",
+      "aliases": [
+        "长安-幽州官道",
+        "河东-河北驿路",
+        "长安-范阳-幽州驿路",
+        "关内河东河北纵贯线"
+      ]
+    },
+    {
+      "id": "长安-河西-敦煌路",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 38,
+        "lon": 100
+      },
+      "visualHierarchy": "large",
+      "displayName": "长安-河西-敦煌路",
+      "oneLiner": "唐丝路东段 + 长安出河西至敦煌的官道——长安 → 新平郡（邠州）→ 安定郡（泾州）→ 天水郡（秦州）→ 金城郡（兰州）→ 武威郡（凉州）→ 张掖郡（甘州）→ 酒泉郡（肃州）→ 晋昌郡（瓜州）→ 敦煌郡（沙州）→ 北道出玉门关 / 南道出阳关；755 时是中国境内最长的官道之一——里程甚长、驿名与逐段距离须据图经 / 郡县志另列；安史前夕仍是粟特商人 + 西域使节 + 唐使的主要孔道。",
+      "docPath": "docs/05-epoch/tang-755/transport/长安-河西-敦煌路.md",
+      "category": "transport",
+      "aliases": [
+        "丝路东段",
+        "河西走廊驿道",
+        "长安西出敦煌路",
+        "西陲驰道"
+      ]
+    },
+    {
+      "id": "长安-洛阳驰道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 34.58,
+        "lon": 110.5
+      },
+      "visualHierarchy": "large",
+      "displayName": "长安-洛阳驰道",
+      "oneLiner": "唐两京间最重要的驿道 + 隋唐第一驰道——长安出东向、过潼关 + 函谷新关 + 陕州 + 至洛阳；盛唐天子东巡、漕运、商旅、使节皆赖此；755 时是中国最繁忙的驿路、半年后即随安史之乱而崩。",
+      "docPath": "docs/05-epoch/tang-755/transport/长安-洛阳驰道.md",
+      "category": "transport",
+      "aliases": [
+        "两京驰道",
+        "两京驿道",
+        "关内 + 河南道东出驰道"
+      ]
+    },
+    {
+      "id": "长安-益州道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "start": "{lat",
+        "lon": "104.0653}]",
+        "end": "{lat",
+        "via": "[{name",
+        "lat": 30.6595,
+        "{name": "\"益州（蜀郡蜀县）\""
+      },
+      "visualHierarchy": "large",
+      "displayName": "长安-益州道",
+      "oneLiner": "长安西南行入蜀的官道总称——出长安经岐州 / 凤翔 + 散关 + 河池 + 梁州（汉中）+ 利州 + 剑门 + 绵州、至益州（成都）；至德元载（756）六月十三日玄宗出延秋门、十四日马嵬驿杨贵妃缢死、七月二十八日至成都——这一段是盛唐转衰的物理 anchor；755 时尚是剑南节度奏报 + 蜀地贡赋 + 文人入蜀的常驿。",
+      "docPath": "docs/05-epoch/tang-755/transport/长安-益州道.md",
+      "category": "transport",
+      "aliases": [
+        "长安入蜀道",
+        "长安-成都道",
+        "关中经故道入蜀路",
+        "玄宗幸蜀道"
+      ]
+    },
+    {
+      "id": "子午道",
+      "archetype": "node",
+      "variant": "ferry",
+      "position": {
+        "lat": 33.5,
+        "lon": 108.85
+      },
+      "visualHierarchy": "large",
+      "displayName": "子午道",
+      "oneLiner": "蜀道八条中最直、最急、也最险的一条，唐人口中\"杜南山道\"——北口在长安城南子午峪，取正南正北而名；天宝中玄宗为博贵妃一笑，自此道南端延伸出一条传送涪州荔枝的快驿，杜牧\"一骑红尘\"即此。",
+      "docPath": "docs/05-epoch/tang-755/transport/子午道.md",
+      "category": "transport",
+      "aliases": [
+        "子午路",
+        "杜南山道"
+      ]
+    },
+    {
+      "id": "大震关",
+      "archetype": "pass",
+      "variant": "minor",
+      "position": {
+        "lat": 34.892,
+        "lon": 106.77
+      },
+      "visualHierarchy": "medium",
+      "displayName": "大震关",
+      "oneLiner": "关中入陇右门户、长安 ↔ 鄯州 物理 anchor——陇州汧阳郡境陇山中一道关塞、东接关中、西通陇右；唐 755 时仍是哥舒翰节度陇右往返长安的必经之关；再过七年（762）吐蕃陷陇右、大震关入吐蕃——盛唐西门户的物理终点。",
+      "docPath": "docs/05-epoch/tang-755/relics/大震关.md",
+      "category": "relic",
+      "aliases": [
+        "西陇关（汉旧名）",
+        "陇关",
+        "陇关大震"
+      ]
+    },
+    {
+      "id": "倒马关",
+      "archetype": "pass",
+      "variant": "minor",
+      "position": {
+        "lat": 39.05,
+        "lon": 114.68
+      },
+      "visualHierarchy": "medium",
+      "displayName": "倒马关",
+      "oneLiner": "太行八陉之飞狐陉东端咽喉、河北平原通代北的物理 anchor——立定州 / 博陵郡唐县境太行东麓一道狭谷里、北望蔚州飞狐县、西通河东代北；唐 755 时尚不称\"倒马关\"——唐人在文牍里写的是\"鸿上关\"或\"常山关\"；再过半年安禄山自范阳起兵、叛军一部经飞狐陉西出代北召集塞外援军——这道在 755 仍以鸿上 / 常山为名的关塞、半年后即成安史之乱的物理通道之一。",
+      "docPath": "docs/05-epoch/tang-755/relics/倒马关.md",
+      "category": "relic",
+      "aliases": [
+        "鸿上关（唐前旧名）",
+        "常山关（唐前旧名）",
+        "倒马关（北宋以后通行名）"
+      ]
+    },
+    {
+      "id": "函谷关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 34.5258,
+        "lon": 110.8736
+      },
+      "visualHierarchy": "large",
+      "displayName": "函谷关",
+      "oneLiner": "中国关塞史最复杂的\"三关一名\"——战国秦古函谷关（虢州灵宝县境）+汉武帝元封间东徙的函谷新关（河南府新安县）+曹魏黄初间复立的魏函谷关（古关南）；唐 755 时三关皆为遗址、不复要塞，要塞职能由 70 里西的潼关接替；老子西出 + 尹喜留经 + 玄宗开元二十九年/741 立玄元皇帝庙——是盛唐最重的怀古 anchor。",
+      "docPath": "docs/05-epoch/tang-755/relics/函谷关.md",
+      "category": "relic",
+      "aliases": [
+        "秦函谷关",
+        "旧函谷关",
+        "古函谷关",
+        "函谷新关（汉关 / 新安关）",
+        "魏函谷关",
+        "函关"
+      ],
+      "extinctionTier": "A3"
+    },
+    {
+      "id": "剑门关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 32.2,
+        "lon": 105.55
+      },
+      "visualHierarchy": "large",
+      "displayName": "剑门关",
+      "oneLiner": "蜀道金牛道咽喉关、大剑山主脊狭口的一道关塞——剑州普安郡普安县境（今四川剑阁县剑门关镇）；李白\"剑阁峥嵘而崔嵬、一夫当关、万夫莫开\"在 755 时已是流传的蜀道想象；至德元载（756）玄宗西奔入蜀经此关 + 至德二载（757）自蜀北还复经此关——剑门关由此从蜀道一关塞、变成盛唐转衰的物理 anchor。",
+      "docPath": "docs/05-epoch/tang-755/relics/剑门关.md",
+      "category": "relics",
+      "aliases": [
+        "剑门",
+        "大剑关（与小剑关并称时用）",
+        "普安郡剑门"
+      ]
+    },
+    {
+      "id": "井陉关",
+      "archetype": "pass",
+      "variant": "minor",
+      "position": {
+        "lat": 38.0367,
+        "lon": 114.0594
+      },
+      "visualHierarchy": "medium",
+      "displayName": "井陉关",
+      "oneLiner": "太行八陉之第五陉、井陉口咽喉、河北 ↔ 山西天然孔道——太行山中段一道狭长隘口、东通恒州 + 河北平原、西通太原 + 山西高原；唐 755 时属恒州/常山郡 井陉县境（西关）+ 获鹿县境（东关土门）；汉高祖三年（BC 204）韩信背水破赵于此——中国战争史最深 anchor 之一；755 这一刻仍是和平年代的塞名 + 驿路关塞——半年后即将成河北-山西拉锯的物理通道。",
+      "docPath": "docs/05-epoch/tang-755/relics/井陉关.md",
+      "category": "relic",
+      "aliases": [
+        "土门关",
+        "井陉口",
+        "井陉塞"
+      ]
+    },
+    {
+      "id": "居庸关",
+      "archetype": "pass",
+      "variant": "minor",
+      "position": {
+        "lat": 40.287,
+        "lon": 116.07
+      },
+      "visualHierarchy": "medium",
+      "displayName": "居庸关",
+      "oneLiner": "太行八陉之最东陉、军都陉咽喉、幽燕北门户——军都山中一道狭长关沟、北通塞外、南控幽州小盆地；唐 755 时属妫州/妫川郡怀戎县境（不在范阳郡幽州）；再过半年安禄山自范阳起兵、叛军主力直接南下河北 + 山西、并不经居庸关；居庸关是塞外援军（同罗 / 奚 / 契丹等部）经此南下的通道——居庸关在 755 这一刻仍是和平年代的关塞、半年后即成安史之乱的物理通道之一。",
+      "docPath": "docs/05-epoch/tang-755/relics/居庸关.md",
+      "category": "relic",
+      "aliases": [
+        "军都关",
+        "蓟门关（唐人偶称）",
+        "纳款关（北齐旧名）"
+      ]
+    },
+    {
+      "id": "散关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 34.3331,
+        "lon": 106.9794
+      },
+      "visualHierarchy": "large",
+      "displayName": "散关",
+      "oneLiner": "关中西南门、陈仓道北口——凤州河池县境西北的山间关塞；756 七月玄宗西奔入蜀路过此关 + 入剑南；755 时是长安西南向蜀地最直接的物理 anchor——是关中四关（东潼、南武、西散、北萧）之西关。",
+      "docPath": "docs/05-epoch/tang-755/transport/散关.md",
+      "category": "transport",
+      "aliases": [
+        "大散关（宋后通称）",
+        "散关镇",
+        "关中四关之西关"
+      ]
+    },
+    {
+      "id": "潼关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 34.5594,
+        "lon": 110.2456
+      },
+      "visualHierarchy": "large",
+      "displayName": "潼关",
+      "oneLiner": "关中东大门、长安东出第一关——黄河南岸 + 秦岭北麓夹峙处；至德元载（756）六月哥舒翰潼关之败——失关西破、玄宗自此 西奔入蜀；755 时仍立、是长安东向最重要的物理 anchor。",
+      "docPath": "docs/05-epoch/tang-755/transport/潼关.md",
+      "category": "transport",
+      "aliases": [
+        "潼关县（唐时县名）",
+        "关中东第一关"
+      ]
+    },
+    {
+      "id": "武关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 33.7136,
+        "lon": 110.4133
+      },
+      "visualHierarchy": "large",
+      "displayName": "武关",
+      "oneLiner": "关中南大门、长安南出荆襄的咽喉——上洛郡商洛县境武关河上游的山间关塞；汉元年（BC 206）冬刘邦由武关入关、灞上受秦王子婴降——汉室代秦的物理起点；战国楚怀王 BC 299 入此被秦昭襄王扣留——楚秦千年交界最沉痛的一笔；755 时是长安南向江汉的物理 anchor——关中四关（东潼、南武、西散、北萧）之南关。",
+      "docPath": "docs/05-epoch/tang-755/relics/武关.md",
+      "category": "relics",
+      "aliases": [
+        "武关塞",
+        "关中四关之南关",
+        "商於之要"
+      ]
+    },
+    {
+      "id": "萧关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 36.0044,
+        "lon": 106.2419
+      },
+      "visualHierarchy": "large",
+      "displayName": "萧关",
+      "oneLiner": "关中西北门 + 长安通灵凉河西的北道关塞——原州平凉郡平高县境六盘山东麓的山口关；王维\"萧关逢候骑、都护在燕然\" 的那一关（开元二十五年/737 奉使凉州过萧关作）；755 时仍立、是关中四关之北关——再过 7 年（763）吐蕃东扩、原州陷蕃、萧关随之失唐控。",
+      "docPath": "docs/05-epoch/tang-755/relics/萧关.md",
+      "category": "relics",
+      "aliases": [
+        "萧关塞",
+        "关中四关之北关",
+        "萧关道（萧关南北通道总称）"
+      ]
+    },
+    {
+      "id": "雁门关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 39.1881,
+        "lon": 112.9542
+      },
+      "visualHierarchy": "large",
+      "displayName": "雁门关",
+      "oneLiner": "河东北门 + 太原北翼第一关——代州雁门县境北的雁门山中；自春秋秦汉以来是关中 / 河东通漠北的塞；755 时是河东节度辖境的北面屏障——盛唐边塞诗高频地名；杨家将故事是宋元后形成、非唐时之事。",
+      "docPath": "docs/05-epoch/tang-755/transport/雁门关.md",
+      "category": "transport",
+      "aliases": [
+        "雁门塞",
+        "雁门关（盛唐通称）",
+        "雁门郡（天宝元年-乾元元年间官称代州为郡）"
+      ]
+    },
+    {
+      "id": "阳关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 40.0211,
+        "lon": 94.0292
+      },
+      "visualHierarchy": "large",
+      "displayName": "阳关",
+      "oneLiner": "河西走廊最西南的关塞——与玉门关合称\"河西二关\"；王维《送元二使安西》\"西出阳关无故人\" 是盛唐边塞诗最有名的别离句；755 时仍立、扼丝路南道、是中国境内最西南的关塞之一。",
+      "docPath": "docs/05-epoch/tang-755/transport/阳关.md",
+      "category": "transport",
+      "aliases": [
+        "阳关",
+        "西出阳关（盛唐通称）"
+      ]
+    },
+    {
+      "id": "阳平关",
+      "archetype": "pass",
+      "variant": "minor",
+      "position": {
+        "lat": 32.9319,
+        "lon": 106.1494
+      },
+      "visualHierarchy": "medium",
+      "displayName": "阳平关",
+      "oneLiner": "兴州顺政郡长举县境嘉陵江西岸的关塞——三国张鲁据汉中二十余年筑关于此 + 215 曹操西征张鲁攻拔之 + 219 刘备夺汉中黄忠斩夏侯渊于定军山；唐 755 时是金牛道与沮道（汉中-武都段）分歧的物理 anchor，是汉中盆地的西门户、入蜀第二关。",
+      "docPath": "docs/05-epoch/tang-755/relics/阳平关.md",
+      "category": "relic",
+      "aliases": [
+        "阳安关（北周后或称、唐 755 时尚以阳平关为主）",
+        "白马城（汉魏一带通名）",
+        "阳平关镇（今地名）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "玉门关",
+      "archetype": "pass",
+      "variant": "major",
+      "position": {
+        "lat": 40.3556,
+        "lon": 93.8722
+      },
+      "visualHierarchy": "large",
+      "displayName": "玉门关",
+      "oneLiner": "河西走廊最西北的关塞——盛唐人嘴里\"春风不度玉门关\"那一关；贞观三年（629）玄奘自瓜州偷渡玉门关 + 入莫贺延碛；755 时仍立、是丝路东段中国境内的最远关之一——但唐玉门关具体位置史源略异（瓜沙边境）。",
+      "docPath": "docs/05-epoch/tang-755/transport/玉门关.md",
+      "category": "transport",
+      "aliases": [
+        "玉门",
+        "玉关",
+        "玉门故关（汉址）",
+        "唐玉门关（盛唐位置略异）"
+      ]
+    },
+    {
+      "id": "紫荆关",
+      "archetype": "pass",
+      "variant": "minor",
+      "position": {
+        "lat": 39.406,
+        "lon": 115.173
+      },
+      "visualHierarchy": "medium",
+      "displayName": "紫荆关",
+      "oneLiner": "太行八陉之第七陉蒲阴陉咽喉、河北平原西入代北 / 山西的山中关口——立易州 / 上谷郡境紫荆岭（今河北易县西北约九十里）；唐 755 时此关不名\"紫荆\"——本名\"五阮关\"、《水经注》或称\"子庄关\"；\"紫荆关\"一名要到金元以后才行用。与北面军都山中的居庸关 + 南面飞狐陉东端的倒马关（亦待至明代方并称）共扼幽燕西门——755 这一刻五阮关是和平年代的山中关塞、半年后安史之乱起、河北一路糜烂、此关亦在叛军兵锋掠及的范围内。",
+      "docPath": "docs/05-epoch/tang-755/relics/紫荆关.md",
+      "category": "relic",
+      "aliases": [
+        "五阮关（汉至北朝 / 隋唐本名）",
+        "子庄关（北魏《水经注》异名）",
+        "蒲阴陉（所扼陉道名）"
+      ]
+    },
+    {
+      "id": "赤壁",
+      "archetype": "ruin",
+      "position": {
+        "lat": 29.7227,
+        "lon": 113.93
+      },
+      "visualHierarchy": "medium",
+      "displayName": "赤壁",
+      "oneLiner": "长江南岸的三国古战场——东汉建安十三年（208）冬周瑜 + 刘备五万水陆联军于此火攻曹操、奠定三分天下的物理 anchor；唐 755 时属江南西道鄂州（江夏郡）蒲圻县西一百二十里、长江南岸赤色崖壁犹存——是唐人沿江下行最显的怀古地之一。",
+      "docPath": "docs/05-epoch/tang-755/relics/赤壁.md",
+      "category": "relic",
+      "aliases": [
+        "赤壁山",
+        "武赤壁",
+        "蒲圻赤壁",
+        "周郎赤壁"
+      ],
+      "extinctionTier": "B1"
+    },
+    {
+      "id": "赤岭碑",
+      "archetype": "ruin",
+      "position": {
+        "lat": 36.6428,
+        "lon": 100.9847
+      },
+      "visualHierarchy": "medium",
+      "displayName": "赤岭碑",
+      "oneLiner": "鄯州西陇右道与吐蕃边界赤岭（今青海日月山）——唐开元二十一年（733）金城公主请定唐蕃疆界、次年唐蕃于赤岭分界立碑；碑文与形制未传、今实物已不存——755 时仍立、是唐蕃边境的物理 anchor。",
+      "docPath": "docs/05-epoch/tang-755/relics/赤岭碑.md",
+      "category": "relic",
+      "aliases": [
+        "赤岭石碑",
+        "唐蕃界碑（733 请、734 立）",
+        "日月山碑（明清后通称）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "淝水",
+      "archetype": "ruin",
+      "position": {
+        "lat": 32.58,
+        "lon": 116.79
+      },
+      "visualHierarchy": "medium",
+      "displayName": "淝水",
+      "oneLiner": "淮南寿州东郊的一条小水——东晋孝武帝太元八年（383）十一月谢玄以八万北府兵败前秦苻坚于此；前秦先军误退、自溃于淝水西岸——\"风声鹤唳、草木皆兵\"出于此战；自此前秦分裂、北方再入后燕、后秦、北凉、夏等割据, 至 439 北魏统一北方、东晋偏安百年——755 时距此战 372 年、淝水仍东流入淮、八公山仍立寿春北郊。",
+      "docPath": "docs/05-epoch/tang-755/relics/淝水.md",
+      "category": "relic",
+      "aliases": [
+        "肥水",
+        "东淝河（今名）",
+        "淝水古战场",
+        "八公山战场"
+      ],
+      "extinctionTier": "B1"
+    },
+    {
+      "id": "垓下",
+      "archetype": "ruin",
+      "position": {
+        "lat": 33.2333,
+        "lon": 117.45
+      },
+      "visualHierarchy": "medium",
+      "displayName": "垓下",
+      "oneLiner": "淮北平原沱河南岸的楚汉决战故地——汉五年十二月（BC 202）韩信合诸侯兵围项羽于此、四面楚歌、项羽悲歌\"虞兮\"（虞姬死事从后出文献《楚汉春秋》）、突围至乌江自刎；自此距 755 已 956 年（公元无 0 年），唐人对垓下精确位置已不能坐实——一说徐州彭城西南、一说亳州谯县东、田野间一片旷土。",
+      "docPath": "docs/05-epoch/tang-755/relics/垓下.md",
+      "category": "relic",
+      "aliases": [
+        "垓下故战场",
+        "垓下古战场",
+        "项王城（民间俗称）",
+        "霸王城（民间俗称）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "镐京",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.185,
+        "lon": 108.8333
+      },
+      "visualHierarchy": "medium",
+      "displayName": "镐京",
+      "oneLiner": "西周宗周王都遗址——周武王灭商后立都于沣水东岸、西周历十二王（十一世、孝王是夷王叔父、支系）居此 275 年；BC 771 犬戎入镐、周幽王死于骊山下、平王东迁洛邑、镐京自此废；755 时已废约 1524-1525 年（BC 771 犬戎入镐约 1525 年、BC 770 平王东迁约 1524 年；无公元 0）——城垣无存、仅余沣水东岸郊原一片；唐人知其大概方位、视之为\"周天子故都\"——盛唐天朝叙事的根。",
+      "docPath": "docs/05-epoch/tang-755/relics/镐京.md",
+      "category": "relic",
+      "aliases": [
+        "宗周",
+        "镐",
+        "西都（西周时）",
+        "丰镐（与丰京合称）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "邗沟入江口",
+      "archetype": "ruin",
+      "position": {
+        "lat": 32.2167,
+        "lon": 119.45
+      },
+      "visualHierarchy": "medium",
+      "displayName": "邗沟入江口",
+      "oneLiner": "邗沟水道与长江交汇的漕运南端启动点——春秋吴王夫差前 486 开邗沟通江淮于此入江、隋炀帝大业元年（605）重浚拓宽、唐 755 时是淮南道广陵郡江都县南三十唐里长江北岸的水道分界点——是盛唐江淮粮米北上洛阳的物理起点、亦是江都 + 瓜洲 + 入江口\"江北水路三镇\"中职能最专的一处。",
+      "docPath": "docs/05-epoch/tang-755/relics/邗沟入江口.md",
+      "category": "relic",
+      "aliases": [
+        "邗沟南口",
+        "江都南口",
+        "邗江入江处",
+        "邗水入江口"
+      ]
+    },
+    {
+      "id": "汉昆明池",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.1731,
+        "lon": 108.8742
+      },
+      "visualHierarchy": "medium",
+      "displayName": "汉昆明池",
+      "oneLiner": "长安西南郊汉武凿的方圆四十里大水——盛唐尚是禁苑一隅、池中石鲸尚立，唐人提起\"昆明\"二字，多是汉武故事，不是云南。",
+      "docPath": "docs/05-epoch/tang-755/relics/汉昆明池.md",
+      "category": "relic",
+      "aliases": [
+        "昆明陂",
+        "昆明渠（部分文献借称）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "汉魏洛阳故城",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.7233,
+        "lon": 112.5933
+      },
+      "visualHierarchy": "large",
+      "displayName": "汉魏洛阳故城",
+      "oneLiner": "东汉 + 曹魏 + 西晋 + 北魏迁洛后四朝旧都的物理废墟——河南府洛阳县东、偃师县西郊原；自东汉建武元年（25）光武迁洛起、至北魏永熙三年（534）东魏迁邺止、为都凡 510 年（中有空缺）；隋大业元年（605）炀帝命于其西十八里另筑新都洛阳、徙旧城居民百工——汉魏故城自此正式废；755 时已废 150 年——城垣可辨、永宁寺九级浮图塔基孤立邙山南麓——是唐人出洛阳东行必过的旧都遗址。",
+      "docPath": "docs/05-epoch/tang-755/relics/汉魏洛阳故城.md",
+      "category": "relic",
+      "aliases": [
+        "洛阳故城",
+        "汉魏洛阳城",
+        "北魏洛阳城",
+        "永宁寺塔基所在",
+        "旧洛阳"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "鸿门",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.385,
+        "lon": 109.216
+      },
+      "visualHierarchy": "medium",
+      "displayName": "鸿门",
+      "oneLiner": "唐京兆府新丰县东十七里（《元和郡县图志》卷一）骊山北麓一道土坂——楚汉前 206 项羽四十万大军屯此、鸿门宴上放刘邦走的那一夜——一个杯酒之间、中国历史走向被改写的瞬间；盛唐 755 时鸿门已远 960 年、坂上无营无垒、只有过往骊山温泉宫的车马道；唐人凭吊鸿门，凭吊的是史记中那一夜的剑、那一杯酒、那一个未拔的玉玦。",
+      "docPath": "docs/05-epoch/tang-755/relics/鸿门.md",
+      "category": "relic",
+      "aliases": [
+        "鸿门坂",
+        "鸿门会",
+        "鸿门宴",
+        "项羽营"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "建康",
+      "archetype": "ruin",
+      "position": {
+        "lat": 32.05,
+        "lon": 118.78
+      },
+      "visualHierarchy": "large",
+      "displayName": "建康",
+      "oneLiner": "六朝古都的废墟——孙吴建业（229 称帝）→ 东晋建康（建邺 313/314 因避愍帝司马邺讳改建康；317 司马睿称晋王 / 318 即皇帝、都建康）→ 宋齐梁陈承之——六朝凡 333 年（229-589）江左王业的物理 anchor；隋开皇九年（589）灭陈、隋文帝诏毁建康城邑宫室、并平荡耕垦——至 755 时已废 166 年；755 时正名润州丹阳郡辖江宁县（润州/丹阳郡治丹徒县）——城垣余夯土、台城 + 石头城 + 乌衣巷遗踪散于田野——是唐人凭吊最深的\"前朝旧都\"。",
+      "docPath": "docs/05-epoch/tang-755/relics/建康.md",
+      "category": "relic",
+      "aliases": [
+        "六朝古都",
+        "江宁（唐时官称县名）",
+        "润州丹阳郡（755 时正名）",
+        "金陵（古名 + 唐人雅称）",
+        "建业（孙吴名）",
+        "蒋州（隋唐间短期州名）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "街亭",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.8583,
+        "lon": 105.725
+      },
+      "visualHierarchy": "medium",
+      "displayName": "街亭",
+      "oneLiner": "秦州治上邽东北 / 北侧陇城县境的陇坻关道——蜀汉建兴六年春、马谡舍水上山失街亭于张郃；诸葛亮一出祁山自此功败、退军汉中、夏戮马谡以谢众——是中国军法严明叙事的物理 anchor，与五丈原同为诸葛亮悲剧的两端。",
+      "docPath": "docs/05-epoch/tang-755/relics/街亭.md",
+      "category": "relic",
+      "aliases": [
+        "街泉亭（《三国志》本名）",
+        "街亭城（陇右地理志）",
+        "略阳川（《水经注》一带通名）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "巨鹿",
+      "archetype": "ruin",
+      "position": {
+        "lat": 37.2189,
+        "lon": 115.0314
+      },
+      "visualHierarchy": "medium",
+      "displayName": "巨鹿",
+      "oneLiner": "漳水南岸的灭秦决战地——秦二世三年（前 207）项羽率楚军救赵、渡漳水、破釜沉舟、以一当十、九战章邯王离军、王离军败、章邯军后降；秦军主力覆灭于此、灭秦序幕由此开；755 时唐人见的是邢州钜鹿郡境内龙冈县东南一片旷野中的旧城残迹、距决战 961 年（公元纪年无 0 年、前 207 至 755 实历 961 年）。",
+      "docPath": "docs/05-epoch/tang-755/relics/巨鹿.md",
+      "category": "relic",
+      "aliases": [
+        "钜鹿",
+        "巨鹿城",
+        "巨鹿故城"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "临淄",
+      "archetype": "ruin",
+      "position": {
+        "lat": 36.8267,
+        "lon": 118.3094
+      },
+      "visualHierarchy": "large",
+      "displayName": "临淄",
+      "oneLiner": "春秋姜齐 + 战国田齐之都——山东淄博临淄；周武王封姜尚（太公望）于齐、都营丘（后徙临淄）；春秋齐桓公小白（BC 685-643）九合诸侯、一匡天下；战国田氏代齐（BC 386）、稷下学宫极盛于齐宣王时（BC 319-301）；秦灭齐 BC 221, 置齐郡, 治临淄县；755 时已废近 1000 年（自 BC 221 秦灭齐计、近 975 年）——故城大城 + 小城周回 21 公里仍可循、是青州北海郡临淄县治所在；唐人凭吊临淄即凭吊\"先秦霸业 + 稷下元气\"那段未被汉武\"独尊儒术\"收编的多元思想史。",
+      "docPath": "docs/05-epoch/tang-755/relics/临淄.md",
+      "category": "relic",
+      "aliases": [
+        "齐都临淄",
+        "齐故城",
+        "临淄故城"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "龙城",
+      "archetype": "ruin",
+      "position": {
+        "lat": 41.5717,
+        "lon": 120.4506
+      },
+      "visualHierarchy": "large",
+      "displayName": "龙城",
+      "oneLiner": "三燕（前燕、后燕、北燕）都城——东晋咸康七年（341）慕容皝徙都于此；自此前燕、后燕、北燕三朝相继都龙城；北魏太延二年（436）灭北燕、龙城退为废都；755 时是营州（柳城郡）治柳城——平卢节度治、安禄山起家地。",
+      "docPath": "docs/05-epoch/tang-755/relics/龙城.md",
+      "category": "relic",
+      "aliases": [
+        "柳城（唐县名）",
+        "营州（唐州名，治柳城/龙城旧址）",
+        "三燕故都",
+        "和龙城（北燕通称）"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "莫高窟",
+      "archetype": "ruin",
+      "position": {
+        "lat": 40.0478,
+        "lon": 94.8166
+      },
+      "visualHierarchy": "large",
+      "displayName": "莫高窟",
+      "oneLiner": "凿在鸣沙山东麓砾岩崖壁上的一千六百年佛窟群——盛唐时正在它的全盛期。",
+      "docPath": "docs/05-epoch/tang-755/relics/莫高窟.md",
+      "category": "relic",
+      "aliases": [
+        "千佛洞",
+        "敦煌石窟",
+        "莫高里"
+      ]
+    },
+    {
+      "id": "牧野",
+      "archetype": "ruin",
+      "position": {
+        "lat": 35.3033,
+        "lon": 113.9265
+      },
+      "visualHierarchy": "medium",
+      "displayName": "牧野",
+      "oneLiner": "周武王伐纣决战地——BC 1046（夏商周断代工程主张；早年有 BC 1027 / BC 1122 等异说）周武王率诸侯之师渡孟津、北上至商郊牧野与商纣王（帝辛）会战；商军倒戈、商亡、周立；755 时已废约 1800 年——城垣无存、唐人据《尚书·牧誓》《史记·周本纪》知此地大略在卫州汲县北郊原；牧野是中国\"天命\"之物理 anchor——周代 800 年礼乐 + 历代\"汤武革命\"叙事皆从此一战出。",
+      "docPath": "docs/05-epoch/tang-755/relics/牧野.md",
+      "category": "relic",
+      "aliases": [
+        "坶野",
+        "牧之野",
+        "商郊牧野（《尚书·牧誓》原文）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "平城",
+      "archetype": "ruin",
+      "position": {
+        "lat": 40.0764,
+        "lon": 113.3
+      },
+      "visualHierarchy": "large",
+      "displayName": "平城",
+      "oneLiner": "北魏前期都城——拓跋鲜卑入主华北的物理 anchor；天兴元年（398）拓跋珪自盛乐迁都平城、至太和十八年（494）孝文帝迁洛阳——为北魏都 96 年；755 时旧都已废 261 年——以云州云中郡治云中县身份存在（属河东节度），平城旧城大半坍废、宫城基址犹立、方山永固陵 + 武州山云冈石窟仍在城西北、是盛唐北方塞下\"代北旧都\"最完整的物理遗存。",
+      "docPath": "docs/05-epoch/tang-755/relics/平城.md",
+      "category": "relic",
+      "aliases": [
+        "代北旧都",
+        "北魏故京",
+        "云中故城",
+        "平城旧都"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "三门峡砥柱",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.82,
+        "lon": 111.35
+      },
+      "visualHierarchy": "large",
+      "displayName": "三门峡砥柱",
+      "oneLiner": "黄河中游最险一段 + 唐漕运最大险关——陕郡治陕县 + 平陆县境黄河中流、河中三巨石（人门 / 神门 / 鬼门）分流成\"三门\"、三门西约一二唐里中流有孤峰\"砥柱\"——《尚书·禹贡》\"至于砥柱\"是中国地理的最早 anchor 之一 + 盛唐裴耀卿三门转运法的物理 anchor；1957 三门峡大坝始建 + 1960 蓄水后没入水下——4 千年地理一坝改变。",
+      "docPath": "docs/05-epoch/tang-755/relics/三门峡砥柱.md",
+      "category": "relics",
+      "aliases": [
+        "砥柱",
+        "中流砥柱",
+        "三门",
+        "三门山",
+        "陕郡砥柱"
+      ]
+    },
+    {
+      "id": "商丘",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.4072,
+        "lon": 115.65
+      },
+      "visualHierarchy": "large",
+      "displayName": "商丘",
+      "oneLiner": "商汤始都 + 周封宋国都的双重古迹——豫东平原睢水北岸；商汤始都亳约 BC 1600（南亳说在此）、周武王伐纣后周公封微子启于宋（约 BC 1043）都商丘、周代宋国约 750 余年、至 BC 286 齐魏楚三国分宋而亡；755 时商丘故城在唐河南道宋州睢阳郡治宋城县西南郊原——商代旧迹已没于平畴、宋国都垣残址间见、唐人凭吊即凭吊商汤始迹 + 宋国微子。",
+      "docPath": "docs/05-epoch/tang-755/relics/商丘.md",
+      "category": "relic",
+      "aliases": [
+        "商",
+        "亳（南亳说）",
+        "宋",
+        "睢阳",
+        "宋城（唐宋城县治）",
+        "梁国（汉）",
+        "大商初都"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "统万城",
+      "archetype": "ruin",
+      "position": {
+        "lat": 37.9933,
+        "lon": 108.8533
+      },
+      "visualHierarchy": "large",
+      "displayName": "统万城",
+      "oneLiner": "大夏赫连勃勃白城——陕北靖边无定河北岸；凤翔元年（413）始筑、约真兴年间（419 前后）宫城落成、北魏始光四年（427）攻克统万、大夏 431 亡国后退为废都；755 时已废 324 年——白色夯土城墙仍立、唐人称\"白城\"、是夏州朔方郡治朔方县（隋岩绿县、贞观二年/628 改名朔方）所在。",
+      "docPath": "docs/05-epoch/tang-755/relics/统万城.md",
+      "category": "relic",
+      "aliases": [
+        "白城",
+        "朔方郡治朔方县（隋岩绿县、贞观二年/628 改名朔方）（唐时官称）",
+        "大夏国都",
+        "真兴城（赫连勃勃年号\"真兴\"间筑）"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "辋川别业",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.08,
+        "lon": 109.32
+      },
+      "visualHierarchy": "medium",
+      "displayName": "辋川别业",
+      "oneLiner": "王维在长安城东南六十里的山谷里经营了二十年的私园——盛唐山水诗的现地原型。",
+      "docPath": "docs/05-epoch/tang-755/relics/辋川别业.md",
+      "category": "relic",
+      "aliases": [
+        "辋川山庄",
+        "辋川庄",
+        "蓝田别业"
+      ]
+    },
+    {
+      "id": "五丈原",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.3389,
+        "lon": 107.6764
+      },
+      "visualHierarchy": "medium",
+      "displayName": "五丈原",
+      "oneLiner": "岐州郿县斜谷口外的一处台原——蜀汉建兴十二年八月、诸葛亮以五十四岁卒于军中；与魏军司马懿对峙百余日的最后一阵未及打、北伐自此终——是中国军政史上最有名的一处\"未竟之地\"。",
+      "docPath": "docs/05-epoch/tang-755/relics/五丈原.md",
+      "category": "relic",
+      "aliases": [
+        "五丈塬（地理学口径）",
+        "武侯坡（明清后部分文献称谓）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "武川镇",
+      "archetype": "ruin",
+      "position": {
+        "lat": 40.9667,
+        "lon": 111.45
+      },
+      "visualHierarchy": "large",
+      "displayName": "武川镇",
+      "oneLiner": "北魏六镇之武川 + 怀朔——阴山以南、北魏拒柔然的边镇；北周宇文泰、隋杨忠、唐李虎（李渊祖父）皆出武川——是西魏 / 北周 / 隋 / 唐四代皇族的祖籍地；755 时阴山以南旧六镇遗址已废 200 余年、但李唐\"出武川\"的祖籍记忆贯穿盛唐。",
+      "docPath": "docs/05-epoch/tang-755/relics/武川镇.md",
+      "category": "relic",
+      "aliases": [
+        "北魏六镇之武川",
+        "西魏 / 北周皇族祖籍地"
+      ],
+      "extinctionTier": "A2"
+    },
+    {
+      "id": "武周天堂",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.6797,
+        "lon": 112.4669
+      },
+      "visualHierarchy": "medium",
+      "displayName": "武周天堂",
+      "oneLiner": "武则天在洛阳紫微城明堂西北所造的礼佛阁——五层、文献记\"高数百尺\"、内立一尊夹纻大像（漆塑非铜）——建成不到七年，证圣元年正月丙申夜一把火烧光，自此再未重建；盛唐至 755 时，天堂遗址只是明堂西北那一片台基。",
+      "docPath": "docs/05-epoch/tang-755/relics/武周天堂.md",
+      "category": "relic",
+      "aliases": [
+        "万象天堂（武周制天堂常配明堂\"万象神宫\"称谓）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "邺城",
+      "archetype": "ruin",
+      "position": {
+        "lat": 36.3389,
+        "lon": 114.4994
+      },
+      "visualHierarchy": "large",
+      "displayName": "邺城",
+      "oneLiner": "漳水南岸的六朝霸都——曹魏 + 后赵 + 冉魏 + 前燕 + 东魏 + 北齐 六代以此为都；北周大象二年（580）杨坚焚邺、自此约 175 年废墟；755 时唐人见的是相州邺县境内一片夯土残墙 + 三台基址 + 漳水仍流。",
+      "docPath": "docs/05-epoch/tang-755/relics/邺城.md",
+      "category": "relic",
+      "aliases": [
+        "邺都",
+        "邺下",
+        "邺中",
+        "邺京（东魏北齐时通称）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "殷墟",
+      "archetype": "ruin",
+      "position": {
+        "lat": 36.13,
+        "lon": 114.32
+      },
+      "visualHierarchy": "medium",
+      "displayName": "殷墟",
+      "oneLiner": "商代晚期王畿遗址——洹水南岸、相州治安阳县西北一片郊原；盘庚迁殷（约 BC 1300）至帝辛（纣）亡国（约 BC 1046）约 250 余年间为商王都（若采《竹书》系文献\"273 年\"之说、则迁殷年代相应早于 BC 1300、本 doc 不同时坐实两者）；755 时已废约 1800 年——但唐人不知此地即殷墟：甲骨文 1899 才发现、唐人凭《尚书》《史记》多以为殷之故都在卫州朝歌——盛唐相州人在洹水边耕作、不识脚下是商王陵区。",
+      "docPath": "docs/05-epoch/tang-755/relics/殷墟.md",
+      "category": "relic",
+      "aliases": [
+        "殷之故墟",
+        "商殷故都",
+        "北蒙（卜辞自称）",
+        "小屯（清末民国通称发掘地）"
+      ]
+    },
+    {
+      "id": "长平",
+      "archetype": "ruin",
+      "position": {
+        "lat": 35.798,
+        "lon": 112.923
+      },
+      "visualHierarchy": "medium",
+      "displayName": "长平",
+      "oneLiner": "战国秦赵决战之地——秦昭襄王 四十五 至 四十七 年（BC 262-260）秦 + 赵 相 持 三 年、廉颇 坚 守 + 赵 王 换 将 赵括 + 秦 阴 以 白起 代 王 龁 + 围 困 四十六 日 + 赵括 突围 战死 + 数十万 降 卒 为 白起 所 殄；755 时 已 远 约 1014 年——属 唐 河东 道 泽州 / 高平 郡 高平 县 西北 丹河 谷地；地表 无 战 阵 + 仅 存 方位 与 后世 传 说 之 \"白 起 台 / 将军 岭 / 骷 髅 山\"、丹河 仍 自 高平 西北 南 流；长平 是 中国 战 国 战 争 escalation 到 极致 的 物理 anchor + \"纸 上 谈 兵\" 一 词 的 远 源 + 白起 三 年 后 被 秦 昭王 赐死 杜 邮 的 因 果 链 起 点。",
+      "docPath": "docs/05-epoch/tang-755/relics/长平.md",
+      "category": "relic",
+      "aliases": [
+        "长平故战场",
+        "长平故城",
+        "长平关",
+        "高平故战场"
+      ],
+      "extinctionTier": "A3"
+    },
+    {
+      "id": "周原",
+      "archetype": "ruin",
+      "position": {
+        "lat": 34.4833,
+        "lon": 107.8833
+      },
+      "visualHierarchy": "large",
+      "displayName": "周原",
+      "oneLiner": "周天命所自来的物理 anchor——岐山以南、漆沮二水之间的一片台塬；约前 12 世纪中叶（具体年不可坐实）古公亶父自豳迁岐、营建邑居 → 王季 → 文王三代经营约数世（一说约 80 年）→ 文王晚年作丰、武王迁镐；自古公迁岐（约前 12 世纪中叶）至 755 约 1890 余年；自武王迁镐（BC 约 1046）周原退为旧邦、至 755 约 1800 年——岐山南麓的田野上仅余地名、周公庙、与《诗经·绵》所述的山形水势；是岐州扶风郡治雍县以东 80-100 里的一片怀古之地。",
+      "docPath": "docs/05-epoch/tang-755/relics/周原.md",
+      "category": "relic",
+      "aliases": [
+        "岐周",
+        "岐下",
+        "周之旧邦",
+        "古公亶父之邑"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "涿鹿",
+      "archetype": "ruin",
+      "position": {
+        "lat": 40.3833,
+        "lon": 115.2167
+      },
+      "visualHierarchy": "medium",
+      "displayName": "涿鹿",
+      "oneLiner": "华夏始战之野——燕山以北、桑干河北岸的一片山前盆地；上古黄帝战蚩尤、又战炎帝之地（《史记·五帝本纪》所记、传说年代约前 26 世纪、具体年不可坐实）；755 时在河北道妫州妫川郡怀戎县境内——唐 武德七年（624）置涿鹿县、贞观八年（634）省入怀戎县——故 755 时涿鹿县已废 121 年、仅作为怀戎县境内的旧地名 + 上古黄帝战蚩尤典故的物理 anchor 存在；距长安东北约一千余里、是中国军事史最古的一处物理起点。",
+      "docPath": "docs/05-epoch/tang-755/relics/涿鹿.md",
+      "category": "relic",
+      "aliases": [
+        "涿鹿之野",
+        "涿鹿之阿",
+        "黄帝战蚩尤地",
+        "上古始战之野"
+      ]
+    },
+    {
+      "id": "阿房宫",
+      "archetype": "temple",
+      "variant": "taoist",
+      "position": {
+        "lat": 34.264,
+        "lon": 108.887
+      },
+      "visualHierarchy": "medium",
+      "displayName": "阿房宫",
+      "oneLiner": "唐长安县西二十里左右（《元和郡县图志》记\"在县西二十里\"，今西安西郊阿房村一带；不同文献参照点不同——以长安外郭城为参照可至三十里左右）、渭水南岸一片东西千余步的夯土大台——秦始皇野心未竟的朝宫前殿、二世续作未毕、楚汉以来千年凭吊；盛唐人提起\"阿房\"二字，对的是一个传说中的火、一个传说中的宫——而台上其实从未真正建成。",
+      "docPath": "docs/05-epoch/tang-755/relics/阿房宫.md",
+      "category": "relic",
+      "aliases": [
+        "阿城",
+        "阿房",
+        "秦阿房",
+        "阿房前殿"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "白马寺",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 34.7227,
+        "lon": 112.5944
+      },
+      "visualHierarchy": "large",
+      "displayName": "白马寺",
+      "oneLiner": "河南府洛阳东郊古刹，汉传佛教祖庭；按永平求法旧说，白马驮经入洛——唐人到此先见的是佛教入华的起点。",
+      "docPath": "docs/05-epoch/tang-755/relics/白马寺.md",
+      "category": "relic",
+      "aliases": [
+        "招提寺（北魏一度更名）",
+        "释源",
+        "祖庭"
+      ]
+    },
+    {
+      "id": "曹溪南华寺",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 24.9617,
+        "lon": 113.6311
+      },
+      "visualHierarchy": "large",
+      "displayName": "曹溪南华寺",
+      "oneLiner": "韶州曲江东南六十里曹溪畔的禅宗祖庭——六祖慧能在此居三十余年、开演南宗顿悟；先天二年示寂于新州国恩寺、同年迁神龛归曹溪安奉；755 时寺名\"法泉寺\"、距慧能圆寂已四十二年——天下禅僧南来朝祖之圣地。",
+      "docPath": "docs/05-epoch/tang-755/relics/曹溪南华寺.md",
+      "category": "relic",
+      "aliases": [
+        "宝林寺（唐初寺名，仪凤二年/677 慧能至时已存）",
+        "中兴寺（神龙元年/705 武则天敕赐）",
+        "法泉寺（中兴寺旋改；755 时官称）",
+        "南华寺（北宋开宝元年/968 始改今名）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "草堂寺",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 34.0789,
+        "lon": 108.7444
+      },
+      "visualHierarchy": "large",
+      "displayName": "草堂寺",
+      "oneLiner": "京兆府鄠县圭峰山北麓的古寺——后秦弘始三年（401）姚兴迎鸠摩罗什入长安、于此地的逍遥园译经十二载、出大乘经论三十五部凡二百九十四卷；罗什所译《中论》《百论》《十二门论》为中国三论宗祖典——草堂寺由是为三论宗祖庭、兼为罗什译经所涉法华、般若、净土等共同记忆。",
+      "docPath": "docs/05-epoch/tang-755/relics/草堂寺.md",
+      "category": "relic",
+      "aliases": [
+        "逍遥园（后秦姚兴朝罗什译经场所、即后草堂寺地）",
+        "大寺（后秦至北朝间通称之一）",
+        "栖禅寺（北朝间一作）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "大昭寺红山宫",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 29.6529,
+        "lon": 91.1311
+      },
+      "visualHierarchy": "large",
+      "displayName": "大昭寺红山宫",
+      "oneLiner": "吐蕃逻些（拉萨）城心——松赞干布七世纪中叶所建：山下大昭寺供文成 / 尺尊公主入藏所携释迦摩尼像、红山顶宫殿（布达拉宫前身）九层千室；755 时俱已百年，吐蕃赞普赤德祖赞此年前后卒、赤松德赞即将即位。",
+      "docPath": "docs/05-epoch/tang-755/relics/大昭寺红山宫.md",
+      "category": "relic",
+      "aliases": [
+        "惹萨",
+        "惹萨幻显寺（藏文 ra-sa vrul-snang——大昭寺早期名）",
+        "觉康（jo-khang——大昭寺通称）",
+        "布达拉宫前身（红山宫）"
+      ],
+      "extinctionTier": "A3-foreign"
+    },
+    {
+      "id": "法门寺",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 34.4406,
+        "lon": 107.8869
+      },
+      "visualHierarchy": "large",
+      "displayName": "法门寺",
+      "oneLiner": "扶风郡扶风县北的佛指舍利寺，唐人所信阿育王分舍利处；岐山南麓一座塔下，真身地宫久闭，帝王香火几度西来。",
+      "docPath": "docs/05-epoch/tang-755/relics/法门寺.md",
+      "category": "relic",
+      "aliases": [
+        "阿育王寺",
+        "无忧王寺",
+        "真身宝塔",
+        "岐阳真身寺"
+      ]
+    },
+    {
+      "id": "九成宫",
+      "archetype": "temple",
+      "variant": "taoist",
+      "position": {
+        "lat": 34.6794,
+        "lon": 107.8867
+      },
+      "visualHierarchy": "large",
+      "displayName": "九成宫",
+      "oneLiner": "麟游山中的隋仁寿宫——唐太宗改名\"九成\"、魏徵撰文欧阳询书《醴泉铭》立此一碑；高宗朝水灾后渐离、玄宗朝不至——盛唐人提起\"九成\"，已是六十年前的旧事。",
+      "docPath": "docs/05-epoch/tang-755/relics/九成宫.md",
+      "category": "relic",
+      "aliases": [
+        "仁寿宫（隋名 + 唐永徽五年-乾封二年间称 万年宫）",
+        "万年宫（永徽五年 654 至乾封二年 667 间称）"
+      ],
+      "extinctionTier": "A1"
+    },
+    {
+      "id": "凉州大云寺",
+      "archetype": "temple",
+      "variant": "small_temple",
+      "position": {
+        "lat": 37.929,
+        "lon": 102.641
+      },
+      "visualHierarchy": "medium",
+      "displayName": "凉州大云寺",
+      "oneLiner": "武周遗产 + 河西陇右佛教 + 凉州城内物理 anchor——武则天天授元年（690）颁《大云经》于天下、诏诸州各置大云寺一所；凉州大云寺即其中一所、立在陇右道凉州武威郡治姑臧县城内；唐 755 时是哥舒翰节度河西陇右、戍卒商旅过凉州的城内日常；再过八到十年（763-765）凉州陷蕃——大云寺随凉州入吐蕃辖境、唐廷之外八十余年。",
+      "docPath": "docs/05-epoch/tang-755/relics/凉州大云寺.md",
+      "category": "relic",
+      "aliases": [
+        "姑臧大云寺",
+        "武威郡大云寺",
+        "大云寺（凉州）"
+      ]
+    },
+    {
+      "id": "灵岩寺",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 36.5039,
+        "lon": 116.8525
+      },
+      "visualHierarchy": "large",
+      "displayName": "灵岩寺",
+      "oneLiner": "齐州济南郡长清县灵岩山中一座北魏太延元年（435）法定禅师所立的山中禅寺——北魏至北齐间渐成山东第一禅寺，隋唐再修、玄宗朝鼎盛；755 时是齐鲁佛教的物理 anchor，距法定始建已三百二十年；后世（北宋 1090s 起）渐与天台国清、当阳玉泉、南京栖霞并称为\"海内四大名刹\"——但这一并称非盛唐唐人语。",
+      "docPath": "docs/05-epoch/tang-755/relics/灵岩寺.md",
+      "category": "relic",
+      "aliases": [
+        "神宝寺（北魏太延元年/435 法定始建时初名，史源有异文）",
+        "灵岩寺（北魏正光间/520s 通称；唐 755 时官称）",
+        "灵岩禅寺"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "隆中",
+      "archetype": "temple",
+      "variant": "small_temple",
+      "position": {
+        "lat": 32.0125,
+        "lon": 112.0833
+      },
+      "visualHierarchy": "large",
+      "displayName": "隆中",
+      "oneLiner": "襄州襄阳城西二十里的山中——诸葛亮自荆州避乱躬耕于此十年、刘备三顾草庐、孔明出\"隆中对\"定三分天下——盛唐人凭吊三国地最盛者，李白杜甫多有题诗。",
+      "docPath": "docs/05-epoch/tang-755/relics/隆中.md",
+      "category": "relic",
+      "aliases": [
+        "隆中山",
+        "古隆中",
+        "诸葛庐（盛唐人称谓）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "楼观台",
+      "archetype": "temple",
+      "variant": "taoist",
+      "position": {
+        "lat": 34.0244,
+        "lon": 108.2528
+      },
+      "visualHierarchy": "large",
+      "displayName": "楼观台",
+      "oneLiner": "京兆府盩厔县终南山北麓的道教祖庭——传说老子在此说《道德经》传关令尹喜；李唐皇室追祖老子、武德间立\"宗圣观\"奉为道祖庙——是唐皇家道教中心，玄宗朝多次亲祀。",
+      "docPath": "docs/05-epoch/tang-755/relics/楼观台.md",
+      "category": "relic",
+      "aliases": [
+        "楼观（古名）",
+        "宗圣观（武德间敕赐）",
+        "宗圣宫（武德间敕修后通称；唐 755 时官称）",
+        "终南福地"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "王屋山阳台宫",
+      "archetype": "temple",
+      "variant": "taoist",
+      "position": {
+        "lat": 35.19,
+        "lon": 112.37
+      },
+      "visualHierarchy": "large",
+      "displayName": "王屋山阳台宫",
+      "oneLiner": "河南道怀州（河内郡）王屋县境王屋山的道教祖庭——开元十二年（724）玄宗命茅山宗第十二代宗师司马承祯于此置阳台观——王屋山为道教\"十大洞天\"之首\"小有清虚天\"，与终南楼观并称玄宗朝两大国家级道观。",
+      "docPath": "docs/05-epoch/tang-755/relics/王屋山阳台宫.md",
+      "category": "relic",
+      "aliases": [
+        "阳台观（开元十二年/724 初敕赐之名）",
+        "阳台宫（后世通称；本 doc 标题用此通行名）",
+        "小有清虚天（道教十大洞天之首；王屋山之道教名）"
+      ],
+      "extinctionTier": "A4"
+    },
+    {
+      "id": "巍山祖庭",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 25.2308,
+        "lon": 100.3072
+      },
+      "visualHierarchy": "medium",
+      "displayName": "巍山祖庭",
+      "oneLiner": "南诏国发祥地——唐贞观间细奴罗立蒙舍诏于巍山、皮逻阁开元二十六年（738）灭其他五诏统一为南诏；755 时阁罗凤朝 7 年、天宝战刚平、巍山仍是南诏祖庭（皇室祖祭的具体场所与规模 史载未详）——南诏 6 代诏主（南诏王、蒙氏王）的物理起点。",
+      "docPath": "docs/05-epoch/tang-755/relics/巍山祖庭.md",
+      "category": "relic",
+      "aliases": [
+        "蒙舍诏故地",
+        "蒙舍",
+        "蒙化（明清通称）",
+        "巍山（清代后通称）"
+      ],
+      "extinctionTier": "A3-foreign"
+    },
+    {
+      "id": "兴教寺",
+      "archetype": "temple",
+      "variant": "grand",
+      "position": {
+        "lat": 34.0747,
+        "lon": 108.9486
+      },
+      "visualHierarchy": "large",
+      "displayName": "兴教寺",
+      "oneLiner": "长安东南樊川杜陵原上的玄奘葬地，唐人口中的法相宗祖庭；自高宗总章二年（669）立寺起，寺内三塔——玄奘居中，窥基、圆测分立两侧，盛唐\"玄奘一生\"最后的物理坐标便在这片塬上。",
+      "docPath": "docs/05-epoch/tang-755/relics/兴教寺.md",
+      "category": "relic",
+      "aliases": [
+        "大唐护国兴教寺",
+        "樊川兴教寺",
+        "樊川三塔寺"
+      ]
+    },
+    {
+      "id": "玉华宫",
+      "archetype": "temple",
+      "variant": "taoist",
+      "position": {
+        "lat": 35.335,
+        "lon": 108.905
+      },
+      "visualHierarchy": "large",
+      "displayName": "玉华宫",
+      "oneLiner": "宜君山中的唐太宗离宫——建成才四年便废为玉华寺；十二年后玄奘西归后徙居于此肃诚院，在山中四年译毕《大般若经》六百卷——麟德元年二月五日圆寂于此；盛唐人到 755 时已见废殿荒凉，杜甫数年后再访作《玉华宫》。",
+      "docPath": "docs/05-epoch/tang-755/relics/玉华宫.md",
+      "category": "relic",
+      "aliases": [
+        "玉华寺（永徽二年/651 起；玄奘晚年驻锡之名）",
+        "仁智宫（高祖武德七年/624 所建——玉华宫前身基址）"
+      ],
+      "extinctionTier": "A1"
+    }
+  ]
+}
