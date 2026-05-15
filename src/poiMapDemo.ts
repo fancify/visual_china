@@ -125,21 +125,6 @@ async function loadRegistry(): Promise<PoiRegistry> {
   return res.json();
 }
 
-function poiScale(hierarchy: string): number {
-  switch (hierarchy) {
-    case "gravity":
-      return 1.2;
-    case "large":
-      return 1.0;
-    case "medium":
-      return 0.65;
-    case "small":
-      return 0.45;
-    default:
-      return 0.6;
-  }
-}
-
 async function placePois(): Promise<void> {
   const registry = await loadRegistry();
   console.log(`Loaded ${registry.totalEntries} POI entries`);
@@ -152,8 +137,7 @@ async function placePois(): Promise<void> {
     const group = builder();
     const { x, z } = projectLatLon(entry.position.lat, entry.position.lon);
     group.position.set(x, 0, z);
-    const s = poiScale(entry.visualHierarchy);
-    group.scale.set(s, s, s);
+    // 不做额外 scale 调整 — model 的 size 已由 archetype + variant 决定 (city S/M/L 等)
 
     // Attach entry data for raycast hit
     group.traverse((obj) => {
