@@ -125,13 +125,23 @@ async function loadRegistry(): Promise<PoiRegistry> {
   return res.json();
 }
 
-// 全局 + city 档位 scale (per user 指令)
+// 全局 + 档位 scale (per user 指令)
 const GLOBAL_SCALE = 1 / 5; // 所有 model 缩小 5 倍
 function poiScale(entry: PoiEntry): number {
+  // 城市档位: small 为 base, medium = small × 1.2, large = medium × 1.2
   if (entry.archetype === "city") {
-    // 以 city.small 为 base 1.0, medium=1.5x, large=1.2x
-    if (entry.size === "medium") return GLOBAL_SCALE * 1.5;
-    if (entry.size === "large") return GLOBAL_SCALE * 1.2;
+    if (entry.size === "medium") return GLOBAL_SCALE * 1.2;
+    if (entry.size === "large") return GLOBAL_SCALE * 1.2 * 1.2; // = 1.44x
+  }
+  // 帝陵 / 关塞 / 名楼 — 缩小为当前的 1/3 (相对全局基准)
+  if (entry.archetype === "mausoleum" && entry.variant === "imperial") {
+    return GLOBAL_SCALE / 3;
+  }
+  if (entry.archetype === "pass") {
+    return GLOBAL_SCALE / 3;
+  }
+  if (entry.archetype === "node" && entry.variant === "tower") {
+    return GLOBAL_SCALE / 3;
   }
   return GLOBAL_SCALE;
 }
