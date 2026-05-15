@@ -41,24 +41,48 @@ export function buildNode(
   });
 
   if (variant === "bridge") {
-    // ----- 拱形桥身 -----
-    const archGeom = new THREE.TorusGeometry(1.2, 0.15, 6, 8, Math.PI);
+    // ----- 拱形桥身 (∩ 形, 拱顶向上) -----
+    // TorusGeometry default 在 xy 平面, θ=0..π 是上半圆 (∩ shape, 顶在 +y)
+    // 不要 rotation, default 已是拱桥形状
+    const archR = 1.2;
+    const archGeom = new THREE.TorusGeometry(archR, 0.15, 6, 16, Math.PI);
     const arch = new THREE.Mesh(archGeom, muSeMat);
     arch.name = "bridge_arch";
-    // 默认 Torus 平面在 xy, 半圆开口朝 -y; rotateX(π) 翻转使开口向下
-    arch.rotation.x = Math.PI;
-    arch.position.set(0, 1.0, 0);
+    arch.position.set(0, 0.05, 0); // 拱底端在 y≈0 (略略上抬避免水面穿模)
     group.add(arch);
 
-    // ----- 桥两侧栏杆: 各 6 个 buildColumn(0.3, muSe), 间隔 0.4 -----
+    // ----- 桥面: 沿拱顶曲线的平板 (用多个小 box 拼接近似) -----
+    // 6 个 box 沿 x 分布, 每个 box 的 y 由 arch 弧度决定
+    const deckSegments = 12;
+    const deckW = 0.5; // 桥面宽 (沿 z)
+    for (let i = 0; i < deckSegments; i++) {
+      const t = (i + 0.5) / deckSegments; // 0..1
+      const theta = t * Math.PI; // 0..π
+      const x = -archR * Math.cos(theta); // -R..+R
+      const y = archR * Math.sin(theta) * 0.95 + 0.05; // 略低于拱顶
+      const dx = (Math.PI * archR) / deckSegments * 1.1; // 段长
+      const angle = theta - Math.PI / 2; // 切线角
+      const seg = new THREE.Mesh(
+        new THREE.BoxGeometry(dx, 0.08, deckW),
+        muSeMat,
+      );
+      seg.position.set(x, y, 0);
+      seg.rotation.z = -angle; // 沿弧度倾斜
+      seg.name = `bridge_deck_${i}`;
+      group.add(seg);
+    }
+
+    // ----- 栏杆: 沿拱顶曲线两侧, 每侧 7 根, 沿弧排布 -----
     for (let side = 0; side < 2; side++) {
-      const z = side === 0 ? 0.5 : -0.5;
-      for (let i = 0; i < 6; i++) {
-        const col = buildColumn(0.3, TANG_PALETTE.muSe);
+      const z = side === 0 ? deckW / 2 : -deckW / 2;
+      for (let i = 0; i < 7; i++) {
+        const t = (i + 0.5) / 7;
+        const theta = t * Math.PI;
+        const x = -archR * Math.cos(theta);
+        const yBase = archR * Math.sin(theta) * 0.95 + 0.05;
+        const col = buildColumn(0.28, TANG_PALETTE.muSe);
+        col.position.set(x, yBase, z);
         col.name = `bridge_railing_${side === 0 ? "front" : "back"}_${i}`;
-        // 桥长 ~3m, 6 根柱沿 x 排列, 间隔 0.4, 居中
-        const x = (i - 2.5) * 0.4;
-        col.position.set(x, 1.0, z);
         group.add(col);
       }
     }
@@ -148,40 +172,64 @@ export function buildNode(
       group.add(building);
     });
   } else {
-    // ----- tower: 3 层楼阁 -----
-    const layerSpecs = [
-      { w: 2.5, d: 2.5, h: 2.0, y: 1.0 },
-      { w: 2.2, d: 2.2, h: 1.8, y: 3.2 },
-      { w: 1.9, d: 1.9, h: 1.6, y: 5.2 },
+    // ----- tower: 3 层楼阁 (类塔结构: 墙体 + 水平檐口 + 顶层歇山顶) -----
+    // 设计: 不用 buildSimpleHall 叠加 (会产生重复柱+横梁+斗拱混乱)
+    // 改用 box 墙体 (zhuHong) + 水平檐口板 (daiHei) + 4 角斗拱
+    // 最顶层用 buildHipRoof 收顶
+    const zhuMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.zhuHong });
+    const daiMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.daiHei });
+    const layers = [
+      { w: 2.8, d: 2.8, h: 2.0 }, // 底层最大
+      { w: 2.4, d: 2.4, h: 1.6 },
+      { w: 2.0, d: 2.0, h: 1.4 }, // 顶层最小
     ];
-    layerSpecs.forEach((spec, i) => {
-      const hall = buildSimpleHall(spec.w, spec.d, spec.h);
-      hall.name = `tower_floor_${i + 1}`;
-      hall.position.set(0, spec.y, 0);
-      group.add(hall);
+    let curY = 0;
+    layers.forEach((spec, i) => {
+      // 1) 墙体 (整层红色 box)
+      const wallGeom = new THREE.BoxGeometry(spec.w, spec.h, spec.d);
+      const wall = new THREE.Mesh(wallGeom, zhuMat);
+      wall.position.set(0, curY + spec.h / 2, 0);
+      wall.name = `tower_wall_${i + 1}`;
+      group.add(wall);
 
-      // 每层 4 个转角 buildBracketSet(0.4) 在屋檐下
-      const eaveY = spec.y + spec.h / 2;
+      curY += spec.h;
+
+      // 2) 4 角斗拱 (在墙顶, 角落)
       const hw = spec.w / 2;
       const hd = spec.d / 2;
       const corners: Array<[number, number]> = [
-        [-hw, -hd],
-        [hw, -hd],
-        [-hw, hd],
-        [hw, hd],
+        [-hw + 0.1, -hd + 0.1],
+        [hw - 0.1, -hd + 0.1],
+        [-hw + 0.1, hd - 0.1],
+        [hw - 0.1, hd - 0.1],
       ];
       corners.forEach((c, j) => {
-        const bracket = buildBracketSet(0.4);
-        bracket.name = `tower_bracket_floor${i + 1}_${j}`;
-        bracket.position.set(c[0], eaveY, c[1]);
+        const bracket = buildBracketSet(0.25);
+        bracket.position.set(c[0], curY, c[1]);
+        bracket.name = `tower_bracket_${i + 1}_${j}`;
         group.add(bracket);
       });
+
+      // 3) 中间层用水平檐口板 (顶层不加, 用 hipRoof 替代)
+      if (i < layers.length - 1) {
+        const eaveOverhang = 1.35;
+        const eaveThick = 0.15;
+        const eaveGeom = new THREE.BoxGeometry(spec.w * eaveOverhang, eaveThick, spec.d * eaveOverhang);
+        const eave = new THREE.Mesh(eaveGeom, daiMat);
+        eave.position.set(0, curY + 0.25 + eaveThick / 2, 0); // 斗拱顶之上
+        eave.name = `tower_eave_${i + 1}`;
+        group.add(eave);
+        curY += 0.25 + eaveThick + 0.05; // 斗拱高 + 檐口厚 + 间隔
+      } else {
+        curY += 0.25; // 斗拱高
+      }
     });
 
-    // ----- 顶部歇山顶 -----
-    const roof = buildHipRoof(2.0, 2.0, 0.6);
+    // ----- 顶层歇山顶 -----
+    const topLayer = layers[layers.length - 1]!;
+    const roof = buildHipRoof(topLayer.w * 1.35, topLayer.d * 1.35, 0.8);
     roof.name = "tower_roof";
-    roof.position.set(0, 6.4, 0);
+    roof.position.set(0, curY, 0);
     group.add(roof);
 
     // ----- 前方华表 -----
