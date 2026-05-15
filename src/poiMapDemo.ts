@@ -152,6 +152,10 @@ function poiScale(entry: PoiEntry): number {
   if (entry.archetype === "node" && entry.variant === "tower") {
     return GLOBAL_SCALE / 3;
   }
+  // 石窟 — 缩小为当前的一半
+  if (entry.archetype === "cave") {
+    return GLOBAL_SCALE / 2;
+  }
   return GLOBAL_SCALE;
 }
 
