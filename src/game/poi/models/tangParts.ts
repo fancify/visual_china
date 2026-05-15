@@ -178,13 +178,12 @@ export function buildHipRoof(
   chiwenMesh.name = "hipRoof_chiwen";
   group.add(chiwenMesh);
 
-  // ── 4 角飞檐 (corner cone) — 从屋顶底边 4 角向上向外翘起的"尖端" ──
-  // cone 默认 axis = +y, base 在 y=-len/2, apex 在 y=+len/2.
-  // 我们要 base 落在屋顶底部角 (= eave board 顶面), apex 沿 45° 向上向外翘起.
+  // ── 4 角飞檐 (corner upturn) — 屋顶角"小翘起", 含蓄如鸱吻附属, 不像独立 spike ──
+  // 缩小 + 几乎贴近屋顶角 (不再像牛角向外伸)
   const eaveGeoms: THREE.BufferGeometry[] = [];
-  const eaveLen = Math.min(width, depth) * 0.25; // 更长更显眼
-  const eaveR = eaveLen * 0.18;                  // 略粗
-  const eaveTilt = Math.PI / 4;                  // 45° 倾斜
+  const eaveLen = Math.min(width, depth) * 0.10; // 大幅缩小
+  const eaveR = eaveLen * 0.30;                  // 圆润一点
+  const eaveTilt = Math.PI / 3;                  // 60° 几乎直立 (含蓄翘起)
   const cornerOffsetX = width / 2;
   const cornerOffsetZ = depth / 2;
 
@@ -628,9 +627,45 @@ export function buildSimpleHall(
   rightWallMesh.name = "simpleHall_rightWall";
   group.add(rightWallMesh);
 
-  // ── 顶部 hipRoof ──
+  // ── 横梁 (柱顶一圈, 连接 4 柱, muSe 木色) ──
+  // 让屋顶有明确的"承重梁"视觉, 不再悬浮于柱顶之上
+  const beamThick = height * 0.06;
+  const beamY = height - beamThick / 2;
+  const beamSize = Math.min(width, depth) * 0.92;
+  // 前梁 + 后梁 (沿 x 方向)
+  const beamFG = new THREE.BoxGeometry(width * 0.98, beamThick, beamThick);
+  beamFG.translate(0, beamY, depth / 2 - depth * 0.08);
+  const beamFM = new THREE.Mesh(beamFG, lambert(TANG_PALETTE.muSe));
+  beamFM.name = "simpleHall_beam_front";
+  group.add(beamFM);
+  const beamBG = new THREE.BoxGeometry(width * 0.98, beamThick, beamThick);
+  beamBG.translate(0, beamY, -depth / 2 + depth * 0.08);
+  const beamBM = new THREE.Mesh(beamBG, lambert(TANG_PALETTE.muSe));
+  beamBM.name = "simpleHall_beam_back";
+  group.add(beamBM);
+  // 左右梁 (沿 z 方向)
+  const beamLG = new THREE.BoxGeometry(beamThick, beamThick, depth * 0.98);
+  beamLG.translate(-width / 2 + width * 0.08, beamY, 0);
+  const beamLM = new THREE.Mesh(beamLG, lambert(TANG_PALETTE.muSe));
+  beamLM.name = "simpleHall_beam_left";
+  group.add(beamLM);
+  const beamRG = new THREE.BoxGeometry(beamThick, beamThick, depth * 0.98);
+  beamRG.translate(width / 2 - width * 0.08, beamY, 0);
+  const beamRM = new THREE.Mesh(beamRG, lambert(TANG_PALETTE.muSe));
+  beamRM.name = "simpleHall_beam_right";
+  group.add(beamRM);
+
+  // ── 4 柱顶斗拱 (让屋顶 "坐" 在斗拱上) ──
+  const bracketScale = Math.min(width, depth) * 0.10;
+  for (const [cx, cz] of columnPositions) {
+    const bracket = buildBracketSet(bracketScale);
+    bracket.position.set(cx, height + beamThick * 0.5, cz);
+    group.add(bracket);
+  }
+
+  // ── 顶部 hipRoof — 紧贴梁/斗拱顶面 ──
   const roof = buildHipRoof(width * 1.15, depth * 1.15, height * 0.5);
-  roof.position.y = height;
+  roof.position.y = height + bracketScale * 1.5; // 斗拱高度之上
   group.add(roof);
 
   return group;

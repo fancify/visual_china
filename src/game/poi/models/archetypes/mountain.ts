@@ -60,10 +60,37 @@ export function buildMountain(): THREE.Group {
     group.add(c);
   }
 
-  // 庑殿顶
+  // 横梁 (碑亭柱顶一圈, 4 边, muSe 木色) — 让屋顶有承重感
+  const beamH = 0.1;
+  const paviBeamY = 1.15;
+  const paviBeamMat = new THREE.MeshLambertMaterial({ color: TANG_PALETTE.muSe });
+  // 前梁 + 后梁 (沿 x)
+  const beamFG = new THREE.BoxGeometry(0.95, beamH, beamH);
+  const beamFM = new THREE.Mesh(beamFG, paviBeamMat);
+  beamFM.position.set(0, paviBeamY, paviCenterZ + 0.4);
+  beamFM.name = "mountain_pavilion_beam_front";
+  group.add(beamFM);
+  const beamBG = new THREE.BoxGeometry(0.95, beamH, beamH);
+  const beamBM = new THREE.Mesh(beamBG, paviBeamMat);
+  beamBM.position.set(0, paviBeamY, paviCenterZ - 0.4);
+  beamBM.name = "mountain_pavilion_beam_back";
+  group.add(beamBM);
+  // 左右梁 (沿 z)
+  const beamLG = new THREE.BoxGeometry(beamH, beamH, 0.95);
+  const beamLM = new THREE.Mesh(beamLG, paviBeamMat);
+  beamLM.position.set(-0.4, paviBeamY, paviCenterZ);
+  beamLM.name = "mountain_pavilion_beam_left";
+  group.add(beamLM);
+  const beamRG = new THREE.BoxGeometry(beamH, beamH, 0.95);
+  const beamRM = new THREE.Mesh(beamRG, paviBeamMat);
+  beamRM.position.set(0.4, paviBeamY, paviCenterZ);
+  beamRM.name = "mountain_pavilion_beam_right";
+  group.add(beamRM);
+
+  // 庑殿顶 — 紧贴梁顶 (而不是悬浮)
   const roof = buildHipRoof(1.0, 1.0, 0.4);
   roof.name = "mountain_pavilion_roof";
-  roof.position.set(0, 1.4, paviCenterZ);
+  roof.position.set(0, 1.2, paviCenterZ); // 1.2 = 梁顶
   group.add(roof);
 
   // 内立石碑
