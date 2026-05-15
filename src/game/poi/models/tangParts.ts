@@ -115,6 +115,16 @@ export function buildHipRoof(
   // 屋脊长度 (顶部矩形) — 沿 x 方向, 约 width 的 50%
   const ridgeLen = width * 0.5;
 
+  // ── 水平檐口板 (eave board) — 让屋顶底面与墙顶接合, 同时向外出挑 ──
+  // 此板薄薄一层位于 y=0 (= 墙顶 world 坐标), 既封闭"屋顶悬在墙上方"的缝隙,
+  // 也给飞檐 cone 一个明确的底盘.
+  const eaveBoardThick = ridgeHeight * 0.08;
+  const eaveBoardGeom = new THREE.BoxGeometry(width, eaveBoardThick, depth);
+  eaveBoardGeom.translate(0, -eaveBoardThick / 2, 0);
+  const eaveBoardMesh = new THREE.Mesh(eaveBoardGeom, lambert(TANG_PALETTE.daiHei));
+  eaveBoardMesh.name = "hipRoof_eaveBoard";
+  group.add(eaveBoardMesh);
+
   // ── 4 个屋顶斜面 (tile 瓦面) ──
   // 前后 (沿 z 倾斜): bottomWidth = width, topWidth = ridgeLen, depth = depth/2
   const tileGeoms: THREE.BufferGeometry[] = [];
@@ -168,27 +178,34 @@ export function buildHipRoof(
   chiwenMesh.name = "hipRoof_chiwen";
   group.add(chiwenMesh);
 
-  // ── 4 角飞檐 (corner cone, 倾斜 ~30° 向上向外) ──
+  // ── 4 角飞檐 (corner cone) — 从屋顶底边 4 角向上向外翘起的"尖端" ──
+  // cone 默认 axis = +y, base 在 y=-len/2, apex 在 y=+len/2.
+  // 我们要 base 落在屋顶底部角 (= eave board 顶面), apex 沿 45° 向上向外翘起.
   const eaveGeoms: THREE.BufferGeometry[] = [];
-  const eaveLen = Math.min(width, depth) * 0.18;
-  const eaveTilt = Math.PI / 6; // 30°
-  const cornerY = ridgeHeight * 0.05;
+  const eaveLen = Math.min(width, depth) * 0.25; // 更长更显眼
+  const eaveR = eaveLen * 0.18;                  // 略粗
+  const eaveTilt = Math.PI / 4;                  // 45° 倾斜
   const cornerOffsetX = width / 2;
   const cornerOffsetZ = depth / 2;
 
+  // yawRad: 把 +z 方向 (cone 倾斜后尖端外伸方向) 旋转到对应角的对角线方向
   const eaveConfigs: Array<[number, number, number]> = [
-    [cornerOffsetX, cornerOffsetZ, -Math.PI / 4],      // +x +z
-    [-cornerOffsetX, cornerOffsetZ, Math.PI / 4],      // -x +z
-    [cornerOffsetX, -cornerOffsetZ, -3 * Math.PI / 4], // +x -z
-    [-cornerOffsetX, -cornerOffsetZ, 3 * Math.PI / 4], // -x -z
+    [cornerOffsetX, cornerOffsetZ, Math.PI / 4],         // +x +z 角, 尖端朝 (+x,+z)
+    [-cornerOffsetX, cornerOffsetZ, -Math.PI / 4],       // -x +z 角, 尖端朝 (-x,+z)
+    [cornerOffsetX, -cornerOffsetZ, 3 * Math.PI / 4],    // +x -z 角, 尖端朝 (+x,-z)
+    [-cornerOffsetX, -cornerOffsetZ, -3 * Math.PI / 4],  // -x -z 角, 尖端朝 (-x,-z)
   ];
 
   for (const [cx, cz, yawRad] of eaveConfigs) {
-    const eave = new THREE.ConeGeometry(eaveLen * 0.25, eaveLen, 4);
-    // 默认 cone +y 方向: 先倾斜 30° 让尖端向上向外 (绕 z 轴), 再绕 y 转到对应角
-    eave.rotateZ(eaveTilt);
+    const eave = new THREE.ConeGeometry(eaveR, eaveLen, 4);
+    // 1) 把 base 移到 y=0 (默认 base 在 y=-eaveLen/2)
+    eave.translate(0, eaveLen / 2, 0);
+    // 2) 沿 x 轴向 +z 方向倾倒 45° (apex 朝 +z 上方)
+    eave.rotateX(-eaveTilt);
+    // 3) 绕 y 转到对应角的对角线 yaw
     eave.rotateY(yawRad);
-    eave.translate(cx, cornerY + eaveLen * 0.4, cz);
+    // 4) 平移到屋顶底部 4 角; 略略上抬一点点避免与水平檐口板穿模
+    eave.translate(cx, ridgeHeight * 0.02, cz);
     eaveGeoms.push(eave);
   }
 
@@ -388,7 +405,10 @@ export function buildRammedEarthWall(
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * 多层塔: 每层方形 box + hipRoof + 飞檐; 顶部塔刹 (cone + 球).
+ * 多层塔: 每层方形墙体 + 水平檐口 (出挑薄板); 顶层用完整歇山顶; 塔刹 (cone + 球).
+ *
+ * 中国塔的真正几何: 中间层之间用**水平檐口**分隔, 不是歇山顶.
+ * 只有最顶层才用完整 hipRoof 作为塔的"顶冠".
  *
  * @param levels    层数 (3-7)
  * @param baseSize  底层边长
@@ -398,34 +418,57 @@ export function buildPagoda(levels: number, baseSize: number): THREE.Group {
   group.name = `pagoda_${levels}level`;
 
   const clampedLevels = Math.max(3, Math.min(7, Math.floor(levels)));
-  const levelHeight = baseSize * 0.55;
-  const shrink = 0.85; // 每层缩小比例
+  const levelHeight = baseSize * 0.65;     // 每层墙体高
+  const eaveThick = levelHeight * 0.08;    // 檐口板厚
+  const eaveOverhang = 1.4;                // 檐口宽 / 墙宽 比例 (出挑 40%)
+  const shrink = 0.88;                     // 每层缩小比例
 
   let currentY = 0;
   let currentSize = baseSize;
 
   for (let i = 0; i < clampedLevels; i++) {
-    // 层身 (zhuHong 朱红)
+    // 1. 层身 (zhuHong 朱红 墙体)
     const bodyGeom = new THREE.BoxGeometry(currentSize, levelHeight, currentSize);
     bodyGeom.translate(0, currentY + levelHeight / 2, 0);
     const bodyMesh = new THREE.Mesh(bodyGeom, lambert(TANG_PALETTE.zhuHong));
     bodyMesh.name = `pagoda_body_${i}`;
     group.add(bodyMesh);
 
-    // 层顶 (mini hipRoof — 简化为薄片 + 飞檐)
-    const roofHeight = levelHeight * 0.35;
-    const roof = buildHipRoof(currentSize * 1.25, currentSize * 1.25, roofHeight);
-    roof.position.y = currentY + levelHeight;
-    roof.name = `pagoda_roof_${i}`;
-    group.add(roof);
+    currentY += levelHeight;
 
-    currentY += levelHeight + roofHeight + levelHeight * 0.05;
+    // 2. 顶层用完整歇山顶, 中间层用水平檐口
+    if (i === clampedLevels - 1) {
+      const topRoofH = levelHeight * 0.6;
+      const topRoof = buildHipRoof(
+        currentSize * eaveOverhang,
+        currentSize * eaveOverhang,
+        topRoofH,
+      );
+      topRoof.position.y = currentY;
+      topRoof.name = "pagoda_topRoof";
+      group.add(topRoof);
+      currentY += topRoofH + eaveThick;
+      break;
+    }
+
+    // 中间层: 纯水平檐口 (daiHei 黛黑瓦, 向四周出挑)
+    const eaveGeom = new THREE.BoxGeometry(
+      currentSize * eaveOverhang,
+      eaveThick,
+      currentSize * eaveOverhang,
+    );
+    eaveGeom.translate(0, currentY + eaveThick / 2, 0);
+    const eaveMesh = new THREE.Mesh(eaveGeom, lambert(TANG_PALETTE.daiHei));
+    eaveMesh.name = `pagoda_eave_${i}`;
+    group.add(eaveMesh);
+
+    currentY += eaveThick + levelHeight * 0.04; // 小间隔
     currentSize *= shrink;
   }
 
-  // ── 塔刹 (高 cone + 小球) ──
+  // 3. 塔刹 (高 cone + 小球) — 立在最顶层 hipRoof 之上
   const finialParts: THREE.BufferGeometry[] = [];
-  const spireH = baseSize * 0.6;
+  const spireH = baseSize * 0.7;
   const spire = new THREE.ConeGeometry(currentSize * 0.18, spireH, 8);
   spire.translate(0, currentY + spireH / 2, 0);
   finialParts.push(spire);

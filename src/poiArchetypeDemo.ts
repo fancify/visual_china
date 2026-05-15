@@ -86,6 +86,7 @@ labelLayer.style.width = "100%";
 labelLayer.style.height = "100%";
 labelLayer.style.pointerEvents = "none";
 labelLayer.style.fontFamily = "'PingFang SC', 'Helvetica Neue', sans-serif";
+labelLayer.style.zIndex = "10";
 document.body.appendChild(labelLayer);
 
 const labelMeta: Array<{ el: HTMLElement; pos: Vector3 }> = [];
@@ -104,14 +105,17 @@ entries.forEach((entry, idx) => {
   // Label
   const label = document.createElement("div");
   label.style.position = "absolute";
-  label.style.transform = "translate(-50%, 0)";
-  label.style.padding = "4px 10px";
-  label.style.background = "rgba(40, 30, 25, 0.75)";
+  label.style.transform = "translate(-50%, -50%)";
+  label.style.padding = "5px 12px";
+  label.style.background = "rgba(20, 15, 10, 0.85)";
   label.style.color = "#f4e4c1";
+  label.style.border = "1px solid rgba(244, 228, 193, 0.4)";
   label.style.borderRadius = "3px";
-  label.style.fontSize = "13px";
+  label.style.fontSize = "14px";
+  label.style.fontWeight = "500";
   label.style.whiteSpace = "nowrap";
   label.style.letterSpacing = "0.05em";
+  label.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
 
   // 显示文本: archetype + variant/size (中文友好)
   const labelText = formatLabel(entry);
@@ -120,7 +124,7 @@ entries.forEach((entry, idx) => {
 
   labelMeta.push({
     el: label,
-    pos: new Vector3(x, -0.2, z + cellSize * 0.4), // 模型下方稍前
+    pos: new Vector3(x, 9, z), // 模型上方 (浮空)
   });
 });
 
