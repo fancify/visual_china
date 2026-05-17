@@ -45,7 +45,8 @@ export const DEFAULT_BINDINGS: Binding[] = [
   { action: "ui.dismiss",          code: "Escape", emit: "click", note: "关最上层 / 退锁定" },
 
   // ── Debug ──────────────────────────────────────────────────────────
-  { action: "debug.togglePanel",   code: "Backquote", emit: "click", note: "唤起 debug 面板" }
+  { action: "debug.togglePanel",   code: "Backquote", emit: "click", note: "唤起 debug 面板" },
+  { action: "debug.togglePanel",   code: "Tab",       emit: "click", note: "唤起 debug 面板（备用键）" }
 ];
 
 /** 给现有 characterInputFromKeySet 用的 action → key 字符串映射。 */
