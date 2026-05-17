@@ -124,9 +124,15 @@ function computeCoastProximityArray(
   return proximity;
 }
 
-// 地形调色板：从 terrainStyle.ts 动态读取当前风格
-// 支持运行时切换 (qinglu / ink / botw / lowpoly)，切换后调 refreshVertexColors 即可
-import { getTerrainPalette } from "./terrainStyle.js";
+// Low-poly 策略地图风调色板（硬编码，无运行时切换开销）
+const COLOR_LOW_GREEN = new Color(0.58, 0.72, 0.38);     // 暖黄绿草原
+const COLOR_MID_WARM = new Color(0.72, 0.66, 0.40);      // 金黄丘陵
+const COLOR_HIGH_STONE = new Color(0.62, 0.52, 0.36);    // 赭金山岩
+const COLOR_SNOW = new Color(0.95, 0.94, 0.90);          // 暖白雪顶
+const COLOR_STEEP = new Color(0.50, 0.42, 0.30);         // 深褐陡坡
+const COLOR_BEACH = new Color(0.85, 0.78, 0.55);         // 金沙滩
+const COLOR_COASTAL_CLIFF = new Color(0.65, 0.55, 0.40); // 沙岩断崖
+const COLOR_COASTAL_GRASS = new Color(0.55, 0.68, 0.38); // 海岸草甸
 
 // 海岸 tint 适用的 worldY 上限。VERTICAL_SCALE=500 / EXAG=1.07 → 1 worldY ≈ 467m elev。
 // 0.18 worldY ≈ 85m 海拔；覆盖中国沿海平原 (渤海/长江/珠江口都在此带内)。
@@ -139,21 +145,20 @@ function colorForVertex(
   ny: number,
   coastProximity: number = 0
 ): void {
-  const p = getTerrainPalette();
   const slopeT = Math.max(0, Math.min(1, (1 - ny) * 2.2));
   const elevT = Math.max(0, Math.min(1, y / 18));
   const snowT = Math.max(0, Math.min(1, (y - 7.4) / 2.8));
   if (snowT >= 1) {
-    out.copy(p.snow);
+    out.copy(COLOR_SNOW);
   } else if (elevT < 0.35) {
-    out.copy(p.lowGreen).lerp(p.midWarm, elevT / 0.35);
+    out.copy(COLOR_LOW_GREEN).lerp(COLOR_MID_WARM, elevT / 0.35);
   } else if (elevT < 0.75) {
-    out.copy(p.midWarm).lerp(p.highStone, (elevT - 0.35) / 0.4);
+    out.copy(COLOR_MID_WARM).lerp(COLOR_HIGH_STONE, (elevT - 0.35) / 0.4);
   } else {
-    out.copy(p.highStone);
+    out.copy(COLOR_HIGH_STONE);
   }
-  out.lerp(p.snow, snowT * 0.9);
-  out.lerp(p.steep, slopeT * 0.55);
+  out.lerp(COLOR_SNOW, snowT * 0.9);
+  out.lerp(COLOR_STEEP, slopeT * 0.55);
 
   // 海岸 tint —— 只在低海拔 + 接近 land mask 边缘的 vertex 上施加。
   if (coastProximity > 0 && y < COAST_BAND_WORLD_Y_MAX) {
@@ -161,16 +166,16 @@ function colorForVertex(
     const tintStrength = elevFactor * coastProximity;
     let coastCol: Color;
     if (ny > 0.92) {
-      coastCol = p.beach;
+      coastCol = COLOR_BEACH;
     } else if (ny < 0.65) {
-      coastCol = p.coastalCliff;
+      coastCol = COLOR_COASTAL_CLIFF;
     } else {
       if (ny > 0.78) {
         const t = (0.92 - ny) / (0.92 - 0.78);
-        coastCol = new Color().copy(p.beach).lerp(p.coastalGrass, t);
+        coastCol = new Color().copy(COLOR_BEACH).lerp(COLOR_COASTAL_GRASS, t);
       } else {
         const t = (0.78 - ny) / (0.78 - 0.65);
-        coastCol = new Color().copy(p.coastalGrass).lerp(p.coastalCliff, t);
+        coastCol = new Color().copy(COLOR_COASTAL_GRASS).lerp(COLOR_COASTAL_CLIFF, t);
       }
     }
     out.lerp(coastCol, tintStrength * 0.35);

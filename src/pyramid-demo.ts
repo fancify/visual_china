@@ -41,7 +41,7 @@ import {
   pyramidEnvironmentStatus
 } from "./game/pyramidEnvironmentRuntime.js";
 import { WindManager } from "./game/windManager.js";
-import { setTerrainStyle, getTerrainPalette } from "./game/terrain/terrainStyle.js";
+// lowpoly 风格硬编码，不再动态切换
 import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
   qinlingRegionBounds,
@@ -156,10 +156,10 @@ function hidePreload(): void {
 }
 
 const scene = new Scene();
-// 从当前 terrain style 读取初始 fog/background
-const _initPalette = getTerrainPalette();
-scene.background = _initPalette.fogColor;
-scene.fog = new Fog(_initPalette.fogColor, _initPalette.fogNear, _initPalette.fogFar);
+// Low-poly 策略地图风：淡蓝天空雾
+const LOWPOLY_FOG = new Color(0xb8d4e8);
+scene.background = LOWPOLY_FOG;
+scene.fog = new Fog(LOWPOLY_FOG, 300, 1100);
 
 // 起始位置: 唐 755 长安。
 const CHANGAN_START_GEO = { lat: 34.27, lon: 108.95 };
@@ -398,8 +398,8 @@ const handle = await bootstrapPyramidTerrain(scene, {
 // character demo. At Beijing start this cuts the active terrain set from about
 // 155 chunks to about 94 without reintroducing missing-tile holes.
 handle.setLodBands([60, 120, 180]);
-// 初始 terrain style 的 flat shading
-if (_initPalette.flatShading) handle.setFlatShading(true);
+// Low-poly: 开启 flat shading
+handle.setFlatShading(true);
 
 const terrainManifest = await handle.loader.loadManifest();
 
@@ -490,9 +490,9 @@ const oceanPlane = createOceanPlane({ seaLevelY: -3 });
 scene.add(oceanPlane);
 oceanWaterSurface = oceanPlane.userData.waterSurface as typeof oceanWaterSurface;
 oceanWaterSurface?.setSunDirection(sun.position.clone());
-// 初始 water palette
-oceanWaterSurface?.setBaseColor?.(_initPalette.water.oceanColor);
-oceanWaterSurface?.setOpacity?.(_initPalette.water.oceanOpacity);
+// Low-poly: 深海蓝
+oceanWaterSurface?.setBaseColor?.(new Color(0x2a6a90));
+oceanWaterSurface?.setOpacity?.(0.92);
 
 // lakes (Natural Earth 10m, 186 China lakes) — flat polygon meshes, Y 跟随 sampler
 // 查 terrain 海拔 (青海湖 ~6.8u, 鄱阳湖 ~0.03u). Sampler 未加载的 chunk fallback 海平面.
@@ -559,41 +559,6 @@ const debugPanel = createDebugPanel({
   },
   onBeachTintToggle(active) {
     handle.setBeachTint(active);
-  },
-  onTerrainStyleChange(style) {
-    const p = setTerrainStyle(style);
-    // 地形 vertex colors
-    handle.refreshAllColors();
-    // fog + background
-    scene.background = p.fogColor;
-    (scene.fog as Fog).color.copy(p.fogColor);
-    (scene.fog as Fog).near = p.fogNear;
-    (scene.fog as Fog).far = p.fogFar;
-    // flat shading（lowpoly 自动开）
-    handle.setFlatShading(p.flatShading);
-    debugPanel.setFlatShading(p.flatShading);
-    // 水体颜色
-    const w = p.water;
-    oceanWaterSurface?.setBaseColor?.(w.oceanColor);
-    oceanWaterSurface?.setOpacity?.(w.oceanOpacity);
-    // 湖泊
-    const lakeWS = lakeHandle.group.userData.waterSurface as
-      { setBaseColor?(c: Color): void; setOpacity?(o: number): void } | undefined;
-    lakeWS?.setBaseColor?.(w.lakeColor);
-    lakeWS?.setOpacity?.(w.lakeOpacity);
-    // 河流（LineMaterial.color + userData.waterBaseColor）
-    for (const rh of loadedRiverGroups.values()) {
-      if (!rh?.group) continue;
-      rh.group.traverse((obj: import("three").Object3D) => {
-        const mat = (obj as any).material as import("three/examples/jsm/lines/LineMaterial.js").LineMaterial | undefined;
-        if (!mat?.userData?.waterBaseColor) return;
-        (mat.userData.waterBaseColor as Color).copy(w.riverColor);
-        mat.userData.waterBaseOpacity = w.riverOpacity;
-        mat.color.copy(w.riverColor);
-        mat.opacity = w.riverOpacity;
-        mat.needsUpdate = true;
-      });
-    }
   },
   onGroundOffsetChange(v) {
     characterMountOffsets.ground = v;
