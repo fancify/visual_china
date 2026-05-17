@@ -127,7 +127,7 @@ const MAX_GRID_COLUMNS = 8192;
 const MAX_GRID_ROWS = 8192;
 const MAX_TOTAL_CELLS = 32 * 1024 * 1024;
 
-// 千里江山图风格垂直夸张系数。在 sampleHeight 里统一应用，让 mesh、
+// 长安三万里风格垂直夸张系数。在 sampleHeight 里统一应用，让 mesh、
 // player.y、scenery、label 全部一致使用夸张后的高度，避免漂浮 / 下沉。
 // 用户："地形夸张再高一倍"。1.6 → 3.2，山形比 1:1 真实拔高 220%。
 // 用户："夸张程度再少一半"。2.13 / 2 ≈ 1.07，接近原始高度（无夸张）。

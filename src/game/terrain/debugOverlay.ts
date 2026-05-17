@@ -30,32 +30,6 @@ import {
 import type { PyramidManifest } from "./pyramidTypes.js";
 import { POI_REGISTRY, type PoiEntry } from "../../data/poiRegistry.generated.js";
 
-// Tang 中文 label 字典 — 跟 minimap.ts POI_LABELS 保持同步.
-// (考虑未来抽到 src/data/poiLabels.ts 单源, 现在双处先 OK)
-const POI_LABEL_DICT: Record<string, string> = {
-  changan: "长安",
-  luoyang: "洛阳",
-  yangzhou: "扬州",
-  taiyuan: "太原",
-  youzhou: "幽州",
-  yizhou: "益州",
-  liangzhou: "凉州",
-  lingwu: "灵武",
-  shanzhou: "鄯州",
-  huashan: "华山",
-  songshan: "嵩山",
-  taishan: "泰山",
-  taibaishan: "太白山",
-  lushan: "庐山",
-  "zhongnan-shan": "终南山",
-  "baima-si": "白马寺",
-  "famen-si": "法门寺",
-  "longmen-shiku": "龙门石窟",
-  "mogao-caves": "莫高窟",
-  "wangchuan-bieye": "辋川别业",
-  "xingjiao-si": "兴教寺"
-};
-
 const POI_COLOR_BY_CATEGORY: Record<string, number> = {
   city: 0xff5050,      // 红
   relic: 0xffaa50,     // 橙
@@ -68,7 +42,7 @@ function poiColor(poi: PoiEntry): number {
 }
 
 function poiLabel(poi: PoiEntry): string {
-  return POI_LABEL_DICT[poi.id] ?? poi.id;
+  return poi.name || poi.id;
 }
 
 const STAKE_HEIGHT = 60;

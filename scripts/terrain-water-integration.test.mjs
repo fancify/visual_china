@@ -57,8 +57,9 @@ test("ocean, river, and lake renderers use distinct water palettes", () => {
       }
     ]
   });
-  assert.equal(group.children[0].material.color.getHex(), RIVER_WATER_COLOR.getHex());
-  assert.equal(group.children[0].material.opacity, RIVER_WATER_OPACITY);
+  const riverMaterial = group.children[0].material;
+  assert.equal(riverMaterial.uniforms.uBaseColor.value.getHex(), RIVER_WATER_COLOR.getHex());
+  assert.equal(riverMaterial.uniforms.uOpacity.value, RIVER_WATER_OPACITY);
   assert.notEqual(RIVER_WATER_COLOR.getHex(), OCEAN_WATER_COLOR.getHex());
   assert.notEqual(LAKE_WATER_COLOR.getHex(), OCEAN_WATER_COLOR.getHex());
   assert.ok(RIVER_WATER_OPACITY < LAKE_WATER_OPACITY);
@@ -120,11 +121,66 @@ test("water surfaces expose subtle shimmer timing without changing base water st
     ]
   });
   const material = group.children[0].material;
-  const baseColor = material.color.getHex();
+  assert.equal(material.uniforms.uTime.value, 0, "shader uTime should start at 0");
   updateRiverGroupShimmer(group, 4);
-  assert.notEqual(material.color.getHex(), baseColor);
-  assert.ok(material.opacity >= RIVER_WATER_OPACITY * 0.96);
-  assert.ok(material.opacity <= RIVER_WATER_OPACITY);
+  assert.equal(material.uniforms.uTime.value, 4, "updateRiverGroupShimmer drives shader uTime uniform");
+  // 旧版用 JS 突变 .color/.opacity 模拟闪烁；新版闪烁完全在 fragment shader (sin FBM),
+  // JS 端只送 uTime + 保留 base color/opacity 不动.
+  assert.equal(material.uniforms.uBaseColor.value.getHex(), RIVER_WATER_COLOR.getHex());
+  assert.equal(material.uniforms.uOpacity.value, RIVER_WATER_OPACITY);
+});
+
+test("river renderer exposes per-order ribbon meshes for pyramid demo LOD filtering", () => {
+  const loader = new RiverLoader({ sampler });
+  const group = loader.buildRiverGroup({
+    schemaVersion: "visual-china.rivers-chunk.v1",
+    chunkX: 0,
+    chunkZ: 0,
+    bounds: { west: 120, east: 121, south: 30, north: 31 },
+    polylineCount: 4,
+    polylines: [
+      {
+        id: "below-threshold",
+        ord: 3,
+        coords: [[120.05, 30.1], [120.1, 30.15]]
+      },
+      {
+        id: "minor",
+        ord: 4,
+        coords: [[120.1, 30.1], [120.2, 30.2]]
+      },
+      {
+        id: "middle",
+        ord: 6,
+        coords: [[120.2, 30.1], [120.3, 30.2]]
+      },
+      {
+        id: "major",
+        ord: 8,
+        coords: [[120.3, 30.1], [120.4, 30.2]]
+      }
+    ]
+  });
+
+  const names = group.children.map((child) => child.name);
+  assert.deepEqual(names, ["rivers-ord-4", "rivers-ord-6", "rivers-ord-8"]);
+  assert.ok(group.children.every((child) => child.name.match(/rivers-ord-(\d+)/)));
+
+  const minRiverOrd = 6;
+  for (const child of group.children) {
+    const m = child.name.match(/rivers-ord-(\d+)/);
+    if (m) child.visible = Number(m[1]) >= minRiverOrd;
+  }
+
+  assert.deepEqual(
+    group.children.map((child) => [child.name, child.visible]),
+    [
+      ["rivers-ord-4", false],
+      ["rivers-ord-6", true],
+      ["rivers-ord-8", true]
+    ]
+  );
+  assert.ok(group.children.every((child) => child.material.uniforms.uTime));
 });
 
 test("ocean plane is wide and fog-aware for an infinite sea horizon", () => {
@@ -234,16 +290,26 @@ test("river renderer clips line segments outside land and inside lakes", () => {
     ]
   });
 
-  const positions = Array.from(group.children[0].geometry.attributes.instanceStart.array);
-  assert.ok(positions.length > 0);
+  // Ribbon mesh: 每点 2 顶点 (L/R), position 是 BufferGeometry.attributes.position (xyz triplets)
+  const positions = Array.from(group.children[0].geometry.attributes.position.array);
+  assert.ok(positions.length > 0, "clipped ribbon should still emit at least one valid run");
+  // 所有顶点 x 在合理范围
   for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i];
-    assert.ok(Number.isFinite(x));
+    assert.ok(Number.isFinite(positions[i]));
   }
-  assert.ok(
-    group.children[0].geometry.attributes.instanceStart.count < 15,
-    "clipped rivers should emit fewer line segments than the full smoothed line"
-  );
+  // 所有顶点 lon 必须 < 120.7 (landMask 阈值), 且不能落在 lake [120.25, 120.45] 内
+  for (let i = 0; i < positions.length; i += 3) {
+    const geo = unprojectWorldToGeo(
+      { x: positions[i], z: positions[i + 2] },
+      qinlingRegionBounds,
+      qinlingRegionWorld
+    );
+    assert.ok(geo.lon < 120.71, `vertex at lon=${geo.lon} should be on land`);
+    assert.ok(
+      geo.lon < 120.26 || geo.lon > 120.44,
+      `vertex at lon=${geo.lon} should not be inside lake [120.25, 120.45]`
+    );
+  }
 });
 
 test("river renderer clips river mouths to the coastline instead of dropping the outlet segment", () => {
@@ -270,13 +336,12 @@ test("river renderer clips river mouths to the coastline instead of dropping the
     ]
   });
 
-  const starts = Array.from(group.children[0].geometry.attributes.instanceStart.array);
-  const ends = Array.from(group.children[0].geometry.attributes.instanceEnd.array);
-  const emitted = [...starts, ...ends];
+  // Ribbon: read all vertex positions, compute lon for each, check max ≈ shore (120.5)
+  const positions = Array.from(group.children[0].geometry.attributes.position.array);
   const lons = [];
-  for (let i = 0; i < emitted.length; i += 3) {
+  for (let i = 0; i < positions.length; i += 3) {
     const geo = unprojectWorldToGeo(
-      { x: emitted[i], z: emitted[i + 2] },
+      { x: positions[i], z: positions[i + 2] },
       qinlingRegionBounds,
       qinlingRegionWorld
     );
@@ -311,9 +376,13 @@ test("river loader builds a spatial candidate index instead of scanning the mani
 });
 
 test("river renderer samples cached terrain height without prefetching DEM chunks", () => {
-  const source = fs.readFileSync(new URL("../src/game/terrain/riverRenderer.ts", import.meta.url), "utf8");
-  assert.match(source, /sampleHeightWorldCached/);
-  assert.doesNotMatch(source, /sampler\.sampleHeightWorld\(/);
+  // sampler 调用在 ribbon builder 里 (riverRenderer 现在只编排, 不直接 sample)
+  const builder = fs.readFileSync(new URL("../src/game/terrain/riverRibbonMesh.ts", import.meta.url), "utf8");
+  assert.match(builder, /sampleHeightWorldCached/);
+  assert.doesNotMatch(builder, /sampler\.sampleHeightWorld\(/);
+  // riverRenderer 自身不该再做未缓存的 sampleHeight 调用
+  const renderer = fs.readFileSync(new URL("../src/game/terrain/riverRenderer.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(renderer, /sampler\.sampleHeightWorld\(/);
 });
 
 test("pyramid demo evicts river groups outside the active candidate radius", () => {
@@ -340,7 +409,7 @@ test("pyramid demo preload screen stages terrain and water before entering", () 
 
   assert.match(html, /id="preload"/);
   assert.doesNotMatch(html, /preload-title/);
-  assert.doesNotMatch(html, /千里江山正在展开/);
+  assert.doesNotMatch(html, /长安三万里正在展开/);
   assert.match(html, /body \{[\s\S]*background: #c7d5e3/);
   assert.match(html, /#canvas \{[\s\S]*background: #c7d5e3/);
   assert.match(html, /rgba\(246, 249, 244, 0\.58\)/);
@@ -422,11 +491,11 @@ test("pyramid demo wires debug toggles + wheel zoom through InputManager", () =>
   assert.match(source, /playerInput\.right = false/);
 });
 
-test("pyramid demo starts above Beijing at roughly 10km altitude", () => {
+test("pyramid demo starts at Tang Chang'an in close follow view", () => {
   const source = fs.readFileSync(new URL("../src/pyramid-demo.ts", import.meta.url), "utf8");
-  assert.match(source, /BEIJING_START_GEO\s*=\s*\{\s*lat:\s*39\.9042,\s*lon:\s*116\.4074\s*\}/);
-  assert.match(source, /START_ALTITUDE_WORLD_Y\s*=\s*21\.4/);
-  assert.match(source, /camera\.position\.set\(startWorld\.x,\s*START_ALTITUDE_WORLD_Y,\s*startWorld\.z\)/);
+  assert.match(source, /CHANGAN_START_GEO\s*=\s*\{\s*lat:\s*34\.27,\s*lon:\s*108\.95\s*\}/);
+  assert.match(source, /CLOSE_CAMERA_DISTANCE\s*=\s*3\.2/);
+  assert.match(source, /camera\.position\.set\(startWorld\.x,\s*1\.6,\s*startWorld\.z\)/);
 });
 
 test("pyramid demo does not expose temporary globals after terrain seam debugging", () => {

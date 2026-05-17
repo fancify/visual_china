@@ -156,7 +156,7 @@ function buildWalkingAvatarLegRig(avatar: Group): Map<string, Mesh> {
     leg.position.set(0.02, 0.1, spec.z);
     leg.rotation.set(0, 0, spec.baseRotation);
     // 腿短化：原 1.55 拉长到接近成人比例，用户偏好"chibi 短腿"卡通感，
-    // 降到 0.78（约一半），剪影更接近 千里江山图 风格的小人。
+    // 降到 0.78（约一半），剪影更接近 长安三万里 风格的小人。
     leg.scale.set(1, 0.78, 1);
     avatarLegsByName.set(spec.name, leg);
   });

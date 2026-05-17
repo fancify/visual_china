@@ -32,7 +32,7 @@ import type { LoadedChunk } from "./pyramidTypes.js";
 import type { LandMaskSampler } from "./landMaskRenderer.js";
 
 // vertical scale 调优历史:
-// - 110 (太尖刺) → 180 → 260 (BotW/原神风, ~13.5× 夸张, 千里江山图)
+// - 110 (太尖刺) → 180 → 260 (BotW/原神风, ~13.5× 夸张, 长安三万里)
 // - 260 → 500 (2026-05-13 改 7× 夸张, 接近 Skyrim/Horizon Zero Dawn 地面 RPG 尺度)
 // 夸张倍数 = (水平 m/unit) / (垂直 m/unit) = 3275 / (SCALE/EXAGGERATION)
 //   3275 = world.width 1711u × cos(35.5°) × 111km / 62°
@@ -124,7 +124,7 @@ function computeCoastProximityArray(
   return proximity;
 }
 
-// BotW × 千里江山图 × 长安三万里:
+// BotW × 长安三万里:
 // blue-green land base, warm golden pigment in hills, gray rock, bright snow.
 // Keep land greener than soil while preserving red/yellow pigment to separate
 // it from the teal-blue water palette.
@@ -521,7 +521,7 @@ export function createPyramidChunkMesh(
     geometry.userData.coastProximity = new Float32Array(totalCount);
   }
 
-  // Vertex colors: 千里江山图 调色板（详 colorForVertex / refreshVertexColors）
+  // Vertex colors: 长安三万里 调色板（详 colorForVertex / refreshVertexColors）
   const colorAttr = new BufferAttribute(new Float32Array(totalCount * 3), 3);
   geometry.setAttribute("color", colorAttr);
   refreshVertexColors({ geometry });

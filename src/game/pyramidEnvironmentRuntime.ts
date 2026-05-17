@@ -113,10 +113,10 @@ export function applyPyramidEnvironmentRuntime(
   sunLight.intensity = visuals.sunIntensity * 0.46;
   sunLight.position.copy(visuals.sunDirection);
   moonLight.color.copy(visuals.moonColor);
-  moonLight.intensity = visuals.moonOpacity * 0.34;
+  moonLight.intensity = visuals.moonOpacity * 0.42;
   moonLight.position.copy(visuals.moonDirection);
   rimLight.color.copy(visuals.rimColor);
-  rimLight.intensity = visuals.rimIntensity * 0.28;
+  rimLight.intensity = visuals.rimIntensity * 0.34;
 
   renderer.setClearColor(visuals.skyColor);
   skyDome.group.position.copy(cameraPosition);

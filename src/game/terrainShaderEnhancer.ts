@@ -292,7 +292,7 @@ export function attachTerrainShaderEnhancements(
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <output_fragment>",
       /* glsl */ `
-        // ===== 千里江山图 terrain shader 增强 =====
+        // ===== 长安三万里 terrain shader 增强 =====
         // 1. 低频 noise，打破纯色块感
         float ttn = th_noise(vWorldPosition.xz * uNoiseFrequency);
         outgoingLight += ttn * uNoiseStrength * vec3(0.42, 0.45, 0.32);

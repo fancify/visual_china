@@ -106,7 +106,7 @@ export function createTerrainMesh(sampler: TerrainSampler): TerrainMeshHandle {
   const material = new MeshPhongMaterial({
     vertexColors: true,
     // 2026-05-11: flatShading true → false (smoothShading)。用户反复 "陷入大三角"
-    // 反馈 + 千里江山图 风格目标。每三角面共享法线让山形平滑，符合 山水画 silhouette。
+    // 反馈 + 长安三万里 风格目标。每三角面共享法线让山形平滑，符合 山水画 silhouette。
     flatShading: false,
     shininess: 8,
     transparent: true,

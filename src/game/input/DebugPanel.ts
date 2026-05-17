@@ -22,7 +22,18 @@ export interface DebugPanelHandlers {
   /** 角色自发光强度（夜里最低可视度） */
   onCharacterEmissiveChange?: (value: number) => void;
   initialCharacterEmissive?: number;
-  getStats?: () => { fps: number; chunks: number; timeOfDay: number; weather: Weather; season: Season };
+  getStats?: () => {
+    fps: number;
+    chunks: number;
+    timeOfDay: number;
+    weather: Weather;
+    season: Season;
+    player?: string;
+    playerWorld?: string;
+    cameraWorld?: string;
+    nearbyPoi?: string;
+    message?: string;
+  };
 }
 
 export interface DebugPanel {
@@ -134,6 +145,19 @@ function makeDropdown<T extends string>(label: string, options: T[], initial: T,
   return row;
 }
 
+function makeStatRow(label: string): { row: HTMLDivElement; value: HTMLSpanElement } {
+  const row = document.createElement("div");
+  row.style.cssText = ROW_STYLE;
+  const labelEl = document.createElement("span");
+  labelEl.style.cssText = LABEL_STYLE;
+  labelEl.textContent = label;
+  const value = document.createElement("span");
+  value.style.cssText = VALUE_STYLE + "text-align: right; overflow-wrap: anywhere;";
+  value.textContent = "—";
+  row.append(labelEl, value);
+  return { row, value };
+}
+
 export function createDebugPanel(handlers: DebugPanelHandlers): DebugPanel {
   const root = document.createElement("div");
   root.style.cssText = PANEL_STYLE;
@@ -201,22 +225,30 @@ export function createDebugPanel(handlers: DebugPanelHandlers): DebugPanel {
   statsHeader.textContent = "状态";
   root.append(statsHeader);
 
-  const fpsRow = document.createElement("div"); fpsRow.style.cssText = ROW_STYLE;
-  const fpsLabel = document.createElement("span"); fpsLabel.style.cssText = LABEL_STYLE; fpsLabel.textContent = "FPS";
-  const fpsValue = document.createElement("span"); fpsValue.style.cssText = VALUE_STYLE; fpsValue.textContent = "—";
-  fpsRow.append(fpsLabel, fpsValue);
+  const fps = makeStatRow("FPS");
+  const chunks = makeStatRow("Chunks");
+  const playerState = makeStatRow("玩家");
+  const playerWorld = makeStatRow("玩家坐标");
+  const cameraWorld = makeStatRow("相机坐标");
+  const environment = makeStatRow("环境");
+  const nearbyPoi = makeStatRow("附近 POI");
+  const message = makeStatRow("消息");
 
-  const chunkRow = document.createElement("div"); chunkRow.style.cssText = ROW_STYLE;
-  const chunkLabel = document.createElement("span"); chunkLabel.style.cssText = LABEL_STYLE; chunkLabel.textContent = "Chunks (loaded)";
-  const chunkValue = document.createElement("span"); chunkValue.style.cssText = VALUE_STYLE; chunkValue.textContent = "—";
-  chunkRow.append(chunkLabel, chunkValue);
-
-  root.append(fpsRow, chunkRow);
+  root.append(
+    fps.row,
+    chunks.row,
+    playerState.row,
+    playerWorld.row,
+    cameraWorld.row,
+    environment.row,
+    nearbyPoi.row,
+    message.row
+  );
 
   // ── Hint ───────────────────────────────────────────────────────
   const hint = document.createElement("div");
   hint.style.cssText = HINT_STYLE;
-  hint.innerHTML = "WASD 镜头相对移动 · 左/右键拖镜头<br/>Shift 加速 · Space/Ctrl 升降 · P 切坐骑<br/>F 复位镜头 · T/L/K 时间/季节/天气 · M 地图";
+  hint.innerHTML = "WASD 镜头相对移动 · 左/右键拖镜头<br/>Shift 加速 · Space/Ctrl 升降 · P 切坐骑<br/>F 复位镜头 · T/L/K 时间/季节/天气 · M 地图 · I POI";
   root.append(hint);
 
   document.body.append(root);
@@ -243,8 +275,14 @@ export function createDebugPanel(handlers: DebugPanelHandlers): DebugPanel {
     refreshStats() {
       const stats = handlers.getStats?.();
       if (!stats) return;
-      fpsValue.textContent = stats.fps.toFixed(0);
-      chunkValue.textContent = String(stats.chunks);
+      fps.value.textContent = stats.fps.toFixed(0);
+      chunks.value.textContent = String(stats.chunks);
+      playerState.value.textContent = stats.player ?? "—";
+      playerWorld.value.textContent = stats.playerWorld ?? "—";
+      cameraWorld.value.textContent = stats.cameraWorld ?? "—";
+      environment.value.textContent = `${stats.timeOfDay.toFixed(1)}h · ${stats.season} · ${stats.weather}`;
+      nearbyPoi.value.textContent = stats.nearbyPoi ?? "—";
+      message.value.textContent = stats.message ?? "—";
     },
     dispose() {
       root.remove();

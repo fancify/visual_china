@@ -254,6 +254,8 @@ test("sky dome materials use moon occlusion depth, directional horizon uniforms,
     const dome = atmosphereLayer.createSkyDome();
 
     assert.equal(dome.starDomeMaterial.depthTest, true);
+    assert.equal(dome.starDomeMaterial.sizeAttenuation, false);
+    assert.ok(dome.starDomeMaterial.size >= 2.2);
     assert.equal(dome.moonDiscMaterial.depthTest, true);
     assert.equal(dome.moonDiscMaterial.depthWrite, true);
     assert.deepEqual(

@@ -205,11 +205,8 @@ export function createCharacterController(
         position.x += forwardX * speed * dt;
         position.z += forwardZ * speed * dt;
       } else {
-        speed *= decel;
-        if (speed < 0.02) {
-          speed = 0;
-          mode = "idle";
-        }
+        speed = 0;
+        mode = "idle";
       }
 
       position.y = sampler.sampleSurfaceHeight(position.x, position.z);

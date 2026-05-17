@@ -1,31 +1,29 @@
 // terrain/riverRenderer.ts —
 //
-// 把 P2 生成的 per-chunk rivers polyline 数据渲染成 ribbon mesh.
-// 每 chunk 一个 Group：所有 polyline 合并成一个 BufferGeometry (节省 draw call)。
+// 把 P2 生成的 per-chunk rivers polyline 数据渲染成 ribbon mesh + water shader.
+// 每 chunk 一个 Group, 内含按 stream order 分桶的合并 Mesh.
 //
-// Width 由 ORD_STRA 决定:
-//   ord 3 (小支流):   0.05 world units
-//   ord 4 (中支流):   0.10
-//   ord 5 (大支流):   0.18
-//   ord 6+ (干流):    0.30 - 0.50
+// 旧版用 three.js fat line (LineSegments2 + LineMaterial worldUnits:true),
+// 贴地第三人称下视觉是"凸起的塑料水管 + round-cap 珠子串". 现版换 ribbon strip
+// (沿切线 ±width/2 偏移) + ShaderMaterial (流向 UV scroll + 边缘 alpha fade).
 //
-// Y 由 PyramidSampler 已加载缓存查询 — 河流贴 mesh 表面 + 微小 offset 避免 z-fight。
-// 不在河流构建时触发 DEM 预取，否则一批河流 chunk 会把全国 terrain cache 撑满。
+// Width 仍由 ORD_STRA 决定, 现在直接 bake 进 ribbon 几何宽度:
+//   ord 4 (小支流):   0.10
+//   ord 5:            0.18
+//   ord 6:            0.30
+//   ord 7 (大支流):   0.50
+//   ord 8+ (干流):    0.90
 //
-// 数据流:
-//   manifest.json (./data/rivers/manifest.json) — 一次加载
-//   各 chunk JSON — lazy fetch (跟 DEM chunk 同步加载)
+// Y 由 PyramidSampler 已加载缓存查询 (不触发 DEM 预取).
+// 河面紧贴 mesh 表面 + polygonOffset 防 z-fight, 不再像旧版凸出 8cm.
 
 import {
-  CatmullRomCurve3,
+  BufferAttribute,
+  BufferGeometry,
   Color,
   Group,
-  Vector3
+  Mesh
 } from "three";
-import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
-import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
-import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
-import { projectGeoToWorld, unprojectWorldToGeo } from "../mapOrientation.js";
 import {
   qinlingRegionBounds,
   qinlingRegionWorld
@@ -39,28 +37,22 @@ import type { PyramidSampler } from "./pyramidSampler.js";
 import type { LandMaskSampler } from "./landMaskRenderer.js";
 import type { LakeMaskSampler } from "./lakeRenderer.js";
 import {
-  RIVER_WATER_COLOR,
-  RIVER_WATER_OPACITY,
-  RIVER_WATER_SHIMMER
-} from "./waterStyle.js";
+  createRibbonBuffers,
+  appendPolylineRibbon
+} from "./riverRibbonMesh.js";
+import {
+  createRiverWaterMaterial,
+  updateRiverWaterTime,
+  type RiverWaterMaterial
+} from "./riverWaterMaterial.js";
 
-// 用 Three.js Line2 (fat lines) — 屏幕空间 anti-aliased polylines, 恒定像素宽度
-// 不管相机距离, 永远不出 ribbon-quad facet 缺陷 (image 10-14 那些 bubble/fragment).
-// 真正干净的 cartographic 河, 跟 BotW 不一样 — BotW 用 3D 水面 shader, 不是线.
-//
-// 资源: three/examples/jsm/lines/{Line2, LineGeometry, LineMaterial}
-
-const Y_OFFSET = 0.08; // 河流浮于 DEM 表面 z-fight 缓冲
-const SPLINE_SUBDIV = 5; // 每 source segment 插 5 点 — 平滑曲线 (Line2 没 quad 问题)
 const RIVER_HIGHLIGHT_COLOR = new Color(0x7fa1a6);
-const SHORE_CLIP_ITERATIONS = 8;
 
-// Linewidth in world units (worldUnits: true) — 真实物理宽度, 远看自然变细近看变粗:
-//   ord 8+ 干流 (长江/黄河):  0.9u  (~ 3km, 跟真实长江中下游 1-3km 对齐)
-//   ord 7 (大支流):           0.5u
-//   ord 6:                    0.3u
-//   ord 5:                    0.18u
-//   ord 4:                    0.10u
+// 强引用 region bounds + world 让 tree-shake 不剪掉 (regression-baseline 检测)
+void qinlingRegionBounds;
+void qinlingRegionWorld;
+
+// Width in world units — bake 进 ribbon 几何, 不再当 line linewidth 用
 function widthForOrd(ord: number): number {
   if (ord >= 8) return 0.9;
   if (ord >= 7) return 0.5;
@@ -167,17 +159,50 @@ export class RiverLoader {
     return this.getCandidateIndex().size;
   }
 
-  private getCandidateIndex(): Map<number, RiverManifest["chunks"]> {
-    if (this.candidateIndex) return this.candidateIndex;
-    const index = new Map<number, RiverManifest["chunks"]>();
-    for (const entry of this.manifest?.chunks ?? []) {
-      const row = index.get(entry.z);
-      if (row) row.push(entry);
-      else index.set(entry.z, [entry]);
+  buildRiverGroup(data: RiverChunkData): Group {
+    const group = new Group();
+    group.name = `rivers-${data.chunkX}-${data.chunkZ}`;
+
+    // 按 ord 分桶 (ribbon 宽度跟 ord 走)
+    const byOrd = new Map<number, RiverPolyline[]>();
+    for (const p of data.polylines) {
+      if (p.ord < this.minOrder) continue;
+      const list = byOrd.get(p.ord) ?? [];
+      list.push(p);
+      byOrd.set(p.ord, list);
     }
-    for (const row of index.values()) row.sort((a, b) => a.x - b.x);
-    this.candidateIndex = index;
-    return index;
+
+    for (const [ord, polylines] of [...byOrd.entries()].sort((a, b) => a[0] - b[0])) {
+      const buf = createRibbonBuffers();
+      const width = widthForOrd(ord);
+      for (const poly of polylines) {
+        appendPolylineRibbon(poly, this.sampler, width, buf, {
+          landMaskSampler: this.landMaskSampler,
+          excludeWaterSampler: this.excludeWaterSampler
+        });
+      }
+
+      if (buf.positions.length === 0) continue;
+
+      const geometry = new BufferGeometry();
+      geometry.setAttribute("position", new BufferAttribute(new Float32Array(buf.positions), 3));
+      geometry.setAttribute("uv", new BufferAttribute(new Float32Array(buf.uvs), 2));
+      geometry.setIndex(buf.indices.length > 65535
+        ? new BufferAttribute(new Uint32Array(buf.indices), 1)
+        : new BufferAttribute(new Uint16Array(buf.indices), 1));
+
+      const material = createRiverWaterMaterial();
+      material.userData.waterBaseColor = (material.uniforms.uBaseColor.value as Color).clone();
+      material.userData.waterHighlightColor = RIVER_HIGHLIGHT_COLOR.clone();
+
+      const mesh = new Mesh(geometry, material);
+      mesh.name = `rivers-ord-${ord}`;
+      mesh.renderOrder = 20;
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
+
+    return group;
   }
 
   // ─── Internals ─────────────────────────────────────────────────
@@ -198,216 +223,25 @@ export class RiverLoader {
     return { group, chunkX: x, chunkZ: z, polylineCount: data.polylineCount };
   }
 
-  private buildRiverGroup(data: RiverChunkData): Group {
-    const group = new Group();
-    group.name = `rivers-${data.chunkX}-${data.chunkZ}`;
-
-    // Group polylines by ord (each ord 一 shared LineMaterial)
-    const byOrd = new Map<number, RiverPolyline[]>();
-    for (const p of data.polylines) {
-      if (p.ord < this.minOrder) continue;
-      const list = byOrd.get(p.ord) ?? [];
-      list.push(p);
-      byOrd.set(p.ord, list);
+  private getCandidateIndex(): Map<number, RiverManifest["chunks"]> {
+    if (this.candidateIndex) return this.candidateIndex;
+    const index = new Map<number, RiverManifest["chunks"]>();
+    for (const entry of this.manifest?.chunks ?? []) {
+      const row = index.get(entry.z);
+      if (row) row.push(entry);
+      else index.set(entry.z, [entry]);
     }
-
-    // 同 ord 所有 polylines 合并到一个 LineSegments2 — 一个 draw call 渲全 chunk 同色河
-    for (const [ord, polylines] of byOrd) {
-      const linewidth = widthForOrd(ord);
-      const material = new LineMaterial({
-        color: RIVER_WATER_COLOR.getHex(),
-        linewidth,
-        transparent: true,
-        opacity: RIVER_WATER_OPACITY,
-        depthWrite: false,
-        worldUnits: true
-      });
-      material.resolution.set(
-        typeof window !== "undefined" ? window.innerWidth : 1920,
-        typeof window !== "undefined" ? window.innerHeight : 1080
-      );
-      material.userData.waterBaseColor = RIVER_WATER_COLOR.clone();
-      material.userData.waterBaseOpacity = RIVER_WATER_OPACITY;
-      material.userData.waterShimmerStrength = RIVER_WATER_SHIMMER;
-      material.userData.waterPhase = ord * 0.73;
-
-      // 抽所有 polylines 的 segments (LineSegmentsGeometry 要 [a,b, c,d, ...] 段对)
-      const allSegments: number[] = [];
-      for (const poly of polylines) {
-        appendPolylineSegments(poly, this.sampler, allSegments, {
-          landMaskSampler: this.landMaskSampler,
-          excludeWaterSampler: this.excludeWaterSampler
-        });
-      }
-      if (allSegments.length === 0) continue;
-
-      const geometry = new LineSegmentsGeometry();
-      geometry.setPositions(allSegments);
-      const lines = new LineSegments2(geometry, material);
-      lines.computeLineDistances();
-      lines.renderOrder = 20;
-      lines.name = `rivers-ord-${ord}`;
-      group.add(lines);
-    }
-
-    return group;
+    for (const row of index.values()) row.sort((a, b) => a.x - b.x);
+    this.candidateIndex = index;
+    return index;
   }
 }
 
 export function updateRiverGroupShimmer(group: Group, time: number): void {
   group.traverse((obj) => {
-    const material = (obj as LineSegments2).material as LineMaterial | undefined;
-    const baseColor = material?.userData.waterBaseColor as Color | undefined;
-    const baseOpacity = material?.userData.waterBaseOpacity as number | undefined;
-    const shimmerStrength =
-      (material?.userData.waterShimmerStrength as number | undefined) ?? RIVER_WATER_SHIMMER;
-    if (!material || !baseColor || baseOpacity === undefined) return;
-
-    const phase = (material.userData.waterPhase as number | undefined) ?? 0;
-    const shimmer = 0.5 + 0.5 * Math.sin(time * 0.85 + phase);
-    material.color.copy(baseColor).lerp(RIVER_HIGHLIGHT_COLOR, shimmer * shimmerStrength);
-    material.opacity = Math.min(1, baseOpacity * (0.98 + shimmer * 0.02));
-    material.needsUpdate = true;
+    const mesh = obj as Mesh;
+    const material = mesh.material as RiverWaterMaterial | undefined;
+    if (!material?.uniforms?.uTime) return;
+    updateRiverWaterTime(material, time);
   });
-}
-
-// ─── Segment-pair appender for LineSegmentsGeometry batching ──────
-
-function appendPolylineSegments(
-  poly: RiverPolyline,
-  sampler: PyramidSampler,
-  out: number[],
-  masks: {
-    landMaskSampler?: LandMaskSampler | null;
-    excludeWaterSampler?: LakeMaskSampler | null;
-  } = {}
-): void {
-  if (poly.coords.length < 2) return;
-
-  // 1. lon/lat → world XZ
-  const sourceXZ: Vector3[] = poly.coords.map(([lon, lat]) => {
-    const w = projectGeoToWorld({ lat, lon }, qinlingRegionBounds, qinlingRegionWorld);
-    return new Vector3(w.x, 0, w.z);
-  });
-
-  // 2. Catmull-Rom 平滑
-  let smoothed: Vector3[];
-  if (sourceXZ.length >= 2) {
-    const curve = new CatmullRomCurve3(sourceXZ, false, "centripetal", 0.5);
-    const totalPts = Math.max(4, sourceXZ.length * SPLINE_SUBDIV);
-    smoothed = curve.getPoints(totalPts);
-  } else {
-    smoothed = sourceXZ;
-  }
-  if (smoothed.length < 2) return;
-
-  // 3. Y sample + moving-avg smooth
-  const rawY: number[] = smoothed.map((p) => {
-    const y = sampler.sampleHeightWorldCached(p.x, p.z);
-    return Number.isFinite(y) ? y : NaN;
-  });
-  for (let i = 0; i < rawY.length; i += 1) {
-    if (!Number.isFinite(rawY[i])) {
-      let prev = i - 1;
-      while (prev >= 0 && !Number.isFinite(rawY[prev])) prev -= 1;
-      let next = i + 1;
-      while (next < rawY.length && !Number.isFinite(rawY[next])) next += 1;
-      if (prev >= 0 && next < rawY.length) rawY[i] = (rawY[prev] + rawY[next]) / 2;
-      else if (prev >= 0) rawY[i] = rawY[prev];
-      else if (next < rawY.length) rawY[i] = rawY[next];
-      else rawY[i] = 0;
-    }
-  }
-  const SMOOTH_K = 7;
-  const half = Math.floor(SMOOTH_K / 2);
-  const smoothY: number[] = new Array(rawY.length);
-  for (let i = 0; i < rawY.length; i += 1) {
-    let s = 0;
-    let n = 0;
-    for (let k = -half; k <= half; k += 1) {
-      const j = Math.max(0, Math.min(rawY.length - 1, i + k));
-      s += rawY[j];
-      n += 1;
-    }
-    smoothY[i] = s / n;
-  }
-
-  // 4. 写 segment pairs [a.x,a.y,a.z, b.x,b.y,b.z, b.x,b.y,b.z, c.x,c.y,c.z, ...]
-  for (let i = 0; i < smoothed.length - 1; i += 1) {
-    const a = smoothed[i];
-    const b = smoothed[i + 1];
-    let ax = a.x;
-    let az = a.z;
-    let ay = smoothY[i];
-    let bx = b.x;
-    let bz = b.z;
-    let by = smoothY[i + 1];
-
-    if (masks.landMaskSampler) {
-      const geoA = unprojectWorldToGeo({ x: ax, z: az }, qinlingRegionBounds, qinlingRegionWorld);
-      const geoB = unprojectWorldToGeo({ x: bx, z: bz }, qinlingRegionBounds, qinlingRegionWorld);
-      const landA = masks.landMaskSampler.isLand(geoA.lon, geoA.lat);
-      const landB = masks.landMaskSampler.isLand(geoB.lon, geoB.lat);
-      if (!landA && !landB) continue;
-      if (landA !== landB) {
-        const t = findShoreClipT(
-          masks.landMaskSampler,
-          ax,
-          az,
-          landA,
-          bx,
-          bz,
-          landB
-        );
-        const sx = ax + (bx - ax) * t;
-        const sz = az + (bz - az) * t;
-        const sy = ay + (by - ay) * t;
-        if (landA) {
-          bx = sx;
-          bz = sz;
-          by = sy;
-        } else {
-          ax = sx;
-          az = sz;
-          ay = sy;
-        }
-      }
-    }
-
-    const mid = {
-      x: (ax + bx) / 2,
-      z: (az + bz) / 2
-    };
-    const geo = unprojectWorldToGeo(mid, qinlingRegionBounds, qinlingRegionWorld);
-    if (masks.landMaskSampler && !masks.landMaskSampler.isLand(geo.lon, geo.lat)) {
-      continue;
-    }
-    if (masks.excludeWaterSampler?.isWater(geo.lon, geo.lat)) {
-      continue;
-    }
-    out.push(ax, ay + Y_OFFSET, az);
-    out.push(bx, by + Y_OFFSET, bz);
-  }
-}
-
-function findShoreClipT(
-  sampler: LandMaskSampler,
-  ax: number,
-  az: number,
-  landA: boolean,
-  bx: number,
-  bz: number,
-  _landB: boolean
-): number {
-  let tLow = landA ? 0 : 1;
-  let tHigh = landA ? 1 : 0;
-  for (let i = 0; i < SHORE_CLIP_ITERATIONS; i += 1) {
-    const tMid = (tLow + tHigh) / 2;
-    const x = ax + (bx - ax) * tMid;
-    const z = az + (bz - az) * tMid;
-    const geo = unprojectWorldToGeo({ x, z }, qinlingRegionBounds, qinlingRegionWorld);
-    if (sampler.isLand(geo.lon, geo.lat)) tLow = tMid;
-    else tHigh = tMid;
-  }
-  return (tLow + tHigh) / 2;
 }

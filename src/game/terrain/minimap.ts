@@ -1,6 +1,7 @@
 // terrain/minimap.ts —
 //
-// 双模式 minimap (compact 角落 / fullscreen 全屏):
+// 三模式 minimap (collapsed 收起 / compact 角落 / fullscreen 全屏):
+//   - collapsed: 隐藏地图, 只留文字按钮
 //   - compact: 屏幕一角缩略图, fit-to-canvas 整中国, pointer-events 透传
 //   - fullscreen (M 键切): 占大半屏, 鼠标滚轮 zoom, 拖拽 pan, 显示完整 POI label
 // 跟 3D 主画面 + debugOverlay 共用 POI_REGISTRY (SSOT — Tang docs frontmatter 派生).
@@ -33,10 +34,11 @@ export interface MinimapHandle {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   update(cameraWorldX: number, cameraWorldZ: number, cameraYaw: number, timeOfDay?: number): void;
-  setMode(mode: "compact" | "fullscreen"): void;
+  setMode(mode: MinimapMode): void;
   dispose(): void;
 }
 
+export type MinimapMode = "collapsed" | "compact" | "fullscreen";
 export type MinimapTerrainKind = "ocean" | "lowland" | "hill" | "mountain" | "plateau";
 
 type MinimapPoiVisibilityInput = Pick<PoiEntry, "id" | "hierarchy">;
@@ -78,9 +80,10 @@ const COMPACT_CITY_IDS = new Set(["changan", "taiyuan", "yangzhou", "yizhou"]);
 
 export function minimapPoiVisibleInMode(
   poi: MinimapPoiVisibilityInput,
-  mode: "compact" | "fullscreen",
+  mode: MinimapMode,
   zoomFactor: number
 ): boolean {
+  if (mode === "collapsed") return false;
   if (mode === "compact") {
     return COMPACT_CITY_IDS.has(poi.id);
   }
@@ -237,6 +240,50 @@ const CATEGORY_STYLE: Record<PoiCategory, { color: string; shape: "circle" | "sq
   transport: { color: "#9ccdd8", shape: "diamond" }
 };
 
+const CATEGORY_LABEL: Record<PoiCategory, string> = {
+  city: "城邑",
+  relic: "古迹",
+  scenic: "山川",
+  transport: "交通"
+};
+
+const POI_CATEGORIES: readonly PoiCategory[] = ["city", "relic", "scenic", "transport"];
+
+interface MinimapPoiKindItem {
+  id: string;
+  name: string;
+  order: number;
+}
+
+interface MinimapPoiKindGroup {
+  category: PoiCategory;
+  kinds: MinimapPoiKindItem[];
+}
+
+function escapeSidebarHtml(value: string | number | undefined | null): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function minimapPoiKindGroups(): MinimapPoiKindGroup[] {
+  return POI_CATEGORIES.map((category) => {
+    const kinds = [...new Map(
+      POI_REGISTRY
+        .filter((poi) => poi.category === category)
+        .map((poi) => [poi.kind, {
+          id: poi.kind,
+          name: poi.kindName,
+          order: poi.kindOrder
+        }])
+    ).values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "zh-Hans-CN"));
+    return { category, kinds };
+  }).filter((group) => group.kinds.length > 0);
+}
+
 const HIERARCHY_RADIUS: Record<string, number> = {
   gravity: 5,
   large: 4,
@@ -244,45 +291,12 @@ const HIERARCHY_RADIUS: Record<string, number> = {
   small: 2
 };
 
-// id → 中文 label (UI 装饰, 跟 doc 解耦)
-const POI_LABELS: Record<string, string> = {
-  changan: "长安",
-  luoyang: "洛阳",
-  yangzhou: "扬州",
-  taiyuan: "太原",
-  youzhou: "幽州",
-  yizhou: "益州",
-  liangzhou: "凉州",
-  lingwu: "灵武",
-  shanzhou: "鄯州",
-  huashan: "华山",
-  songshan: "嵩山",
-  taishan: "泰山",
-  taibaishan: "太白山",
-  lushan: "庐山",
-  "zhongnan-shan": "终南山",
-  "baima-si": "白马寺",
-  "famen-si": "法门寺",
-  "longmen-shiku": "龙门石窟",
-  "mogao-caves": "莫高窟",
-  "wangchuan-bieye": "辋川别业",
-  "xingjiao-si": "兴教寺",
-  "baoxie-dao": "褒斜道",
-  "chencang-dao": "陈仓道",
-  "jinniu-dao": "金牛道",
-  "lizhi-dao": "荔枝道",
-  "micang-dao": "米仓道",
-  "qishan-dao": "岐山道",
-  "tangluo-dao": "傥骆道",
-  "ziwu-dao": "子午道"
-};
-
-function poiLabel(id: string): string {
-  return POI_LABELS[id] ?? id;
+function poiLabel(poi: PoiEntry): string {
+  return poi.name || poi.id;
 }
 
 interface MinimapState {
-  mode: "compact" | "fullscreen";
+  mode: MinimapMode;
   /** view center in world coords */
   centerX: number;
   centerZ: number;
@@ -305,7 +319,10 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
   const ctxMaybe = canvas.getContext("2d");
   if (!ctxMaybe) throw new Error("minimap: 2d context unavailable");
   const ctx = ctxMaybe;
+  const sidebar = document.createElement("aside");
+  const openButton = document.createElement("button");
   document.body.appendChild(canvas);
+  document.body.append(sidebar, openButton);
 
   // World bounds covered by map
   const nw = projectGeoToWorld(
@@ -343,15 +360,109 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
   let lastCamYaw = 0;
   let lastTimeOfDay = 12;
   let terrainAtlasCanvas: HTMLCanvasElement | null = null;
+  const poiKindGroups = minimapPoiKindGroups();
+  const activePoiKinds = new Set<string>(
+    poiKindGroups.flatMap((group) => group.kinds.map((kind) => kind.id))
+  );
+
+  function positionCollapsedButton(): void {
+    openButton.style.top = openButton.style.left = openButton.style.right = openButton.style.bottom = "auto";
+    switch (corner) {
+      case "top-right":
+        openButton.style.top = `${margin}px`;
+        openButton.style.right = `${margin}px`;
+        break;
+      case "top-left":
+        openButton.style.top = `${margin}px`;
+        openButton.style.left = `${margin}px`;
+        break;
+      case "bottom-right":
+        openButton.style.bottom = `${margin}px`;
+        openButton.style.right = `${margin}px`;
+        break;
+      case "bottom-left":
+        openButton.style.bottom = `${margin}px`;
+        openButton.style.left = `${margin}px`;
+        break;
+    }
+  }
+
+  function applySidebarCSS(fullscreenBounds: { left: number; top: number; width: number; height: number } | null): void {
+    sidebar.style.position = "fixed";
+    sidebar.style.zIndex = "24";
+    sidebar.style.boxSizing = "border-box";
+    sidebar.style.padding = "14px 12px";
+    sidebar.style.border = `1px solid ${PALETTE.borderHi}`;
+    sidebar.style.borderRadius = "8px";
+    sidebar.style.background = "rgba(31, 23, 16, 0.94)";
+    sidebar.style.boxShadow = "0 10px 40px rgba(0,0,0,0.45)";
+    sidebar.style.color = PALETTE.text;
+    sidebar.style.font = "12px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    sidebar.style.pointerEvents = "auto";
+    sidebar.style.display = state.mode === "fullscreen" && fullscreenBounds ? "grid" : "none";
+    sidebar.style.gap = "8px";
+    sidebar.style.alignContent = "start";
+    sidebar.style.overflow = "auto";
+    sidebar.style.scrollbarWidth = "thin";
+    if (!fullscreenBounds) return;
+    const width = 136;
+    sidebar.style.width = `${width}px`;
+    sidebar.style.height = `${fullscreenBounds.height}px`;
+    sidebar.style.left = `${Math.max(margin, fullscreenBounds.left - width - 10)}px`;
+    sidebar.style.top = `${fullscreenBounds.top}px`;
+  }
+
+  function renderSidebar(): void {
+    sidebar.innerHTML = `
+      <div style="font-weight: 700; color: #f7d99a; margin-bottom: 2px;">类型</div>
+      ${poiKindGroups.map((group) => `
+        <section style="display: grid; gap: 5px; padding-top: 3px;">
+          <div style="display: flex; align-items: center; gap: 6px; color: rgba(247, 217, 154, 0.82); font-size: 11px; font-weight: 700;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: ${CATEGORY_STYLE[group.category].color};"></span>
+            <span>${CATEGORY_LABEL[group.category]}</span>
+          </div>
+          ${group.kinds.map((kind) => `
+            <label style="display: flex; align-items: center; gap: 7px; cursor: pointer; line-height: 1.35; padding-left: 2px;">
+              <input type="checkbox" data-poi-kind="${escapeSidebarHtml(kind.id)}" ${activePoiKinds.has(kind.id) ? "checked" : ""} style="accent-color: ${CATEGORY_STYLE[group.category].color};">
+              <span>${escapeSidebarHtml(kind.name)}</span>
+            </label>
+          `).join("")}
+        </section>
+      `).join("")}
+    `;
+  }
 
   function applyCSS(): void {
     canvas.style.position = "fixed";
+    canvas.style.zIndex = "23";
     canvas.style.borderRadius = state.mode === "compact" ? "4px" : "8px";
     canvas.style.border = `1px solid ${state.mode === "compact" ? PALETTE.border : PALETTE.borderHi}`;
     canvas.style.background = state.mode === "compact" ? PALETTE.bgCompact : PALETTE.bgFullscreen;
     canvas.style.boxShadow = state.mode === "fullscreen" ? "0 10px 40px rgba(0,0,0,0.6)" : "none";
     canvas.style.cursor = state.mode === "fullscreen" ? (state.dragging ? "grabbing" : "grab") : "default";
 
+    openButton.type = "button";
+    openButton.textContent = "地图";
+    openButton.style.position = "fixed";
+    openButton.style.zIndex = "24";
+    openButton.style.padding = "7px 11px";
+    openButton.style.color = "#f7d99a";
+    openButton.style.background = "rgba(31, 23, 16, 0.84)";
+    openButton.style.border = `1px solid ${PALETTE.border}`;
+    openButton.style.borderRadius = "4px";
+    openButton.style.cursor = "pointer";
+    openButton.style.font = "12px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    openButton.style.display = state.mode === "collapsed" ? "block" : "none";
+    positionCollapsedButton();
+
+    if (state.mode === "collapsed") {
+      canvas.style.display = "none";
+      canvas.style.pointerEvents = "none";
+      applySidebarCSS(null);
+      return;
+    }
+
+    canvas.style.display = "block";
     if (state.mode === "compact") {
       canvas.style.width = `${compactW}px`;
       canvas.style.height = `${compactH}px`;
@@ -375,16 +486,21 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
           canvas.style.left = `${margin}px`;
           break;
       }
+      applySidebarCSS(null);
     } else {
       // Fullscreen: 占 viewport 大半中央
-      const vw = Math.round(window.innerWidth * 0.9);
+      const sidebarBudget = 156;
+      const vw = Math.round(Math.min(window.innerWidth * 0.86, window.innerWidth - sidebarBudget - margin * 3));
       const vh = Math.round(window.innerHeight * 0.9);
+      const left = Math.round((window.innerWidth - vw + sidebarBudget) / 2);
+      const top = Math.round((window.innerHeight - vh) / 2);
       canvas.style.width = `${vw}px`;
       canvas.style.height = `${vh}px`;
-      canvas.style.left = `${Math.round((window.innerWidth - vw) / 2)}px`;
-      canvas.style.top = `${Math.round((window.innerHeight - vh) / 2)}px`;
+      canvas.style.left = `${left}px`;
+      canvas.style.top = `${top}px`;
       canvas.style.right = canvas.style.bottom = "auto";
       canvas.style.pointerEvents = "auto";
+      applySidebarCSS({ left, top, width: vw, height: vh });
     }
   }
 
@@ -694,6 +810,7 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     const zoomFactor = state.pixelsPerUnit / fitScale;
     ctx.font = "10px -apple-system, sans-serif";
     for (const poi of POI_REGISTRY) {
+      if (!activePoiKinds.has(poi.kind)) continue;
       if (!minimapPoiVisibleInMode(poi, state.mode, zoomFactor)) continue;
 
       const wp = projectGeoToWorld(
@@ -716,7 +833,7 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
         (poi.hierarchy === "small" && state.mode === "fullscreen" && zoomFactor > 3.0);
       if (labelable) {
         ctx.fillStyle = PALETTE.text;
-        const label = poiLabel(poi.id);
+        const label = poiLabel(poi);
         ctx.fillText(label, c.x + radius + 2, c.y + 3);
       }
     }
@@ -760,7 +877,7 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     if (state.mode === "fullscreen") {
       ctx.fillStyle = PALETTE.textDim;
       ctx.font = "11px -apple-system, sans-serif";
-      const hint = "M 关闭 · 滚轮 缩放 · 拖拽 移动";
+      const hint = "M 切换 · 滚轮 缩放 · 拖拽 移动";
       const metrics = ctx.measureText(hint);
       ctx.fillText(hint, w - metrics.width - 6, h - 6);
       // top-left mode label
@@ -779,7 +896,7 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
 
   function onKeydown(e: KeyboardEvent): void {
     if (e.key.toLowerCase() === fullscreenKey) {
-      setMode(state.mode === "compact" ? "fullscreen" : "compact");
+      cycleMode();
     } else if (state.mode === "fullscreen" && e.key === "Escape") {
       setMode("compact");
     }
@@ -836,7 +953,13 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
   }
 
-  function setMode(mode: "compact" | "fullscreen"): void {
+  function cycleMode(): void {
+    if (state.mode === "compact") setMode("fullscreen");
+    else if (state.mode === "fullscreen") setMode("collapsed");
+    else setMode("compact");
+  }
+
+  function setMode(mode: MinimapMode): void {
     if (mode === state.mode) return;
     state.mode = mode;
     if (mode === "fullscreen") {
@@ -846,6 +969,8 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
       applyCSS();
       resizeBackingStore();
       state.pixelsPerUnit = computeFitScale(getCanvasSize().w, getCanvasSize().h) * 0.95;
+    } else if (mode === "collapsed") {
+      applyCSS();
     } else {
       applyCSS();
       resizeBackingStore();
@@ -853,7 +978,21 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
   }
 
+  openButton.addEventListener("click", () => {
+    setMode("compact");
+  });
+  sidebar.addEventListener("change", (event) => {
+    const input = event.target instanceof HTMLInputElement ? event.target : null;
+    const kind = input?.dataset.poiKind;
+    if (!input || !kind) return;
+    if (input.checked) activePoiKinds.add(kind);
+    else activePoiKinds.delete(kind);
+    renderSidebar();
+    update(lastCamX, lastCamZ, lastCamYaw, lastTimeOfDay);
+  });
+
   // initial layout
+  renderSidebar();
   applyCSS();
   resizeBackingStore();
   void loadMinimapTerrainAtlas().catch((error: unknown) => {
@@ -873,6 +1012,8 @@ export function createMinimap(opts: MinimapOptions = {}): MinimapHandle {
     window.removeEventListener("keydown", onKeydown);
     window.removeEventListener("resize", onResize);
     canvas.remove();
+    sidebar.remove();
+    openButton.remove();
   }
 
   return { canvas, ctx, update, setMode, dispose };

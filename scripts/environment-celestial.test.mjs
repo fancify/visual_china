@@ -8,6 +8,10 @@ import {
 } from "../src/game/celestial.js";
 import { EnvironmentController } from "../src/game/environment.ts";
 
+function luminance(color) {
+  return color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722;
+}
+
 test("clear night stays readable and exposes moon, stars, and clouds", () => {
   const visuals = celestialCycle({
     timeOfDay: 23,
@@ -22,6 +26,21 @@ test("clear night stays readable and exposes moon, stars, and clouds", () => {
   assert.ok(visuals.starOpacity >= 0.55);
   assert.ok(visuals.cloudOpacity >= 0.18);
   assert.ok(visuals.sunDiscOpacity < 0.1);
+});
+
+test("clear night lifts land readability without flattening it into daytime", () => {
+  const controller = new EnvironmentController();
+
+  controller.state.timeOfDay = 0;
+  const midnight = controller.computeVisuals();
+  controller.state.timeOfDay = 12;
+  const noon = controller.computeVisuals();
+
+  assert.ok(midnight.ambientIntensity >= 1.36, "midnight ambient floor should be readable");
+  assert.ok(luminance(midnight.ambientColor) >= 0.28, "midnight ambient color should carry visible blue fill");
+  assert.ok(midnight.terrainLightnessMul >= 1.4, "terrain colors need a night readability lift");
+  assert.ok(midnight.ambientIntensity < noon.ambientIntensity, "night must remain dimmer than day");
+  assert.ok(luminance(midnight.ambientColor) < luminance(noon.ambientColor), "night color must remain below daylight");
 });
 
 test("daytime shows sun and keeps clouds visible", () => {

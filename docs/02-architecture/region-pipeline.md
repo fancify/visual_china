@@ -5,7 +5,7 @@ tags: [architecture, design]
 updated: 2026-05-12
 ---
 
-# 千里江山图 · 区域流水线（Region Pipeline）
+# 长安三万里 · 区域流水线（Region Pipeline）
 
 把"加一个新区域"这件事拆成可重复执行的步骤。本文档基于 秦岭-关中-四川盆地 切片
 （`region.id = qinling`，bounds 103.5..109°E, 30.4..35.4°N）总结而成；后续要做的

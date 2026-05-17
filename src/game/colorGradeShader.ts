@@ -1,7 +1,7 @@
 import { Color } from "three";
 
 /**
- * 千里江山图 split-toning 色彩分级——青绿山水审美：
+ * 长安三万里 split-toning 色彩分级——青绿山水审美：
  * - 阴影区域 (luminance < 0.4) 推冷青色
  * - 高光区域 (luminance > 0.6) 推暖金色
  * - 中调 (0.4..0.6) 不动，保留原始山地色

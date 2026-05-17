@@ -721,7 +721,7 @@ const bloomPass = new UnrealBloomPass(
   0.92
 );
 bloomComposer.addPass(bloomPass);
-// 千里江山图 split-toning：阴影偏冷青、高光偏暖金，对应青绿山水审美。
+// 长安三万里 split-toning：阴影偏冷青、高光偏暖金，对应青绿山水审美。
 // 在 OutputPass 之前做，操作 linear 色。
 const colorGradePass = new ShaderPass(ColorGradeShader);
 bloomComposer.addPass(colorGradePass);
@@ -770,7 +770,7 @@ const terrainMaterial = new MeshPhongMaterial({
   vertexColors: true,
   // 2026-05-11 切回 smoothShading=false → flatShading=false: 用户反复反馈"三角化
   // 感强 / 陷入大三角"。flat shading 每三角面独立法线 → 视觉低多边形块状。
-  // smooth 让相邻面共享法线 → 平滑过渡，接近 千里江山图 山水画 silhouette。
+  // smooth 让相邻面共享法线 → 平滑过渡，接近 长安三万里 山水画 silhouette。
   // 性能不变 (Codex commit aeee91862 已确认 perf delta <1%)。
   flatShading: false,
   shininess: 8,

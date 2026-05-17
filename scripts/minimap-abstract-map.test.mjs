@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   abstractMinimapTerrainKindForGeo,
+  minimapPoiKindGroups,
   minimapTerrainColorForSample,
   minimapNightOverlayForTime,
   minimapPoiVisibleInMode
@@ -59,6 +60,41 @@ test("fullscreen minimap preserves existing POI progression", () => {
   assert.equal(minimapPoiVisibleInMode({ id: "taishan", hierarchy: "medium" }, "fullscreen", 1.6), true);
   assert.equal(minimapPoiVisibleInMode({ id: "baima-si", hierarchy: "small" }, "fullscreen", 2.9), false);
   assert.equal(minimapPoiVisibleInMode({ id: "baima-si", hierarchy: "small" }, "fullscreen", 3.1), true);
+});
+
+test("collapsed minimap hides POIs while preserving compact/fullscreen cycle affordances", async () => {
+  assert.equal(minimapPoiVisibleInMode({ id: "changan", hierarchy: "gravity" }, "collapsed", 1), false);
+
+  const source = await readFile(
+    new URL("../src/game/terrain/minimap.ts", import.meta.url),
+    "utf8"
+  );
+  assert.match(source, /type MinimapMode = "collapsed" \| "compact" \| "fullscreen"/);
+  assert.match(source, /function cycleMode/);
+  assert.match(source, /openButton\.textContent = "地图"/);
+});
+
+test("fullscreen minimap exposes POI category filters in a side panel", async () => {
+  const source = await readFile(
+    new URL("../src/game/terrain/minimap.ts", import.meta.url),
+    "utf8"
+  );
+  assert.match(source, /const CATEGORY_LABEL/);
+  assert.match(source, />类型<\/div>/);
+  assert.match(source, /data-poi-kind/);
+  assert.match(source, /activePoiKinds\.has\(poi\.kind\)/);
+  assert.match(source, /sidebar\.addEventListener\("change"/);
+});
+
+test("fullscreen minimap POI filter exposes Line B subtypes under the four visual groups", () => {
+  const groups = minimapPoiKindGroups();
+  const allKinds = groups.flatMap((group) => group.kinds.map((kind) => kind.name));
+
+  assert.deepEqual(groups.map((group) => group.category), ["city", "relic", "scenic", "transport"]);
+  assert.ok(allKinds.includes("都城"));
+  assert.ok(allKinds.includes("寺庙塔观"));
+  assert.ok(allKinds.includes("道路"));
+  assert.ok(allKinds.length > groups.length);
 });
 
 test("minimap source draws a DEM atlas before POI markers with abstract fallback", async () => {

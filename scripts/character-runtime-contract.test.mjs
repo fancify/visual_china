@@ -79,6 +79,23 @@ test("Line A character and flight controllers can share the terrain sampler cont
   assert.ok(flight.position.y > 3);
 });
 
+test("Line A character controller returns to idle on the first frame after movement input stops", () => {
+  const sampler = { sampleSurfaceHeight: () => 0 };
+  const controller = createCharacterController({
+    sampler,
+    walkSpeed: 1,
+    runSpeed: 2
+  });
+
+  controller.update(1 / 60, characterInputFromKeySet(new Set(["w"])), 0);
+  assert.equal(controller.getMode(), "walk");
+
+  controller.update(1 / 60, characterInputFromKeySet(new Set()), 0);
+
+  assert.equal(controller.getSpeed(), 0);
+  assert.equal(controller.getMode(), "idle");
+});
+
 test("Line A flight height clamps above terrain while ground mode remains terrain-following", () => {
   const scale = characterPlayerScaleDefaults();
 

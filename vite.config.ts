@@ -10,7 +10,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
-        chinaLowres: resolve(__dirname, "china-lowres.html")
+        chinaLowres: resolve(__dirname, "china-lowres.html"),
+        pyramidDemo: resolve(__dirname, "pyramid-demo.html")
       },
       output: {
         manualChunks: {

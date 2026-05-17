@@ -26,6 +26,7 @@ const GROUPS = {
     "world-axis-contract",
     "world-coordinate-contract",
     "input-state",
+    "input-manager-focus-loss",
     "navigation-controls",
     "compass-orientation",
     "camera-view",
@@ -39,6 +40,12 @@ const GROUPS = {
     "dem-pyramid-ocean-cleanup",
     "pyramid-coastal-lod",
     "pyramid-environment-runtime",
+    "pyramid-demo-start",
+    "poi-authoring-boundaries",
+    "poi-archetype-layer",
+    "pyramid-poi-hud",
+    "poi-lineb-models",
+    "build-poi-registry-lineb",
     "ssot-drift",            // SSOT round 5 守卫
     "surface-provider",      // S3 SurfaceProvider contract + 默认实现
     "epoch-manifest"         // S4 EpochManifest schema + modern/tang manifests

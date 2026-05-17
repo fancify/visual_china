@@ -80,6 +80,14 @@ function setActive(state: InternalState, action: ActionName, active: boolean): v
   else state.activeActions.delete(action);
 }
 
+function clearActiveState(state: InternalState): void {
+  state.activeCodes.clear();
+  state.activeActions.clear();
+  state.pointerDownButton = null;
+  state.pointerDownAt = null;
+  state.pointerDragAccum = 0;
+}
+
 function handleKeyDown(state: InternalState, e: KeyboardEvent): void {
   if (e.repeat) {
     // 默认不让浏览器自动 repeat 触发 action.click。run-loop 用 isPressed 取连续状态。
@@ -92,6 +100,7 @@ function handleKeyDown(state: InternalState, e: KeyboardEvent): void {
     if (binding.code !== e.code) continue;
     if (!matchesModifier(binding, e)) continue;
     if (binding.emit === "down") {
+      if (shouldSuppress(state, binding.action)) continue;
       setActive(state, binding.action, true);
       emit(state, binding.action, { kind: "press" });
     } else if (binding.emit === "click") {
@@ -193,14 +202,29 @@ export function createInputManager(options: InputManagerOptions): InputManager {
   const pu = (e: Event) => handlePointerUp(state, e as PointerEvent);
   const pm = (e: Event) => handlePointerMove(state, e as PointerEvent);
   const wh = (e: Event) => { (e as WheelEvent).preventDefault(); handleWheel(state, e as WheelEvent); };
+  const clear = () => clearActiveState(state);
+  const visibility = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      clearActiveState(state);
+    }
+  };
 
   keyboardTarget.addEventListener("keydown", kd);
   keyboardTarget.addEventListener("keyup", ku);
   options.pointerTarget.addEventListener("pointerdown", pd);
   options.pointerTarget.addEventListener("pointerup", pu);
   options.pointerTarget.addEventListener("pointermove", pm);
+  options.pointerTarget.addEventListener("pointercancel", clear);
+  options.pointerTarget.addEventListener("pointerleave", clear);
   options.pointerTarget.addEventListener("wheel", wh, { passive: false });
   options.pointerTarget.addEventListener("contextmenu", handleContextMenu);
+  if (typeof window !== "undefined") {
+    window.addEventListener("blur", clear);
+  }
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", visibility);
+    document.addEventListener("pointerlockchange", clear);
+  }
 
   state.unbinders.push(
     () => keyboardTarget.removeEventListener("keydown", kd),
@@ -208,8 +232,19 @@ export function createInputManager(options: InputManagerOptions): InputManager {
     () => options.pointerTarget.removeEventListener("pointerdown", pd),
     () => options.pointerTarget.removeEventListener("pointerup", pu),
     () => options.pointerTarget.removeEventListener("pointermove", pm),
+    () => options.pointerTarget.removeEventListener("pointercancel", clear),
+    () => options.pointerTarget.removeEventListener("pointerleave", clear),
     () => options.pointerTarget.removeEventListener("wheel", wh),
-    () => options.pointerTarget.removeEventListener("contextmenu", handleContextMenu)
+    () => options.pointerTarget.removeEventListener("contextmenu", handleContextMenu),
+    () => {
+      if (typeof window !== "undefined") window.removeEventListener("blur", clear);
+    },
+    () => {
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", visibility);
+        document.removeEventListener("pointerlockchange", clear);
+      }
+    }
   );
 
   return {
@@ -247,6 +282,7 @@ export function createInputManager(options: InputManagerOptions): InputManager {
     },
     pushContext(name) {
       state.contextStack.push(name);
+      clearActiveState(state);
     },
     popContext(name) {
       const idx = state.contextStack.lastIndexOf(name);
@@ -256,8 +292,7 @@ export function createInputManager(options: InputManagerOptions): InputManager {
       for (const unbind of state.unbinders) unbind();
       state.unbinders.length = 0;
       state.handlers.clear();
-      state.activeCodes.clear();
-      state.activeActions.clear();
+      clearActiveState(state);
     }
   };
 }

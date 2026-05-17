@@ -222,8 +222,8 @@ export function createSkyDome(): SkyDomeHandle {
   starDomeGeometry.userData.milkyWay = starDomeData.milkyWay;
   const starDomeMaterial = new PointsMaterial({
     vertexColors: true,
-    size: 0.95,
-    sizeAttenuation: true,
+    size: 2.25,
+    sizeAttenuation: false,
     transparent: true,
     opacity: 0,
     depthTest: true,
@@ -341,7 +341,7 @@ export function applySkyVisuals(
   handle.shellMaterial.uniforms.groundColor.value.copy(ground);
   handle.shellMaterial.uniforms.sunInfluence.value = options.sunInfluence ?? 0;
   handle.shellMaterial.uniforms.sunVisibility.value = options.sunVisibility ?? 1;
-  handle.starDomeMaterial.opacity = options.starOpacity;
+  handle.starDomeMaterial.opacity = Math.min(1, options.starOpacity * 1.42);
   // 白天 starOpacity 接近 0，但 GPU 仍要处理 5000 个 point 的顶点+片元——
   // visible:false 让它整体跳过 draw call，省一笔白天的 GPU 浪费。
   handle.starDome.visible = options.starOpacity > 0.02;
@@ -372,7 +372,7 @@ function createCloudCluster(): Object3D {
   const baseRadius = 6 + Math.random() * 4; // 主泡 6-10 单位
   for (let i = 0; i < puffCount; i += 1) {
     const radius = baseRadius * (0.55 + Math.random() * 0.55);
-    // 用低多边形保持云轮廓 polygon-ish (千里江山图风格里云本来就硬朗块状)。
+    // 用低多边形保持云轮廓 polygon-ish (长安三万里风格里云本来就硬朗块状)。
     const geometry = new SphereGeometry(radius, 8, 6);
     const puff = new Mesh(geometry, CLOUD_BODY_MATERIAL);
     // 偏移：水平分布更宽（让云形是椭圆扁平），上下幅度小。

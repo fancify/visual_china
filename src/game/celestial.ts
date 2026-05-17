@@ -159,7 +159,7 @@ export function celestialCycle(
   return {
     daylight,
     nightReadability: clamp(0.68 + night * 0.26 - weatherSunCut * 0.1, 0.58, 0.94),
-    terrainLightnessFloor: clamp(1.14 + night * 0.18 - weatherSunCut * 0.08, 1.02, 1.34),
+    terrainLightnessFloor: clamp(1.22 + night * 0.2 - weatherSunCut * 0.08, 1.08, 1.44),
     moonOpacity: clamp(night * (1 - cloudDeckOcclusion * 0.88), 0, 1),
     starOpacity: clamp(starGate * night * 0.98 * (1 - cloudDeckOcclusion), 0, 1),
     sunDiscOpacity: clamp(daylight * (0.86 - weatherSunCut * 0.5) * (1 - cloudDeckOcclusion), 0, 0.86),

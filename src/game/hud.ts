@@ -127,7 +127,7 @@ export function createHud(
   hud.className = "hud";
   hud.innerHTML = `
     <div class="title-block">
-      <div class="eyebrow">千里江山图</div>
+      <div class="eyebrow">长安三万里</div>
       <!-- 用户："标题不应该永远是秦岭关中四川盆地，应该直接说现在在什么位置"。
            h1 现在用 zone-line（跟原 status-block 同一个钩子），main.ts refreshHud
            已经把当前位置写进 snapshot.zone，hud.ts updateStatus 用 #zone-line

@@ -12,6 +12,7 @@ import {
   Fog,
   PerspectiveCamera,
   Scene,
+  Vector2,
   Vector3,
   WebGLRenderer
 } from "three";
@@ -26,6 +27,7 @@ import {
   createMinimap,
   createDebugOverlay
 } from "./game/terrain/index.js";
+import { createPoiArchetypeLayer } from "./game/terrain/poiArchetypeLayer.js";
 import { createSkyDome } from "./game/atmosphereLayer.js";
 import { createCloudLayer } from "./game/cloudPlanes.js";
 import {
@@ -58,6 +60,7 @@ import type { TierName } from "./game/terrain/pyramidTypes.js";
 import { createInputManager } from "./game/input/InputManager.js";
 import { createDebugPanel } from "./game/input/DebugPanel.js";
 import { tintCloudFlightVisual } from "./game/skeletal/flightVisuals.js";
+import { createPyramidPoiHud } from "./game/pyramidPoiHud.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const statusBody = document.getElementById("status-body")!;
@@ -66,9 +69,20 @@ const preloadPoem = document.getElementById("preload-poem")!;
 const preloadPoemMeta = document.getElementById("preload-poem-meta")!;
 const preloadMeta = document.getElementById("preload-meta")!;
 const preloadBar = document.getElementById("preload-bar") as HTMLDivElement;
+const poiPointerNdc = new Vector2();
+let poiPointerActive = false;
+let lastHoveredPoiId: string | null = null;
+let lastPoiPointerClient: { clientX: number; clientY: number } | null = null;
+let latestStatusMessage = "加载中...";
+let latestNearbyPoiDebug: string | undefined;
 
 function setStatus(text: string): void {
+  latestStatusMessage = text.replace(/<br\s*\/?>/g, " · ").replace(/<[^>]+>/g, "");
   statusBody.innerHTML = text;
+}
+
+function truncateDebugText(text: string, maxLength: number): string {
+  return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 1))}…` : text;
 }
 
 const POEM_ROTATION_MS = 15_000;
@@ -146,14 +160,12 @@ scene.background = new Color(0xc7d5e3);
 // 远景雾：隐藏 DEM 数据边缘和海天交界，让世界读起来像继续延伸。
 scene.fog = new Fog(0xc7d5e3, 360, 1250);
 
-// 起始相机位置: 北京上空约 10km。
-// 项目垂直比例: worldY = meters / 500 * 1.07，因此 10000m ≈ 21.4u。
-const BEIJING_START_GEO = { lat: 39.9042, lon: 116.4074 };
-const START_ALTITUDE_WORLD_Y = 21.4;
+// 起始位置: 唐 755 长安。
+const CHANGAN_START_GEO = { lat: 34.27, lon: 108.95 };
 const DEMO_VIEW_RADIUS_UNITS = 360;
 const GROUND_CAMERA_DISTANCE = 22;
 const FLIGHT_CAMERA_DISTANCE = 34;
-const CLOSE_CAMERA_DISTANCE = 1.6;       // F 键拉近：与人物等高水平视角的舒适距离
+const CLOSE_CAMERA_DISTANCE = 3.2;       // F 键拉近：与人物等高水平视角的舒适距离
 const CAMERA_OVERRIDE_MIN = 0.5;         // 滚轮在 override 模式下最近 0.5m（贴脸）
 const CAMERA_OVERRIDE_MAX = 90;
 const DEFAULT_CAMERA_PITCH = 0;          // 水平视角（不俯视），让 horizon 在角色头部高度
@@ -166,7 +178,7 @@ const CAMERA_ZOOM_MIN = 0.55;
 const CAMERA_ZOOM_MAX = 2.4;
 const PLAYER_TURN_SPEED = 2.2;
 const startWorld = projectGeoToWorld(
-  BEIJING_START_GEO,
+  CHANGAN_START_GEO,
   qinlingRegionBounds,
   qinlingRegionWorld
 );
@@ -176,9 +188,8 @@ const camera = new PerspectiveCamera(
   0.1,
   12000
 );
-// camera demo 强制 yaw=0/pitch=-0.3 (朝北 + 略下俯)
-camera.position.set(startWorld.x, START_ALTITUDE_WORLD_Y, startWorld.z);
-camera.lookAt(startWorld.x, 0, startWorld.z - 260);
+camera.position.set(startWorld.x, 1.6, startWorld.z);
+camera.lookAt(startWorld.x, 0, startWorld.z);
 
 // 灯：盛唐金光（《长安三万里》参考）
 const ambient = new AmbientLight(0xfff0d4, 0.45);
@@ -288,7 +299,7 @@ let characterHeading = 0;
 let cameraAzimuth = 0;
 let cameraPitch = DEFAULT_CAMERA_PITCH;
 let cameraDistanceScale = 1;
-let cameraDistanceOverride: number | null = null;
+let cameraDistanceOverride: number | null = CLOSE_CAMERA_DISTANCE;
 function clampNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -390,8 +401,8 @@ const terrainManifest = await handle.loader.loadManifest();
 function currentL0Chunk(): { x: number; z: number } {
   const l0 = terrainManifest.tiers.L0;
   return {
-    x: Math.floor((BEIJING_START_GEO.lon - terrainManifest.bounds.west) / l0.chunkSizeDeg),
-    z: Math.floor((terrainManifest.bounds.north - BEIJING_START_GEO.lat) / l0.chunkSizeDeg)
+    x: Math.floor((CHANGAN_START_GEO.lon - terrainManifest.bounds.west) / l0.chunkSizeDeg),
+    z: Math.floor((terrainManifest.bounds.north - CHANGAN_START_GEO.lat) / l0.chunkSizeDeg)
   };
 }
 
@@ -570,17 +581,64 @@ const debugPanel = createDebugPanel({
     environmentController.state.season = season;
   },
   getStats() {
+    const playerState = playerRuntime.snapshot();
     return {
       fps: lastFpsSample,
       chunks: handle.loader.cacheSize(),
       timeOfDay: environmentController.state.timeOfDay,
       weather: environmentController.state.weather,
-      season: environmentController.state.season
+      season: environmentController.state.season,
+      player: `${playerState.travelMode} · ${playerState.movementMode} · speed ${playerState.speed.toFixed(2)}`,
+      playerWorld: `${playerState.position.x.toFixed(1)}, ${playerState.position.y.toFixed(1)}, ${playerState.position.z.toFixed(1)}`,
+      cameraWorld: `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}`,
+      nearbyPoi: latestNearbyPoiDebug,
+      message: truncateDebugText(latestStatusMessage, 88)
     };
   }
 });
 // 同步初始状态
 debugPanel.setBeachTint(true);
+
+const poiLayer = createPoiArchetypeLayer({
+  sampler: handle.sampler,
+  maxPois: 180
+});
+scene.add(poiLayer.group);
+const poiHud = createPyramidPoiHud(document.body);
+
+function updatePoiPointerFromClient(clientX: number, clientY: number): boolean {
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  poiPointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  poiPointerNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+  return true;
+}
+
+canvas.addEventListener("pointermove", (event) => {
+  if (!updatePoiPointerFromClient(event.clientX, event.clientY)) return;
+  lastPoiPointerClient = { clientX: event.clientX, clientY: event.clientY };
+  poiPointerActive = true;
+  const currentPoi = poiHud.currentPoi();
+  if (currentPoi) {
+    poiHud.setHoverTarget(currentPoi, lastPoiPointerClient);
+  }
+});
+canvas.addEventListener("dblclick", (event) => {
+  if (!updatePoiPointerFromClient(event.clientX, event.clientY)) return;
+  lastPoiPointerClient = { clientX: event.clientX, clientY: event.clientY };
+  const hoveredPoi = poiLayer.hoveredPoiAt(poiPointerNdc, camera);
+  if (!hoveredPoi) return;
+  lastHoveredPoiId = hoveredPoi.id;
+  poiPointerActive = true;
+  poiHud.showDetail(hoveredPoi);
+  event.preventDefault();
+});
+canvas.addEventListener("pointerleave", () => {
+  poiPointerActive = false;
+  lastPoiPointerClient = null;
+  lastHoveredPoiId = null;
+  poiHud.setHoverTarget(null);
+});
 
 // ── 主键位 action 订阅 ────────────────────────────────────────────────
 inputManager.on("world.cycleTime", () => {
@@ -603,6 +661,9 @@ inputManager.on("debug.togglePanel", () => {
 });
 
 inputManager.on("ui.dismiss", () => {
+  if (poiHud.currentPoi()) {
+    poiHud.hideDetail();
+  }
   if (debugPanel.isVisible()) {
     debugPanel.setVisible(false);
     inputManager.popContext("debugPanel");
@@ -611,6 +672,10 @@ inputManager.on("ui.dismiss", () => {
   if (immersionLocked) {
     document.exitPointerLock?.();
   }
+});
+
+inputManager.on("ui.togglePoiDetail", () => {
+  poiHud.toggleDetail();
 });
 
 
@@ -756,6 +821,29 @@ function animate(): void {
   // 跟 BotW 三角法则一致 — 远只见标志性地理, 近见全细节.
   if (frameCounter % 12 === 0) {
     const alt = camera.position.y;
+    poiLayer.update(
+      alt,
+      camera,
+      renderer.domElement.clientHeight || window.innerHeight,
+      environmentController.state.timeOfDay
+    );
+    if (poiPointerActive && !immersionLocked) {
+      const hoveredPoi = poiLayer.hoveredPoiAt(poiPointerNdc, camera);
+      const nextHoveredPoiId = hoveredPoi?.id ?? null;
+      if (nextHoveredPoiId !== lastHoveredPoiId) {
+        lastHoveredPoiId = nextHoveredPoiId;
+        poiHud.setHoverTarget(hoveredPoi, lastPoiPointerClient);
+      } else if (hoveredPoi && lastPoiPointerClient) {
+        poiHud.setHoverTarget(hoveredPoi, lastPoiPointerClient);
+      }
+    } else if (lastHoveredPoiId !== null) {
+      lastHoveredPoiId = null;
+      poiHud.setHoverTarget(null);
+    }
+    const nearbyPoi = poiLayer.nearestPoi(player.position.x, player.position.z, 10);
+    latestNearbyPoiDebug = nearbyPoi
+      ? `${nearbyPoi.name} · ${truncateDebugText(nearbyPoi.summary, 42)}`
+      : undefined;
     let minRiverOrd: number;
     let maxLakeScalerank: number;
     if (alt > 300) { minRiverOrd = 7; maxLakeScalerank = 2; }
@@ -784,19 +872,6 @@ function animate(): void {
   // debug panel stats 刷新（panel 显示时才更新）
   if (frameCounter % 10 === 0 && debugPanel.isVisible()) {
     debugPanel.refreshStats();
-  }
-
-  // status
-  if (frameCounter % 30 === 0) {
-    const cacheN = handle.loader.cacheSize();
-    setStatus(
-        `玩家 ${player.travelMode} · ${player.movementMode} · speed ${player.speed.toFixed(2)}<br />` +
-        `玩家 world(${player.position.x.toFixed(1)}, ${player.position.y.toFixed(1)}, ${player.position.z.toFixed(1)})<br />` +
-        `相机 world(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)})<br />` +
-        `${pyramidEnvironmentStatus(environmentController)}<br />` +
-        `cache: ${cacheN} chunks · FPS: ${lastFpsSample.toFixed(0)}<br />` +
-        `WASD 镜头相对走 · 左/右键拖镜头 · P 切坐骑 · \` 调试`
-    );
   }
 
   renderer.render(scene, camera);

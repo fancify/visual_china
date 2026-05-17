@@ -686,7 +686,7 @@ export class EnvironmentController {
     const fogColor = new Color(season.fogNight)
       .lerp(new Color("#49645e"), celestial.nightReadability * 0.35)
       .lerp(new Color(season.fogDay), daylight);
-    const ambientColor = new Color("#254574").lerp(new Color("#fff2df"), daylight);
+    const ambientColor = new Color("#639ed0").lerp(new Color("#fff2df"), daylight);
     const sunColor = new Color("#fffaf0").lerp(new Color("#cfd8ef"), 1 - daylight);
     const weatherOcclusion = MathUtils.clamp(
       weather.sunCut * 1.95 + weather.fogBoost * 110,
@@ -793,9 +793,9 @@ export class EnvironmentController {
       rimColor,
       sunDirection,
       moonDirection,
-      ambientIntensity: MathUtils.lerp(1.18, 1.75, daylight),
+      ambientIntensity: MathUtils.lerp(1.38, 1.75, daylight),
       sunIntensity: MathUtils.lerp(0.1, 2.9, daylight) * (1 - weather.sunCut),
-      rimIntensity: MathUtils.lerp(0.25, 0.82, daylight),
+      rimIntensity: MathUtils.lerp(0.34, 0.82, daylight),
       // fogDensity 砍半（用户："看不到地形"）——之前 0.003-0.0075 范围
       // 在 cameraDistance 170 overview 视角下让 200 单元远的地形 76% 失彩，
       // 整图灰蒙。FogExp2 衰减 = exp(-density² × distance²)，density 减半
