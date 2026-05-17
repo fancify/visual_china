@@ -176,7 +176,7 @@ export function createDebugPanel(handlers: DebugPanelHandlers): DebugPanel {
   const lodTint    = makeCheckbox("LOD tint",      false, (v) => handlers.onLodTintToggle?.(v));
   const overlay    = makeCheckbox("Debug overlay", false, (v) => handlers.onOverlayToggle?.(v));
   const beachTint  = makeCheckbox("Beach tint",    true,  (v) => handlers.onBeachTintToggle?.(v));
-  const TERRAIN_STYLES: TerrainStyleName[] = ["qinglu", "ink", "botw"];
+  const TERRAIN_STYLES: TerrainStyleName[] = ["qinglu", "ink", "botw", "lowpoly"];
   const styleSel = makeDropdown<TerrainStyleName>("Terrain style", TERRAIN_STYLES, "qinglu", (v) => handlers.onTerrainStyleChange?.(v));
   root.append(flatShading.row, lodTint.row, overlay.row, beachTint.row, styleSel);
 

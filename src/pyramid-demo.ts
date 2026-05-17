@@ -236,6 +236,8 @@ let oceanWaterSurface:
       setTime(time: number): void;
       setSunDirection(direction: Vector3): void;
       setShimmerStrength?(strength: number): void;
+      setBaseColor?(color: Color): void;
+      setOpacity?(opacity: number): void;
     }
   | undefined;
 window.addEventListener("resize", () => {
@@ -555,12 +557,38 @@ const debugPanel = createDebugPanel({
   },
   onTerrainStyleChange(style) {
     const p = setTerrainStyle(style);
+    // 地形 vertex colors
     handle.refreshAllColors();
-    // 同步 fog + background
+    // fog + background
     scene.background = p.fogColor;
     (scene.fog as Fog).color.copy(p.fogColor);
     (scene.fog as Fog).near = p.fogNear;
     (scene.fog as Fog).far = p.fogFar;
+    // flat shading（lowpoly 自动开）
+    handle.setFlatShading(p.flatShading);
+    debugPanel.setFlatShading(p.flatShading);
+    // 水体颜色
+    const w = p.water;
+    oceanWaterSurface?.setBaseColor?.(w.oceanColor);
+    oceanWaterSurface?.setOpacity?.(w.oceanOpacity);
+    // 湖泊
+    const lakeWS = lakeHandle.group.userData.waterSurface as
+      { setBaseColor?(c: Color): void; setOpacity?(o: number): void } | undefined;
+    lakeWS?.setBaseColor?.(w.lakeColor);
+    lakeWS?.setOpacity?.(w.lakeOpacity);
+    // 河流（LineMaterial.color + userData.waterBaseColor）
+    for (const rh of loadedRiverGroups.values()) {
+      if (!rh?.group) continue;
+      rh.group.traverse((obj: import("three").Object3D) => {
+        const mat = (obj as any).material as import("three/examples/jsm/lines/LineMaterial.js").LineMaterial | undefined;
+        if (!mat?.userData?.waterBaseColor) return;
+        (mat.userData.waterBaseColor as Color).copy(w.riverColor);
+        mat.userData.waterBaseOpacity = w.riverOpacity;
+        mat.color.copy(w.riverColor);
+        mat.opacity = w.riverOpacity;
+        mat.needsUpdate = true;
+      });
+    }
   },
   onGroundOffsetChange(v) {
     characterMountOffsets.ground = v;
