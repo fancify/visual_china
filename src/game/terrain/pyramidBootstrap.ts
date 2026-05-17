@@ -438,11 +438,23 @@ export async function bootstrapPyramidTerrain(
     }
   }
 
-  /** 全量刷新所有已加载 chunk 的 vertex colors（风格切换后调用） */
+  /** 全量刷新所有已加载 chunk 的 vertex colors（风格切换后调用）。
+   *  分帧执行，每帧最多处理 BATCH 个 chunk，避免卡主线程。 */
+  let _refreshGeneration = 0;
   function refreshAllColors(): void {
-    for (const [, handle] of meshHandles) {
-      refreshVertexColors(handle);
+    const BATCH = 8;
+    const gen = ++_refreshGeneration;
+    const handles = Array.from(meshHandles.values());
+    let i = 0;
+    function step() {
+      if (gen !== _refreshGeneration) return; // 被更新的调用取代
+      const end = Math.min(i + BATCH, handles.length);
+      for (; i < end; i++) {
+        refreshVertexColors(handles[i]);
+      }
+      if (i < handles.length) requestAnimationFrame(step);
     }
+    step();
   }
 
   /** 设 LOD 距离 band (world units) �� mutate in-place 让 updateVisible 闭包看到新值 */
