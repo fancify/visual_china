@@ -124,20 +124,9 @@ function computeCoastProximityArray(
   return proximity;
 }
 
-// BotW × 长安三万里:
-// blue-green land base, warm golden pigment in hills, gray rock, bright snow.
-// Keep land greener than soil while preserving red/yellow pigment to separate
-// it from the teal-blue water palette.
-const COLOR_LOW_GREEN = new Color(0.43, 0.62, 0.34);  // 平原青绿草地
-const COLOR_MID_WARM = new Color(0.58, 0.62, 0.38);   // 丘陵青绿 + 暖金
-const COLOR_HIGH_STONE = new Color(0.46, 0.50, 0.43); // 高山冷灰岩
-const COLOR_SNOW = new Color(0.94, 0.93, 0.88);       // 雪线
-const COLOR_STEEP = new Color(0.38, 0.40, 0.30);      // 陡坡暗岩草
-
-// BotW 风海岸调色 — 见 feedback_botw_coast_palette
-const COLOR_BEACH = new Color(0.83, 0.76, 0.60);          // 沙带 muted khaki，不要亮黄
-const COLOR_COASTAL_CLIFF = new Color(0.50, 0.46, 0.42);  // 滨海岩崖 灰褐，比内陆 STEEP 更湿冷
-const COLOR_COASTAL_GRASS = new Color(0.42, 0.62, 0.40);  // 海边草甸，比内陆 LOW_GREEN 略饱和
+// 地形调色板：从 terrainStyle.ts 动态读取当前风格
+// 支持运行时切换 (qinglu / ink / botw / lowpoly)，切换后调 refreshVertexColors 即可
+import { getTerrainPalette } from "./terrainStyle.js";
 
 // 海岸 tint 适用的 worldY 上限。VERTICAL_SCALE=500 / EXAG=1.07 → 1 worldY ≈ 467m elev。
 // 0.18 worldY ≈ 85m 海拔；覆盖中国沿海平原 (渤海/长江/珠江口都在此带内)。
@@ -150,40 +139,38 @@ function colorForVertex(
   ny: number,
   coastProximity: number = 0
 ): void {
+  const p = getTerrainPalette();
   const slopeT = Math.max(0, Math.min(1, (1 - ny) * 2.2));
   const elevT = Math.max(0, Math.min(1, y / 18));
   const snowT = Math.max(0, Math.min(1, (y - 7.4) / 2.8));
   if (snowT >= 1) {
-    out.copy(COLOR_SNOW);
+    out.copy(p.snow);
   } else if (elevT < 0.35) {
-    out.copy(COLOR_LOW_GREEN).lerp(COLOR_MID_WARM, elevT / 0.35);
+    out.copy(p.lowGreen).lerp(p.midWarm, elevT / 0.35);
   } else if (elevT < 0.75) {
-    out.copy(COLOR_MID_WARM).lerp(COLOR_HIGH_STONE, (elevT - 0.35) / 0.4);
+    out.copy(p.midWarm).lerp(p.highStone, (elevT - 0.35) / 0.4);
   } else {
-    out.copy(COLOR_HIGH_STONE);
+    out.copy(p.highStone);
   }
-  out.lerp(COLOR_SNOW, snowT * 0.9);
-  out.lerp(COLOR_STEEP, slopeT * 0.55);
+  out.lerp(p.snow, snowT * 0.9);
+  out.lerp(p.steep, slopeT * 0.55);
 
   // 海岸 tint —— 只在低海拔 + 接近 land mask 边缘的 vertex 上施加。
-  // BotW slope-aware：平地→沙、陡坡→灰岩、中间→海边草。
   if (coastProximity > 0 && y < COAST_BAND_WORLD_Y_MAX) {
-    const elevFactor = 1 - y / COAST_BAND_WORLD_Y_MAX;  // 0 海拔=1，COAST_BAND 顶=0
+    const elevFactor = 1 - y / COAST_BAND_WORLD_Y_MAX;
     const tintStrength = elevFactor * coastProximity;
-    // slope buckets: ny>0.92 平地 → beach；ny<0.65 陡 → cliff；中间 → grass
     let coastCol: Color;
     if (ny > 0.92) {
-      coastCol = COLOR_BEACH;
+      coastCol = p.beach;
     } else if (ny < 0.65) {
-      coastCol = COLOR_COASTAL_CLIFF;
+      coastCol = p.coastalCliff;
     } else {
-      // 平滑过渡：BEACH (ny=0.92) → GRASS (ny=0.78) → CLIFF (ny=0.65)
       if (ny > 0.78) {
         const t = (0.92 - ny) / (0.92 - 0.78);
-        coastCol = new Color().copy(COLOR_BEACH).lerp(COLOR_COASTAL_GRASS, t);
+        coastCol = new Color().copy(p.beach).lerp(p.coastalGrass, t);
       } else {
         const t = (0.78 - ny) / (0.78 - 0.65);
-        coastCol = new Color().copy(COLOR_COASTAL_GRASS).lerp(COLOR_COASTAL_CLIFF, t);
+        coastCol = new Color().copy(p.coastalGrass).lerp(p.coastalCliff, t);
       }
     }
     out.lerp(coastCol, tintStrength * 0.35);

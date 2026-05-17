@@ -44,6 +44,8 @@ export interface PyramidTerrainHandle {
   setFlatShading(active: boolean): void;
   /** Visual compare: toggle subtle flat-shore beach tint. */
   setBeachTint(active: boolean): void;
+  /** 全量刷新 vertex colors（风格切换后） */
+  refreshAllColors(): void;
   /** 设置 LOD 距离 band (world units). 3 个数字: L0/L1, L1/L2, L2/L3 边界. 下一帧生效 */
   setLodBands(bands: [number, number, number]): void;
   /** 读当前 LOD 距离 band (world units) — 3 元组 */
@@ -436,7 +438,14 @@ export async function bootstrapPyramidTerrain(
     }
   }
 
-  /** 设 LOD 距离 band (world units) — mutate in-place 让 updateVisible 闭包看到新值 */
+  /** 全量刷新所有已加载 chunk 的 vertex colors（风格切换后调用） */
+  function refreshAllColors(): void {
+    for (const [, handle] of meshHandles) {
+      refreshVertexColors(handle);
+    }
+  }
+
+  /** 设 LOD 距离 band (world units) �� mutate in-place 让 updateVisible 闭包看到新值 */
   function setLodBands(bands: [number, number, number]): void {
     lodBands[0] = bands[0];
     lodBands[1] = bands[1];
@@ -456,6 +465,7 @@ export async function bootstrapPyramidTerrain(
     setDebugLodTint,
     setFlatShading,
     setBeachTint,
+    refreshAllColors,
     setLodBands,
     getLodBands,
     dispose

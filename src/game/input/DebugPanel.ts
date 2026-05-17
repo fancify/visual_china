@@ -4,6 +4,7 @@
 // 偏好备忘: simple-debug-panel — toggle/slider only，无文字命令。
 
 import type { Season, Weather } from "../environment.js";
+import type { TerrainStyleName } from "../terrain/terrainStyle.js";
 
 export interface DebugPanelHandlers {
   onFlatShadingToggle?: (active: boolean) => void;
@@ -19,6 +20,8 @@ export interface DebugPanelHandlers {
   onCloudOffsetChange?: (value: number) => void;
   /** 当前各 offset 初值，用于 slider 默认位置 */
   initialMountOffsets?: { ground: number; sword: number; cloud: number };
+  /** 地形风格切换 */
+  onTerrainStyleChange?: (style: TerrainStyleName) => void;
   /** 角色自发光强度（夜里最低可视度） */
   onCharacterEmissiveChange?: (value: number) => void;
   initialCharacterEmissive?: number;
@@ -173,7 +176,9 @@ export function createDebugPanel(handlers: DebugPanelHandlers): DebugPanel {
   const lodTint    = makeCheckbox("LOD tint",      false, (v) => handlers.onLodTintToggle?.(v));
   const overlay    = makeCheckbox("Debug overlay", false, (v) => handlers.onOverlayToggle?.(v));
   const beachTint  = makeCheckbox("Beach tint",    true,  (v) => handlers.onBeachTintToggle?.(v));
-  root.append(flatShading.row, lodTint.row, overlay.row, beachTint.row);
+  const TERRAIN_STYLES: TerrainStyleName[] = ["qinglu", "ink", "botw"];
+  const styleSel = makeDropdown<TerrainStyleName>("Terrain style", TERRAIN_STYLES, "qinglu", (v) => handlers.onTerrainStyleChange?.(v));
+  root.append(flatShading.row, lodTint.row, overlay.row, beachTint.row, styleSel);
 
   // ── Environment ────────────────────────────────────────────────
   const envHeader = document.createElement("div");

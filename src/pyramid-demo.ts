@@ -41,6 +41,7 @@ import {
   pyramidEnvironmentStatus
 } from "./game/pyramidEnvironmentRuntime.js";
 import { WindManager } from "./game/windManager.js";
+import { setTerrainStyle, getTerrainPalette } from "./game/terrain/terrainStyle.js";
 import { projectGeoToWorld, unprojectWorldToGeo } from "./game/mapOrientation.js";
 import {
   qinlingRegionBounds,
@@ -551,6 +552,15 @@ const debugPanel = createDebugPanel({
   },
   onBeachTintToggle(active) {
     handle.setBeachTint(active);
+  },
+  onTerrainStyleChange(style) {
+    const p = setTerrainStyle(style);
+    handle.refreshAllColors();
+    // 同步 fog + background
+    scene.background = p.fogColor;
+    (scene.fog as Fog).color.copy(p.fogColor);
+    (scene.fog as Fog).near = p.fogNear;
+    (scene.fog as Fog).far = p.fogFar;
   },
   onGroundOffsetChange(v) {
     characterMountOffsets.ground = v;
