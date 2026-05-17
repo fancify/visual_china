@@ -156,10 +156,10 @@ function hidePreload(): void {
 }
 
 const scene = new Scene();
-// 长安三万里 暖金色天 调色
-scene.background = new Color(0xc7d5e3);
-// 远景雾：隐藏 DEM 数据边缘和海天交界，让世界读起来像继续延伸。
-scene.fog = new Fog(0xc7d5e3, 360, 1250);
+// 从当前 terrain style 读取初始 fog/background
+const _initPalette = getTerrainPalette();
+scene.background = _initPalette.fogColor;
+scene.fog = new Fog(_initPalette.fogColor, _initPalette.fogNear, _initPalette.fogFar);
 
 // 起始位置: 唐 755 长安。
 const CHANGAN_START_GEO = { lat: 34.27, lon: 108.95 };
@@ -398,6 +398,8 @@ const handle = await bootstrapPyramidTerrain(scene, {
 // character demo. At Beijing start this cuts the active terrain set from about
 // 155 chunks to about 94 without reintroducing missing-tile holes.
 handle.setLodBands([60, 120, 180]);
+// 初始 terrain style 的 flat shading
+if (_initPalette.flatShading) handle.setFlatShading(true);
 
 const terrainManifest = await handle.loader.loadManifest();
 
@@ -488,6 +490,9 @@ const oceanPlane = createOceanPlane({ seaLevelY: -3 });
 scene.add(oceanPlane);
 oceanWaterSurface = oceanPlane.userData.waterSurface as typeof oceanWaterSurface;
 oceanWaterSurface?.setSunDirection(sun.position.clone());
+// 初始 water palette
+oceanWaterSurface?.setBaseColor?.(_initPalette.water.oceanColor);
+oceanWaterSurface?.setOpacity?.(_initPalette.water.oceanOpacity);
 
 // lakes (Natural Earth 10m, 186 China lakes) — flat polygon meshes, Y 跟随 sampler
 // 查 terrain 海拔 (青海湖 ~6.8u, 鄱阳湖 ~0.03u). Sampler 未加载的 chunk fallback 海平面.

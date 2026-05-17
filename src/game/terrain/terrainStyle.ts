@@ -133,8 +133,8 @@ const lowpoly: TerrainPalette = {
 export const TERRAIN_STYLES = { qinglu, ink, botw, lowpoly } as const;
 export type TerrainStyleName = keyof typeof TERRAIN_STYLES;
 
-let _active: TerrainStyleName = "qinglu";
-let _palette: TerrainPalette = qinglu;
+let _active: TerrainStyleName = "lowpoly";
+let _palette: TerrainPalette = lowpoly;
 
 export function getTerrainStyle(): TerrainStyleName {
   return _active;
